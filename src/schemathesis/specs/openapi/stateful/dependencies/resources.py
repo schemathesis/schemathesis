@@ -62,6 +62,8 @@ class ExtractedResource:
     identifier_pointer: str | None = None
     # Whether only the operation path names the resource, as no `$ref` declares it
     named_after_path: bool = False
+    # Types a primitive identifier declares (`integer` for a created id); empty for other resources
+    value_types: frozenset[str] = frozenset()
 
 
 def extract_resources_from_responses(
@@ -168,7 +170,9 @@ def iter_resources_from_response(
     # Example: POST /api/users returns just an integer ID - treat this as User.id
     schema_type = schema.get("type")
     if _is_created_identifier(method=method, schema_type=schema_type, response=response, produces=produces):
-        primitive_resource = _resource_from_primitive_response(path=path, resources=resources)
+        primitive_resource = _resource_from_primitive_response(
+            path=path, resources=resources, value_types=frozenset((schema["type"],))
+        )
         if primitive_resource is not None:
             yield primitive_resource
             return None
@@ -178,7 +182,9 @@ def iter_resources_from_response(
     if method == "get" and schema_type == "array":
         items = schema.get("items")
         if isinstance(items, dict) and items.get("type") in ("string", "integer"):
-            primitive_array = _resource_from_primitive_array(path=path, resources=resources)
+            primitive_array = _resource_from_primitive_array(
+                path=path, resources=resources, value_types=frozenset((items["type"],))
+            )
             if primitive_array is not None:
                 yield primitive_array
                 return None
@@ -218,7 +224,9 @@ def iter_resources_from_response(
         resolved = properties[wrapper_field]
         # A created id wrapped next to status fields: `{httpStatus: ..., response: "<id>"}`
         if method == "post" and resolved.get("type") in ("string", "integer"):
-            primitive_resource = _resource_from_primitive_response(path=path, resources=resources, pointer=pointer)
+            primitive_resource = _resource_from_primitive_response(
+                path=path, resources=resources, value_types=frozenset((resolved["type"],)), pointer=pointer
+            )
             if primitive_resource is not None:
                 yield primitive_resource
             return None
@@ -501,7 +509,7 @@ def _can_carry_identifier(media_type: str) -> bool:
 
 
 def _resource_from_primitive_response(
-    *, path: str, resources: ResourceMap, pointer: str = ROOT_POINTER
+    *, path: str, resources: ResourceMap, value_types: frozenset[str], pointer: str = ROOT_POINTER
 ) -> ExtractedResource | None:
     """Handle POST/PUT returning a bare primitive identifier (e.g., slug string or integer ID)."""
     name = from_path(path)
@@ -521,6 +529,7 @@ def _resource_from_primitive_response(
         pointer=pointer,
         is_primitive_identifier=True,
         named_after_path=True,
+        value_types=value_types,
     )
 
 
@@ -553,7 +562,9 @@ def _resource_from_map_by_id(*, path: str, resources: ResourceMap) -> ExtractedR
     )
 
 
-def _resource_from_primitive_array(*, path: str, resources: ResourceMap) -> ExtractedResource | None:
+def _resource_from_primitive_array(
+    *, path: str, resources: ResourceMap, value_types: frozenset[str]
+) -> ExtractedResource | None:
     """Handle GET returning a bare array of primitive identifiers (e.g., ["foo", "bar"])."""
     name = from_path(path)
     if name is None:
@@ -572,6 +583,7 @@ def _resource_from_primitive_array(*, path: str, resources: ResourceMap) -> Extr
         pointer=ROOT_POINTER,
         is_primitive_identifier=True,
         named_after_path=True,
+        value_types=value_types,
     )
 
 

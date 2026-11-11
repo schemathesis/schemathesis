@@ -11,7 +11,7 @@ from typing import Any, TypeAlias, TypeVar
 
 from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver
-from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.jsonschema.types import ALL_TYPES, JsonSchema
 from schemathesis.core.parameters import ParameterLocation, iter_path_parameters
 from schemathesis.core.text import to_pascal_case
 from schemathesis.core.transforms import (
@@ -63,10 +63,12 @@ class DependencyGraph:
                 del input["body_path"]
                 del input["item_fields"]
                 del input["is_inline_item"]
+                del input["takes_uuid"]
             for output in operation["outputs"]:
                 output["resource"] = output["resource"]["name"]
                 del output["response_fields"]
                 del output["named_after_path"]
+                del output["value_types"]
                 if output.get("identifier_pointer") is None:
                     output.pop("identifier_pointer", None)
                 if output.get("path_parameter") is None:
@@ -80,6 +82,7 @@ class DependencyGraph:
             del resource["inherited_fields"]
             for fk_field in [*resource["fk_fields"], *resource["nested_fk_fields"]]:
                 del fk_field["holds_array"]
+                del fk_field["value_types"]
             # Simplify FK fields for readability
             if not resource["fk_fields"]:
                 del resource["fk_fields"]
@@ -188,6 +191,8 @@ class DependencyGraph:
                             # request body (e.g. POST /sessions with body {sessionId: ...}).
                             value_expr = f"$request.body#/{output_slot.body_field}"
                         elif output_slot.is_primitive_identifier:
+                            if not input_slot.takes(output_slot.value_types):
+                                continue
                             # A bare id (POST's created slug, GET's list of ids) fills only identifier fields.
                             identifiers = path_identifiers.get(output_slot.resource.name)
                             field = input_slot.resource_field
@@ -412,8 +417,7 @@ class DependencyGraph:
                         consumer_path = encoded_paths[consumer_id]
 
                         for input_slot in input_slots:
-                            # A whole array of identifiers fits only a parameter taking an array.
-                            if fk_field.holds_array and not input_slot.takes_array:
+                            if not input_slot.takes_foreign_key(fk_field):
                                 continue
                             # Build the body pointer to the FK field
                             if fk_field.is_array:
@@ -463,7 +467,7 @@ class DependencyGraph:
                         consumer_path = encoded_paths[consumer_id]
 
                         for input_slot in input_slots:
-                            if nested_fk.holds_array and not input_slot.takes_array:
+                            if not input_slot.takes_foreign_key(nested_fk):
                                 continue
                             # Build pointer: output_slot.pointer + nested_fk.pointer
                             if output_slot.cardinality == Cardinality.MANY:
@@ -696,6 +700,28 @@ def _resolve_reference(schema: dict[str, Any], resolver: Resolver) -> tuple[Reso
         return None
 
 
+_ANY_VALUE_TYPES = frozenset(ALL_TYPES)
+
+
+def _foreign_key_values(schema: JsonSchema, resolver: Resolver, *, is_array: bool) -> tuple[bool, frozenset[str]]:
+    """Whether a singular foreign key holds a whole array of identifiers, and the types of those identifiers."""
+    holds_array = not is_array and holds_only_array_values(schema, resolver, _resolve_reference)
+    return holds_array, _identifier_types(schema, resolver, holds_many=is_array or holds_array)
+
+
+def _identifier_types(schema: object, resolver: Resolver, *, holds_many: bool) -> frozenset[str]:
+    """Types of the identifiers a field holds, read from its items when it holds many; any type when undeclared."""
+    if not isinstance(schema, dict):
+        return _ANY_VALUE_TYPES
+    resolved = _resolve_reference(schema, resolver) if "$ref" in schema else (resolver, schema)
+    if resolved is None:
+        return _ANY_VALUE_TYPES
+    resolver, node = resolved
+    if holds_many:
+        return _identifier_types(node.get("items"), resolver, holds_many=False)
+    return declared_types(node) or _ANY_VALUE_TYPES
+
+
 def extract_fk_fields(properties: Mapping[str, tuple[Resolver, JsonSchema]]) -> list[FKField]:
     """Extract FK fields from the properties of a resource schema.
 
@@ -708,13 +734,15 @@ def extract_fk_fields(properties: Mapping[str, tuple[Resolver, JsonSchema]]) -> 
         if fk_info is not None:
             target_resource, target_field, is_array = fk_info
             field_resolver, subschema = properties[field]
+            holds_array, value_types = _foreign_key_values(subschema, field_resolver, is_array=is_array)
             result.append(
                 FKField(
                     field_name=field,
                     target_resource=target_resource,
                     target_field=target_field,
                     is_array=is_array,
-                    holds_array=not is_array and holds_only_array_values(subschema, field_resolver, _resolve_reference),
+                    value_types=value_types,
+                    holds_array=holds_array,
                 )
             )
     return result
@@ -760,6 +788,7 @@ def extract_nested_fk_fields(
             # Skip top-level FK fields - they're already captured in fk_fields
             if pointer:
                 target_resource, target_field, is_array = fk_info
+                holds_array, value_types = _foreign_key_values(field_schema, resolver, is_array=is_array)
                 result.append(
                     NestedFKField(
                         pointer=field_pointer,
@@ -767,8 +796,8 @@ def extract_nested_fk_fields(
                         target_resource=target_resource,
                         target_field=target_field,
                         is_array=is_array,
-                        holds_array=not is_array
-                        and holds_only_array_values(field_schema, resolver, _resolve_reference),
+                        value_types=value_types,
+                        holds_array=holds_array,
                     )
                 )
             continue  # Don't recurse into FK fields
@@ -1102,6 +1131,16 @@ class InputSlot:
     item_fields: frozenset[str] | None = None
     # Whether this input is a top-level array item declared inline rather than as a named schema
     is_inline_item: bool = False
+    # Whether a parameter takes UUIDs (`format: uuid`), alone or as array items
+    takes_uuid: bool = False
+
+    def takes(self, value_types: Collection[str]) -> bool:
+        """Whether this input accepts values of `value_types`: a UUID parameter takes only strings."""
+        return not self.takes_uuid or "string" in value_types
+
+    def takes_foreign_key(self, field: FKField | NestedFKField) -> bool:
+        """Whether the values of a foreign key fit: a whole array of identifiers only fits a parameter taking one."""
+        return (self.takes_array or not field.holds_array) and self.takes(field.value_types)
 
 
 class OpenFields(frozenset[str]):
@@ -1143,6 +1182,8 @@ class OutputSlot:
     identifier_pointer: str | None = None
     # Whether only the operation path names the resource, as no `$ref` declares it
     named_after_path: bool = False
+    # Types a bare identifier declares (`integer` for a created id); empty for other outputs
+    value_types: frozenset[str] = frozenset()
 
     @property
     def declared_fields(self) -> Collection[str]:
@@ -1179,6 +1220,8 @@ class FKField:
     target_field: str
     # Whether the FK field is an array (e.g., site_ids)
     is_array: bool
+    # Types of the identifiers the field holds, e.g. `integer` for `customer_id: 3` or `site_ids: [1, 2]`
+    value_types: frozenset[str]
     # Whether a singular name holds a whole array of identifiers, e.g. `site_id: [1, 2]`
     holds_array: bool = False
 
@@ -1197,6 +1240,8 @@ class NestedFKField:
     target_field: str
     # Whether the FK field is an array (e.g., site_ids)
     is_array: bool
+    # Types of the identifiers the field holds, e.g. `integer` for `warehouse_id: 3` or `product_ids: [1, 2]`
+    value_types: frozenset[str]
     # Whether a singular name holds a whole array of identifiers, e.g. `site_id: [1, 2]`
     holds_array: bool = False
 

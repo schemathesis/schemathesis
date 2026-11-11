@@ -12315,8 +12315,19 @@ def test_identifier_parameters_take_primary_key_field(ctx):
 
 
 UUID = {"type": "string", "format": "uuid"}
+UUID_IDS = {"type": "array", "items": UUID}
+INTEGER_IDS = {"type": "array", "items": INTEGER}
 
 
+def owner_member_id(schema):
+    return {"owner": {"type": "object", "properties": {"member_id": schema}}}
+
+
+def status_envelope(schema):
+    return {"type": "object", "properties": {"response": schema}}
+
+
+# A row declaring a type is the whole created response, e.g. a bare id, rather than the group's properties.
 @pytest.mark.parametrize(
     ("component", "consumer_first"),
     [("Group", False), ("Group", True), ("UserGroup", False)],
@@ -12346,6 +12357,23 @@ UUID = {"type": "string", "format": "uuid"}
         ("path", "uid", "/groups/{uid}", UUID, {"pk": INTEGER}, None),
         ("path", "groupUuid", "/groups/{groupUuid}", UUID, {"pk": INTEGER}, None),
         ("path", "groupGuid", "/groups/{groupGuid}", UUID, {"pk": INTEGER}, None),
+        ("query", "group_id", "/members", UUID_IDS, {"id": INTEGER}, None),
+        ("query", "group_id", "/members", UUID_IDS, {"id": UUID}, "id"),
+        ("query", "group_id", "/members", INTEGER_IDS, {"id": INTEGER}, "id"),
+        ("path", "id", "/members/{id}", UUID, {"member_id": INTEGER}, None),
+        ("path", "id", "/members/{id}", UUID, {"member_id": UUID}, "member_id"),
+        ("path", "id", "/members/{id}", INTEGER, {"member_id": INTEGER}, "member_id"),
+        ("path", "id", "/members/{id}", UUID, owner_member_id(INTEGER), None),
+        ("path", "id", "/members/{id}", UUID, owner_member_id(UUID), "owner/member_id"),
+        ("path", "id", "/members/{id}", UUID, {"member_ids": INTEGER_IDS}, None),
+        ("path", "id", "/members/{id}", UUID, {"member_ids": UUID_IDS}, "member_ids/*"),
+        ("query", "id", "/members", UUID_IDS, {"member_id": INTEGER_IDS}, None),
+        ("query", "id", "/members", UUID_IDS, {"member_id": UUID_IDS}, "member_id"),
+        ("path", "id", "/groups/{id}", UUID, INTEGER, None),
+        ("path", "id", "/groups/{id}", UUID, {"type": "string"}, ""),
+        ("path", "id", "/groups/{id}", INTEGER, INTEGER, ""),
+        ("path", "id", "/groups/{id}", UUID, status_envelope(INTEGER), None),
+        ("path", "id", "/groups/{id}", UUID, status_envelope({"type": "string"}), "response"),
     ],
     ids=[
         "id-integer-pk",
@@ -12369,12 +12397,30 @@ UUID = {"type": "string", "format": "uuid"}
         "uid-integer-pk",
         "prefixed-uuid-integer-pk",
         "prefixed-guid-integer-pk",
+        "query-uuid-array-integer-id",
+        "query-uuid-array-uuid-id",
+        "query-integer-array-integer-id",
+        "foreign-key-uuid-integer",
+        "foreign-key-uuid-uuid",
+        "foreign-key-integer-integer",
+        "nested-foreign-key-uuid-integer",
+        "nested-foreign-key-uuid-uuid",
+        "foreign-key-array-uuid-integer",
+        "foreign-key-array-uuid-uuid",
+        "foreign-key-holding-array-uuid-integer",
+        "foreign-key-holding-array-uuid-uuid",
+        "created-id-uuid-integer",
+        "created-id-uuid-string",
+        "created-id-integer-integer",
+        "wrapped-created-id-uuid-integer",
+        "wrapped-created-id-uuid-string",
     ],
 )
 def test_identifier_parameters_take_fields_their_format_accepts(
     ctx, location, name, path, schema, properties, field, component, consumer_first
 ):
-    producer = operation("post", "/groups", "201", component_ref(component))
+    created = properties if "type" in properties else component_ref(component)
+    producer = operation("post", "/groups", "201", created)
     consumer = operation(
         "get", path, "200", parameters=[{"name": name, "in": location, "required": True, "schema": schema}]
     )
@@ -12396,6 +12442,33 @@ def test_identifier_parameters_take_fields_their_format_accepts(
         ]
     ]
     assert inferred_links(graph) == (links if field is not None else [])
+
+
+@pytest.mark.parametrize(
+    ("items", "expected"), [(INTEGER, False), ({"type": "string"}, True)], ids=["integer", "string"]
+)
+def test_uuid_parameter_takes_only_listed_string_ids(ctx, items, expected):
+    paths = {
+        **operation("get", "/groups", "200", {"type": "array", "items": items}),
+        **operation(
+            "get", "/groups/{id}", "200", parameters=[{"name": "id", "in": "path", "required": True, "schema": UUID}]
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths)
+
+    links = [
+        [
+            "#/paths/~1groups/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1groups~1{id}/get",
+                "parameters": {"path.id": "$response.body#/*"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+    assert inferred_links(graph) == (links if expected else [])
 
 
 @pytest.mark.parametrize("consumer_first", [False, True], ids=["producer-first", "consumer-first"])

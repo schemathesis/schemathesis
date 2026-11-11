@@ -811,11 +811,19 @@ def unbind_mistyped_values(
     """Unbind values a request slot rejects: one identifier for an array field, a non-string for a UUID parameter."""
     unbind_single_values_from_array_fields(operations, deferred)
     for label, node in operations.items():
-        slots = _non_string_parameter_slots(node)
-        if slots:
-            declared = schema.find_operation_by_label(label)
-            assert declared is not None
-            _bind_to_string_identifiers(node, slots, _uuid_parameters(declared))
+        _mark_uuid_parameters(schema, label, node)
+        _bind_to_string_identifiers(node, _non_string_parameter_slots(node))
+
+
+def _mark_uuid_parameters(schema: OpenApiSchema, label: str, node: OperationNode) -> None:
+    # Only parameters take UUIDs, so an operation filling body fields alone has nothing to mark.
+    if all(slot.parameter_location == ParameterLocation.BODY for slot in node.inputs):
+        return
+    declared = schema.find_operation_by_label(label)
+    assert declared is not None
+    parameters = _uuid_parameters(declared)
+    for slot in node.inputs:
+        slot.takes_uuid = (slot.parameter_location, slot.parameter_name) in parameters
 
 
 def _non_string_parameter_slots(node: OperationNode) -> list[InputSlot]:
@@ -834,15 +842,17 @@ def _uuid_parameters(operation: APIOperation) -> set[tuple[ParameterLocation, st
 
 def _takes_uuid(parameter: OpenApiParameter) -> bool:
     schema = _parameter_schema(parameter)
-    return isinstance(schema, dict) and schema.get("format") == "uuid"
+    if not isinstance(schema, dict):
+        return False
+    # A list of UUIDs (`?ids=<uuid>&ids=<uuid>`) takes them one by one.
+    items = schema.get("items")
+    return schema.get("format") == "uuid" or (isinstance(items, dict) and items.get("format") == "uuid")
 
 
-def _bind_to_string_identifiers(
-    node: OperationNode, slots: list[InputSlot], parameters: set[tuple[ParameterLocation, str]]
-) -> None:
+def _bind_to_string_identifiers(node: OperationNode, slots: list[InputSlot]) -> None:
     # A UUID parameter takes the resource's string identifier (`uuid` beside an integer `pk`), or nothing.
     for slot in slots:
-        if (slot.parameter_location, slot.parameter_name) not in parameters:
+        if not slot.takes_uuid:
             continue
         identifier = _string_identifier_for(slot)
         if identifier is None:
