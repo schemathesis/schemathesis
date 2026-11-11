@@ -30,6 +30,8 @@ from schemathesis.transport import BaseTransport, SerializationContext, retry_on
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
+    from google.protobuf.descriptor import Descriptor
+
     from schemathesis.generation.case import Case
 
 # How long a failed call waits for the channel to connect before blaming the network.
@@ -142,55 +144,13 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         with ratelimit(config.rate_limit_for(operation=case.operation), config.base_url):
             content, outcome, elapsed = retry_on_transport_errors(attempt, retries)
         self._answered.add(channel)
-        code = outcome.code()
-        details = outcome.details() or ""
-        if content is None:
-            # A unary call answers with exactly one message, so clients turn an OK without one into an error.
-            code = grpc.StatusCode.INTERNAL
-            details = NO_RESPONSE_MESSAGE
-            content = b""
-        response_headers: dict[str, list[str]] = {}
-        for key, value in (*(outcome.initial_metadata() or ()), *(outcome.trailing_metadata() or ())):
-            text = base64.b64encode(value).decode() if isinstance(value, bytes) else value
-            response_headers.setdefault(key, []).append(text)
-        response_headers["grpc-status"] = [str(code.value[0])]
-        response_headers["grpc-message"] = [details]
-        render_content: Callable[[bytes], str | None] | None = None
-        if code == grpc.StatusCode.OK:
-            output_class = message_factory.GetMessageClass(method.output_type)
-
-            def render_content(content: bytes) -> str | None:
-                try:
-                    rendered = message_to_json(output_class.FromString(content), method.output_type.file.pool)
-                    return json.dumps(rendered, indent=2, ensure_ascii=False)
-                except (message.DecodeError, json_format.Error, ValueError):
-                    # Shown as binary when it does not decode or holds a value JSON cannot express.
-                    return None
-
-        elif "grpc-status-details-bin" in response_headers:
-            encoded = response_headers["grpc-status-details-bin"][0]
-
-            # An error carries no message, so its status details show in its place.
-            def render_content(content: bytes) -> str | None:
-                try:
-                    status = status_pb2.Status.FromString(base64.b64decode(encoded))
-                    rendered = message_to_json(status, status.DESCRIPTOR.file.pool)
-                    return json.dumps(rendered, indent=2, ensure_ascii=False)
-                except (message.DecodeError, json_format.Error, ValueError):
-                    # Shown as binary when the details do not decode or hold a value JSON cannot express.
-                    return None
-
-        return Response(
-            status_code=code.value[0],
-            headers=response_headers,
-            content=content,
+        return _to_response(
+            outcome,
+            content,
+            output_type=method.output_type,
             request=request,
             elapsed=elapsed,
             verify=verify is not False,
-            message=code.name,
-            http_version="2",
-            render_content=render_content,
-            status_line=f"{code.name}: {details}" if details else code.name,
         )
 
     def _channel(self, address: str, tls: bool, verify: bool | str, cert: str | tuple[str, str] | None) -> grpc.Channel:
@@ -254,6 +214,69 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                 raise requests.exceptions.ConnectionError(cause, request=request) from cause
             return b"", outcome, elapsed
         return content, outcome, started_at.elapsed
+
+
+def _to_response(
+    outcome: grpc.Call,
+    content: bytes | None,
+    *,
+    output_type: Descriptor,
+    request: requests.PreparedRequest,
+    elapsed: float,
+    verify: bool,
+) -> Response:
+    code = outcome.code()
+    details = outcome.details() or ""
+    if content is None:
+        # A unary call answers with exactly one message, so clients turn an OK without one into an error.
+        code = grpc.StatusCode.INTERNAL
+        details = NO_RESPONSE_MESSAGE
+        content = b""
+    headers = _response_metadata(outcome, code, details)
+    return Response(
+        status_code=code.value[0],
+        headers=headers,
+        content=content,
+        request=request,
+        elapsed=elapsed,
+        verify=verify,
+        message=code.name,
+        http_version="2",
+        render_content=_content_renderer(code, output_type, headers),
+        status_line=f"{code.name}: {details}" if details else code.name,
+    )
+
+
+def _response_metadata(outcome: grpc.Call, code: grpc.StatusCode, details: str) -> dict[str, list[str]]:
+    metadata: dict[str, list[str]] = {}
+    for key, value in (*(outcome.initial_metadata() or ()), *(outcome.trailing_metadata() or ())):
+        text = base64.b64encode(value).decode() if isinstance(value, bytes) else value
+        metadata.setdefault(key, []).append(text)
+    metadata["grpc-status"] = [str(code.value[0])]
+    metadata["grpc-message"] = [details]
+    return metadata
+
+
+def _content_renderer(
+    code: grpc.StatusCode, output_type: Descriptor, headers: dict[str, list[str]]
+) -> Callable[[bytes], str | None] | None:
+    if code == grpc.StatusCode.OK:
+        return partial(_render_message, output_type)
+    if "grpc-status-details-bin" in headers:
+        details = base64.b64decode(headers["grpc-status-details-bin"][0])
+        # An error carries no message, so its status details show in its place.
+        return lambda _: _render_message(status_pb2.Status.DESCRIPTOR, details)
+    return None
+
+
+def _render_message(descriptor: Descriptor, data: bytes) -> str | None:
+    try:
+        decoded = message_factory.GetMessageClass(descriptor).FromString(data)
+        rendered = message_to_json(decoded, descriptor.file.pool)
+        return json.dumps(rendered, indent=2, ensure_ascii=False)
+    except (message.DecodeError, json_format.Error, ValueError):
+        # Shown as binary when it does not decode or holds a value JSON cannot express.
+        return None
 
 
 def serialize_message(context: SerializationContext, body: Body) -> dict[str, bytes]:
