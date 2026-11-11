@@ -675,7 +675,7 @@ def holds_only_array_values(
     )
 
 
-_NULL_ONLY = frozenset({"null"})
+NULL_ONLY = frozenset({"null"})
 
 
 def _alternatives_hold_only_arrays(
@@ -684,7 +684,7 @@ def _alternatives_hold_only_arrays(
     """Whether one of `branches` holds only arrays and every other one holds only arrays or only `null`."""
     chains = [list(iter_all_of_chain(branch, scope, resolve)) for branch in branches]
     return any(map(holds_only_arrays, chains)) and all(
-        holds_only_arrays(chain) or _NULL_ONLY in map(declared_types, chain) for chain in chains
+        holds_only_arrays(chain) or NULL_ONLY in map(declared_types, chain) for chain in chains
     )
 
 

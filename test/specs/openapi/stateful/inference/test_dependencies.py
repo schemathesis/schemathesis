@@ -5272,43 +5272,71 @@ def test_top_level_array_body_links_every_fk_field_of_its_items(ctx):
     ]
 
 
+WAREHOUSES = {"type": "array", "items": component_ref("Warehouse")}
+WAREHOUSES_OR_NULL = {"anyOf": [WAREHOUSES, {"type": "null"}]}
+
+
+@pytest.mark.parametrize(
+    ["body", "takes_item"],
+    [
+        (WAREHOUSES, True),
+        (WAREHOUSES_OR_NULL, True),
+        ({"oneOf": [{"type": "null"}, WAREHOUSES]}, True),
+        (component_ref("WarehousesOrNull"), True),
+        ({"allOf": [WAREHOUSES_OR_NULL]}, True),
+        (
+            {
+                "oneOf": [
+                    WAREHOUSES,
+                    {"type": "array", "items": {"type": "object", "properties": {"tracking_id": {"type": "string"}}}},
+                ]
+            },
+            False,
+        ),
+    ],
+    ids=[
+        "array",
+        "any-of-array-or-null",
+        "one-of-null-or-array",
+        "any-of-array-or-null-ref",
+        "any-of-array-or-null-all-of",
+        "one-of-two-arrays",
+    ],
+)
 @pytest.mark.parametrize(
     ["list_schema", "items_pointer"],
     [
-        ({"type": "array", "items": component_ref("Warehouse")}, "/*"),
-        (
-            {"type": "object", "properties": {"data": {"type": "array", "items": component_ref("Warehouse")}}},
-            "/data/*",
-        ),
+        (WAREHOUSES, "/*"),
+        ({"type": "object", "properties": {"data": WAREHOUSES}}, "/data/*"),
     ],
     ids=["bare", "enveloped"],
 )
-def test_top_level_array_body_takes_one_item_of_a_list_response(ctx, list_schema, items_pointer):
+def test_top_level_array_body_takes_one_item_of_a_list_response(ctx, list_schema, items_pointer, body, takes_item):
     _, graph = analyze_dependencies(
         ctx,
         {
             **operation("get", "/warehouses", "200", list_schema),
             **operation("get", "/warehouses/{id}", "200", component_ref("Warehouse"), [path_param("id", "integer")]),
-            **operation_with_body(
-                "post", "/warehouses/batch", "200", {"type": "array", "items": component_ref("Warehouse")}
-            ),
+            **operation_with_body("post", "/warehouses/batch", "200", body),
         },
+        version="3.1.0",
         components={
             "schemas": {
-                "Warehouse": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}
+                "Warehouse": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}},
+                "WarehousesOrNull": WAREHOUSES_OR_NULL,
             }
         },
     )
-    assert inferred_links(graph) == [
-        [
-            "#/paths/~1warehouses/get",
-            "200",
-            {
-                "operationRef": "#/paths/~1warehouses~1{id}/get",
-                "x-schemathesis": {"is_inferred": True},
-                "parameters": {"path.id": f"$response.body#{items_pointer}/id"},
-            },
-        ],
+    read = [
+        "#/paths/~1warehouses/get",
+        "200",
+        {
+            "operationRef": "#/paths/~1warehouses~1{id}/get",
+            "x-schemathesis": {"is_inferred": True},
+            "parameters": {"path.id": f"$response.body#{items_pointer}/id"},
+        },
+    ]
+    batch = [
         [
             "#/paths/~1warehouses/get",
             "200",
@@ -5328,6 +5356,7 @@ def test_top_level_array_body_takes_one_item_of_a_list_response(ctx, list_schema
             },
         ],
     ]
+    assert inferred_links(graph) == [read, *(batch if takes_item else [])]
 
 
 def inline_object(*names):
@@ -5848,10 +5877,14 @@ LINKED_LINES = [{"warehouse_id": "$response.body#/id"}]
         "untyped-object",
     ],
 )
-def test_nested_body_fk_links_through_nullable_array(ctx, version, lines, components, expected):
+@pytest.mark.parametrize("nested", [False, True], ids=["top-level", "nested"])
+def test_nested_body_fk_links_through_nullable_array(ctx, version, lines, components, expected, nested):
+    body = lines
+    if nested:
+        body, expected = nested_object("lines", lines), {"lines": expected}
     paths = {
         **operation("post", "/warehouses", "201", SCHEMA_WITH_ID, operation_id="createWarehouse"),
-        **operation_with_body("post", "/orders", "201", nested_object("lines", lines), operation_id="createOrder"),
+        **operation_with_body("post", "/orders", "201", body, operation_id="createOrder"),
     }
     _, graph = analyze_dependencies(ctx, paths, version=version, components=components)
     assert inferred_links(graph) == [
@@ -5860,7 +5893,7 @@ def test_nested_body_fk_links_through_nullable_array(ctx, version, lines, compon
             "201",
             {
                 "operationRef": "#/paths/~1orders/post",
-                "requestBody": {"lines": expected},
+                "requestBody": expected,
                 "x-schemathesis": {"is_inferred": True, "merge_body": True},
             },
         ]

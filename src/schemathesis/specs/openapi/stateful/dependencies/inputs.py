@@ -16,6 +16,7 @@ from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.converter import is_read_only
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
+    NULL_ONLY,
     BodyPath,
     Cardinality,
     DeferredBindings,
@@ -447,7 +448,7 @@ def _resolve_body_dependencies(
     bundled = schema.get(BUNDLE_STORAGE_KEY, {})
 
     # For `items`, we'll inject an array with extracted resource
-    items = resolved.get("items")
+    items = _array_items(resolved, bundled)
     if isinstance(items, dict):
         resource_name = body.resource_name or naming.from_path(operation.path)
 
@@ -599,7 +600,7 @@ def _extract_nested_body_fk_fields(
     When the FK target resource isn't yet registered, the lookup is appended to
     `deferred` so the caller can replay it once every operation has been scanned.
     """
-    items = schema.get("items")
+    items = _array_items(schema, scan.bundled)
     children: list[tuple[str | int, Any]]
     if isinstance(items, dict):
         # Items of a top-level array body carry FK fields like nested array items: `[{"groupId": ...}]`.
@@ -763,6 +764,24 @@ def _names_identifier_array(name: str, schema: JsonSchema, bundled: dict[str, An
     if fk_info is None or not holds_only_array_values(schema, bundled, _resolve_bundled):
         return None
     return fk_info[2]
+
+
+def _array_items(schema: dict[str, Any], bundled: dict[str, Any]) -> dict[str, Any] | None:
+    """`items` of an array body, or of its array alternative when the other `anyOf`/`oneOf` ones allow only `null`."""
+    items = schema.get("items")
+    if isinstance(items, dict):
+        return items
+    for parent in iter_all_of_chain(schema, bundled, _resolve_bundled):
+        for keyword in ("anyOf", "oneOf"):
+            branches = parent.get(keyword)
+            if not isinstance(branches, list):
+                continue
+            chains = [list(iter_all_of_chain(branch, bundled, _resolve_bundled)) for branch in branches]
+            # Alternatives of different array shapes describe different requests, so only one array may remain.
+            others = [chain for chain in chains if NULL_ONLY not in map(declared_types, chain)]
+            if len(others) == 1 and holds_only_arrays(others[0]):
+                return next((node["items"] for node in others[0] if isinstance(node.get("items"), dict)), None)
+    return None
 
 
 def _resolve_bundled(schema: dict[str, Any], bundled: dict[str, Any]) -> tuple[dict[str, Any], object] | None:
