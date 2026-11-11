@@ -19,7 +19,13 @@ from schemathesis.config._dictionaries import (
     lookup_parameter,
     parse_body_path,
 )
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, schema_with_bundle
+from schemathesis.core.jsonschema import (
+    BUNDLE_STORAGE_KEY,
+    example_is_valid,
+    make_validator,
+    schema_with_bundle,
+    try_make_validator,
+)
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import split_body_path
@@ -27,6 +33,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.jsonschema.strategy import json_identity
 from schemathesis.generation.value import GeneratedValue, prune_overwritten_constants
 from schemathesis.resources import PoolDraw, SemanticDraw
+from schemathesis.transport.serialization import contains_binary
 
 if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig, ProjectConfig
@@ -346,7 +353,7 @@ def _walk_leaf_schema(
 ) -> tuple[JsonSchema, tuple[bool, ...]] | None:
     # `unique` tells whether a schema met so far at this position declares `uniqueItems`.
     if isinstance(current, dict):
-        unique = unique or _declares_unique_items(current)
+        unique = unique or _declares_unique_items(current, bundled, visited)
         reference = current.get("$ref")
         if isinstance(reference, str):
             if reference in visited:
@@ -385,11 +392,19 @@ def _walk_leaf_schema(
     return None
 
 
-def _declares_unique_items(schema: JsonSchemaObject) -> bool:
+def _declares_unique_items(schema: JsonSchemaObject, bundled: dict[str, JsonSchema], visited: tuple[str, ...]) -> bool:
+    if schema.get("uniqueItems") is True:
+        return True
+    reference = schema.get("$ref")
+    if isinstance(reference, str) and reference not in visited:
+        target = bundled.get(reference.rsplit("/", 1)[-1])
+        if isinstance(target, dict) and _declares_unique_items(target, bundled, (*visited, reference)):
+            return True
     # Every `allOf` branch applies to the same array, so `uniqueItems` in a sibling branch binds it too.
-    all_of = schema.get("allOf")
-    branches = all_of if isinstance(all_of, list) else []
-    return any(isinstance(part, dict) and part.get("uniqueItems") is True for part in (schema, *branches))
+    branches = schema.get("allOf")
+    return isinstance(branches, list) and any(
+        isinstance(branch, dict) and _declares_unique_items(branch, bundled, visited) for branch in branches
+    )
 
 
 def build_body_dictionary_overlay_strategy(
@@ -397,6 +412,7 @@ def build_body_dictionary_overlay_strategy(
     *,
     bindings: list[_ResolvedBodyBinding],
     operation_label: str,
+    container_schema: JsonSchema,
     validator_cls: type,
     generation_mode: GenerationMode,
 ) -> st.SearchStrategy:
@@ -414,6 +430,14 @@ def build_body_dictionary_overlay_strategy(
 
     if not eligible_per_binding:
         return inner
+
+    container_validator = try_make_validator(container_schema, validator_cls)
+
+    def keeps_mode(body: JsonValue) -> bool:
+        if generation_mode.is_positive:
+            return example_is_valid(body, container_validator)
+        # A body the validator cannot read keeps its entries, as the entries alone already fail their field.
+        return container_validator is None or contains_binary(body) or not container_validator.is_valid(body)
 
     @st.composite
     def overlay(draw: st.DrawFn) -> GeneratedValue | JsonValue:
@@ -436,7 +460,8 @@ def build_body_dictionary_overlay_strategy(
         random = draw(st.randoms())
         new_draws: list[DictionaryDraw] = []
         for binding, eligible, positions in eligible_per_binding:
-            value = _substitute_entries(
+            mark = len(new_draws)
+            substituted = _substitute_entries(
                 value,
                 split_body_path(binding.pointer),
                 binding.unique_items,
@@ -452,6 +477,11 @@ def build_body_dictionary_overlay_strategy(
                 set(),
                 new_draws,
             )
+            # Other keywords judge the entries in place, e.g. `contains` on their array or `enum` on its parent.
+            if len(new_draws) > mark and not keeps_mode(substituted):
+                del new_draws[mark:]
+            else:
+                value = substituted
 
         if not new_draws and not isinstance(produced, GeneratedValue):
             return produced

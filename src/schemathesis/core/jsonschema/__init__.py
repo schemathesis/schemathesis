@@ -327,6 +327,23 @@ def make_validator(schema: JsonSchema, validator_cls: type) -> jsonschema_rs.Val
     return validator
 
 
+def try_make_validator(schema: JsonSchema, validator_cls: type) -> jsonschema_rs.Validator | None:
+    """Like `make_validator`, but `None` for a malformed schema, so checks against it can be skipped."""
+    try:
+        return make_validator(schema, validator_cls)
+    except jsonschema_rs.ValidationError:
+        return None
+
+
+def example_is_valid(value: object, validator: jsonschema_rs.Validator | None) -> bool:
+    if validator is None:
+        return True
+    try:
+        return validator.is_valid(value)
+    except Exception:
+        return True
+
+
 def make_validator_with_seed(
     schema_builder: Callable[[], JsonSchema],
     validator_cls: type,

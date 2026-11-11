@@ -22,12 +22,14 @@ from schemathesis.core.jsonschema import (
     VALIDATED_FORMATS_BY_DRAFT,
     BundleError,
     Bundler,
+    example_is_valid,
     make_validator,
     maybe_resolve_bundled,
     resolve_bundled_ref,
     resolve_bundled_root,
     resolve_with_root_bundle,
     schema_with_bundle,
+    try_make_validator,
 )
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
 from schemathesis.core.jsonschema.resolver import Resolver
@@ -135,15 +137,6 @@ CONSTANTS_OVERLAY_PROBABILITY = 0.15
 _TYPE_DECIDING_KEYWORDS = ("anyOf", "oneOf", "allOf", "not", "$ref")
 
 
-def example_is_valid(value: object, validator: jsonschema_rs.Validator | None) -> bool:
-    if validator is None:
-        return True
-    try:
-        return validator.is_valid(value)
-    except Exception:
-        return True
-
-
 def build_semantic_overlay(
     inner_strategy: st.SearchStrategy,
     leaf_descriptors: list[LeafDescriptor],
@@ -172,13 +165,7 @@ def build_semantic_overlay(
             validator = None
         paired.append((descriptor, validator))
 
-    container_validator: jsonschema_rs.Validator | None = None
-    if container_schema is not None:
-        try:
-            container_validator = make_validator(container_schema, validator_cls)
-        except jsonschema_rs.ValidationError:
-            # Malformed container schema; substitutions skip the container-level revalidation.
-            container_validator = None
+    container_validator = None if container_schema is None else try_make_validator(container_schema, validator_cls)
 
     @st.composite
     def overlaid(draw: st.DrawFn) -> JsonValue | GeneratedValue:
@@ -909,13 +896,11 @@ def build_hybrid_strategy(
     """
     from hypothesis import strategies as st
 
-    container_validator: jsonschema_rs.Validator | None = None
-    if container_schema is not None and validator_cls is not None:
-        try:
-            container_validator = make_validator(container_schema, validator_cls)
-        except jsonschema_rs.ValidationError:
-            # Malformed container schema; the merge goes in unchecked, as it did before.
-            container_validator = None
+    container_validator = (
+        try_make_validator(container_schema, validator_cls)
+        if container_schema is not None and validator_cls is not None
+        else None
+    )
 
     # Pre-compute keys for all variants
     variant_keys = [jsonschema_rs.canonical.json.to_string(v.overlay) for v in captured_variants]
@@ -1999,6 +1984,7 @@ class OpenApiBody(OpenApiComponent):
                 strategy,
                 bindings=body_bindings,
                 operation_label=operation.label,
+                container_schema=schema,
                 validator_cls=operation.schema.adapter.jsonschema_validator_cls,
                 generation_mode=generation_mode,
             )

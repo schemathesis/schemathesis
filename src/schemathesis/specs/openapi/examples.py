@@ -20,6 +20,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
+    example_is_valid,
     is_valid,
     make_validator_for,
 )
@@ -49,7 +50,6 @@ from schemathesis.specs.openapi.adapter.parameters import (
     OpenApiParameter,
     OpenApiParameterSet,
     _deep_merge_overlay,
-    example_is_valid,
 )
 from schemathesis.specs.openapi.adapter.references import example_object_value, resolve_example
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
