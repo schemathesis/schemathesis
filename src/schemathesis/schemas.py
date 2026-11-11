@@ -39,7 +39,7 @@ from schemathesis.core.transport import (
     http_status_class,
     is_uninformative_status,
 )
-from schemathesis.generation import GenerationMode
+from schemathesis.generation import GenerationMode, overrides
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
@@ -1230,21 +1230,21 @@ class APIOperation(Generic[P, R, S, SchemaT]):
             from schemathesis.python._constants.orchestrator import make_constants_value_source
 
             feedback = FeedbackSources(constants_value_source=make_constants_value_source(self.schema))
-        if self.schema.config.headers:
-            headers = {**(headers or {}), **self.schema.config.headers}
+        containers = {"path_parameters": path_parameters, "headers": headers, "cookies": cookies, "query": query}
+        # Configured values win over passed ones, as they do when the CLI sends the request.
+        configured = overrides.with_config_headers(self.schema.config, operation=self).as_strategy_kwargs()
+        for name, values in configured.items():
+            containers[name] = {**(containers[name] or {}), **values}
         strategy = self.schema.get_case_strategy(
             self,
             hooks=hooks,
             auth_storage=auth_storage,
             generation_mode=generation_mode,
             feedback=feedback,
-            path_parameters=path_parameters,
-            headers=headers,
-            cookies=cookies,
-            query=query,
             body=body,
             media_type=media_type,
             phase=phase,
+            **containers,
         )
         return apply_case_hooks(strategy, self, local=hooks)
 

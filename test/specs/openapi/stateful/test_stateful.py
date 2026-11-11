@@ -12,7 +12,7 @@ from hypothesis.internal.conjecture.data import Status
 from pydantic import BaseModel
 
 import schemathesis
-from schemathesis.config import OperationConfig
+from schemathesis.config import OperationConfig, SchemathesisConfig
 from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.parameters import ParameterLocation
@@ -1171,14 +1171,35 @@ def test_long_scenarios_follow_links_beyond_default_step_allowance():
 
 
 def test_configured_headers_sent_on_every_step():
-    schema = schemathesis.openapi.from_asgi("/openapi.json", app=_users_api_with_optional_auth_header())
-    schema.config.update(headers={"X-Token": "secret"})
+    schema = schemathesis.openapi.from_asgi(
+        "/openapi.json",
+        app=_users_api_with_optional_auth_header(),
+        config=SchemathesisConfig.from_str(
+            """
+headers = { "X-Token" = "secret" }
+
+[parameters]
+"header.authorization" = "Bearer fixed"
+
+[[operations]]
+include-path = "/users/{userId}"
+headers = { "X-User" = "known" }
+"""
+        ),
+    )
     schema.config.generation.update(modes=list(GenerationMode))
-    headers = []
+    headers = set()
 
     class Workflow(schema.as_state_machine()):
         def validate_response(self, response, case, additional_checks=None, **kwargs):
-            headers.append(case.headers.get("X-Token"))
+            headers.add(
+                (
+                    case.operation.label,
+                    case.headers.get("X-Token"),
+                    case.headers.get("authorization"),
+                    case.headers.get("X-User"),
+                )
+            )
 
     Workflow.run(
         settings=settings(
@@ -1189,7 +1210,12 @@ def test_configured_headers_sent_on_every_step():
             phases=[Phase.generate],
         )
     )
-    assert set(headers) == {"secret"}
+    assert headers == {
+        ("POST /users", "secret", "Bearer fixed", None),
+        ("GET /users/{userId}", "secret", "Bearer fixed", "known"),
+        ("PUT /users/{userId}", "secret", "Bearer fixed", "known"),
+        ("DELETE /users/{userId}", "secret", "Bearer fixed", "known"),
+    }
 
 
 def test_linked_steps_keep_negative_share_of_scenario_starts(ctx, response_factory):

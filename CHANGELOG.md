@@ -19,6 +19,7 @@
 - Stateful `--max-time` runs never learning links from their own `Location` headers or body URLs.
 - Cache replay sending requests without auth providers or `[auth.openapi]` credentials.
 - Configured `Authorization` headers replaced by netrc credentials for the same host.
+- `[parameters]` and `[[operations]]` headers ignored by `as_strategy()`, `as_state_machine()` and linked `st fuzz` steps.
 - `ignored_auth` sending two extra requests per authenticated success in pytest and `call_and_validate()`.
 - Custom `encoding` ignored for form fields declared in `allOf` branches.
 - False positive `negative_data_rejection` for scalar values sent to form body array fields.

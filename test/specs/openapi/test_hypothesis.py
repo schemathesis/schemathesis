@@ -481,16 +481,114 @@ def test_format_values_follow_codec_changed_after_generation():
     assert [value["q"] for value in generate_many(strategy, 50) if not value["q"].isascii()] == []
 
 
-def test_as_strategy_keeps_passed_headers_unchanged(ctx):
-    schema = ctx.openapi.load_schema({"/x": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    schema.config.update(headers={"X-Configured": "global"})
+def test_as_strategy_keeps_passed_containers_unchanged(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/x": {
+                "get": {
+                    "parameters": [{"name": "tenant", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        config=SchemathesisConfig.from_str('headers = { "X-Configured" = "global" }\n[parameters]\ntenant = "acme"'),
+    )
     headers = {"X-Caller": "local"}
-    strategy = schema["/x"]["GET"].as_strategy(headers=headers)
-    assert headers == {"X-Caller": "local"}
+    query = {"tenant": "caller", "page": "1"}
+    strategy = schema["/x"]["GET"].as_strategy(headers=headers, query=query)
+    assert (headers, query) == ({"X-Caller": "local"}, {"tenant": "caller", "page": "1"})
 
     @run_given(strategy, max_examples=1)
     def test(case):
-        assert case.headers == {"X-Caller": "local", "X-Configured": "global"}
+        assert (case.headers, case.query) == (
+            {"X-Caller": "local", "X-Configured": "global"},
+            {"tenant": "acme", "page": "1"},
+        )
+
+
+CONFIGURED_OVERRIDES = """
+headers = { "X-Project" = "project" }
+
+[parameters]
+"path.id" = 7
+"query.tenant" = "acme"
+"header.X-Tenant" = "header-acme"
+"cookie.session" = "fixed"
+
+[[operations]]
+include-name = "GET /items/{id}"
+headers = { "X-Operation" = "operation" }
+"""
+OPTIONAL_OPERATION_HEADER = {
+    "name": "X-Operation",
+    "in": "header",
+    "required": False,
+    "schema": {"type": "string", "enum": ["generated"]},
+}
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        (
+            "/items/{id}",
+            [
+                (
+                    {"id": 7},
+                    {"tenant": "acme"},
+                    {"X-Tenant": "header-acme", "X-Operation": "operation", "X-Project": "project"},
+                    {"session": "fixed"},
+                )
+            ],
+        ),
+        (
+            "/other",
+            [
+                ({}, {}, {"X-Project": "project"}, {}),
+                ({}, {}, {"X-Operation": "generated", "X-Project": "project"}, {}),
+            ],
+        ),
+    ],
+    ids=["configured-operation", "other-operation"],
+)
+def test_as_strategy_applies_configured_parameters_and_operation_headers(ctx, path, expected):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{id}": {
+                "get": {
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "integer", "enum": [1, 2]}},
+                        {
+                            "name": "tenant",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["acme", "other"]},
+                        },
+                        {
+                            "name": "X-Tenant",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["a", "b"]},
+                        },
+                        {
+                            "name": "session",
+                            "in": "cookie",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["a", "b"]},
+                        },
+                        OPTIONAL_OPERATION_HEADER,
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/other": {"get": {"parameters": [OPTIONAL_OPERATION_HEADER], "responses": {"200": {"description": "OK"}}}},
+        },
+        config=SchemathesisConfig.from_str(CONFIGURED_OVERRIDES),
+    )
+
+    @run_given(schema[path]["GET"].as_strategy(), max_examples=10)
+    def test(case):
+        assert (case.path_parameters, case.query, case.headers, case.cookies) in expected
 
 
 CONSTRAINED_HEADER_SCHEMAS = [

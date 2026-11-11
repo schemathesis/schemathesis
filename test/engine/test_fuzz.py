@@ -437,6 +437,28 @@ def test_fuzz_generation_parameter_overrides_are_applied(ctx):
     assert query_values == [{"id": -1}] * len(query_values)
 
 
+def test_fuzz_parameter_overrides_apply_to_linked_steps(ctx):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    # The link fills other query parameters of the same operation
+    schema.config.parameters = {"query.code": 7}
+    schema.config.continue_on_failure = True
+    stream = from_schema(schema).fuzz(FuzzConfig(max_time=30))
+    linked_codes = []
+    for event in stream:
+        if isinstance(event, events.FuzzScenarioFinished):
+            linked_codes.extend(
+                node.value.query["code"]
+                for node in event.recorder.cases.values()
+                if node.value.operation.label == "GET /users/{user_id}"
+                and node.value.query.get("user_id") == node.value.path_parameters["user_id"]
+            )
+            if len(linked_codes) >= 3:
+                stream.stop()
+                break
+    assert set(linked_codes) == {7}
+
+
 @pytest.mark.parametrize("workers", [1, 3], ids=["single-worker", "multiple-workers"])
 def test_fuzz_unique_inputs_sends_each_input_once(ctx, app_runner, workers):
     # Following a link or not is a separate choice in every step, so scenarios vastly outnumber the two inputs.
