@@ -2048,6 +2048,8 @@ def _positive_for_leaves(
     exclusivity = None
     if isinstance(one_of, list):
         exclusivity = [_judges(_branch_as_judged(ctx, branch), ctx) for branch in one_of]
+    any_yielded = False
+    any_shared = False
     for leaf in leaves:
         with ExitStack() as stack:
             for reference in leaf.references:
@@ -2068,10 +2070,12 @@ def _positive_for_leaves(
                     and leaf.one_of is not None
                     and _matches_another_branch(value.value, leaf.one_of, exclusivity)
                 ):
+                    any_shared = True
                     if fallback is None:
                         fallback = value
                     continue
                 yielded = True
+                any_yielded = True
                 yield value
             if not yielded and fallback is not None and allow_negative_fallback:
                 # Every value this branch could draw also satisfies a sibling branch, so it can never
@@ -2082,6 +2086,48 @@ def _positive_for_leaves(
                     generation_mode=GenerationMode.NEGATIVE,
                     description=f"{fallback.description} (ambiguous with a sibling `oneOf` branch)",
                 )
+    if any_shared and not any_yielded:
+        # Overlapping branches (`integer` beside `number`) can leave every swept value shared by two of them.
+        yield from _exclusive_positive(ctx, schema)
+
+
+def _exclusive_positive(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
+    """One value the whole node admits, found among values that break a single `oneOf` branch."""
+    judges = _judges(schema, ctx)
+    if not judges:
+        return
+    # A recursive schema reaches the same node many times, and a search that finds nothing walks every branch.
+    cache_key = (
+        "exclusive_positive",
+        ctx.schema_key(schema),
+        ctx.session.token_for(ctx.custom_formats),
+        ctx.session.token_for(ctx.update_pattern),
+        ctx.validator_cls,
+        ctx.alphabet,
+        ctx.location,
+        ctx.media_type,
+        ctx.is_required,
+    )
+    value = ctx.session.values.get(cache_key)
+    if value is MISSING:
+        value = _search_exclusive(ctx, schema, judges)
+        ctx.session.values[cache_key] = value
+    if value is not UNSATISFIABLE_RESULT:
+        yield PositiveValue(
+            deepclone(value) if isinstance(value, (dict, list)) else value,
+            scenario=CoverageScenario.DEFAULT_POSITIVE_TEST,
+            description="Valid value",
+        )
+
+
+def _search_exclusive(ctx: CoverageContext, schema: JsonSchemaObject, judges: list[jsonschema_rs.Validator]) -> object:
+    negative = ctx.with_negative()
+    for branch in schema["oneOf"]:
+        # A value that breaks one branch can still satisfy exactly one sibling.
+        for generated in cover_schema_iter(negative, branch):
+            if not contains_binary(generated.value) and all(judge.is_valid(generated.value) for judge in judges):
+                return generated.value
+    return UNSATISFIABLE_RESULT
 
 
 def _matches_another_branch(value: Any, index: int, branches: list[list[jsonschema_rs.Validator]]) -> bool:

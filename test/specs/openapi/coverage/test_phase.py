@@ -7158,35 +7158,82 @@ def test_coverage_negative_string_property_xml_not_wire_identical(ctx):
                 )
 
 
-def test_coverage_positive_oneof_body_valid_for_whole_schema(ctx):
-    # oneOf where both branches allow the same set of values (no additionalProperties: false).
-    # POSITIVE coverage must not yield bodies that are invalid for the whole oneOf (i.e. valid
-    # for multiple branches simultaneously).
+# Boundary values here match two branches, yet values only one branch admits exist and must be sent.
+@pytest.mark.parametrize(
+    ("schema", "components"),
+    [
+        ({"oneOf": [{"type": "integer"}, {"type": "number"}]}, {}),
+        (
+            {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "required": ["name"],
+                        "properties": {"name": {"type": "string"}, "meow": {"type": "boolean"}},
+                    },
+                    {
+                        "type": "object",
+                        "required": ["name"],
+                        "properties": {"name": {"type": "string"}, "bark": {"type": "boolean"}},
+                    },
+                ]
+            },
+            {},
+        ),
+        (
+            {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "properties": {"email": {"type": "string", "example": "a@b.com"}},
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "email": {"type": "string"},
+                            "code": {"type": "string"},
+                        },
+                    },
+                ]
+            },
+            {},
+        ),
+        (
+            {"oneOf": [{"$ref": "#/components/schemas/A"}, {"$ref": "#/components/schemas/B"}]},
+            {
+                "schemas": {
+                    "A": {
+                        "type": "object",
+                        "required": ["kind"],
+                        "properties": {"kind": {"type": "string"}, "a": {"type": "integer"}},
+                    },
+                    "B": {
+                        "type": "object",
+                        "required": ["kind"],
+                        "properties": {"kind": {"type": "string"}, "b": {"type": "number"}},
+                    },
+                }
+            },
+        ),
+    ],
+    ids=["integer-number", "shared-required-name", "email-code", "shared-required-kind-refs"],
+)
+def test_coverage_positive_oneof_body_valid_for_whole_schema(ctx, schema, components):
+    operation = body_operation(ctx, schema, path="/modify", method="patch", components=components)
+
+    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
+
+
+# YAML `!!binary` values load as bytes, and no validator loads a schema holding them, so no value can be confirmed.
+def test_coverage_positive_oneof_overlap_without_a_loadable_validator_sends_no_body(ctx):
     operation = body_operation(
         ctx,
-        {
-            "oneOf": [
-                {
-                    "type": "object",
-                    "properties": {"email": {"type": "string", "example": "a@b.com"}},
-                },
-                {
-                    "type": "object",
-                    "properties": {
-                        "email": {"type": "string"},
-                        "code": {"type": "string"},
-                    },
-                },
-            ]
-        },
+        {"oneOf": [{"type": "integer"}, {"type": "number"}], "default": b"\x00"},
         path="/modify",
         method="patch",
     )
-    validator = body_validator(operation)
 
-    for case in iter_cases(operation, GenerationMode.POSITIVE):
-        if case.media_type == "application/json" and body_mode(case) == GenerationMode.POSITIVE:
-            assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid for oneOf: {case.body!r}"
+    assert [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)] == []
 
 
 def test_coverage_form_urlencoded_primitive_body_negative_no_crash(ctx):
