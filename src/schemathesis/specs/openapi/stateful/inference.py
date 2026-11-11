@@ -118,7 +118,11 @@ class LinkInferencer:
     def match(self, path: str) -> tuple[OperationReference, Mapping[str, str]] | None:
         """Match path to API operation and extract path parameters."""
         try:
-            operation, arguments = self._adapter.match(path)
+            try:
+                operation, arguments = self._adapter.match(path)
+            except MethodNotAllowed as exc:
+                # A path without GET matches through one of its own methods, picked in a stable order
+                operation, arguments = self._adapter.match(path, method=min(exc.valid_methods or ()))
         except (NotFound, MethodNotAllowed, RequestRedirect):
             return None
         names = self._parameter_names[operation]
