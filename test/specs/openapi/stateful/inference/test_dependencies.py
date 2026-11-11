@@ -13985,11 +13985,38 @@ def test_created_id_from_primitive_body_needs_identifier_media_type(ctx, media_t
     assert inferred_links(graph) == expected
 
 
-def test_created_id_from_primitive_body_in_swagger_2(ctx):
+@pytest.mark.parametrize(
+    ("operation_produces", "global_produces", "expected"),
+    [
+        (["text/html"], None, []),
+        (None, ["text/html"], []),
+        (["application/json"], None, CALL_ID_FROM_CREATED_CALL),
+        (["text/html", "application/json"], None, CALL_ID_FROM_CREATED_CALL),
+        (["application/json"], ["text/html"], CALL_ID_FROM_CREATED_CALL),
+        (None, None, CALL_ID_FROM_CREATED_CALL),
+        ([None], None, CALL_ID_FROM_CREATED_CALL),
+        (5, None, CALL_ID_FROM_CREATED_CALL),
+    ],
+    ids=[
+        "operation-html",
+        "global-html",
+        "json",
+        "html-or-json",
+        "operation-overrides-global",
+        "no-produces",
+        "malformed-item",
+        "malformed-scalar",
+    ],
+)
+def test_created_id_from_primitive_body_in_swagger_2(ctx, operation_produces, global_produces, expected):
+    create = {"responses": {"201": {"description": "Created", "schema": {"type": "string"}}}}
+    if operation_produces is not None:
+        create["produces"] = operation_produces
+    extra = {} if global_produces is None else {"produces": global_produces}
     _, graph = analyze_dependencies(
         ctx,
         {
-            "/calls": {"post": {"responses": {"201": {"description": "Created", "schema": {"type": "string"}}}}},
+            "/calls": {"post": create},
             "/calls/{call_id}/accept": {
                 "post": {
                     "parameters": [{"name": "call_id", "in": "path", "required": True, "type": "string"}],
@@ -13998,8 +14025,9 @@ def test_created_id_from_primitive_body_in_swagger_2(ctx):
             },
         },
         version="2.0",
+        **extra,
     )
-    assert inferred_links(graph) == CALL_ID_FROM_CREATED_CALL
+    assert inferred_links(graph) == expected
 
 
 # Spring-style envelopes wrap a created id next to status fields: `{time, httpStatus, isSuccess, response: "<id>"}`.
