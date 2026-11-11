@@ -19,6 +19,7 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import cache
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.specs.openapi.auth_inference import record_auth_inference
+from test.apps.runtime import OpenAPIApp
 from test.utils import refusing_url
 
 
@@ -155,10 +156,65 @@ def test_error_feedback_contradicted_drops_entry(ctx, tmp_path, app_runner):
     assert entries == []
 
 
-def test_method_not_allowed_confirmed_with_configured_auth_hydrates_skip(ctx, tmp_path):
-    api = ctx.openapi.apps.unimplemented_method()
-    schema = schemathesis.openapi.from_url(api.schema_url)
+def _basic_auth(schema):
     schema.config.update(basic_auth=("user", "pass"))
+
+
+def _schema_auth_provider(schema):
+    @schema.auth()
+    class Auth:
+        def get(self, case, context):
+            return "schema-token"
+
+        def set(self, case, data, context):
+            case.headers["Authorization"] = f"Bearer {data}"
+
+
+def _global_auth_provider(schema):
+    @schemathesis.auth()
+    class Auth:
+        def get(self, case, context):
+            return "global-token"
+
+        def set(self, case, data, context):
+            case.headers["Authorization"] = f"Bearer {data}"
+
+
+def _security_scheme_credentials(schema):
+    schema.config.auth.openapi.schemes["BearerAuth"] = HttpBearerAuthConfig(bearer="scheme-token")
+
+
+@pytest.mark.parametrize(
+    ("configure_auth", "authorization"),
+    [
+        (_basic_auth, "Basic dXNlcjpwYXNz"),
+        (_schema_auth_provider, "Bearer schema-token"),
+        (_global_auth_provider, "Bearer global-token"),
+        (_security_scheme_credentials, "Bearer scheme-token"),
+    ],
+    ids=["basic-auth", "schema-provider", "global-provider", "security-scheme"],
+)
+def test_method_not_allowed_confirmed_with_configured_auth_hydrates_skip(ctx, tmp_path, configure_auth, authorization):
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/missing": {
+                "post": {
+                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={"securitySchemes": {"BearerAuth": {"type": "http", "scheme": "bearer"}}},
+        security=[{"BearerAuth": []}],
+    )
+
+    @app.route("/missing", methods=["POST"])
+    def missing():
+        return jsonify({"error": "Method Not Allowed"}), 405
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    configure_auth(schema)
     _point_cache_at(schema, tmp_path)
     _seed(
         tmp_path,
@@ -181,11 +237,40 @@ def test_method_not_allowed_confirmed_with_configured_auth_hydrates_skip(ctx, tm
 
     assert report.replayed == 1
     assert [(request.method, request.path, request.headers.get("Authorization")) for request in api.requests] == [
-        ("POST", "/missing", "Basic dXNlcjpwYXNz")
+        ("POST", "/missing", authorization)
     ]
     verdict = engine.supervisor.verdict("POST /missing")
     assert verdict.directive is SchedulingDirective.SKIP
     assert "restored from cache" in (verdict.reason or "")
+
+
+def test_method_not_allowed_skipped_when_auth_provider_fails(ctx, tmp_path):
+    api = ctx.openapi.apps.unimplemented_method()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+
+    @schema.auth()
+    class Auth:
+        def get(self, case, context):
+            raise RuntimeError("Login endpoint is down")
+
+        def set(self, case, data, context):
+            case.headers["Authorization"] = f"Bearer {data}"
+
+    _point_cache_at(schema, tmp_path)
+    _seed(
+        tmp_path,
+        [
+            Entry(
+                id=1,
+                kind=Kind.METHOD_NOT_ALLOWED,
+                operation="POST /missing",
+                request=Request(method="POST", headers={"content-type": "application/json"}, body={"name": "x"}),
+            )
+        ],
+    )
+
+    assert _engine_for(schema).cache.run() == cache.CacheReport(replayed=0, dropped=0, skipped=1)
+    assert api.requests == []
 
 
 def test_method_not_allowed_contradicted_drops_entry(ctx, tmp_path, app_runner):
