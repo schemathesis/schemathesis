@@ -96,78 +96,7 @@ def create_test(
 
     ApiOperationMark.set(hypothesis_test, operation)
 
-    # Get user's explicit settings from their @settings decorator (if present).
-    # config.explicit_settings carries settings applied outside the lazy schema wrapper
-    # (e.g. @settings applied after @lazy_schema.parametrize()).
-    user_explicit_settings = getattr(test_func, SETTINGS_ATTRIBUTE_NAME, None) or config.explicit_settings
-
-    # Get settings from the @given wrapper (inherits from loaded profile or default)
-    given_settings = getattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, None)
-    assert given_settings is not None
-
-    # Determine the source of user's settings:
-    # - User's @settings decorator takes priority
-    # - Otherwise use @given settings (which inherit from loaded profile or default)
-    if user_explicit_settings is not None:
-        user_settings = user_explicit_settings
-    else:
-        user_settings = given_settings
-
-    default = hypothesis.settings.default
-    # Hypothesis always has a loaded profile.
-    assert default is not None
-    if user_settings.verbosity == default.verbosity:
-        user_settings = hypothesis.settings(user_settings, verbosity=Verbosity.quiet)
-
-    if config.settings is not None:
-        # Get hypothesis' built-in defaults (not affected by loaded profiles)
-        hypothesis_defaults = hypothesis.settings.get_profile("default")
-
-        # Values are whatever each Hypothesis setting accepts.
-        overrides: dict[str, Any] = {}
-        if hypothesis.settings.default is not CI:
-            # Values from `@settings` or a loaded profile that differ from Hypothesis defaults override the config,
-            # except that a loaded profile never overrides options set via CLI, config file or `update()`.
-            overrides = {
-                item: getattr(user_settings, item)
-                for item in all_settings
-                if getattr(user_settings, item) != getattr(hypothesis_defaults, item)
-                and (user_explicit_settings is not None or item not in config.explicit_setting_names)
-            }
-        elif config.apply_ci_profile:
-            # Hypothesis loads its `ci` profile on its own when it detects a CI environment. Precedence:
-            # - User's @settings decorator: values that differ from the `ci` profile
-            # - Schemathesis config: options set via CLI, config file or `update()`, whatever the value,
-            #   and, for configs built in Python, values that differ from Hypothesis defaults
-            # - `ci` profile
-            for item in all_settings:
-                user_value = getattr(user_settings, item)
-                profile_value = getattr(CI, item)
-                default_value = getattr(hypothesis_defaults, item)
-                if user_value != profile_value:
-                    overrides[item] = user_value
-                    continue
-                configured = item in config.explicit_setting_names or getattr(config.settings, item) != default_value
-                # Derandomizing drops the example database, so a configured one keeps randomness
-                drops_database = item == "derandomize" and config.settings.database is not None
-                if not configured and not drops_database and profile_value != default_value:
-                    overrides[item] = profile_value
-        # Otherwise it is a CLI test under the skipped `ci` profile: without a @settings decorator,
-        # the @given settings carry nothing but that profile.
-        settings = hypothesis.settings(config.settings, **overrides)
-    else:
-        settings = user_settings
-
-    if Phase.explain in settings.phases:
-        phases: tuple[Phase, ...] = tuple(phase for phase in settings.phases if phase != Phase.explain)
-        settings = hypothesis.settings(settings, phases=phases)
-
-    # Remove `reuse` & `generate` phases to avoid yielding any test cases if we don't do fuzzing
-    if HypothesisTestMode.FUZZING not in config.modes and (
-        Phase.generate in settings.phases or Phase.reuse in settings.phases
-    ):
-        phases = tuple(phase for phase in settings.phases if phase not in (Phase.reuse, Phase.generate))
-        settings = hypothesis.settings(settings, phases=phases)
+    settings = _drop_unused_phases(_resolve_settings(test_func, hypothesis_test, config), config.modes)
 
     specification = operation.schema.specification
 
@@ -177,24 +106,7 @@ def create_test(
         and Phase.explicit in settings.phases
         and specification.supports_feature(SpecificationFeature.EXAMPLES)
     ):
-        # Check if user provided custom strategies via @schema.given()
-        # AND the operation actually has examples
-        # These are incompatible because examples only provide 'case' while custom strategies require additional parameters
-        if config.given_kwargs:
-            # Check if there are actually examples to add
-            try:
-                example_strategies = list(
-                    operation.get_strategies_from_examples(feedback=config.feedback, **strategy_kwargs)
-                )
-            except Exception:
-                # If we can't get examples (invalid schema, etc), let add_examples handle it
-                example_strategies = []
-
-            if example_strategies:
-                # Get the parameter names from given_kwargs to show in error message
-                param_names = ", ".join(sorted(config.given_kwargs.keys()))
-                raise IncorrectUsage(format_given_and_schema_examples_error(param_names))
-
+        _reject_given_with_schema_examples(operation, config, strategy_kwargs)
         hypothesis_test = add_examples(
             hypothesis_test,
             operation,
@@ -237,6 +149,109 @@ def create_test(
     setattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, settings)
 
     return hypothesis_test
+
+
+def _resolve_settings(
+    test_func: Callable, hypothesis_test: Callable, config: HypothesisTestConfig
+) -> hypothesis.settings:
+    """Combine the user's Hypothesis settings with the ones from the Schemathesis config."""
+    # Get user's explicit settings from their @settings decorator (if present).
+    # config.explicit_settings carries settings applied outside the lazy schema wrapper
+    # (e.g. @settings applied after @lazy_schema.parametrize()).
+    user_explicit_settings = getattr(test_func, SETTINGS_ATTRIBUTE_NAME, None) or config.explicit_settings
+
+    # Get settings from the @given wrapper (inherits from loaded profile or default)
+    given_settings = getattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, None)
+    assert given_settings is not None
+
+    # Determine the source of user's settings:
+    # - User's @settings decorator takes priority
+    # - Otherwise use @given settings (which inherit from loaded profile or default)
+    if user_explicit_settings is not None:
+        user_settings = user_explicit_settings
+    else:
+        user_settings = given_settings
+
+    default = hypothesis.settings.default
+    # Hypothesis always has a loaded profile.
+    assert default is not None
+    if user_settings.verbosity == default.verbosity:
+        user_settings = hypothesis.settings(user_settings, verbosity=Verbosity.quiet)
+
+    if config.settings is None:
+        return user_settings
+
+    # Get hypothesis' built-in defaults (not affected by loaded profiles)
+    hypothesis_defaults = hypothesis.settings.get_profile("default")
+
+    # Values are whatever each Hypothesis setting accepts.
+    overrides: dict[str, Any] = {}
+    if hypothesis.settings.default is not CI:
+        # Values from `@settings` or a loaded profile that differ from Hypothesis defaults override the config,
+        # except that a loaded profile never overrides options set via CLI, config file or `update()`.
+        overrides = {
+            item: getattr(user_settings, item)
+            for item in all_settings
+            if getattr(user_settings, item) != getattr(hypothesis_defaults, item)
+            and (user_explicit_settings is not None or item not in config.explicit_setting_names)
+        }
+    elif config.apply_ci_profile:
+        # Hypothesis loads its `ci` profile on its own when it detects a CI environment. Precedence:
+        # - User's @settings decorator: values that differ from the `ci` profile
+        # - Schemathesis config: options set via CLI, config file or `update()`, whatever the value,
+        #   and, for configs built in Python, values that differ from Hypothesis defaults
+        # - `ci` profile
+        for item in all_settings:
+            user_value = getattr(user_settings, item)
+            profile_value = getattr(CI, item)
+            default_value = getattr(hypothesis_defaults, item)
+            if user_value != profile_value:
+                overrides[item] = user_value
+                continue
+            configured = item in config.explicit_setting_names or getattr(config.settings, item) != default_value
+            # Derandomizing drops the example database, so a configured one keeps randomness
+            drops_database = item == "derandomize" and config.settings.database is not None
+            if not configured and not drops_database and profile_value != default_value:
+                overrides[item] = profile_value
+    # Otherwise it is a CLI test under the skipped `ci` profile: without a @settings decorator,
+    # the @given settings carry nothing but that profile.
+    return hypothesis.settings(config.settings, **overrides)
+
+
+def _drop_unused_phases(settings: hypothesis.settings, modes: list[HypothesisTestMode]) -> hypothesis.settings:
+    if Phase.explain in settings.phases:
+        phases: tuple[Phase, ...] = tuple(phase for phase in settings.phases if phase != Phase.explain)
+        settings = hypothesis.settings(settings, phases=phases)
+
+    # Remove `reuse` & `generate` phases to avoid yielding any test cases if we don't do fuzzing
+    if HypothesisTestMode.FUZZING not in modes and (
+        Phase.generate in settings.phases or Phase.reuse in settings.phases
+    ):
+        phases = tuple(phase for phase in settings.phases if phase not in (Phase.reuse, Phase.generate))
+        settings = hypothesis.settings(settings, phases=phases)
+    return settings
+
+
+def _reject_given_with_schema_examples(
+    operation: APIOperation, config: HypothesisTestConfig, strategy_kwargs: dict[str, Any]
+) -> None:
+    # Check if user provided custom strategies via @schema.given()
+    # AND the operation actually has examples
+    # These are incompatible because examples only provide 'case' while custom strategies require additional parameters
+    if config.given_kwargs:
+        # Check if there are actually examples to add
+        try:
+            example_strategies = list(
+                operation.get_strategies_from_examples(feedback=config.feedback, **strategy_kwargs)
+            )
+        except Exception:
+            # If we can't get examples (invalid schema, etc), let add_examples handle it
+            example_strategies = []
+
+        if example_strategies:
+            # Get the parameter names from given_kwargs to show in error message
+            param_names = ", ".join(sorted(config.given_kwargs.keys()))
+            raise IncorrectUsage(format_given_and_schema_examples_error(param_names))
 
 
 SETTINGS_ATTRIBUTE_NAME = "_hypothesis_internal_use_settings"
