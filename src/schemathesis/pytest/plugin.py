@@ -46,7 +46,7 @@ from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, _WORKER_AFTER_RUN_FAI
 from schemathesis.pytest._subtests import HAS_CORE_SUBTESTS, is_subtest_report
 from schemathesis.pytest._test_builder import schema_error_suffix
 from schemathesis.pytest.control_flow import fail_on_no_matches
-from schemathesis.pytest.reporting import PytestReportOutcome, open_writers, write_report_locations
+from schemathesis.pytest.reporting import PytestReportOutcome, open_writers, write_report_locations, write_to_writers
 from schemathesis.pytest.warnings import (
     emit_constants_warnings,
     emit_openapi_auth_warnings,
@@ -532,47 +532,29 @@ def _open_writers(
     )
 
 
-def _write_to_writers(
-    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter],
-    recorder: ScenarioRecorder,
-    elapsed_sec: float,
-    tags: list[str] | None = None,
-    outcome: PytestReportOutcome | None = None,
-    has_recorder: bool = True,
-) -> None:
-    from schemathesis.reporting.html.writer import HtmlWriter
-    from schemathesis.reporting.junitxml import JunitXmlWriter
-
-    _AllureWriter: type[AllureWriter] | None = None
-    try:
-        from schemathesis.reporting.allure import AllureWriter as _AllureWriter
-    except ImportError:
-        pass
-
-    for writer in writers:
-        if isinstance(writer, (JunitXmlWriter, HtmlWriter)):
-            writer.write(
-                recorder,
-                elapsed_sec,
-                status=outcome.status if outcome is not None else None,
-                message=outcome.message if outcome is not None else None,
-            )
-        elif _AllureWriter is not None and isinstance(writer, _AllureWriter):
-            writer.write(
-                recorder,
-                elapsed_sec,
-                tags=tags,
-                status=outcome.status if outcome is not None else None,
-                message=outcome.message if outcome is not None else None,
-            )
-        elif has_recorder:
-            writer.write(recorder)
-
-
 def _writers_key(schema: SchemaMetadata) -> int:
     # Schemas cloned for each test share their report config, so it identifies whose reports a result belongs to.
     # The registered entry keeps that config alive, so its id cannot be reused while the entry exists.
     return id(schema.config)
+
+
+def _ensure_writer_entry(
+    config: pytest.Config, schema: SchemaMetadata
+) -> tuple[PytestReportDispatcher, list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter]] | None:
+    """The dispatcher and report writers shared by this schema's tests, created by the first test that needs them."""
+    from schemathesis.pytest.reporting import PytestReportDispatcher
+
+    entries = config.stash[_CASSETTE_KEY]
+    schema_id = _writers_key(schema)
+    entry = entries.get(schema_id)
+    if entry is not None:
+        return entry
+    # Workers write no reports themselves; they collect results for the controller.
+    writers = [] if _is_xdist_worker(config) else _open_writers(schema, config)
+    if not writers and not _is_xdist_worker(config):
+        return None
+    entry = entries[schema_id] = (PytestReportDispatcher(schema), writers)
+    return entry
 
 
 def _register_allure_forwarder(
@@ -698,7 +680,7 @@ def _write_pytest_result(
             has_recorder=has_recorder,
         )
     else:
-        _write_to_writers(
+        write_to_writers(
             writers,
             recorder,
             elapsed_sec,
@@ -713,23 +695,11 @@ def report_subtest(
     item: pytest.Item, schema: SchemaMetadata, label: str, tags: list[str] | None
 ) -> Generator[None, None, None]:
     reports = schema.config.reports
-    if not (_has_reports(reports)):
+    entry = _ensure_writer_entry(item.config, schema) if _has_reports(reports) else None
+    if entry is None:
         yield
         return
-
-    from schemathesis.pytest.reporting import PytestReportDispatcher
-
-    schema_id = _writers_key(schema)
-    entry = item.config.stash[_CASSETTE_KEY].get(schema_id)
-    if entry is None:
-        writers = [] if _is_xdist_worker(item.config) else _open_writers(schema, item.config)
-        if not writers and not _is_xdist_worker(item.config):
-            yield
-            return
-        dispatcher = PytestReportDispatcher(schema)
-        item.config.stash[_CASSETTE_KEY][schema_id] = (dispatcher, writers)
-    else:
-        dispatcher, writers = entry
+    dispatcher, writers = entry
 
     allure_buffer = None
     if _is_xdist_worker(item.config) and reports.allure.enabled:
@@ -767,51 +737,36 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         _setup_stateful_test(item, item_cls, schema)
         return
 
-    if not isinstance(item, SchemathesisFunction):
-        return
-    if item.operation_label is None:
+    if not isinstance(item, SchemathesisFunction) or item.operation_label is None:
         return
     schema = SchemaHandleMark.get(item.test_function)
+    if schema is not None:
+        _setup_operation_reporting(item, schema, item.operation_label)
 
-    from schemathesis.pytest.reporting import PytestReportDispatcher
 
-    if schema is None:
-        return
-
+def _setup_operation_reporting(item: SchemathesisFunction, schema: BaseSchema, label: str) -> None:
     reports = schema.config.reports
-    if not (_has_reports(reports)):
+    if not _has_reports(reports):
         return
-    schema_id = _writers_key(schema)
-
     if _is_xdist_worker(item.config):
-        dispatcher = PytestReportDispatcher(schema)
-        item.config.stash[_CASSETTE_KEY][schema_id] = (dispatcher, [])
+        from schemathesis.pytest.reporting import PytestReportDispatcher
 
+        item.config.stash[_CASSETTE_KEY][_writers_key(schema)] = (PytestReportDispatcher(schema), [])
         if reports.allure.enabled:
             from schemathesis.reporting.allure import AllureCallBuffer
 
             buffer = AllureCallBuffer()
-            forwarder = _register_allure_forwarder(item.operation_label, [buffer])
+            forwarder = _register_allure_forwarder(label, [buffer])
             assert forwarder is not None
             item.stash[_ALLURE_BUFFER_KEY] = buffer
             item.stash[_ALLURE_FORWARDER_KEY] = forwarder
         return
 
-    entry = item.config.stash[_CASSETTE_KEY].get(schema_id)
-    if entry is not None:
-        _, writers = entry
-        forwarder = _register_allure_forwarder(item.operation_label, writers)
-        if forwarder is not None:
-            item.stash[_ALLURE_FORWARDER_KEY] = forwarder
+    entry = _ensure_writer_entry(item.config, schema)
+    if entry is None:
         return
-
-    writers = _open_writers(schema, item.config)
-    if not writers:
-        return
-
-    dispatcher = PytestReportDispatcher(schema)
-    item.config.stash[_CASSETTE_KEY][schema_id] = (dispatcher, writers)
-    forwarder = _register_allure_forwarder(item.operation_label, writers)
+    _, writers = entry
+    forwarder = _register_allure_forwarder(label, writers)
     if forwarder is not None:
         item.stash[_ALLURE_FORWARDER_KEY] = forwarder
 
@@ -824,7 +779,7 @@ def _setup_stateful_test(item: pytest.Item, item_cls: type, schema: BaseSchema) 
         reports = schema.config.reports
         if _has_reports(reports):
 
-            def _xdist_stateful_callback(recorder: Any, elapsed_sec: float) -> None:
+            def _xdist_stateful_callback(recorder: ScenarioRecorder, elapsed_sec: float) -> None:
                 # pytest-xdist sets `workeroutput` on worker configs.
                 workeroutput = item.config.workeroutput  # type: ignore[attr-defined]
                 _push_to_xdist_workeroutput(workeroutput, schema, recorder, elapsed_sec)
@@ -836,9 +791,9 @@ def _setup_stateful_test(item: pytest.Item, item_cls: type, schema: BaseSchema) 
         item.stash[_STATEFUL_WRITERS_KEY] = writers
         if writers:
 
-            def _stateful_callback(recorder: Any, elapsed_sec: float) -> None:
+            def _stateful_callback(recorder: ScenarioRecorder, elapsed_sec: float) -> None:
                 # Tags are not available for stateful tests — operations are discovered dynamically
-                _write_to_writers(writers, recorder, elapsed_sec)
+                write_to_writers(writers, recorder, elapsed_sec)
 
             StatefulCallbackMark.set(item_cls, _stateful_callback)
 
@@ -855,15 +810,20 @@ def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> 
 def _teardown_reporting(item: pytest.Item) -> None:
     item_cls = getattr(item, "cls", None)
     if item_cls is not None and StatefulSchemaMark.is_set(item_cls):
-        StatefulCallbackMark.set(item_cls, None)
-        for writer in item.stash.get(_STATEFUL_WRITERS_KEY, []):
-            writer.close()
+        _teardown_stateful_test(item, item_cls)
         return
+    if not isinstance(item, SchemathesisFunction) or item.operation_label is None:
+        return
+    _teardown_operation_reporting(item, item.operation_label)
 
-    if not isinstance(item, SchemathesisFunction):
-        return
-    if item.operation_label is None:
-        return
+
+def _teardown_stateful_test(item: pytest.Item, item_cls: type) -> None:
+    StatefulCallbackMark.set(item_cls, None)
+    for writer in item.stash.get(_STATEFUL_WRITERS_KEY, []):
+        writer.close()
+
+
+def _teardown_operation_reporting(item: SchemathesisFunction, label: str) -> None:
     forwarder = item.stash.get(_ALLURE_FORWARDER_KEY, None)
     if forwarder is not None:
         del item.stash[_ALLURE_FORWARDER_KEY]
@@ -884,7 +844,7 @@ def _teardown_reporting(item: pytest.Item) -> None:
     _write_pytest_result(
         item,
         schema,
-        item.operation_label,
+        label,
         item.operation_tags,
         dispatcher,
         writers,

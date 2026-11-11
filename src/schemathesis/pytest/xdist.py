@@ -25,7 +25,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.failure_codes import get_failure_class
 from schemathesis.pytest._keys import _WORKER_AFTER_RUN_FAILURES_KEY
-from schemathesis.pytest.reporting import PYTEST_FORMATS, PytestReportOutcome, open_writers
+from schemathesis.pytest.reporting import PYTEST_FORMATS, PytestReportOutcome, open_writers, write_to_writers
 from schemathesis.reporting._command import get_command_representation
 from schemathesis.reporting.html.build import enabled_checks
 
@@ -396,13 +396,6 @@ class XdistReportingPlugin:
         )
 
     def pytest_sessionfinish(self, session: pytest.Session, exitstatus: int) -> None:
-        try:
-            from schemathesis.reporting.allure import AllureWriter
-        except ImportError:
-            AllureWriter = None  # type: ignore[assignment,misc]
-        from schemathesis.reporting.html.writer import HtmlWriter
-        from schemathesis.reporting.junitxml import JunitXmlWriter
-
         if hasattr(session.config, "workerinput"):
             return
         data = session.config.stash.get(_XDIST_WRITERS_KEY, {})
@@ -418,47 +411,55 @@ class XdistReportingPlugin:
             try:
                 for record in payload["records"]:
                     recorder, elapsed_sec = deserialize_recorder(record)
-                    tags: list[str] | None = record.get("tags")
-                    raw_status = record.get("status")
-                    outcome = (
-                        PytestReportOutcome(Status[raw_status], record.get("message"))
-                        if raw_status is not None
-                        else None
+                    write_to_writers(
+                        writers,
+                        recorder,
+                        elapsed_sec,
+                        tags=record.get("tags"),
+                        outcome=_outcome_from_record(record),
+                        has_recorder=record.get("has_recorder", True),
                     )
-                    has_recorder = record.get("has_recorder", True)
-                    for writer in writers:
-                        if isinstance(writer, (JunitXmlWriter, HtmlWriter)):
-                            writer.write(
-                                recorder,
-                                elapsed_sec,
-                                status=outcome.status if outcome is not None else None,
-                                message=outcome.message if outcome is not None else None,
-                            )
-                        elif AllureWriter is not None and isinstance(writer, AllureWriter):
-                            writer.write(
-                                recorder,
-                                elapsed_sec,
-                                tags=tags,
-                                status=outcome.status if outcome is not None else None,
-                                message=outcome.message if outcome is not None else None,
-                            )
-                            for call in record.get("allure_calls", []):
-                                t = call["type"]
-                                label = call["label"]
-                                if t == "attach":
-                                    body = base64.b64decode(call["body"]["$base64"])
-                                    writer.accumulate_attachment(label, call["name"], body, _MimeProxy(call["mime"]))
-                                elif t == "link":
-                                    writer.accumulate_link(label, call["url"], call["link_type"], call["name"])
-                                elif t == "title":
-                                    writer.accumulate_title(label, call["title"])
-                                elif t == "description":
-                                    writer.accumulate_description(label, call["description"])
-                        elif has_recorder:
-                            writer.write(recorder)
+                    _replay_allure_calls(writers, record.get("allure_calls", []))
             finally:
                 for writer in writers:
                     writer.close()
+
+
+def _outcome_from_record(record: dict) -> PytestReportOutcome | None:
+    raw_status = record.get("status")
+    if raw_status is None:
+        return None
+    return PytestReportOutcome(Status[raw_status], record.get("message"))
+
+
+def _replay_allure_calls(
+    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter], calls: list[dict]
+) -> None:
+    """Apply the Allure calls a worker captured during a test to the Allure reports."""
+    if not calls:
+        return
+    try:
+        from schemathesis.reporting.allure import AllureWriter
+    except ImportError:
+        return
+    for writer in writers:
+        if isinstance(writer, AllureWriter):
+            for call in calls:
+                _replay_allure_call(writer, call)
+
+
+def _replay_allure_call(writer: AllureWriter, call: dict) -> None:
+    kind = call["type"]
+    label = call["label"]
+    if kind == "attach":
+        body = base64.b64decode(call["body"]["$base64"])
+        writer.accumulate_attachment(label, call["name"], body, _MimeProxy(call["mime"]))
+    elif kind == "link":
+        writer.accumulate_link(label, call["url"], call["link_type"], call["name"])
+    elif kind == "title":
+        writer.accumulate_title(label, call["title"])
+    elif kind == "description":
+        writer.accumulate_description(label, call["description"])
 
 
 def _rendered(text: str | None) -> Callable[[bytes], str | None] | None:
