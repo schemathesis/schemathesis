@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core import NOT_SET
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import Unresolvable
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi.stateful import LinkedBody
-from schemathesis.specs.openapi.stateful.link_values import count_matches, select_match
+from schemathesis.specs.openapi.stateful.link_values import count_matches, select_match, with_body_fields
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 
 if TYPE_CHECKING:
@@ -55,21 +56,28 @@ def collect_link_candidates(
                 overrides[container_name] = container_overrides
         if failed:
             continue
+        request_body = NOT_SET
         if transition.request_body is not None:
-            resolved_body = _resolve(transition.request_body.value)
-            if resolved_body is _FAILED:
+            request_body = _resolve(transition.request_body.value)
+            if request_body is _FAILED:
                 continue
-            overrides["body"] = resolved_body
         candidates.extend(
-            _candidates_per_match(operations_by_label[target_label], overrides, merge_body=link.merge_body)
+            _candidates_per_match(
+                operations_by_label[target_label], overrides, request_body, merge_body=link.merge_body
+            )
         )
     return candidates
 
 
 def _candidates_per_match(
-    target: APIOperation, overrides: dict[str, Any], *, merge_body: bool
+    target: APIOperation, overrides: dict[str, Any], request_body: Any, *, merge_body: bool
 ) -> list[tuple[APIOperation, dict[str, Any]]]:
-    """One candidate per value a wildcard link matched; a merged link body keeps the other generated fields."""
+    """One candidate per value a wildcard link matched; linked body values keep the other generated fields."""
+    body = with_body_fields(request_body, overrides.pop("body", {}))
+    if body is not NOT_SET:
+        overrides["body"] = body
+    # Only a linked request body can replace the generated one
+    merge_body = merge_body or request_body is NOT_SET
     candidates: list[tuple[APIOperation, dict[str, Any]]] = []
     for index in range(count_matches(overrides)):
         selected = select_match(overrides, index)

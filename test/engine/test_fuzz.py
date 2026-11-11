@@ -876,15 +876,31 @@ def test_iter_link_candidates_edge_links(ctx, case_factory, response_factory, li
 
 
 @pytest.mark.parametrize(
-    ("extension", "expected"),
+    ("link_values", "extension", "expected"),
     [
-        (None, {"productId": "abc", "quantity": 1}),
-        ({"merge_body": False}, {"productId": "abc"}),
+        ({"requestBody": {"productId": "$response.body#/productId"}}, None, {"productId": "abc", "quantity": 1}),
+        ({"requestBody": {"productId": "$response.body#/productId"}}, {"merge_body": False}, {"productId": "abc"}),
+        ({"parameters": {"body.productId": "$response.body#/productId"}}, None, {"productId": "abc", "quantity": 1}),
+        (
+            {"parameters": {"body.productId": "$response.body#/productId"}},
+            {"merge_body": False},
+            {"productId": "abc", "quantity": 1},
+        ),
+        (
+            {"parameters": {"body.productId": "$response.body#/productId"}, "requestBody": {"quantity": 1}},
+            None,
+            {"productId": "abc", "quantity": 1},
+        ),
+        (
+            {"parameters": {"body.productId": "$response.body#/productId"}, "requestBody": {"quantity": 1}},
+            {"merge_body": False},
+            {"productId": "abc", "quantity": 1},
+        ),
     ],
-    ids=["merge", "replace"],
+    ids=["merge", "replace", "merge-field", "replace-field", "merge-field-and-body", "replace-field-and-body"],
 )
-def test_link_candidate_body_merging(ctx, case_factory, response_factory, extension, expected):
-    link = {"operationId": "createOrder", "requestBody": {"productId": "$response.body#/productId"}}
+def test_link_candidate_body_merging(ctx, case_factory, response_factory, link_values, extension, expected):
+    link = {"operationId": "createOrder", **link_values}
     if extension is not None:
         link["x-schemathesis"] = extension
     schema = ctx.openapi.load_schema(
