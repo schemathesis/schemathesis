@@ -27,6 +27,7 @@
 - `ignored_auth` sending two extra requests per authenticated success in pytest and `call_and_validate()`.
 - Blank argument values in Hypothesis failures of pytest sessions without Schemathesis tests.
 - Custom `encoding` ignored for form fields declared in `allOf` branches.
+- False positive `negative_data_rejection` for `deepObject` members sent more than once.
 - False positive `negative_data_rejection` for scalar values sent to form body array fields.
 - False positive and internal error in `negative_data_rejection` for `deepObject` members under `$ref`. [#6025](https://github.com/schemathesis/schemathesis/issues/6025) [#6028](https://github.com/schemathesis/schemathesis/issues/6028)
 - False positive `positive_data_acceptance` when a `body.*` override sets a field sharing its `$ref` with others. [#6026](https://github.com/schemathesis/schemathesis/issues/6026)
