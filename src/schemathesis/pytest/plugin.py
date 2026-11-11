@@ -58,7 +58,6 @@ from schemathesis.pytest.warnings import (
     emit_schema_warnings,
     emit_unserializable_payload_warning,
 )
-from schemathesis.python import asgi
 from schemathesis.python._constants.orchestrator import make_constants_value_source
 from schemathesis.schemas import APIOperation
 
@@ -813,7 +812,11 @@ def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> 
     # Applications reached over ASGI keep their lifespan running between requests; end it with the test that
     # started it, while its fixtures are still alive.
     try:
-        asgi.shutdown_lifespans()
+        # Only the ASGI client starts lifespans, so while it is not loaded there is nothing to end.
+        if "schemathesis.python.asgi" in sys.modules:
+            from schemathesis.python.asgi import shutdown_lifespans
+
+            shutdown_lifespans()
     finally:
         _teardown_reporting(item)
 

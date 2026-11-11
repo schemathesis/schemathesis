@@ -1,5 +1,7 @@
 import platform
 import ssl
+import subprocess
+import sys
 import time
 
 import pytest
@@ -538,6 +540,15 @@ from schemathesis import *
     )
     result = testdir.runpytest()
     assert "cannot collect test class" not in result.stdout.str()
+
+
+# Every pytest run with Schemathesis installed loads the plugin, so it should not pay for an HTTP client.
+_PLUGIN_PROBE = "import sys, schemathesis.pytest.plugin; print(sorted(m for m in sys.modules if m.split('.')[0] in {'requests', 'urllib3'} or m == 'schemathesis.python.asgi'))"
+
+
+def test_plugin_load_does_not_import_asgi_client():
+    output = subprocess.run([sys.executable, "-c", _PLUGIN_PROBE], capture_output=True, text=True, check=True).stdout
+    assert output.strip() == "[]"
 
 
 def test_skip_negative_without_parameters(testdir):
