@@ -515,6 +515,96 @@ def test_negative_data_rejection_body_override_restoring_mutated_field(ctx, cli)
     ], result.stdout
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize("phase", ["fuzzing", "stateful"])
+def test_positive_data_acceptance_body_override_of_shared_ref_field_no_false_positive(ctx, cli, snapshot_cli, phase):
+    # `id` and `owner` share one definition, so a mutation recorded at `owner` must not leak into `id`.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/resources": {
+                "post": {
+                    "operationId": "createResource",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {"$ref": "#/components/schemas/Id"},
+                                        "owner": {"$ref": "#/components/schemas/Id"},
+                                    },
+                                    "required": ["id", "owner"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "GetResource": {
+                                    "operationId": "getResource",
+                                    "parameters": {"id": "$response.body#/id"},
+                                }
+                            },
+                        },
+                        "400": {"description": "Invalid"},
+                    },
+                }
+            },
+            "/resources/{id}": {
+                "get": {
+                    "operationId": "getResource",
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"$ref": "#/components/schemas/Id"}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        components={"schemas": {"Id": {"type": "string", "format": "uuid"}}},
+    )
+
+    def is_uuid(value):
+        try:
+            return isinstance(value, str) and str(uuid.UUID(value)) == value
+        except ValueError:
+            return False
+
+    @app.route("/resources", methods=["POST"])
+    def create_resource():
+        body = request.get_json(silent=True, force=True)
+        if not isinstance(body, dict) or set(body) != {"id", "owner"} or not all(map(is_uuid, body.values())):
+            return jsonify({"error": "invalid body"}), 400
+        return jsonify(body), 201
+
+    @app.route("/resources/<id>", methods=["GET"])
+    def get_resource(id):
+        return jsonify({"id": id}), 200
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--checks=positive_data_acceptance",
+            f"--phases={phase}",
+            # Few negative bodies mutate `owner`, so the run needs enough cases to always draw one.
+            "--max-examples=100",
+            "--seed=1",
+            config={
+                "operations": [
+                    {
+                        "include-name": "POST /resources",
+                        "parameters": {"body.owner": "7c4a4a3e-24b6-4bd5-9a37-2a4b8a9e3b4f"},
+                    }
+                ]
+            },
+        )
+        == snapshot_cli
+    )
+
+
 def test_negative_data_rejection_query_integer_param_accepts_numeric_string_no_false_positive(ctx, cli, app_runner):
     # See GH-3712
     app, _ = ctx.openapi.make_flask_app(
