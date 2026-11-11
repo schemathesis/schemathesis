@@ -31,7 +31,7 @@ from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
 from schemathesis.engine.run.unit._pool import WORKER_FINISHED, DefaultScheduler, WorkerPool, split_results
 from schemathesis.engine.supervisor import SchedulingDirective, Verdict
 from schemathesis.generation import overrides
-from schemathesis.generation.drivers import CaseGenerator, CoverageGenerator, ExamplesGenerator
+from schemathesis.generation.drivers import CaseGenerator, build_coverage_generator, build_examples_generator
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
@@ -44,33 +44,6 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 WORKER_TIMEOUT = 0.1
-
-
-def _build_coverage_generator(
-    operation: APIOperation, ctx: EngineContext, override: Override, feedback: FeedbackSources
-) -> CoverageGenerator:
-    generation = ctx.config.generation_for(operation=operation, phase=PhaseName.COVERAGE.value)
-    return CoverageGenerator(
-        operation=operation,
-        generation_modes=generation.modes,
-        generation_config=generation,
-        auth_storage=None,
-        override=override,
-        feedback=feedback,
-        session=ctx.coverage_session,
-    )
-
-
-def _build_examples_generator(
-    operation: APIOperation, ctx: EngineContext, override: Override, feedback: FeedbackSources
-) -> ExamplesGenerator:
-    phases_config = ctx.config.phases_for(operation=operation)
-    return ExamplesGenerator(
-        operation=operation,
-        override=override,
-        feedback=feedback,
-        fill_missing=phases_config.examples.fill_missing,
-    )
 
 
 def _create_scheduler(
@@ -328,8 +301,10 @@ def _build_driver_generator(
     feedback: FeedbackSources,
 ) -> CaseGenerator:
     if phase == PhaseName.COVERAGE:
-        return _build_coverage_generator(operation, ctx, override, feedback)
-    return _build_examples_generator(operation, ctx, override, feedback)
+        return build_coverage_generator(
+            ctx.config, operation, override=override, feedback=feedback, session=ctx.coverage_session
+        )
+    return build_examples_generator(ctx.config, operation, override=override, feedback=feedback)
 
 
 def _run_hypothesis_test(
