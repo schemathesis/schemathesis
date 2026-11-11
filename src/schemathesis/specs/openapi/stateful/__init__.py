@@ -8,7 +8,13 @@ from hypothesis import strategies as st
 from hypothesis.stateful import RULE_MARKER, Bundle, Rule
 
 from schemathesis.core import NOT_SET
-from schemathesis.core.errors import InvalidStateMachine, InvalidTransition, RefResolutionError
+from schemathesis.core.errors import (
+    InvalidSchema,
+    InvalidStateMachine,
+    InvalidTransition,
+    RefResolutionError,
+    SerializationNotPossible,
+)
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.engine.link_calibration import DEFAULT_USE_PROBABILITY, LinkCalibrationState
@@ -16,8 +22,9 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis import add_database_key
+from schemathesis.generation.hypothesis.reporting import UnsatisfiableSchema
 from schemathesis.generation.meta import TestPhase
-from schemathesis.generation.stateful.control import TransitionController
+from schemathesis.generation.stateful.control import TransitionController, UnbuildableOperationFound
 from schemathesis.generation.stateful.state_machine import (
     APIStateMachine,
     RecordingStateMachine,
@@ -187,6 +194,22 @@ def _step_case_strategy(
     return _mixed_mode_case(strategies)
 
 
+def _draw_case(draw: st.DrawFn, strategy: st.SearchStrategy[Case], operation: APIOperation) -> Case:
+    try:
+        return draw(strategy)
+    except (InvalidSchema, UnsatisfiableSchema, SerializationNotPossible) as exc:
+        machine = draw(st.runner(default=None))
+        # When the run records such operations, it reports this one and continues without it
+        if isinstance(machine, OpenAPIStateMachine) and machine.control.drop_unbuildable(operation, exc):
+            raise UnbuildableOperationFound from exc
+        raise
+
+
+@st.composite
+def _initial_step(draw: st.DrawFn, strategy: st.SearchStrategy[Case], operation: APIOperation) -> StepInput:
+    return StepInput.initial(_draw_case(draw, strategy, operation))
+
+
 def create_state_machine(
     schema: OpenApiSchema,
     *,
@@ -280,7 +303,7 @@ def create_state_machine(
                     name=name,
                     target=catch_all,
                     precondition=is_root_allowed(target.label),
-                    input=case_strategy.map(StepInput.initial),
+                    input=_initial_step(case_strategy, target),
                 )
                 root_rules.add(name)
                 root_labels.add(target.label)
@@ -366,7 +389,8 @@ def into_step_input(
             plan = plan_link_values(
                 transition, merge_body=link.merge_body, use_probability=use_p, calibrated=calibrated, random=random
             )
-            case = draw(
+            case = _draw_case(
+                draw,
                 _step_case_strategy(
                     target,
                     modes,
@@ -376,7 +400,8 @@ def into_step_input(
                     headers=plan.overrides.get("headers"),
                     cookies=plan.overrides.get("cookies"),
                     body=plan.body,
-                )
+                ),
+                target,
             )
             if plan.merged_body is not NOT_SET:
                 LinkedBody(plan.merged_body).apply(case)

@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     from schemathesis.engine.supervisor import Supervisor
     from schemathesis.generation.stateful.state_machine import StepInput
+    from schemathesis.schemas import APIOperation
 
 
 class _Endpoint(Protocol):
@@ -77,6 +78,11 @@ class BundleTransitions:
         yield from self.bundle_sources.get(bundle_name, ())
 
 
+# An interrupt, so Hypothesis neither records nor replays the scenario that raised it.
+class UnbuildableOperationFound(KeyboardInterrupt):
+    """Ends the suite once an operation whose data cannot be generated is left out, so later suites never draw it."""
+
+
 # It is enough to be able to catch double-click type of issues
 MAX_OPERATIONS_PER_SOURCE_CAP = 2
 # Maximum number of concurrent root sources (e.g., active users in the system)
@@ -109,7 +115,15 @@ def _get_max_operations_per_source(transitions: Transitions) -> int:
 class TransitionController:
     """Controls which transitions can be executed in a state machine."""
 
-    __slots__ = ("transitions", "roots", "max_operations_per_source", "statistic", "productive_roots", "supervisor")
+    __slots__ = (
+        "transitions",
+        "roots",
+        "max_operations_per_source",
+        "statistic",
+        "productive_roots",
+        "supervisor",
+        "unbuildable",
+    )
 
     def __init__(self, transitions: Transitions, roots: Collection[str]) -> None:
         # Incoming & outgoing transitions available in the state machine
@@ -124,9 +138,20 @@ class TransitionController:
         # Optional engine-side supervisor; the engine sets this on the per-scenario
         # state machine so transitions targeting SKIP-verdict operations are filtered out.
         self.supervisor: Supervisor | None = None
+        # Optional engine-side record of operations whose data cannot be generated, by label; they are never scheduled.
+        self.unbuildable: dict[str, tuple[APIOperation, Exception]] | None = None
 
     def _is_skipped(self, label: str) -> bool:
+        if self.unbuildable is not None and label in self.unbuildable:
+            return True
         return self.supervisor is not None and self.supervisor.verdict(label).directive is SchedulingDirective.SKIP
+
+    def drop_unbuildable(self, operation: APIOperation, error: Exception) -> bool:
+        """Stop scheduling an operation whose data cannot be generated; `False` when nothing records such errors."""
+        if self.unbuildable is None:
+            return False
+        self.unbuildable[operation.label] = (operation, error)
+        return True
 
     def record_step(self, input: StepInput, recorder: ScenarioRecorder) -> None:
         """Record API call input."""

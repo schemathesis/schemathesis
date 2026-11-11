@@ -12,6 +12,7 @@
 - Links from `2XX` or `default` responses followed on status codes another response declares.
 - Link calibration lowering correct links' reuse on 4xx responses unrelated to the linked values.
 - Internal error when a link targets an operation with an unresolvable `$ref`.
+- Stateful phase ending with an unlabeled error when one operation's schema cannot generate data.
 - Links using Swagger 2.0 HTML or other non-identifier response bodies as the created resource id.
 - Links treating `anyOf`/`oneOf` array-or-null fields named like `customer_id` as a single identifier.
 - Missing links for request bodies declared as `anyOf`/`oneOf` of an array and `null`.

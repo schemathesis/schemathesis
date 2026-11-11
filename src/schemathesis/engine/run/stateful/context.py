@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from schemathesis.core.failures import Failure
 from schemathesis.engine import Status
 from schemathesis.generation.metrics import MetricCollector
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
 
 
 @dataclass
@@ -27,6 +31,10 @@ class StatefulContext:
     passed_steps: set[int] = field(default_factory=set)
     # Operations whose skipped timed-out steps are already reported
     reported_timeouts: set[str] = field(default_factory=set)
+    # Operations whose data cannot be generated, by label; later scenarios leave them out
+    unbuildable_operations: dict[str, tuple[APIOperation, Exception]] = field(default_factory=dict)
+    # Labels of those operations that are already reported
+    reported_unbuildable: set[str] = field(default_factory=set)
 
     def reset_scenario(self) -> None:
         self.completed_scenarios += 1
@@ -39,6 +47,14 @@ class StatefulContext:
             return False
         self.reported_timeouts.add(operation_label)
         return True
+
+    def take_unreported_unbuildable(self) -> list[tuple[APIOperation, Exception]]:
+        """Operations whose data cannot be generated and that are not reported yet, each returned once."""
+        unreported = [
+            entry for label, entry in self.unbuildable_operations.items() if label not in self.reported_unbuildable
+        ]
+        self.reported_unbuildable.update(self.unbuildable_operations)
+        return unreported
 
     def reset(self) -> None:
         self.seen_in_suite.clear()
