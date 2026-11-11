@@ -210,6 +210,22 @@ _LIST_CONFIGS = {
     },
     "links": {"ListAllConfigs": {"operationRef": "#/paths/~1brokers~1-~1configs/get"}},
 }
+_CONFIGS = _LIST_CONFIGS["content"]["application/json"]["schema"]
+_CONFIG = _CONFIGS["properties"]["data"]["items"]
+
+
+def _list_configs(schema):
+    return {**_LIST_CONFIGS, "content": {"application/json": {"schema": schema}}}
+
+
+def _configs_referencing(reference):
+    return {**_CONFIGS, "properties": {"data": {"type": "array", "items": {"allOf": [{"$ref": reference}]}}}}
+
+
+# Its references resolve against the name its schema gives itself, so operations keep sharing it.
+_NAMED_LIST_CONFIGS = _list_configs(
+    {**_configs_referencing("#/$defs/Config"), "$id": "https://example.com/configs", "$defs": {"Config": _CONFIG}}
+)
 
 
 # `/brokers/-/configs` shares its response with `/brokers/{broker_id}/configs` but has no `{broker_id}` to forward.
@@ -246,15 +262,28 @@ _LIST_CONFIGS = {
             {"$ref": "responses.json#/ListConfigs"},
             {"$ref": "responses.json#/ListConfigs"},
             {},
+            "$request.path.broker_id",
+        ),
+        (
+            {"$ref": "responses.json#/NamedListConfigs"},
+            {"$ref": "responses.json#/NamedListConfigs"},
+            {},
             "$response.body#/data/*/broker_id",
         ),
     ],
-    ids=["component", "inline", "component-with-media-type-reference", "other-file"],
+    ids=["component", "inline", "component-with-media-type-reference", "other-file", "other-file-with-id"],
 )
 def test_inject_links_keeps_links_off_operations_sharing_a_response(
     ctx, owner_response, shared_response, components, owner_broker_id
 ):
-    ctx.makefile({"ListConfigs": _LIST_CONFIGS}, filename="responses")
+    ctx.makefile(
+        {
+            "ListConfigs": _list_configs(_configs_referencing("#/Config")),
+            "Config": _CONFIG,
+            "NamedListConfigs": _NAMED_LIST_CONFIGS,
+        },
+        filename="responses",
+    )
     path = ctx.openapi.write_schema(
         {
             "/brokers/{broker_id}/configs": {
@@ -301,7 +330,7 @@ def test_inject_links_keeps_links_off_operations_sharing_a_response(
 
 
 def test_inject_links_copies_path_parameters_every_operation_sharing_a_response_has(ctx):
-    ctx.makefile({"ListConfigs": _LIST_CONFIGS}, filename="responses")
+    ctx.makefile({"ListConfigs": _NAMED_LIST_CONFIGS}, filename="responses")
     list_configs = {
         "get": {"parameters": _path_param("broker_id"), "responses": {"200": {"$ref": "responses.json#/ListConfigs"}}}
     }
