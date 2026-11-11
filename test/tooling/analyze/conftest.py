@@ -16,7 +16,7 @@ def analyzer_ndjson(app_runner, tmp_path_factory) -> Path:
     # Session-scoped: the NDJSON is read-only, every test consumes the same shard.
     app, _ = make_flask_app(make_fixture_app.PATHS)
     make_fixture_app.attach_handlers(app)
-    port = app_runner.run_flask_app(app)
+    url = app_runner.openapi_url(app)
 
     directory = tmp_path_factory.mktemp("analyzer")
     out = directory / "run.ndjson"
@@ -26,7 +26,7 @@ def analyzer_ndjson(app_runner, tmp_path_factory) -> Path:
             schemathesis.cli.schemathesis,
             [
                 "run",
-                f"http://127.0.0.1:{port}/openapi.json",
+                url,
                 f"--report-ndjson-path={out}",
                 "--max-examples=8",
                 "--seed=1",

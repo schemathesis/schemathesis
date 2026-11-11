@@ -183,10 +183,7 @@ def create_user_only() -> OpenAPIApp:
     """Just POST /users/ — used to verify behaviour when stateful linking has no target operations."""
     full = _build_users_schema()
     paths = {"/users/": full["paths"]["/users/"]}
-    spec = build_schema(paths, components=full["components"])
-    app = make_flask_app_from_schema(spec)
-    _register_users_handlers(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(paths, _register_users_handlers, components=full["components"])
 
 
 def crud_with_success() -> OpenAPIApp:

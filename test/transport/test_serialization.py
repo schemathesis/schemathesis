@@ -47,11 +47,6 @@ def csv_serializer():
     def serialize_csv(ctx, value):
         return to_csv(value)
 
-    yield
-
-    for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
-        transport.unregister_serializer("text/csv", "text/tsv")
-
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.usefixtures("csv_serializer")
@@ -226,25 +221,21 @@ def test_custom_serializer_returning_none_omits_body(ctx):
     def serialize_empty(ctx, value):
         return None
 
-    try:
-        operation = ctx.openapi.load_operation(
-            "POST /data",
-            {
-                "requestBody": {
-                    "required": True,
-                    "content": {"application/x-empty": {"schema": {"type": "object"}}},
-                },
-                "responses": {"200": {"description": "OK"}},
+    operation = ctx.openapi.load_operation(
+        "POST /data",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"application/x-empty": {"schema": {"type": "object"}}},
             },
-        )
-        case = operation.Case(body={"key": "value"}, media_type="application/x-empty")
-        for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
-            serialized = transport.serialize_case(case)
-            assert serialized["headers"]["Content-Type"] == "application/x-empty"
-            assert "data" not in serialized
-    finally:
-        for transport in (ASGI_TRANSPORT, REQUESTS_TRANSPORT, WSGI_TRANSPORT):
-            transport.unregister_serializer("application/x-empty")
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(body={"key": "value"}, media_type="application/x-empty")
+    for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
+        serialized = transport.serialize_case(case)
+        assert serialized["headers"]["Content-Type"] == "application/x-empty"
+        assert "data" not in serialized
 
 
 def test_unregister_serializer_is_idempotent():
@@ -264,30 +255,24 @@ def test_custom_serializer_for_multipart_part_receives_the_case(ctx, case_factor
     def serialize_empty(ctx, value):
         received.append((ctx.case.media_type, value))
 
-    try:
-        operation = ctx.openapi.load_operation(
-            "POST /upload",
-            {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "multipart/form-data": {
-                            "schema": {"type": "object", "properties": {"meta": {"type": "object"}}},
-                            "encoding": {"meta": {"contentType": "application/x-empty"}},
-                        }
-                    },
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {"type": "object", "properties": {"meta": {"type": "object"}}},
+                        "encoding": {"meta": {"contentType": "application/x-empty"}},
+                    }
                 },
-                "responses": {"200": {"description": "OK"}},
             },
-        )
-        case = case_factory(
-            operation=operation, method="POST", body={"meta": {"a": 1}}, media_type="multipart/form-data"
-        )
-        REQUESTS_TRANSPORT.serialize_case(case)
-        assert received == [("multipart/form-data", {"a": 1})]
-    finally:
-        for transport in (ASGI_TRANSPORT, REQUESTS_TRANSPORT, WSGI_TRANSPORT):
-            transport.unregister_serializer("application/x-empty")
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = case_factory(operation=operation, method="POST", body={"meta": {"a": 1}}, media_type="multipart/form-data")
+    REQUESTS_TRANSPORT.serialize_case(case)
+    assert received == [("multipart/form-data", {"a": 1})]
 
 
 @pytest.mark.parametrize(
@@ -3028,52 +3013,44 @@ def test_duplicate_xml_attributes(ctx):
 def test_serializer_alias_single(ctx, target, source, body, expected_content):
     schemathesis.serializer.alias(target, source)
 
-    try:
-        operation = ctx.openapi.load_operation(
-            "POST /test",
-            {
-                "requestBody": {
-                    "content": {target: {"schema": {"type": "object"}}},
-                },
-                "responses": {"200": {"description": "OK"}},
+    operation = ctx.openapi.load_operation(
+        "POST /test",
+        {
+            "requestBody": {
+                "content": {target: {"schema": {"type": "object"}}},
             },
-        )
-        case = operation.Case(body=body, media_type=target)
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(body=body, media_type=target)
 
-        for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
-            data = transport.serialize_case(case)["data"]
-            data_str = data.decode() if isinstance(data, bytes) else data
-            assert expected_content in data_str
-    finally:
-        for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
-            transport.unregister_serializer(target)
+    for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
+        data = transport.serialize_case(case)["data"]
+        data_str = data.decode() if isinstance(data, bytes) else data
+        assert expected_content in data_str
 
 
 def test_serializer_alias_multiple_targets(ctx):
     schemathesis.serializer.alias(["application/x-custom-yaml", "text/vnd.yaml.custom"], "application/yaml")
 
-    try:
-        operation = ctx.openapi.load_operation(
-            "POST /test",
-            {
-                "requestBody": {
-                    "content": {
-                        "application/x-custom-yaml": {"schema": {"type": "object"}},
-                    }
-                },
-                "responses": {"200": {"description": "OK"}},
+    operation = ctx.openapi.load_operation(
+        "POST /test",
+        {
+            "requestBody": {
+                "content": {
+                    "application/x-custom-yaml": {"schema": {"type": "object"}},
+                }
             },
-        )
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
 
-        for media_type in ["application/x-custom-yaml", "text/vnd.yaml.custom"]:
-            case = operation.Case(body={"id": 42}, media_type=media_type)
-            for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
-                data = transport.serialize_case(case)["data"]
-                data_str = data.decode() if isinstance(data, bytes) else data
-                assert "id" in data_str and "42" in data_str
-    finally:
+    for media_type in ["application/x-custom-yaml", "text/vnd.yaml.custom"]:
+        case = operation.Case(body={"id": 42}, media_type=media_type)
         for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
-            transport.unregister_serializer("application/x-custom-yaml", "text/vnd.yaml.custom")
+            data = transport.serialize_case(case)["data"]
+            data_str = data.decode() if isinstance(data, bytes) else data
+            assert "id" in data_str and "42" in data_str
 
 
 @pytest.mark.parametrize(

@@ -325,7 +325,6 @@ def test_multiple_conformance_issues(engine_factory):
     }
 
 
-@pytest.mark.flaky(reruns=9)
 def test_find_use_after_free(engine_factory):
     engine = engine_factory(
         UseAfterFree(),
@@ -365,14 +364,12 @@ def _use_after_free_state_machine(ctx):
     return StateMachine
 
 
-@pytest.mark.flaky(reruns=9)
 def test_find_use_after_free_via_state_machine(ctx):
     with pytest.raises(FailureGroup) as exc_info:
         _use_after_free_state_machine(ctx).run(settings=_STATE_MACHINE_SETTINGS)
     assert any("Deleted resource still available" in str(e) for e in exc_info.value.exceptions)
 
 
-@pytest.mark.flaky(reruns=9)
 def test_find_use_after_free_via_state_machine_with_overridden_validate_response(ctx):
     class CustomStateMachine(_use_after_free_state_machine(ctx)):
         def validate_response(self, response, case, additional_checks=None, **kwargs):
@@ -711,8 +708,6 @@ def test_negative_changing_to_positive(app_runner):
         CUSTOMERS[customer_id] = data
         return jsonify(customer_id), 201
 
-    app_port = app_runner.run_flask_app(app)
-
     config = schemathesis.Config.from_dict(
         {
             "checks": {
@@ -722,7 +717,7 @@ def test_negative_changing_to_positive(app_runner):
         }
     )
     schema = schemathesis.openapi.from_dict(schema, config=config)
-    schema.config.update(base_url=f"http://127.0.0.1:{app_port}/")
+    schema.config.update(base_url=app_runner.openapi_url(app, path="/"))
     schema.config.generation.update(database="none")
     engine = stateful.execute(
         engine=EngineContext(schema=schema, stop_event=threading.Event()),
@@ -769,11 +764,9 @@ def test_explicit_auth_header_does_not_trigger_negative_data_rejection(app_runne
             return auth_error()
         return jsonify({})
 
-    app_port = app_runner.run_flask_app(app)
-
     config = schemathesis.Config.from_dict(
         {
-            "base-url": f"http://127.0.0.1:{app_port}/",
+            "base-url": app_runner.openapi_url(app, path="/"),
             "headers": {"Authorization": "Bearer secret"},
             "checks": {
                 "enabled": False,
@@ -1275,7 +1268,6 @@ def test_ensure_resource_availability_after_own_path_post(
     def get_user(user_id):
         return jsonify({"detail": "not found"}), 404
 
-    port = app_runner.run_flask_app(app)
     config = schemathesis.Config.from_dict(
         {
             "max-failures": 1,
@@ -1283,7 +1275,7 @@ def test_ensure_resource_availability_after_own_path_post(
             "generation": {"mode": "positive", "max-examples": 40, "database": "none"},
         }
     )
-    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app), config=config)
     result = collect_result(
         stateful.execute(
             engine=EngineContext(schema=schema, stop_event=stop_event),
@@ -1363,7 +1355,6 @@ def test_removal_by_non_delete_verb_suppresses_resource_availability(ctx, app_ru
             return jsonify({"detail": "not found"}), 404
         return jsonify({"userId": user_id}), 200
 
-    port = app_runner.run_flask_app(app)
     config = schemathesis.Config.from_dict(
         {
             "max-failures": 1,
@@ -1371,7 +1362,7 @@ def test_removal_by_non_delete_verb_suppresses_resource_availability(ctx, app_ru
             "generation": {"mode": "positive", "max-examples": 40, "database": "none"},
         }
     )
-    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app), config=config)
     result = collect_result(
         stateful.execute(
             engine=EngineContext(schema=schema, stop_event=stop_event),
@@ -1422,11 +1413,10 @@ def test_inferred_body_link_sends_a_listed_value(ctx, app_runner, stop_event, me
         sent.append((payload or {}).get("language"))
         return jsonify({}), 200
 
-    port = app_runner.run_flask_app(app)
     config = schemathesis.Config.from_dict(
         {"checks": {"enabled": False}, "generation": {"mode": "positive", "max-examples": 10, "database": "none"}}
     )
-    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app), config=config)
     collect_result(
         stateful.execute(
             engine=EngineContext(schema=schema, stop_event=stop_event),

@@ -2,6 +2,7 @@ import base64
 import re
 
 import pytest
+import requests
 from google.protobuf import any_pb2
 from google.rpc import error_details_pb2, status_pb2
 from requests.structures import CaseInsensitiveDict
@@ -180,6 +181,24 @@ def test_ignored_auth_outside_a_run(ctx, headers):
         ("Bearer x", "1"),
         (None, "1"),
     ]
+
+
+@pytest.mark.parametrize(
+    ("auth", "headers", "expected"),
+    [
+        (("user", "pass"), {}, ["Basic dXNlcjpwYXNz", None]),
+        (None, {"authorization": "Bearer s"}, ["Bearer s", None]),
+    ],
+    ids=["session-auth", "session-headers"],
+)
+def test_ignored_auth_probe_drops_session_credentials(ctx, auth, headers, expected):
+    server = ctx.grpc.apps.users()
+    operation = schemathesis.grpc.from_url(server.target)["pkg.Users"]["GetUser"]
+    session = requests.Session()
+    session.auth = auth
+    session.headers = headers
+    operation.Case(body={"userId": 403}).call_and_validate(session=session, checks=[ignored_auth])
+    assert [dict(call.metadata).get("authorization") for call in server.calls] == expected
 
 
 def test_failures_group_by_message(operation, response_factory):

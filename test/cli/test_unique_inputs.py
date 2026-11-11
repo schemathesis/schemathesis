@@ -109,7 +109,6 @@ def run(ctx, cli, unique_hook, schema, base_url, hypothesis_max_examples, *args)
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
-@pytest.mark.flaky(reruns=2)
 def test_cli(ctx, unique_hook, raw_schema, cli, hypothesis_max_examples, snapshot_cli):
     api = ctx.openapi.apps.success()
     assert run(ctx, cli, unique_hook, raw_schema, f"{api.base_url}/api", hypothesis_max_examples) == snapshot_cli

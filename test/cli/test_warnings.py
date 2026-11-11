@@ -932,12 +932,10 @@ def test_missing_test_data_for_graphql_survives_stateful(ctx, cli, app_runner, s
             return jsonify({"data": {"addBook": {"id": "1", "title": "Hitchhiker"}}})
         return jsonify({"data": None})
 
-    port = app_runner.run_flask_app(app)
-
     assert (
         cli.run(
             str(sdl),
-            f"--url=http://127.0.0.1:{port}/graphql",
+            f"--url={app_runner.openapi_url(app, path='/graphql')}",
             "--max-examples=5",
             "-m",
             "positive",
