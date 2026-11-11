@@ -96,7 +96,9 @@ class Observations:
         origin = urlsplit(response.request.url or "")[:2]
         seen = {(entry.status_code, entry.pointer) for entry in entries}
         found = len(entries)
+        scanned = False
         for pointer, value in _iter_strings(document):
+            scanned = True
             path = _same_origin_path(value, origin)
             if path is None or (response.status_code, pointer) in seen:
                 continue
@@ -104,7 +106,11 @@ class Observations:
             entries.append(BodyUrlEntry(status_code=response.status_code, pointer=pointer, value=path))
             if len(entries) >= MAX_BODY_URL_SAMPLES:
                 break
-        self.fruitless_body_scans[operation] = 0 if len(entries) > found else fruitless + 1
+        if len(entries) > found:
+            self.fruitless_body_scans[operation] = 0
+        # A body without strings, like an empty page, can't tell whether this operation ever returns URLs
+        elif scanned:
+            self.fruitless_body_scans[operation] = fruitless + 1
 
 
 def _iter_strings(document: object) -> Iterator[tuple[str, str]]:
