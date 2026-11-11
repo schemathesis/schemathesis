@@ -9,7 +9,7 @@ from hypothesis import strategies as st
 from hypothesis.stateful import RULE_MARKER, Bundle, Rule
 
 from schemathesis.core import NOT_SET
-from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
+from schemathesis.core.errors import InvalidStateMachine, InvalidTransition, RefResolutionError
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
@@ -149,6 +149,9 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
                         transitions.add_outgoing(operation.label, link)
                 except InvalidTransition as exc:
                     errors.append(exc)
+                except RefResolutionError:
+                    # A target with an unresolvable reference is reported as a schema error and never tested
+                    continue
 
     if errors:
         raise InvalidStateMachine(errors)

@@ -893,6 +893,57 @@ def test_transitions_with_colliding_normalized_names_keep_separate_rules(ctx):
     ]
 
 
+_ITEM_ID_PARAMETER = {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"parameters": [_ITEM_ID_PARAMETER, {"$ref": "#/components/parameters/Missing"}]},
+        {
+            "parameters": [
+                _ITEM_ID_PARAMETER,
+                {"name": "q", "in": "query", "required": True, "schema": {"$ref": "#/components/schemas/Missing"}},
+            ]
+        },
+        {"parameters": [_ITEM_ID_PARAMETER], "requestBody": {"$ref": "#/components/requestBodies/Missing"}},
+    ],
+    ids=["parameter-ref", "parameter-schema-ref", "request-body-ref"],
+)
+def test_links_to_operations_with_unresolvable_references_are_skipped(ctx, broken):
+    links = {
+        "GetItem": {"operationId": "getItem", "parameters": {"id": "$response.body#/id"}},
+        "AddChild": {"operationId": "addChild", "parameters": {"id": "$response.body#/id"}},
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "201": {"content": {"application/json": {"schema": _ID_OBJECT}}, "links": links},
+                    }
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [_ITEM_ID_PARAMETER],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/items/{id}/children": {
+                "post": {"operationId": "addChild", "responses": {"201": {"description": "OK"}}, **broken}
+            },
+        }
+    )
+
+    assert [
+        (link.source.label, link.target.label)
+        for transitions in schema.as_state_machine()._transitions.operations.values()
+        for link in transitions.outgoing
+    ] == [("POST /items", "GET /items/{id}")]
+
+
 def test_negative_step_with_link_supplied_parameters_falls_back_to_positive(ctx):
     # The link fills the only parameter that could be negated; the step still has to run.
     operation = ctx.openapi.load_operation(
