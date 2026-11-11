@@ -7837,6 +7837,57 @@ def test_coverage_form_urlencoded_filters_nested_wire_identical_mutations(ctx):
     _assert_form_negatives_survive_stringification(operation)
 
 
+def _negative_scalar_values(operation, name):
+    return [
+        case.body[name]
+        for case in iter_cases(operation, GenerationMode.NEGATIVE)
+        if isinstance(case.body, dict) and not isinstance(case.body.get(name, []), (list, dict))
+    ]
+
+
+@pytest.mark.parametrize(
+    ("media_type", "expected"),
+    [
+        ("application/x-www-form-urlencoded", [0.5, True, "AAA"]),
+        ("multipart/form-data", [0.5, True, None, "AAA"]),
+    ],
+    ids=["urlencoded", "multipart"],
+)
+@pytest.mark.parametrize(
+    "field",
+    [
+        {"type": "array", "items": {"type": "integer"}},
+        {"allOf": [{"type": "array", "items": {"type": "integer"}}]},
+        {"$ref": "#/components/schemas/Integers"},
+    ],
+    ids=["plain", "all-of", "ref-to-all-of"],
+)
+def test_coverage_form_array_property_skips_scalars_sent_like_a_valid_one_item_array(ctx, media_type, expected, field):
+    # A form field carries `0` exactly as it carries `[0]`, so the server cannot tell them apart.
+    operation = body_operation(
+        ctx,
+        {"type": "object", "properties": {"f": field}, "required": ["f"]},
+        media_type=media_type,
+        components={"schemas": {"Integers": {"allOf": [{"type": "array", "items": {"type": "integer"}}]}}},
+    )
+
+    assert _negative_scalar_values(operation, "f") == expected
+
+
+@pytest.mark.parametrize(
+    "media_type", ["application/x-www-form-urlencoded", "multipart/form-data"], ids=["urlencoded", "multipart"]
+)
+def test_coverage_form_string_array_property_skips_scalars_sent_like_a_valid_one_item_array(ctx, media_type):
+    # Every scalar reaches the server as a string, which is a valid one-item array of strings.
+    operation = body_operation(
+        ctx,
+        {"type": "object", "properties": {"f": {"type": "array", "items": {"type": "string"}}}, "required": ["f"]},
+        media_type=media_type,
+    )
+
+    assert _negative_scalar_values(operation, "f") == []
+
+
 def test_coverage_array_above_max_items_with_draft_mismatch_sibling(ctx):
     # When a sibling keyword breaks the auto-detected validator (e.g. `exclusiveMinimum: true`),
     # the `ARRAY_ABOVE_MAX_ITEMS` mutation must still produce a body whose target array exceeds
