@@ -3,7 +3,7 @@ from __future__ import annotations  # noqa: I001
 import queue
 import time
 import unittest
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any, ClassVar, NoReturn
 from warnings import catch_warnings, filterwarnings
 
 import hypothesis
@@ -62,6 +62,8 @@ from schemathesis.generation.metrics import MetricCollector
 from schemathesis.resources import record_delete_attempt, record_interaction
 
 if TYPE_CHECKING:
+    import uuid
+
     from schemathesis.baseline import Baseline
     from schemathesis.core.error_feedback.store import Observation
     from schemathesis.resources import ResourceRecorder
@@ -441,6 +443,14 @@ def _begin_suite(engine: EngineContext, suite_recorders: list[ScenarioRecorder])
         engine.error_feedback.checkpoint()
 
 
+def _hold_suite_recorder(
+    engine: EngineContext, suite_recorders: list[ScenarioRecorder], recorder: ScenarioRecorder
+) -> None:
+    """Keep the scenario's recorder until the suite ends, when its interactions feed the pool."""
+    if engine.extra_data_source is not None:
+        suite_recorders.append(recorder)
+
+
 def _drain_suite_recorders(engine: EngineContext, suite_recorders: list[ScenarioRecorder]) -> None:
     """Feed the suite's recorders into the pool before the next suite builds its strategies."""
     if engine.extra_data_source is not None and suite_recorders:
@@ -524,29 +534,24 @@ def _run_step(
     return result
 
 
-def execute_state_machine_loop(
-    *,
+def instrument(
     state_machine: type[APIStateMachine],
-    event_queue: queue.Queue,
+    *,
     engine: EngineContext,
-) -> None:
-    """Execute the state machine testing loop."""
-    configured_hypothesis_settings = engine.config.get_hypothesis_settings(phase="stateful", apply_ci_profile=False)
-    kwargs = _get_hypothesis_settings_kwargs_override(configured_hypothesis_settings)
-    hypothesis_settings = hypothesis.settings(configured_hypothesis_settings, **kwargs)
-    generation = engine.config.generation_for(phase="stateful")
-
-    ctx = StatefulContext(metric_collector=MetricCollector(metrics=generation.maximize))
-    state = TestingState()
-
+    ctx: StatefulContext,
+    state: TestingState,
+    event_queue: queue.Queue,
+    suite_recorders: list[ScenarioRecorder],
+) -> type[APIStateMachine]:
+    """Subclass the state machine so its scenarios emit events and feed the engine."""
+    unique_inputs = engine.config.generation_for(phase="stateful").unique_inputs
     check_context_cache = CheckContextCache()
-    # Recorders from every scenario in the current suite. The pool stays frozen during the
-    # suite (so Hypothesis shrinking sees a stable strategy); writes are replayed once the
-    # suite finishes, before the next iteration's strategies are built.
-    suite_recorders: list[ScenarioRecorder] = []
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
+
+        # The suite that scenarios report to; the suite loop sets it before every run.
+        suite_id: ClassVar[uuid.UUID]
 
         def __init__(self) -> None:
             super().__init__()
@@ -559,7 +564,9 @@ def execute_state_machine_loop(
 
         def setup(self) -> None:
             self._current_input: StepInput | None = None
-            scenario_started = events.ScenarioStarted(label=None, phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id)
+            scenario_started = events.ScenarioStarted(
+                label=None, phase=PhaseName.STATEFUL_TESTING, suite_id=self.suite_id
+            )
             self._started_at = Instant()
             self._scenario_id = scenario_started.id
             event_queue.put(scenario_started)
@@ -585,7 +592,7 @@ def execute_state_machine_loop(
                 ctx=ctx,
                 state=state,
                 event_queue=event_queue,
-                unique_inputs=generation.unique_inputs,
+                unique_inputs=unique_inputs,
             )
 
         def validate_response(
@@ -609,7 +616,7 @@ def execute_state_machine_loop(
             event_queue.put(
                 events.ScenarioFinished(
                     id=self._scenario_id,
-                    suite_id=suite_id,
+                    suite_id=self.suite_id,
                     phase=PhaseName.STATEFUL_TESTING,
                     label=None,
                     status=ctx.current_step_status or Status.SKIP,
@@ -619,11 +626,58 @@ def execute_state_machine_loop(
                     is_final=build_ctx.is_final,
                 )
             )
-            if engine.extra_data_source is not None:
-                suite_recorders.append(self.recorder)
+            _hold_suite_recorder(engine, suite_recorders, self.recorder)
             ctx.metric_collector.maximize()
             ctx.reset_scenario()
             super().teardown()
+
+    return _InstrumentedStateMachine
+
+
+def _run_suite(
+    machine: type[APIStateMachine],
+    *,
+    seed: int | None,
+    rule_order_seed: int,
+    settings: hypothesis.settings,
+    engine: EngineContext,
+    ctx: StatefulContext,
+    state: TestingState,
+) -> SuiteOutcome:
+    """Run one suite of scenarios and return its status, whether to re-run it, and the events to emit."""
+    seeded = hypothesis.seed(seed)(machine)
+    seeded.rule_order_seed = rule_order_seed
+    try:
+        with catch_warnings(), ignore_hypothesis_output():
+            filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")
+            seeded.run(settings=settings)
+    except (Exception, KeyboardInterrupt, FailureGroup, SkipTest) as exc:
+        return _classify_suite_error(exc, ctx=ctx, engine=engine, state=state, settings=settings)
+    return Status.SUCCESS, False, []
+
+
+def execute_state_machine_loop(
+    *,
+    state_machine: type[APIStateMachine],
+    event_queue: queue.Queue,
+    engine: EngineContext,
+) -> None:
+    """Execute the state machine testing loop."""
+    configured_hypothesis_settings = engine.config.get_hypothesis_settings(phase="stateful", apply_ci_profile=False)
+    kwargs = _get_hypothesis_settings_kwargs_override(configured_hypothesis_settings)
+    hypothesis_settings = hypothesis.settings(configured_hypothesis_settings, **kwargs)
+    generation = engine.config.generation_for(phase="stateful")
+
+    ctx = StatefulContext(metric_collector=MetricCollector(metrics=generation.maximize))
+    state = TestingState()
+
+    # Recorders from every scenario in the current suite. The pool stays frozen during the
+    # suite (so Hypothesis shrinking sees a stable strategy); writes are replayed once the
+    # suite finishes, before the next iteration's strategies are built.
+    suite_recorders: list[ScenarioRecorder] = []
+    instrumented = instrument(
+        state_machine, engine=engine, ctx=ctx, state=state, event_queue=event_queue, suite_recorders=suite_recorders
+    )
 
     suites_started = 0
     try:
@@ -631,24 +685,24 @@ def execute_state_machine_loop(
             # This loop is running until no new failures are found in a single iteration
             _begin_suite(engine, suite_recorders)
             suite_started = events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING)
-            suite_id = suite_started.id
+            instrumented.suite_id = suite_started.id
             event_queue.put(suite_started)
             if _close_suite_early(engine, event_queue, suite_started):
                 break
             suite_status = Status.SUCCESS
-            retry = False
             seed = _suite_seed(engine, hypothesis_settings)
-            InstrumentedStateMachine = hypothesis.seed(seed)(_InstrumentedStateMachine)
             # Each suite opens with Hypothesis's simplest scenarios; a per-suite rule order varies their first step.
-            InstrumentedStateMachine.rule_order_seed = seed if seed is not None else suites_started
+            rule_order_seed = seed if seed is not None else suites_started
             suites_started += 1
             try:
-                with catch_warnings(), ignore_hypothesis_output():
-                    filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")
-                    InstrumentedStateMachine.run(settings=hypothesis_settings)
-            except (Exception, KeyboardInterrupt, FailureGroup, SkipTest) as exc:
-                suite_status, retry, error_events = _classify_suite_error(
-                    exc, ctx=ctx, engine=engine, state=state, settings=hypothesis_settings
+                suite_status, retry, error_events = _run_suite(
+                    instrumented,
+                    seed=seed,
+                    rule_order_seed=rule_order_seed,
+                    settings=hypothesis_settings,
+                    engine=engine,
+                    ctx=ctx,
+                    state=state,
                 )
                 for error_event in error_events:
                     event_queue.put(error_event)
@@ -670,7 +724,7 @@ def execute_state_machine_loop(
 
     finally:
         # Each cycle builds new classes; Hypothesis would otherwise keep every finished one alive.
-        release_state_machines(_InstrumentedStateMachine, state_machine)
+        release_state_machines(instrumented, state_machine)
 
 
 def validate_response(
