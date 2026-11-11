@@ -36,6 +36,7 @@ from schemathesis.hooks import (
 
 if TYPE_CHECKING:
     from schemathesis.auths import AuthStorage
+    from schemathesis.config import ProjectConfig
     from schemathesis.generation.case import Case
     from schemathesis.generation.feedback import FeedbackSources
     from schemathesis.generation.overrides import Override
@@ -200,6 +201,30 @@ class CoverageGenerator:
                 yield processed
 
 
+def build_coverage_generator(
+    config: ProjectConfig,
+    operation: APIOperation,
+    *,
+    override: Override,
+    feedback: FeedbackSources,
+    hooks: HookDispatcher | None = None,
+    auth_storage: AuthStorage | None = None,
+    session: GenerationSession | None = None,
+) -> CoverageGenerator:
+    """Coverage-phase generator for `operation`, with the generation settings `config` gives that phase."""
+    generation = config.generation_for(operation=operation, phase=TestPhase.COVERAGE.value)
+    return CoverageGenerator(
+        operation=operation,
+        generation_modes=generation.modes,
+        generation_config=generation,
+        auth_storage=auth_storage,
+        override=override,
+        feedback=feedback,
+        session=session,
+        hooks=hooks,
+    )
+
+
 class ExamplesGenerator:
     """Yield Examples-phase cases for one operation, materialized from schema-declared examples."""
 
@@ -290,6 +315,26 @@ class ExamplesGenerator:
                     continue
             adjust_urlencoded_payload(case)
             yield case
+
+
+def build_examples_generator(
+    config: ProjectConfig,
+    operation: APIOperation,
+    *,
+    override: Override,
+    feedback: FeedbackSources,
+    hooks: HookDispatcher | None = None,
+    auth_storage: AuthStorage | None = None,
+) -> ExamplesGenerator:
+    """Examples-phase generator for `operation`, filling missing examples when `config` enables it."""
+    return ExamplesGenerator(
+        operation=operation,
+        override=override,
+        feedback=feedback,
+        fill_missing=config.phases_for(operation=operation).examples.fill_missing,
+        hooks=hooks,
+        auth_storage=auth_storage,
+    )
 
 
 EXAMPLES_GENERATION_FAILURE = "Failed to generate test cases from examples for this API operation"

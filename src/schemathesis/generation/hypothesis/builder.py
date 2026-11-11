@@ -14,13 +14,17 @@ from hypothesis import strategies as st
 from hypothesis._settings import CI, all_settings
 
 from schemathesis.auths import AuthStorage, AuthStorageMark
-from schemathesis.config import GenerationConfig, ProjectConfig
+from schemathesis.config import ProjectConfig
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.marks import Mark
-from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
-from schemathesis.generation.drivers import Controller, ExamplesGenerator, missing_path_parameters_error
+from schemathesis.generation.drivers import (
+    Controller,
+    build_coverage_generator,
+    build_examples_generator,
+    missing_path_parameters_error,
+)
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis import setup
 from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
@@ -173,7 +177,6 @@ def create_test(
         and Phase.explicit in settings.phases
         and specification.supports_feature(SpecificationFeature.EXAMPLES)
     ):
-        phases_config = config.project.phases_for(operation=operation)
         # Check if user provided custom strategies via @schema.given()
         # AND the operation actually has examples
         # These are incompatible because examples only provide 'case' while custom strategies require additional parameters
@@ -195,7 +198,7 @@ def create_test(
         hypothesis_test = add_examples(
             hypothesis_test,
             operation,
-            fill_missing=phases_config.examples.fill_missing,
+            config.project,
             override=config.override,
             feedback=config.feedback,
             auth_storage=auth_storage,
@@ -209,17 +212,13 @@ def create_test(
         and not config.given_args
         and not config.given_kwargs
     ):
-        coverage_generation = config.project.generation_for(
-            operation=operation, phase=HypothesisTestMode.COVERAGE.value
-        )
         hypothesis_test = add_coverage(
             hypothesis_test,
             operation,
-            coverage_generation.modes,
-            auth_storage,
-            config.override,
+            config.project,
+            override=config.override,
             feedback=config.feedback,
-            generation_config=coverage_generation,
+            auth_storage=auth_storage,
             hooks=hook_dispatcher,
         )
 
@@ -281,20 +280,15 @@ def make_async_test(test: Callable) -> Callable:
 def add_examples(
     test: Callable,
     operation: APIOperation,
+    config: ProjectConfig,
     *,
-    fill_missing: bool,
     override: Override,
     feedback: FeedbackSources,
     auth_storage: AuthStorage | None,
     hooks: HookDispatcher | None,
 ) -> Callable:
-    generator = ExamplesGenerator(
-        operation=operation,
-        override=override,
-        feedback=feedback,
-        fill_missing=fill_missing,
-        hooks=hooks,
-        auth_storage=auth_storage,
+    generator = build_examples_generator(
+        config, operation, override=override, feedback=feedback, hooks=hooks, auth_storage=auth_storage
     )
     ExamplesControllerMark.set(test, generator.controller)
     _defer_explicit_examples(test, lambda: _as_explicit_examples(generator))
@@ -304,23 +298,15 @@ def add_examples(
 def add_coverage(
     test: Callable,
     operation: APIOperation,
-    generation_modes: list[GenerationMode],
-    auth_storage: AuthStorage | None,
+    config: ProjectConfig,
+    *,
     override: Override,
     feedback: FeedbackSources,
-    generation_config: GenerationConfig,
-    hooks: HookDispatcher | None = None,
+    auth_storage: AuthStorage | None,
+    hooks: HookDispatcher | None,
 ) -> Callable:
-    from schemathesis.generation.drivers import CoverageGenerator
-
-    generator = CoverageGenerator(
-        operation=operation,
-        generation_modes=generation_modes,
-        generation_config=generation_config,
-        auth_storage=auth_storage,
-        override=override,
-        feedback=feedback,
-        hooks=hooks,
+    generator = build_coverage_generator(
+        config, operation, override=override, feedback=feedback, hooks=hooks, auth_storage=auth_storage
     )
 
     def generate() -> list:
