@@ -18,13 +18,9 @@ from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.given import (
     GIVEN_REFRESH_ATTR,
     GIVEN_TARGET_ATTR,
-    GivenArgsMark,
     GivenInput,
-    GivenKwargsMark,
     given_proxy,
-    is_given_applied,
-    merge_given_args,
-    validate_given_args,
+    resolve_given,
 )
 from schemathesis.pytest._keys import track_schema
 from schemathesis.pytest._subtests import make_subtests
@@ -155,23 +151,9 @@ class LazySchema:
 
             def refresh_given_state() -> None:
                 nonlocal invalid_test
-                if not is_given_applied(test_func):
-                    given_kwargs.clear()
-                    invalid_test = None
-                    return
-                given_args = GivenArgsMark.get(test_func)
-                given_kwargs_mark = GivenKwargsMark.get(test_func)
-                assert given_args is not None
-                assert given_kwargs_mark is not None
-                test_function = validate_given_args(test_func, given_args, given_kwargs_mark)
-                if test_function is not None:
-                    invalid_test = test_function
-                    given_kwargs.clear()
-                else:
-                    invalid_test = None
-                    merged = merge_given_args(test_func, given_args, dict(given_kwargs_mark))
-                    given_kwargs.clear()
-                    given_kwargs.update(merged)
+                invalid_test, resolved = resolve_given(test_func)
+                given_kwargs.clear()
+                given_kwargs.update(resolved)
 
             refresh_given_state()
 
@@ -197,17 +179,8 @@ class LazySchema:
                     schema.auth = AuthStorage(providers=list(self.auth.providers) + list(schema.auth.providers))
                 emit_schema_warnings(schema)
                 track_schema(request.session.config, schema)
-                # Check if test function is a method and inject self from request.instance
-                sig = signature(test_func)
-                if "self" in sig.parameters and request.instance is not None:
-                    fixtures = {"self": request.instance}
-                    fixtures.update(get_fixtures(test_func, request, given_kwargs))
-                else:
-                    fixtures = get_fixtures(test_func, request, given_kwargs)
-                # Changing the node id is required for better reporting - the method and path will appear there
-                node_id = request.node.nodeid
+                fixtures = _fixtures_for(test_func, request, given_kwargs)
                 settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
-
                 tests = list(
                     get_all_tests(
                         schema=schema,
@@ -216,50 +189,91 @@ class LazySchema:
                         given_kwargs=given_kwargs,
                     )
                 )
-                if not tests:
-                    fail_on_no_matches(node_id)
-                request.session.testscollected += len(tests)
-                subtests = make_subtests(request)
-                from schemathesis.pytest.plugin import report_subtest
+                _run_operation_tests(request, schema, tests, fixtures)
 
-                for result in tests:
-                    if isinstance(result, Ok):
-                        operation, sub_test = result.ok()
-                        _set_node_id(request.node, f"{node_id}[{operation.label}]")
-                        with report_subtest(request.node, schema, operation.label, operation.tags):
-                            run_subtest(operation, fixtures, sub_test, subtests)
-                    else:
-                        error = result.err()
-                        with report_subtest(request.node, schema, error.label, None):
-                            _schema_error(subtests, error, node_id, request.node)
-                _set_node_id(request.node, node_id)
-
-            sig = signature(test_func)
-            if "self" in sig.parameters:
-                # For methods, wrap with staticmethod to prevent pytest from passing self
-                wrapped_test = staticmethod(wrapped_test)
-                wrapped_func = wrapped_test.__func__
-            else:
-                wrapped_func = wrapped_test
-
-            wrapped_func = pytest.mark.usefixtures(self.fixture_name)(wrapped_func)
-            _copy_marks(test_func, wrapped_func)
-
-            # Needed to prevent a failure when settings are applied to the test function
-            wrapped_func.is_hypothesis_test = True
-            wrapped_func.hypothesis = HypothesisHandle(test_func, wrapped_func, given_kwargs)
-
-            result = wrapped_test if "self" in sig.parameters else wrapped_func
-
-            setattr(result, GIVEN_TARGET_ATTR, test_func)
-            setattr(result, GIVEN_REFRESH_ATTR, refresh_given_state)
-
-            return result
+            # The test body reads settings applied on top of the returned test, so the name must refer to that object
+            wrapped_test = _as_pytest_test(
+                test_func, wrapped_test, self.fixture_name, given_kwargs, refresh_given_state
+            )
+            return wrapped_test
 
         return wrapper
 
     def given(self, *args: GivenInput, **kwargs: GivenInput) -> Callable:
         return given_proxy(*args, **kwargs)
+
+
+def _fixtures_for(test_func: Callable, request: FixtureRequest, given_kwargs: dict[str, GivenInput]) -> dict[str, Any]:
+    __tracebackhide__ = True
+    # Check if test function is a method and inject self from request.instance
+    if "self" in signature(test_func).parameters and request.instance is not None:
+        return {"self": request.instance, **get_fixtures(test_func, request, given_kwargs)}
+    return get_fixtures(test_func, request, given_kwargs)
+
+
+def _run_operation_tests(
+    request: FixtureRequest,
+    schema: BaseSchema,
+    tests: list[Result[tuple[APIOperation, Callable], InvalidSchema]],
+    fixtures: dict[str, Any],
+) -> None:
+    """Run each operation test as a subtest of the collected test."""
+    __tracebackhide__ = True
+    # Changing the node id is required for better reporting - the method and path will appear there
+    node_id = request.node.nodeid
+    if not tests:
+        fail_on_no_matches(node_id)
+    request.session.testscollected += len(tests)
+    subtests = make_subtests(request)
+    for result in tests:
+        _run_operation_test(request, schema, result, fixtures, subtests, node_id)
+    _set_node_id(request.node, node_id)
+
+
+def _run_operation_test(
+    request: FixtureRequest,
+    schema: BaseSchema,
+    result: Result[tuple[APIOperation, Callable], InvalidSchema],
+    fixtures: dict[str, Any],
+    subtests: pytest.Subtests,
+    node_id: str,
+) -> None:
+    __tracebackhide__ = True
+    from schemathesis.pytest.plugin import report_subtest
+
+    if isinstance(result, Ok):
+        operation, sub_test = result.ok()
+        _set_node_id(request.node, f"{node_id}[{operation.label}]")
+        with report_subtest(request.node, schema, operation.label, operation.tags):
+            run_subtest(operation, fixtures, sub_test, subtests)
+    else:
+        error = result.err()
+        with report_subtest(request.node, schema, error.label, None):
+            _schema_error(subtests, error, node_id, request.node)
+
+
+def _as_pytest_test(
+    test_func: Callable,
+    wrapped_test: Callable,
+    fixture_name: str,
+    given_kwargs: dict[str, GivenInput],
+    refresh: Callable[[], None],
+) -> Callable:
+    """Make `wrapped_test` a pytest test that stands in for `test_func`."""
+    wrapped_test = pytest.mark.usefixtures(fixture_name)(wrapped_test)
+    _copy_marks(test_func, wrapped_test)
+
+    # Ad-hoc attributes that prevent a failure when settings are applied to the test function
+    wrapped_test.is_hypothesis_test = True  # type: ignore[attr-defined]
+    wrapped_test.hypothesis = HypothesisHandle(test_func, wrapped_test, given_kwargs)  # type: ignore[attr-defined]
+
+    # For methods, wrap with staticmethod to prevent pytest from passing self
+    result = staticmethod(wrapped_test) if "self" in signature(test_func).parameters else wrapped_test
+
+    setattr(result, GIVEN_TARGET_ATTR, test_func)
+    setattr(result, GIVEN_REFRESH_ATTR, refresh)
+
+    return result
 
 
 def _copy_marks(source: Callable, target: Callable) -> None:

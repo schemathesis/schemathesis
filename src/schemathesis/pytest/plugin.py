@@ -34,14 +34,7 @@ from schemathesis.generation.hypothesis.builder import (
     MissingPathParameters,
     UnserializablePayloadMark,
 )
-from schemathesis.generation.hypothesis.given import (
-    GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE,
-    GivenArgsMark,
-    GivenKwargsMark,
-    is_given_applied,
-    merge_given_args,
-    validate_given_args,
-)
+from schemathesis.generation.hypothesis.given import GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE, resolve_given
 from schemathesis.generation.hypothesis.reporting import (
     build_health_check_error,
     build_unsatisfiable_error,
@@ -153,28 +146,9 @@ class SchemathesisFunction(Function):
 
 class SchemathesisCase(PyCollector):
     def __init__(self, test_function: Callable, schema: BaseSchema, *args: Any, **kwargs: Any) -> None:
-        self.given_kwargs: dict[str, Any]
-        given_args = GivenArgsMark.get(test_function)
-        given_kwargs = GivenKwargsMark.get(test_function)
-
-        assert given_args is not None
-        assert given_kwargs is not None
-
-        def _init_with_valid_test(_test_function: Callable, _args: tuple, _kwargs: dict[str, Any]) -> None:
-            self.test_function = _test_function
-            self.is_invalid_test = False
-            self.given_kwargs = merge_given_args(test_function, _args, _kwargs)
-
-        if is_given_applied(test_function):
-            failing_test = validate_given_args(test_function, given_args, given_kwargs)
-            if failing_test is not None:
-                self.test_function = failing_test
-                self.is_invalid_test = True
-                self.given_kwargs = {}
-            else:
-                _init_with_valid_test(test_function, given_args, given_kwargs)
-        else:
-            _init_with_valid_test(test_function, given_args, given_kwargs)
+        failing_test, self.given_kwargs = resolve_given(test_function)
+        self.test_function = failing_test if failing_test is not None else test_function
+        self.is_invalid_test = failing_test is not None
         self.schema = schema
         super().__init__(*args, **kwargs)
 
