@@ -17,6 +17,7 @@ __all__ = [
     "is_given_applied",
     "given_proxy",
     "merge_given_args",
+    "resolve_given",
     "GivenInput",
     "GivenArgsMark",
     "GivenKwargsMark",
@@ -112,3 +113,17 @@ def validate_given_args(func: Callable, args: tuple, kwargs: dict[str, Any]) -> 
     signature = get_signature(func)
     # Private Hypothesis helper without annotations.
     return is_invalid_test(func, signature, args, kwargs)  # type: ignore[no-untyped-call]
+
+
+def resolve_given(func: Callable) -> tuple[Callable | None, dict[str, GivenInput]]:
+    """Resolve `@schema.given()` arguments into keyword strategies, or into a test that reports their misuse."""
+    if not is_given_applied(func):
+        return None, {}
+    args = GivenArgsMark.get(func)
+    kwargs = GivenKwargsMark.get(func)
+    assert args is not None
+    assert kwargs is not None
+    failing_test = validate_given_args(func, args, kwargs)
+    if failing_test is not None:
+        return failing_test, {}
+    return None, merge_given_args(func, args, dict(kwargs))
