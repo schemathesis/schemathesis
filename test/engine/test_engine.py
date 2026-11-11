@@ -2118,6 +2118,74 @@ def test_links_inferred_from_location_headers(ctx, app_runner, algorithms, expec
     assert started.payload.inferred_transitions == expected
 
 
+def test_stateful_learns_links_from_its_own_location_headers(ctx, app_runner):
+    # Only a stateful step reaches an existing user, so only stateful responses carry the child `Location`.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            "/users/{userId}/children": {
+                "post": {
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"201": {"description": "Created"}, "404": {"description": "Not found"}},
+                }
+            },
+            "/children/{child_ref}": {
+                "get": {
+                    "parameters": [{"name": "child_ref", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+    users = []
+    children = []
+    served = []
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        users.append(len(users) + 1000)
+        return flask.jsonify({"id": users[-1]}), 201
+
+    @app.route("/users/<int:user_id>/children", methods=["POST"])
+    def create_child(user_id):
+        if user_id not in users:
+            return flask.jsonify({}), 404
+        children.append(f"c{len(children)}")
+        return "", 201, {"Location": f"/children/{children[-1]}"}
+
+    @app.route("/children/<child_ref>")
+    def get_child(child_ref):
+        if child_ref not in children:
+            return flask.jsonify({}), 404
+        served.append(child_ref)
+        return flask.jsonify({})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = execute(
+        schema, max_time=2, max_examples=10, modes=[GenerationMode.POSITIVE], phases=[PhaseName.STATEFUL_TESTING]
+    )
+    started = stream.find_all(events.PhaseStarted, phase=lambda phase: phase.name == PhaseName.STATEFUL_TESTING)
+
+    assert (any(event.payload.inferred_transitions > 0 for event in started), bool(served)) == (True, True)
+
+
 TEAM_ID = 982451653
 
 

@@ -58,7 +58,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     try:
         for event in relay_events(event_queue, [thread], timeout=EVENT_QUEUE_TIMEOUT):
             progress.is_executed = True
-            _fold_event(event, progress)
+            _fold_event(engine, event, progress)
             yield event
     except KeyboardInterrupt:
         # Immediately notify the engine thread to stop, even though that the event will be set below in `finally`
@@ -83,7 +83,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     yield events.PhaseFinished(phase=phase, status=progress.final_status(phase), payload=None)
 
 
-def _fold_event(event: events.EngineEvent, progress: PhaseProgress) -> None:
+def _fold_event(engine: EngineContext, event: events.EngineEvent, progress: PhaseProgress) -> None:
     # ERROR & INTERRUPTED statuses are terminal, therefore they should not be overridden
     if (
         isinstance(event, events.SuiteFinished)
@@ -92,4 +92,5 @@ def _fold_event(event: events.EngineEvent, progress: PhaseProgress) -> None:
     ):
         progress.status = event.status
     if isinstance(event, events.ScenarioFinished):
+        engine.record_observations(event.recorder)
         progress.checks_ran = progress.checks_ran or any(event.recorder.checks.values())
