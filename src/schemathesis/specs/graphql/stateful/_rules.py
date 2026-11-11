@@ -23,6 +23,7 @@ from hypothesis.stateful import Bundle, consumes, multiple, precondition, rule
 
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
+from schemathesis.generation import overrides
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful.state_machine import BASE_EXPLORATION_RATE, ExtractedParam
 from schemathesis.specs.graphql._helpers import _unwrap, replace_node, replace_selections, resource_type
@@ -35,6 +36,8 @@ from schemathesis.specs.graphql.substitution import argument_owner, candidate_ha
 if TYPE_CHECKING:
     from random import Random
 
+    from schemathesis.generation.case import Case
+    from schemathesis.schemas import APIOperation
     from schemathesis.specs.graphql.schemas import GraphQLOperationDefinition, GraphQLSchema
 
 
@@ -253,6 +256,16 @@ def _bundle_substituter(
     return mutate
 
 
+def _draw_case(
+    data: st.DataObject,
+    operation: APIOperation,
+    mutate_ast: Callable[[graphql.OperationDefinitionNode, Random], graphql.OperationDefinitionNode],
+) -> Case:
+    # Configured headers go with every step, as they do when the CLI sends the request.
+    configured = overrides.with_config_headers(operation.schema.config, operation=operation).as_strategy_kwargs()
+    return data.draw(graphql_cases(operation=operation, phase=TestPhase.STATEFUL, mutate_ast=mutate_ast, **configured))
+
+
 def _linked_ids(
     machine: Any, consumed: dict[str, Handle], bundle_args: dict[str, Any], sent: set[Handle], parent_id: str | None
 ) -> dict[str, ExtractedParam]:
@@ -280,13 +293,7 @@ def _make_producer_rule(
     def body(self: Any, data: st.DataObject) -> Any:
         operation = self.schema[root_label][field_name]
 
-        case = data.draw(
-            graphql_cases(
-                operation=operation,
-                phase=TestPhase.STATEFUL,
-                mutate_ast=_inject_field(field_name, (*record_path, "id")),
-            )
-        )
+        case = _draw_case(data, operation, _inject_field(field_name, (*record_path, "id")))
         output = self._run_case(case, rule_name=rule_name, parent_id=None)
         if output is None:
             return multiple()
@@ -374,13 +381,7 @@ def _make_handle_producer_rule(
     def body(self: Any, data: st.DataObject) -> Any:
         operation = self.schema[root_label][field_name]
 
-        case = data.draw(
-            graphql_cases(
-                operation=operation,
-                phase=TestPhase.STATEFUL,
-                mutate_ast=_inject_field(field_name, (*record_path, handle.field_name)),
-            )
-        )
+        case = _draw_case(data, operation, _inject_field(field_name, (*record_path, handle.field_name)))
         output = self._run_case(case, rule_name=rule_name, parent_id=None)
         if output is None:
             return multiple()
@@ -425,14 +426,10 @@ def _make_consumer_rule(
 
         operation = self.schema[root_label][field_name]
         sent: set[Handle] = set()
-        case = data.draw(
-            graphql_cases(
-                operation=operation,
-                phase=TestPhase.STATEFUL,
-                mutate_ast=_bundle_substituter(
-                    self.schema, consumed, bundle_args, exploration_rate=BASE_EXPLORATION_RATE, sent=sent
-                ),
-            )
+        case = _draw_case(
+            data,
+            operation,
+            _bundle_substituter(self.schema, consumed, bundle_args, exploration_rate=BASE_EXPLORATION_RATE, sent=sent),
         )
         parent_id = self._id_origins.get((parent_handle, bundle_args[primary_argument]))
         self._run_case(
@@ -498,12 +495,8 @@ def _make_lifecycle_rule(
 
         operation = self.schema[root_label][field_name]
         sent: set[Handle] = set()
-        case = data.draw(
-            graphql_cases(
-                operation=operation,
-                phase=TestPhase.STATEFUL,
-                mutate_ast=_bundle_substituter(self.schema, consumed, bundle_args, exploration_rate=0.0, sent=sent),
-            )
+        case = _draw_case(
+            data, operation, _bundle_substituter(self.schema, consumed, bundle_args, exploration_rate=0.0, sent=sent)
         )
         primary_id = bundle_args[primary_argument]
         parent_id = origin(self).get((primary_handle, primary_id))

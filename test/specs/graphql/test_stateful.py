@@ -3,6 +3,7 @@ import pytest
 import strawberry
 
 import schemathesis
+from schemathesis.config import SchemathesisConfig
 from test.apps.catalog.graphql import bookstore
 
 pytestmark = pytest.mark.usefixtures("book_id_scalar")
@@ -164,7 +165,7 @@ def test_stateful_feeds_ids_captured_through_mutation_payloads(ctx, cli):
     }
 
 
-def test_hooks_apply_once_to_stateful_cases(ctx):
+def test_hooks_and_config_headers_apply_once_to_stateful_cases(ctx):
     @strawberry.type
     class Book:
         id: strawberry.ID
@@ -182,7 +183,13 @@ def test_hooks_apply_once_to_stateful_cases(ctx):
             return Book(id=strawberry.ID("1"))
 
     api = ctx.graphql.apps.from_schema(strawberry.Schema(Query, Mutation))
-    schema = schemathesis.graphql.from_url(api.schema_url)
+    config = SchemathesisConfig.from_dict(
+        {
+            "headers": {"X-Project": "project"},
+            "operations": [{"include-name": "Mutation.addBook", "headers": {"X-Operation": "operation"}}],
+        }
+    )
+    schema = schemathesis.graphql.from_url(api.schema_url, config=config)
     seen = set()
 
     def increment(name):
@@ -194,7 +201,7 @@ def test_hooks_apply_once_to_stateful_cases(ctx):
         return hook
 
     def before_call(context, case, kwargs):
-        seen.add((case.headers["X-Global"], case.headers["X-Schema"]))
+        seen.add((case.operation.label, *map(case.headers.get, ("X-Global", "X-Schema", "X-Project", "X-Operation"))))
 
     schemathesis.hook(before_call)
     schemathesis.hook("map_headers")(increment("X-Global"))
@@ -208,4 +215,7 @@ def test_hooks_apply_once_to_stateful_cases(ctx):
             suppress_health_check=list(hypothesis.HealthCheck),
         )
     )
-    assert seen == {("1", "1")}
+    assert seen == {
+        ("Mutation.addBook", "1", "1", "project", "operation"),
+        ("Query.book", "1", "1", "project", None),
+    }
