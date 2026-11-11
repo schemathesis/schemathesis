@@ -22,48 +22,54 @@ from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, StepOutput
-from schemathesis.specs.openapi.stateful import (
-    collect_transitions,
-    into_step_input,
-    make_response_filter,
-    match_status_code,
-)
+from schemathesis.specs.openapi.stateful import collect_transitions, into_step_input
 from test.apps.catalog.openapi import users as openapi_users
 from test.apps.catalog.openapi.modifiers.stateful import NoMergeBody, SingleUseBearerTokens
 from test.utils import run_given, saved_example_keys
 
 
 @pytest.mark.parametrize(
-    ("response_status", "filter_value", "matching"),
+    ("linked", "unlinked", "status_code", "expected"),
     [
-        (200, 200, True),
-        (200, 201, False),
-        (200, "20X", True),
+        (("2XX", "201"), (), 201, "POST /items -> 201"),
+        (("201", "2XX"), (), 201, "POST /items -> 201"),
+        (("default", "200"), (), 200, "POST /items -> 200"),
+        (("200", "default"), (), 202, "POST /items -> default"),
+        (("default", "20X"), (), 200, "POST /items -> 20X"),
+        (("20X", "default"), (), 210, "POST /items -> default"),
+        (("2XX",), ("201",), 201, None),
+        (("200", "2XX"), (), 404, None),
+    ],
+    ids=[
+        "range-first",
+        "exact-first",
+        "default-excludes-declared",
+        "default-fallback",
+        "default-excludes-range",
+        "range-miss-default",
+        "exact-without-links",
+        "undeclared",
     ],
 )
-def test_match_status_code(response_status, filter_value, matching, response_factory):
-    # When the response has `response_status` status
-    response = response_factory.requests(status_code=response_status)
-    # And the filter should filter by `filter_value`
-    filter_function = match_status_code(filter_value)
-    assert filter_function.__name__ == f"match_{filter_value}_response"
-    # Then that response should match or not depending on the `matching` value
-    assert filter_function(StepOutput(response, None)) is matching
-
-
-@pytest.mark.parametrize(
-    ("response_status", "status_codes", "matching"),
-    [
-        (202, (200, "default"), True),
-        (200, (200, "default"), False),
-        (200, ("20X", "default"), False),
-        (210, ("20X", "default"), True),
-    ],
-)
-def test_default_status_code(response_status, status_codes, matching, response_factory):
-    response = response_factory.requests(status_code=response_status)
-    filter_function = make_response_filter("default", status_codes)
-    assert filter_function(StepOutput(response, None)) is matching
+def test_response_bundle_for_status_code(ctx, case_factory, response_factory, linked, unlinked, status_code, expected):
+    link = {"operationId": "getItem", "parameters": {"id": "$response.body#/id"}}
+    responses = {code: {"description": "OK", "links": {"GetItem": link}} for code in linked}
+    responses.update({code: {"description": "OK"} for code in unlinked})
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {"post": {"responses": responses}},
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    case = case_factory(operation=schema["/items"]["POST"])
+    output = StepOutput(response_factory.core(status_code=status_code), case)
+    assert schema.as_state_machine()()._get_target_for_result(output) == expected
 
 
 def test_custom_rule(ctx, testdir):

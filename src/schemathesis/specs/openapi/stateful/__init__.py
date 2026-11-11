@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 from hypothesis import strategies as st
@@ -13,7 +12,6 @@ from schemathesis.core.errors import InvalidStateMachine, InvalidTransition, Ref
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
-from schemathesis.core.transport import expand_status_code
 from schemathesis.engine.link_calibration import DEFAULT_USE_PROBABILITY, LinkCalibrationState
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -43,8 +41,6 @@ if TYPE_CHECKING:
     from schemathesis.generation.stateful.state_machine import StepOutput
     from schemathesis.specs.openapi.schemas import OpenApiSchema
     from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, OperationNode
-
-FilterFunction = Callable[["StepOutput"], bool]
 
 
 class OpenAPIStateMachine(RecordingStateMachine):
@@ -214,18 +210,17 @@ def create_state_machine(
     # Store them as a class attribute to avoid re-detection for each scenario
     # Create bundles and matchers
     for operation in operations:
-        all_status_codes = operation.responses.status_codes
-        bundle_matchers = []
+        bundle_names = set()
 
         if operation.label in transitions.operations:
             # Use outgoing transitions
             for link in transitions.operations[operation.label].outgoing:
                 bundle_name = f"{operation.label} -> {link.status_code}"
                 bundles[bundle_name] = Bundle(bundle_name)
-                bundle_matchers.append((bundle_name, make_response_filter(link.status_code, all_status_codes)))
+                bundle_names.add(bundle_name)
 
-        if bundle_matchers:
-            _response_matchers[operation.label] = make_response_matcher(bundle_matchers)
+        if bundle_names:
+            _response_matchers[operation.label] = make_response_matcher(frozenset(bundle_names))
 
     rules: dict[str, Callable[..., StepOutput | None]] = {}
     root_rules: set[str] = set()
@@ -556,54 +551,18 @@ def transition(
     return step_function
 
 
-def make_response_matcher(matchers: list[tuple[str, FilterFunction]]) -> Callable[[StepOutput], str | None]:
+def make_response_matcher(bundle_names: frozenset[str]) -> Callable[[StepOutput], str | None]:
+    # Response definitions stay fixed while the state machine runs, so each status code is resolved once
+    targets: dict[int, str | None] = {}
+
     def compare(result: StepOutput) -> str | None:
-        for bundle_name, response_filter in matchers:
-            if response_filter(result):
-                return bundle_name
-        return None
+        status_code = result.response.status_code
+        if status_code not in targets:
+            # Only links of the response definition that describes this status code can follow it
+            operation = result.case.operation
+            definition = operation.responses.find_by_status_code(status_code)
+            bundle_name = None if definition is None else f"{operation.label} -> {definition.status_code}"
+            targets[status_code] = bundle_name if bundle_name in bundle_names else None
+        return targets[status_code]
 
     return compare
-
-
-@lru_cache
-def make_response_filter(status_code: str, all_status_codes: Iterator[str]) -> FilterFunction:
-    """Create a filter for stored responses.
-
-    This filter will decide whether some response is suitable to use as a source for requesting some API operation.
-    """
-    if status_code == "default":
-        return default_status_code(all_status_codes)
-    return match_status_code(status_code)
-
-
-def match_status_code(status_code: str) -> FilterFunction:
-    """Create a filter function that matches all responses with the given status code.
-
-    Note that the status code can contain "X", which means any digit.
-    For example, 50X will match all status codes from 500 to 509.
-    """
-    status_codes = set(expand_status_code(status_code))
-
-    def compare(result: StepOutput) -> bool:
-        return result.response.status_code in status_codes
-
-    compare.__name__ = f"match_{status_code}_response"
-
-    return compare
-
-
-def default_status_code(status_codes: Iterator[str]) -> FilterFunction:
-    """Create a filter that matches all "default" responses.
-
-    In Open API, the "default" response is the one that is used if no other options were matched.
-    Therefore, we need to match only responses that were not matched by other listed status codes.
-    """
-    expanded_status_codes = {
-        status_code for value in status_codes if value != "default" for status_code in expand_status_code(value)
-    }
-
-    def match_default_response(result: StepOutput) -> bool:
-        return result.response.status_code not in expanded_status_codes
-
-    return match_default_response

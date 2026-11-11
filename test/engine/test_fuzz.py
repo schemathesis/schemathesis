@@ -758,6 +758,57 @@ def test_collect_link_candidates(ctx, active, exclude_get, body, expected_overri
         assert overrides == expected_overrides
 
 
+@pytest.mark.parametrize("other", ["default", "2XX"], ids=["default", "range"])
+def test_collect_link_candidates_from_most_specific_response(ctx, case_factory, response_factory, other):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        other: {
+                            "description": "Other",
+                            "links": {
+                                "GetAudit": {"operationId": "getAudit", "parameters": {"code": "$response.body#/id"}}
+                            },
+                        },
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"id": "$response.body#/id"}}
+                            },
+                        },
+                    }
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/audit/{code}": {
+                "get": {
+                    "operationId": "getAudit",
+                    "parameters": [{"name": "code", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    source = schema["/items"]["POST"]
+    get_item = schema["/items/{id}"]["GET"]
+    operations = [source, get_item, schema["/audit/{code}"]["GET"]]
+    candidates = collect_link_candidates(
+        operation=source,
+        case=case_factory(operation=source),
+        response=response_factory.core(status_code=201, content=b'{"id": "x1"}'),
+        operations_by_label={operation.label: operation for operation in operations},
+        excluded_labels=set(),
+    )
+    assert candidates == [(get_item, {"path_parameters": {"id": "x1"}})]
+
+
 @pytest.mark.parametrize(
     "links",
     [
