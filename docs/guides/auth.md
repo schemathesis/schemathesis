@@ -32,6 +32,8 @@ If the schema declares a sign-up operation and a login operation that returns a 
  ✅  Auth: signed up via POST /auth/register and logged in; disable with `auto-signup = false` under `[auth]`
 ```
 
+Sign-up runs only under `schemathesis run`; pytest tests send only the credentials you configure.
+
 Schemathesis recognizes the pair when:
 
 - a `POST` path ends in a sign-up word such as `register`, `signup` or `users`,

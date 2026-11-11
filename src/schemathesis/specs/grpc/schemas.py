@@ -437,7 +437,7 @@ class GrpcSchema(BaseSchema):
         kwargs["headers"] = {
             key: value for key, value in (kwargs.get("headers") or {}).items() if key.lower() != AUTH_METADATA
         }
-        # The session carries `--auth` credentials.
+        # A session passed in by the caller can carry credentials in its auth or its headers.
         kwargs.pop("session", None)
         kwargs.pop("auth", None)
         probe_response = ctx.internals.send_probe(case, probe, kwargs)

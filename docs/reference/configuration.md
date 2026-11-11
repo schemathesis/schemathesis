@@ -671,6 +671,9 @@ These settings can only be applied at the project level.
     baseline = "schemathesis-baseline.json"
     ```
 
+!!! info "CLI Only"
+    This option applies to the `schemathesis run` and `schemathesis fuzz` commands.
+
 ### Phases
 
 #### `phases.enabled`
@@ -817,6 +820,9 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
     [phases.fuzzing.error-feedback]
     enabled = false
     ```
+
+!!! info "CLI Only"
+    This option only applies when using the `schemathesis run` command.
 
 #### `phases.stateful.max-steps`
 
@@ -1069,6 +1075,9 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
     auto-signup = false
     ```
 
+!!! info "CLI Only"
+    This option only applies when using the `schemathesis run` command.
+
 ### Checks
 
 #### `checks.enabled`
@@ -1274,6 +1283,9 @@ The following settings control how Schemathesis makes network requests to the AP
     ```toml
     rate-limit = "auto"
     ```
+
+!!! info "CLI Only"
+    `auto` applies to the `schemathesis run` and `schemathesis fuzz` commands; pytest does not retry a `429`. Fixed limits apply everywhere.
 
 #### `max-redirects`
 
@@ -1539,6 +1551,9 @@ The following settings control how Schemathesis generates test data for your API
     [generation]
     maximize = "response_time"
     ```
+
+!!! info "CLI Only"
+    This option only applies when using the `schemathesis run` command.
 
 #### `generation.with-security-parameters`
 
