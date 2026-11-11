@@ -260,6 +260,20 @@ def _link_by(key: str, value: str, **parameters):
                 link_by_id("patchUser", userId="/users/([^/?#]+)"),
             ],
         ),
+        # Same path without a GET operation
+        (
+            {
+                "/users/{userId}": {
+                    "delete": {"operationId": "deleteUser"},
+                    "patch": {"operationId": "patchUser"},
+                }
+            },
+            "/users/123",
+            [
+                link_by_id("deleteUser", userId="/users/([^/?#]+)"),
+                link_by_id("patchUser", userId="/users/([^/?#]+)"),
+            ],
+        ),
         # Prefix matching should find ALL methods on matching paths
         (
             {
@@ -320,8 +334,9 @@ def test_build_location_link_empty_path(ctx):
     ],
     ids=["missing-trailing-slash", "double-slash", "static-missing-trailing-slash"],
 )
-def test_build_links_location_needing_redirect(ctx, path, location):
-    schema = ctx.openapi.load_schema({path: {"get": {"operationId": "getTeam"}}}, version="3.1.0")
+@pytest.mark.parametrize("method", ["get", "delete"])
+def test_build_links_location_needing_redirect(ctx, path, location, method):
+    schema = ctx.openapi.load_schema({path: {method: {"operationId": "getTeam"}}}, version="3.1.0")
     assert build_links(LinkInferencer.from_schema(schema), location) == []
 
 
