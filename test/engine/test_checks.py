@@ -1527,6 +1527,25 @@ def test_header_conformance_reports_multiple_errors_from_one_header(ctx, respons
     assert schema_paths == {"minimum", "maximum"}
 
 
+def test_header_conformance_names_negated_reference(ctx, response_factory):
+    operation = ctx.openapi.load_operation(
+        "GET /data",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "headers": {"X-Tag": {"schema": {"not": {"$ref": "#/components/schemas/Tag"}}}},
+                }
+            }
+        },
+        components={"schemas": {"Tag": {"type": "string"}}},
+    )
+    response = Response.from_requests(response_factory.requests(headers={"X-Tag": "x"}), True)
+    with pytest.raises(JsonSchemaError) as exc:
+        response_headers_conformance(check_context(), response, operation.Case())
+    assert exc.value.validation_message == '{"$ref":"#/components/schemas/Tag"} is not allowed for "x"'
+
+
 def test_use_after_free_no_false_positive_on_idempotent_delete(ctx, response_factory):
     # RFC 7231 §4.3.5: a repeated DELETE may legitimately return 200/204 instead of 404.
     schema = ctx.openapi.load_schema(

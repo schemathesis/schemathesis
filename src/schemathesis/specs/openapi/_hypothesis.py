@@ -650,6 +650,7 @@ def _build_form_strategy_with_encoding(
         parameter.media_type,
         generation_config,
         validator_cls,
+        parameter.name_to_uri,
     )
     if constants_value_source is not None and generation_mode.is_positive:
         body_strategy = build_constants_overlay_strategy(

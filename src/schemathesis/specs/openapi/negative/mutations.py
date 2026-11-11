@@ -15,7 +15,7 @@ from hypothesis.strategies._internal.featureflags import FeatureFlags, FeatureSt
 
 from schemathesis.core.error_feedback.store import ParameterPath
 from schemathesis.core.jsonschema import ALL_KEYWORDS, BUNDLE_STORAGE_KEY, get_type
-from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
+from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX, definition_location
 from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
 from schemathesis.core.media_types import is_form_urlencoded, is_xml
 from schemathesis.core.mutations import Mutation, MutationChannel, MutationMetadata, OperatorKind
@@ -294,10 +294,13 @@ def _disjoint_descriptor_pool(
     return [candidate for candidate in candidates if keep(candidate)]
 
 
-def _absolutize(target: MutationTarget, local: Mutation) -> Mutation:
+def _absolutize(
+    target: MutationTarget, descriptor: MutationTargetDescriptor, local: Mutation, name_to_uri: dict[str, str]
+) -> Mutation:
     """Prefix a local Mutation's path/schema_pointer with the target's path-from-root.
 
-    Also derives the parameter name from the path's last `properties` step when the
+    Past a `$ref`, the schema pointer starts over at the referenced definition's location in the
+    original document. Also derives the parameter name from the path's last `properties` step when the
     operator didn't set one explicitly. Operators only set `parameter` when negating
     a single-element `required` list; for any other mutation on a parameter-shaped
     target (a single property under root), we want the parameter name to surface
@@ -307,12 +310,14 @@ def _absolutize(target: MutationTarget, local: Mutation) -> Mutation:
     body_path_prefix: ParameterPath = tuple(
         step.selector for step in target.path if step.keyword == "properties" and isinstance(step.selector, str)
     )
-    pointer_segments: list[str] = []
-    for step in target.path:
-        pointer_segments.append(step.keyword)
-        if step.selector is not None:
-            pointer_segments.append(str(step.selector))
-    schema_pointer_prefix = "/" + "/".join(pointer_segments) if pointer_segments else ""
+    schema_pointer_prefix = ""
+    for hop in descriptor.walk:
+        if hop.keyword == "$ref":
+            schema_pointer_prefix = definition_location(str(hop.selector), name_to_uri)
+            continue
+        schema_pointer_prefix += f"/{hop.keyword}"
+        if hop.selector is not None:
+            schema_pointer_prefix += f"/{hop.selector}"
     parameter = local.parameter
     if parameter is None:
         for step in reversed(target.path):
@@ -539,11 +544,11 @@ class MutationContext:
             chosen.append((secondary, secondary_operators))
 
         mutations: list[Mutation] = []
-        for target, applicable in chosen:
+        for descriptor, (target, applicable) in zip(chosen_descriptors, chosen, strict=True):
             mutation = self._apply_one_at_target(draw, target, applicable, enabled_operators)
             if mutation is None:
                 continue
-            mutations.append(_absolutize(target, mutation))
+            mutations.append(_absolutize(target, descriptor, mutation, self.name_to_uri))
             _propagate_required_path(target.path)
 
         if not mutations:

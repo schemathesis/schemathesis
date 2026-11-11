@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import json
+import re
 import textwrap
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urldefrag, urljoin
 
 from schemathesis.config import OutputConfig
 from schemathesis.core.failures import Failure, Severity
-from schemathesis.core.jsonschema.bundler import unbundle, unbundle_path
+from schemathesis.core.jsonschema.bundler import (
+    REFERENCE_TO_BUNDLE_PREFIX,
+    unbundle,
+    unbundle_path,
+    unbundle_reference,
+)
 from schemathesis.core.output import truncate_json, truncate_text
 from schemathesis.core.transforms import iter_decoded_pointer_segments, resolve_path
 
@@ -15,6 +21,9 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     import jsonschema_rs
+
+
+BUNDLED_REFERENCE = re.compile(re.escape(REFERENCE_TO_BUNDLE_PREFIX) + r'/[^"]+')
 
 
 class UndefinedStatusCode(Failure):
@@ -196,6 +205,12 @@ class JsonSchemaError(Failure):
             )
         else:
             validation_message = _shorten_instance(self._raw_message, self.instance, self._config or OutputConfig())
+            name_to_uri = self._name_to_uri
+            # A message that spells out a subschema (e.g. under `not`) names references as the schema below does.
+            if name_to_uri and REFERENCE_TO_BUNDLE_PREFIX in validation_message:
+                validation_message = BUNDLED_REFERENCE.sub(
+                    lambda match: unbundle_reference(match.group(0), name_to_uri), validation_message
+                )
 
         value = textwrap.indent(
             truncate_json(self.instance, config=self._config or OutputConfig(), max_lines=20), prefix="    "

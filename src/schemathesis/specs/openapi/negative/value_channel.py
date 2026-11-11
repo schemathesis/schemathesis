@@ -9,7 +9,7 @@ from typing import Any, Literal, TypeAlias
 
 from schemathesis.core.error_feedback.store import ParameterPath
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
-from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
+from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX, definition_location
 from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
 
 ValueChannelKeyword: TypeAlias = Literal[
@@ -93,17 +93,21 @@ def collect_value_targets(
     path: ParameterPath = (),
     bundle: JsonSchemaObject | None = None,
     schema_pointer: str = "",
+    name_to_uri: dict[str, str] | None = None,
 ) -> list[tuple[ParameterPath, str, JsonValue, str, JsonSchemaObject]]:
     """Emit `(path, schema_pointer, value, keyword, schema_at_path)` for every constraint-bearing leaf.
 
     `path` tracks the body location (with concrete keys/indices, possibly random
     for `additionalProperties`); `schema_pointer` tracks the schema-keyword chain
-    so error messages stay stable across runs. Walks body and schema in lockstep,
+    so error messages stay stable across runs, restarting at the referenced definition's
+    location in the original document after each `$ref`. Walks body and schema in lockstep,
     resolving `$ref` against the schema's `x-bundled` map.
     """
     if bundle is None:
         bundle_candidate = schema.get(BUNDLE_STORAGE_KEY)
         bundle = bundle_candidate if isinstance(bundle_candidate, dict) else {}
+    if name_to_uri is None:
+        name_to_uri = {}
 
     targets: list[tuple[ParameterPath, str, JsonValue, str, JsonSchemaObject]] = []
 
@@ -113,7 +117,9 @@ def collect_value_targets(
         target_name = ref.rsplit("/", 1)[-1]
         target = bundle.get(target_name) if isinstance(bundle, dict) else None
         if isinstance(target, dict):
-            return collect_value_targets(body, target, path, bundle, schema_pointer + f"/$ref/{target_name}")
+            return collect_value_targets(
+                body, target, path, bundle, definition_location(target_name, name_to_uri), name_to_uri
+            )
         return targets
 
     if isinstance(body, dict):
@@ -126,7 +132,12 @@ def collect_value_targets(
                 if name in body and isinstance(prop_schema, dict):
                     targets.extend(
                         collect_value_targets(
-                            body[name], prop_schema, path + (name,), bundle, schema_pointer + f"/properties/{name}"
+                            body[name],
+                            prop_schema,
+                            path + (name,),
+                            bundle,
+                            schema_pointer + f"/properties/{name}",
+                            name_to_uri,
                         )
                     )
         # Walk additionalProperties for keys NOT covered by `properties`.
@@ -138,7 +149,7 @@ def collect_value_targets(
                     continue
                 targets.extend(
                     collect_value_targets(
-                        value, additional, path + (name,), bundle, schema_pointer + "/additionalProperties"
+                        value, additional, path + (name,), bundle, schema_pointer + "/additionalProperties", name_to_uri
                     )
                 )
         if isinstance(schema.get("required"), list) and schema["required"]:
@@ -147,7 +158,9 @@ def collect_value_targets(
         items = schema.get("items")
         if isinstance(items, dict):
             for index, item in enumerate(body):
-                targets.extend(collect_value_targets(item, items, path + (index,), bundle, schema_pointer + "/items"))
+                targets.extend(
+                    collect_value_targets(item, items, path + (index,), bundle, schema_pointer + "/items", name_to_uri)
+                )
     elif isinstance(body, str):
         for keyword in ("pattern", "minLength", "maxLength", "enum"):
             if keyword in schema:

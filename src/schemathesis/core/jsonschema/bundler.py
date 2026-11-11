@@ -250,6 +250,11 @@ def unbundle_path(path: list[str | int], name_to_uri: dict[str, str]) -> list[st
     return result
 
 
+def definition_location(name: str, name_to_uri: dict[str, str]) -> str:
+    """Location of a bundled definition in the original document, e.g. `/components/schemas/Host`."""
+    return "/" + "/".join(str(segment) for segment in unbundle_path([BUNDLE_STORAGE_KEY, name], name_to_uri))
+
+
 def _document_display_name(uri: str) -> str:
     """Name of the referenced document inside a URI, e.g. `pet.json` in `file:///dir/pet.json`."""
     path = urlsplit(uri).path.rstrip("/").rsplit("/", 1)[-1]
@@ -285,18 +290,22 @@ def _unbundled_components(bundled: dict[str, Any], name_to_uri: dict[str, str]) 
     return components
 
 
+def unbundle_reference(reference: str, name_to_uri: dict[str, str]) -> str:
+    """Restore the original form of a reference into the bundle, for display purposes."""
+    bundled_name = reference.split("/")[-1]
+    if bundled_name not in name_to_uri:
+        return reference
+    name = _unbundled_schema_name(bundled_name, name_to_uri[bundled_name])
+    return f"#/components/schemas/{encode_pointer(name)}"
+
+
 def unbundle(schema: JsonSchema | list[JsonSchema], name_to_uri: dict[str, str]) -> JsonSchema:
     """Restore original $ref paths in a bundled schema for display purposes."""
     if isinstance(schema, dict):
         result: dict[str, Any] = {}
         for key, value in schema.items():
             if key == "$ref" and isinstance(value, str) and value.startswith(REFERENCE_TO_BUNDLE_PREFIX):
-                bundled_name = value.split("/")[-1]
-                if bundled_name in name_to_uri:
-                    name = _unbundled_schema_name(bundled_name, name_to_uri[bundled_name])
-                    result[key] = f"#/components/schemas/{encode_pointer(name)}"
-                else:
-                    result[key] = value
+                result[key] = unbundle_reference(value, name_to_uri)
             elif key == BUNDLE_STORAGE_KEY and isinstance(value, dict):
                 result["components"] = _unbundled_components(value, name_to_uri)
             elif isinstance(value, (dict, list)):
