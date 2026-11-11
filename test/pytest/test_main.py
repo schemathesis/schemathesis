@@ -82,6 +82,63 @@ def test_b(case, a):
     result.assert_outcomes(passed=3)
 
 
+@pytest.mark.parametrize(
+    "parametrize",
+    ["schema.parametrize()", 'schemathesis.pytest.from_fixture("simple_schema").parametrize()'],
+    ids=["eager", "lazy"],
+)
+def test_pytest_schema_warnings(testdir, ctx, parametrize):
+    testdir.make_test(
+        f"""
+@{parametrize}
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    pass
+""",
+        schema=ctx.openapi.build_schema(
+            {
+                "/users": {
+                    "post": {
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"address": {"$ref": "#/components/schemas/Address"}},
+                                    }
+                                }
+                            }
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                },
+                "/items": {
+                    "get": {
+                        "parameters": [
+                            {"name": "q", "in": "query", "schema": {"type": "string", "pattern": "(?<=a)+b"}}
+                        ],
+                        "responses": {
+                            "200": {
+                                "description": "OK",
+                                "content": {"application/msgpack": {"schema": {"type": "object"}}},
+                            }
+                        },
+                    }
+                },
+            }
+        ),
+    )
+    result = testdir.runpytest("-W", "always")
+    result.stdout.fnmatch_lines(
+        [
+            "*UserWarning: Unresolvable references: POST /users - `body` - unresolvable reference "
+            "`#/components/schemas/Address`",
+            "*UserWarning: Missing deserializer: GET /items - `200` responses in `application/msgpack` are not validated",
+            "*UserWarning: Unsupported regex patterns: GET /items - Dropped `(?<=a)+b` - generated values may not match it",
+        ]
+    )
+
+
 def test_default_hypothesis_deadline(testdir):
     testdir.make_test(
         """

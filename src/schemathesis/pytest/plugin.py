@@ -55,8 +55,7 @@ from schemathesis.pytest._test_builder import schema_error_suffix
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.reporting import PytestReportOutcome, open_writers, write_report_locations, write_to_writers
 from schemathesis.pytest.warnings import (
-    emit_constants_warnings,
-    emit_openapi_auth_warnings,
+    emit_schema_warnings,
     emit_unserializable_payload_warning,
 )
 from schemathesis.python import asgi
@@ -302,8 +301,7 @@ class SchemathesisCase(PyCollector):
     def collect(self) -> list[Function]:
         """Generate different test items for all API operations available in the given schema."""
         try:
-            emit_openapi_auth_warnings(self.schema)
-            emit_constants_warnings(self.schema)
+            emit_schema_warnings(self.schema)
             feedback = FeedbackSources(constants_value_source=make_constants_value_source(self.schema))
             items: list[Function] = [
                 item for operation in self.schema.get_all_operations() for item in self._gen_items(operation, feedback)
