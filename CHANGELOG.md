@@ -11,8 +11,19 @@
 - Links using Swagger 2.0 HTML or other non-identifier response bodies as the created resource id.
 - Links treating `anyOf`/`oneOf` array-or-null fields named like `customer_id` as a single identifier.
 - Missing links for request bodies declared as `anyOf`/`oneOf` of an array and `null`.
+- Links with `body.<name>` parameters sending only the linked fields as the request body.
+- Links filling `format: uuid` parameters from integer foreign keys or bare created ids.
+- Links learned from `Location` headers or body URLs leaking via shared responses in other files.
+- Links never learned from `Location` headers pointing to paths without a `GET` operation.
+- Links from response body URLs never learned once an operation returned 20 empty pages.
+- Stateful `--max-time` runs never learning links from their own `Location` headers or body URLs.
 - Cache replay sending requests without auth providers or `[auth.openapi]` credentials.
+- Configured `Authorization` headers replaced by netrc credentials for the same host.
+- `ignored_auth` sending two extra requests per authenticated success in pytest and `call_and_validate()`.
 - Custom `encoding` ignored for form fields declared in `allOf` branches.
+- False positive `negative_data_rejection` for scalar values sent to form body array fields.
+- Coverage phase sending no valid body when `oneOf` branches overlap, e.g. `integer` and `number`.
+- Dictionary bindings on `[*]` paths repeating entries in `uniqueItems` arrays. [#6027](https://github.com/schemathesis/schemathesis/issues/6027)
 - Missing pytest warnings for unresolvable references, unsupported regex patterns and other schema problems.
 - `FileNotFoundError` in pytest VCR, HAR and JUnit reports when their directory does not exist.
 - Slow `pytest-xdist` runs with growing memory when any report is enabled.
