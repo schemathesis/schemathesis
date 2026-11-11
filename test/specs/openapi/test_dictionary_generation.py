@@ -16,6 +16,7 @@ from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.resources import SemanticDraw
+from schemathesis.transport.serialization import contains_binary
 from test.utils import run_given
 
 
@@ -784,6 +785,23 @@ def _ids_body(ids: dict) -> dict:
             _ids_body({"allOf": [{"$ref": "#/components/schemas/Strings"}, {"uniqueItems": True, "minItems": 3}]}),
             "3.0.2",
         ),
+        (
+            "body.ids[*]",
+            _ids_body({"allOf": [{"$ref": "#/components/schemas/Strings"}, {"$ref": "#/components/schemas/Unique"}]}),
+            "3.0.2",
+        ),
+        (
+            "body.ids[*]",
+            _ids_body(
+                {
+                    "allOf": [
+                        {"$ref": "#/components/schemas/Strings"},
+                        {"allOf": [{"$ref": "#/components/schemas/Unique"}]},
+                    ]
+                }
+            ),
+            "3.1.0",
+        ),
         ("body.ids[*]", _ids_body({**_UNIQUE_STRINGS, "nullable": True}), "3.0.2"),
         (
             "body.ids[*]",
@@ -832,6 +850,8 @@ def _ids_body(ids: dict) -> dict:
         "array-behind-ref",
         "ref-sibling",
         "all-of-sibling",
+        "all-of-sibling-ref",
+        "nested-all-of-sibling-ref",
         "nullable",
         "enum-items",
         "object-items",
@@ -845,7 +865,11 @@ def test_body_binding_keeps_unique_items_distinct(ctx, key, body_schema, version
         _path_with_body(body_schema),
         version=version,
         components={
-            "schemas": {"UniqueStrings": _UNIQUE_STRINGS, "Strings": {"type": "array", "items": {"type": "string"}}}
+            "schemas": {
+                "UniqueStrings": _UNIQUE_STRINGS,
+                "Strings": {"type": "array", "items": {"type": "string"}},
+                "Unique": {"uniqueItems": True, "minItems": 3},
+            }
         },
     )
     operation = schema["/items"]["POST"]
@@ -860,6 +884,170 @@ def test_body_binding_keeps_unique_items_distinct(ctx, key, body_schema, version
             drawn.update(draw.value for draw in case._meta.dictionary_draws)
 
     assert (invalid, drawn) == ([], {"a", "b"})
+
+
+_STRINGS = {"type": "array", "minItems": 1, "maxItems": 3, "items": {"type": "string"}}
+
+
+def _name_body(**keywords) -> dict:
+    return {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"], **keywords}
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("key", "body_schema", "version", "expected"),
+    [
+        ("body.ids[*]", _ids_body({**_STRINGS, "contains": {"const": "a"}}), "3.1.0", {"a", "b"}),
+        (
+            "body.ids[*]",
+            _ids_body({**_STRINGS, "minItems": 2, "contains": {"const": "a"}, "maxContains": 1}),
+            "3.1.0",
+            {"a", "b"},
+        ),
+        ("body.ids[*]", _ids_body({"$ref": "#/components/schemas/Pairs"}), "3.0.2", {"a"}),
+        (
+            "body.ids[*]",
+            {"allOf": [_ids_body(_STRINGS), {"properties": {"ids": {"contains": {"const": "a"}}}}]},
+            "3.1.0",
+            {"a", "b"},
+        ),
+        ("body.name", {"$ref": "#/components/schemas/Named"}, "3.0.2", {"a"}),
+        ("body.name", _name_body(const={"name": "a"}), "3.1.0", {"a"}),
+        ("body.name", _name_body(**{"not": {"properties": {"name": {"enum": ["b"]}}}}), "3.0.2", {"a"}),
+        (
+            "body.name",
+            {
+                "oneOf": [
+                    _name_body(properties={"name": {"enum": ["a", "b"]}}),
+                    _name_body(properties={"name": {"enum": ["b", "c"]}}),
+                ]
+            },
+            "3.0.2",
+            {"a"},
+        ),
+        (
+            "body.name",
+            _name_body(
+                additionalProperties=False,
+                **{"if": {"properties": {"name": {"const": "b"}}}, "then": {"required": ["extra"]}},
+            ),
+            "3.1.0",
+            {"a"},
+        ),
+        (
+            "body.name",
+            _name_body(dependentSchemas={"name": {"properties": {"name": {"not": {"const": "b"}}}}}),
+            "3.1.0",
+            {"a"},
+        ),
+    ],
+    ids=[
+        "contains",
+        "max-contains",
+        "array-enum-behind-ref",
+        "contains-in-all-of-root",
+        "parent-enum-behind-root-ref",
+        "parent-const",
+        "not",
+        "one-of",
+        "if-then",
+        "dependent-schemas",
+    ],
+)
+def test_body_binding_keeps_whole_body_valid(ctx, key, body_schema, version, expected):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {"dictionaries": {"values": {"values": ["a", "b"]}}, "parameters": {key: {"dictionary": "values"}}},
+        _path_with_body(body_schema),
+        version=version,
+        components={
+            "schemas": {
+                "Pairs": {**_STRINGS, "enum": [["a"], ["b", "c"]]},
+                "Named": _name_body(enum=[{"name": "a"}, {"name": "c"}]),
+            }
+        },
+    )
+    operation = schema["/items"]["POST"]
+    invalid = []
+    drawn = set()
+
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
+    def collect(case):
+        if not operation.body[0].is_valid(case.body):
+            invalid.append(case.body)
+        if case._meta is not None:
+            drawn.update(draw.value for draw in case._meta.dictionary_draws)
+
+    assert (invalid, drawn) == ([], expected)
+
+
+@pytest.mark.hypothesis_nested
+def test_negative_body_binding_keeps_body_invalid(ctx):
+    # The field resolves to the first branch, so an entry failing it may still match the other one.
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {"dictionaries": {"names": {"values": ["long", 5]}}, "parameters": {"body.name": {"dictionary": "names"}}},
+        _path_with_body(
+            {
+                "anyOf": [
+                    _name_body(properties={"name": {"type": "string", "maxLength": 1}}),
+                    _name_body(properties={"name": {"type": "integer"}}),
+                ]
+            }
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    valid = []
+    drawn = set()
+
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=30, derandomize=True)
+    def collect(case):
+        if case._meta is None or not case._meta.dictionary_draws:
+            return
+        drawn.update(draw.value for draw in case._meta.dictionary_draws)
+        if operation.body[0].is_valid(case.body):
+            valid.append(case.body)
+
+    assert (valid, drawn) == ([], {"long"})
+
+
+@pytest.mark.hypothesis_nested
+def test_negative_body_binding_keeps_entries_next_to_binary_fields(ctx):
+    # Raw bytes can't be validated as part of the body, so the entry stays as drawn.
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {"dictionaries": {"names": {"values": ["long"]}}, "parameters": {"body.name": {"dictionary": "names"}}},
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": _name_body(
+                                    properties={
+                                        "name": {"type": "string", "maxLength": 1},
+                                        "file": {"type": "string", "format": "binary"},
+                                    },
+                                    required=["name", "file"],
+                                )
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    operation = schema["/items"]["POST"]
+    names = set()
+
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=30, derandomize=True)
+    def collect(case):
+        if case._meta is not None and case._meta.dictionary_draws and contains_binary(case.body):
+            names.add(case.body["name"])
+
+    assert names == {"long"}
 
 
 @pytest.mark.hypothesis_nested
