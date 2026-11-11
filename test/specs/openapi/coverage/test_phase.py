@@ -8862,7 +8862,7 @@ def test_body_example_is_dropped_when_an_inferred_bound_contradicts_it(ctx, mini
     assert ({"name": "ab"} in bodies) is keeps_example
 
 
-@pytest.mark.parametrize("declared", ["inline", "ref"])
+@pytest.mark.parametrize("declared", ["inline", "ref", "all-of"])
 def test_multipart_template_body_built_from_custom_property_encodings(ctx, declared):
     # A property with a registered `encoding.contentType` draws from that strategy; other required
     # properties get values valid against their own schemas.
@@ -8881,6 +8881,25 @@ def test_multipart_template_body_built_from_custom_property_encodings(ctx, decla
         },
         "required": ["file", "name", "avatar", "count", "kind", "attachments"],
     }
+    details = {
+        "type": "object",
+        "properties": {name: upload["properties"][name] for name in ("name", "avatar", "count", "kind", "attachments")},
+        "required": ["name", "avatar", "count", "kind", "attachments"],
+    }
+    schema = {
+        "inline": upload,
+        "ref": {"$ref": "#/components/schemas/Upload"},
+        "all-of": {
+            "allOf": [
+                {
+                    "type": "object",
+                    "properties": {"file": upload["properties"]["file"], "note": upload["properties"]["note"]},
+                    "required": ["file"],
+                },
+                {"$ref": "#/components/schemas/Details"},
+            ]
+        },
+    }[declared]
     operation = load_schema(
         ctx,
         parameters=[{"name": "q", "in": "query", "schema": {"type": "string", "enum": ["a", "b"]}}],
@@ -8888,13 +8907,18 @@ def test_multipart_template_body_built_from_custom_property_encodings(ctx, decla
             "required": True,
             "content": {
                 "multipart/form-data": {
-                    "schema": upload if declared == "inline" else {"$ref": "#/components/schemas/Upload"},
+                    "schema": schema,
                     "encoding": {"file": {"contentType": "image/png"}},
                 }
             },
         },
         components={
-            "schemas": {"Upload": upload, "Note": {"type": "string"}, "Bin": {"type": "string", "format": "binary"}}
+            "schemas": {
+                "Upload": upload,
+                "Details": details,
+                "Note": {"type": "string"},
+                "Bin": {"type": "string", "format": "binary"},
+            }
         },
     )["/foo"]["post"]
     bodies = [_binary_as_bytes(case.body) for case in iter_cases(operation, GenerationMode.POSITIVE)]

@@ -60,35 +60,44 @@ def make_operation(
     return schema[path][method.upper()]
 
 
-@pytest.mark.parametrize("declared", ["inline", "ref"])
+@pytest.mark.parametrize("declared", ["inline", "ref", "all-of", "all-of-ref"])
 def test_multipart_with_custom_encoding(ctx, declared):
-    xml_strategy = st.just(b"<?xml version='1.0'?><root>test</root>")
-    schemathesis.openapi.media_type("text/xml", xml_strategy)
+    xml = b"<?xml version='1.0'?><root>test</root>"
+    schemathesis.openapi.media_type("text/xml", st.just(xml))
 
     # Given an OpenAPI schema with multipart/form-data and custom encoding
+    named = {
+        "type": "object",
+        "required": ["name"],
+        # Keeps a referenced body bundled with a `$ref` at its root
+        "properties": {"name": {"$ref": "#/components/schemas/Name"}},
+    }
+    attached = {"type": "object", "required": ["file"], "properties": {"file": {"type": "string", "format": "binary"}}}
     upload = {
         "type": "object",
         "required": ["name", "file"],
-        "properties": {
-            # Keeps a referenced body bundled with a `$ref` at its root
-            "name": {"$ref": "#/components/schemas/Name"},
-            "file": {"type": "string", "format": "binary"},
-        },
+        "properties": {**named["properties"], **attached["properties"]},
     }
+    schema = {
+        "inline": upload,
+        "ref": {"$ref": "#/components/schemas/Upload"},
+        "all-of": {"allOf": [named, attached]},
+        "all-of-ref": {"allOf": [{"$ref": "#/components/schemas/Named"}, {"$ref": "#/components/schemas/Attached"}]},
+    }[declared]
     operation = make_operation(
         ctx,
-        {
-            "schema": upload if declared == "inline" else {"$ref": "#/components/schemas/Upload"},
-            "encoding": {"file": {"contentType": "text/xml"}},
+        {"schema": schema, "encoding": {"file": {"contentType": "text/xml"}}},
+        components={
+            "schemas": {"Upload": upload, "Named": named, "Attached": attached, "Name": {"type": "string"}},
         },
-        components={"schemas": {"Upload": upload, "Name": {"type": "string"}}},
     )
 
     @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
-        # Then the file property should use the XML strategy
-        assert case.body["file"] == b"<?xml version='1.0'?><root>test</root>"
+        # Then the file property should use the XML strategy and be sent as a file
+        assert case.body["file"] == xml
         assert isinstance(case.body["name"], str)
+        assert ("file", ("file", xml, "text/xml")) in case.as_transport_kwargs(base_url="http://127.0.0.1")["files"]
 
 
 def test_multipart_without_custom_encoding_uses_default(ctx):
@@ -448,21 +457,37 @@ def test_object_keywords_with_encoding(ctx):
     assert [body for body in bodies if len(body) < 3 or body["file"] != b"<xml/>"] == []
 
 
-def test_negative_body_violations_with_encoding(ctx):
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {
+            "type": "object",
+            "properties": {
+                "file": {"type": "string"},
+                "age": {"type": "integer"},
+            },
+            "required": ["file", "age"],
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "properties": {"age": {"type": "integer"}},
+            "required": ["age"],
+            "allOf": [{"$ref": "#/components/schemas/Filed"}],
+            "maxProperties": 2,
+        },
+    ],
+    ids=["properties", "all-of"],
+)
+def test_negative_body_violations_with_encoding(ctx, schema):
     schemathesis.openapi.media_type("text/xml", st.just(b"<xml/>"))
     operation = make_operation(
         ctx,
-        {
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "file": {"type": "string"},
-                    "age": {"type": "integer"},
-                },
-                "required": ["file", "age"],
-                "additionalProperties": False,
-            },
-            "encoding": {"file": {"contentType": "text/xml"}},
+        {"schema": schema, "encoding": {"file": {"contentType": "text/xml"}}},
+        components={
+            "schemas": {
+                "Filed": {"type": "object", "properties": {"file": {"type": "string"}}, "required": ["file"]},
+            }
         },
     )
 
@@ -518,18 +543,31 @@ def test_encoding_with_invalid_content_type_format(ctx):
         assert "file" in case.body
 
 
-def test_multipart_comma_separated_without_custom_strategy(ctx):
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {
+            "type": "object",
+            "properties": {
+                "image": {"type": "string", "format": "binary"},
+            },
+            "required": ["image"],
+        },
+        {
+            "allOf": [
+                {"type": "object", "properties": {"image": {"type": "string", "format": "binary"}}},
+                {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["image"]},
+            ]
+        },
+    ],
+    ids=["properties", "all-of"],
+)
+def test_multipart_comma_separated_without_custom_strategy(ctx, schema):
     # Comma-separated content types should work even without custom strategies
     operation = make_operation(
         ctx,
         {
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "image": {"type": "string", "format": "binary"},
-                },
-                "required": ["image"],
-            },
+            "schema": schema,
             "encoding": {"image": {"contentType": "image/png, image/jpeg"}},
         },
     )

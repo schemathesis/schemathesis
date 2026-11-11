@@ -650,7 +650,7 @@ def _generate_multipart_body_from_custom_strategies(
         return None
 
     properties = body.form_properties
-    required = (body.resolved_schema or {}).get("required", [])
+    required = body.required_form_properties
 
     result: dict[str, Any] = {}
     content_types: dict[str, str] = {}
