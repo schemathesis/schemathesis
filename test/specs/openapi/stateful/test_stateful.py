@@ -361,6 +361,84 @@ def test_non_object_link_body_is_sent_as_is(link_body, extension, expected):
     assert expected in bodies
 
 
+@pytest.mark.parametrize(
+    ("link_values", "linked"),
+    [
+        ({}, {"owner_id": "owner-1"}),
+        ({"requestBody": {"name": "$response.body#/name"}}, {"owner_id": "owner-1", "name": "Linked"}),
+        ({"x-schemathesis": {"merge_body": False}}, {"owner_id": "owner-1"}),
+    ],
+    ids=["fields", "fields-and-request-body", "replace"],
+)
+def test_body_field_link_parameters_keep_generated_body(ctx, response_factory, link_values, linked):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "UpdateItem": {
+                                    "operationId": "updateItem",
+                                    "parameters": {
+                                        "id": "$response.body#/id",
+                                        "body.owner_id": "$response.body#/owner",
+                                    },
+                                    **link_values,
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            "/items/{id}": {
+                "put": {
+                    "operationId": "updateItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "owner_id": {"type": "string"},
+                                        "name": {"type": "string"},
+                                        "quantity": {"type": "integer"},
+                                    },
+                                    "required": ["owner_id", "name", "quantity"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    source = schema["/items"]["POST"]
+    [link] = collect_transitions([source, schema["/items/{id}"]["PUT"]]).operations[source.label].outgoing
+    content = b'{"id": "item-1", "owner": "owner-1", "name": "Linked"}'
+    response = Response.from_requests(response_factory.requests(content=content, status_code=201), True)
+    strategy = into_step_input(target=link.target, link=link, modes=[GenerationMode.POSITIVE])(
+        StepOutput(response=response, case=source.Case())
+    )
+    bodies = []
+
+    @run_given(input=strategy, max_examples=10)
+    def test(input):
+        applied = {name for location, name in input.applied_parameters if location is ParameterLocation.BODY}
+        bodies.append((applied, input.case.body))
+
+    assert [
+        body
+        for applied, body in bodies
+        if set(body) != {"owner_id", "name", "quantity"} or any(body[name] != linked[name] for name in applied)
+    ] == []
+
+
 def test_inferred_body_link_picks_from_every_listed_resource():
     project = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
     spec = {

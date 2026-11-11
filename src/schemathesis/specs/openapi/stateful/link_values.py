@@ -23,9 +23,9 @@ class LinkPlan:
 
     # Container name -> parameter name -> linked value
     overrides: dict[ContainerName, dict[str, Any]]
-    # Body the request is generated from; `NOT_SET` generates one
+    # Linked request body sent instead of a generated one; `NOT_SET` generates one
     body: Any
-    # Linked values applied on top of the generated body; `NOT_SET` keeps it as generated
+    # Linked values applied on top of the request body; `NOT_SET` keeps it as is
     merged_body: Any
     applied_parameters: list[tuple[ParameterLocation, str | None]]
 
@@ -61,21 +61,32 @@ def plan_link_values(
     overrides, applied_parameters = _plan_parameters(
         transition, index, use_probability=use_probability, calibrated=calibrated, random=random
     )
+    fields = overrides.pop("body", {})
     request_body = _linked_request_body(transition, index)
-    # `body.<name>` link parameters are the body unless the linked request body replaces it
-    body = overrides.pop("body", NOT_SET)
     if merge_body:
+        body = NOT_SET
         merged_body, applied_body = _plan_merged_body(request_body, use_probability, random)
-        return LinkPlan(
-            overrides=overrides,
-            body=body,
-            merged_body=merged_body,
-            applied_parameters=applied_parameters + applied_body,
-        )
-    body, applied_body = _plan_body(request_body, body, use_probability, random)
+    else:
+        body, applied_body = _plan_body(request_body, use_probability, random)
+        merged_body = NOT_SET
     return LinkPlan(
-        overrides=overrides, body=body, merged_body=NOT_SET, applied_parameters=applied_parameters + applied_body
+        overrides=overrides,
+        body=body,
+        merged_body=with_body_fields(merged_body, fields),
+        applied_parameters=applied_parameters + applied_body,
     )
+
+
+def with_body_fields(body: Any, fields: dict[str, Any]) -> Any:
+    """`body` with the values of `body.<name>` link parameters on top; they never stand in for the whole body."""
+    if not fields:
+        return body
+    if body is NOT_SET:
+        return fields
+    # Imported on use: the stateful package imports this module while it loads
+    from schemathesis.specs.openapi.stateful import merge_link_body
+
+    return merge_link_body(body, fields)
 
 
 def _choose_match_index(transition: Transition, random: Random) -> int:
@@ -136,11 +147,11 @@ def _parameter_use_probability(
 
 
 def _plan_body(
-    request_body: Any, body: Any, use_probability: float, random: Random
+    request_body: Any, use_probability: float, random: Random
 ) -> tuple[Any, list[tuple[ParameterLocation, str | None]]]:
-    """Linked request body that replaces `body`, with the body fields it sets."""
+    """Linked request body that replaces the generated one, with the body fields it sets."""
     if request_body is NOT_SET or not _biased_coin(random, use_probability):
-        return body, []
+        return NOT_SET, []
     if isinstance(request_body, dict):
         return request_body, [(ParameterLocation.BODY, field) for field in request_body]
     return request_body, [(ParameterLocation.BODY, None)]
