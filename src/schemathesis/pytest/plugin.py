@@ -762,10 +762,10 @@ def _setup_operation_reporting(item: SchemathesisFunction, schema: BaseSchema, l
     reports = schema.config.reports
     if not _has_reports(reports):
         return
+    entry = _ensure_writer_entry(item.config, schema)
+    if entry is None:
+        return
     if _is_xdist_worker(item.config):
-        from schemathesis.pytest.reporting import PytestReportDispatcher
-
-        item.config.stash[_CASSETTE_KEY][_writers_key(schema)] = (PytestReportDispatcher(schema), [])
         if reports.allure.enabled:
             from schemathesis.reporting.allure import AllureCallBuffer
 
@@ -776,9 +776,6 @@ def _setup_operation_reporting(item: SchemathesisFunction, schema: BaseSchema, l
             item.stash[_ALLURE_FORWARDER_KEY] = forwarder
         return
 
-    entry = _ensure_writer_entry(item.config, schema)
-    if entry is None:
-        return
     _, writers = entry
     forwarder = _register_allure_forwarder(label, writers)
     if forwarder is not None:
