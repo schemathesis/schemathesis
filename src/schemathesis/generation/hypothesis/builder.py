@@ -16,11 +16,9 @@ from hypothesis._settings import CI, all_settings
 from schemathesis.auths import AuthStorage, AuthStorageMark
 from schemathesis.config import ProjectConfig
 from schemathesis.core import SpecificationFeature
-from schemathesis.core.errors import IncorrectUsage, InvalidSchema
-from schemathesis.core.marks import Mark
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.generation.case import Case
 from schemathesis.generation.drivers import (
-    Controller,
     build_coverage_generator,
     build_examples_generator,
     missing_path_parameters_error,
@@ -28,6 +26,12 @@ from schemathesis.generation.drivers import (
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis import setup
 from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
+from schemathesis.generation.hypothesis.marks import (
+    ApiOperationMark,
+    ExamplesControllerMark,
+    MissingPathParameters,
+    UnserializablePayloadMark,
+)
 from schemathesis.generation.meta import content_type_probes_first
 from schemathesis.generation.overrides import Override
 from schemathesis.hooks import HookDispatcher, HookDispatcherMark
@@ -383,9 +387,3 @@ class _DeferredExamples:
 
     def __len__(self) -> int:
         return len(self._materialized())
-
-
-ExamplesControllerMark = Mark[Controller](attr_name="examples_controller")
-UnserializablePayloadMark = Mark[list[str]](attr_name="unserializable_payload")
-MissingPathParameters = Mark[InvalidSchema](attr_name="missing_path_parameters")
-ApiOperationMark = Mark[APIOperation](attr_name="api_operation")

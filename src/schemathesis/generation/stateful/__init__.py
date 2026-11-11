@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
+
+from schemathesis.core.marks import Mark
 
 if TYPE_CHECKING:
     import hypothesis
 
     from schemathesis.generation.stateful.state_machine import APIStateMachine
+    from schemathesis.schemas import BaseSchema
 
 __all__ = [
     "APIStateMachine",
@@ -21,6 +25,9 @@ def __getattr__(name: str) -> type[APIStateMachine]:
 
 
 STATEFUL_TESTS_LABEL = "Stateful tests"
+
+StatefulSchemaMark: Mark[BaseSchema] = Mark(attr_name="stateful_schema")
+StatefulCallbackMark: Mark[Callable | None] = Mark(attr_name="stateful_callback")
 
 
 def run_state_machine_as_test(

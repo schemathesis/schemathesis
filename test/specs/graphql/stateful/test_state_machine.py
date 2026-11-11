@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import subprocess
+import sys
+
 import hypothesis
 import pytest
 from hypothesis.stateful import RuleBasedStateMachine
 
 import schemathesis
+from schemathesis.core import INTERNAL_BUFFER_SIZE
 from schemathesis.core.errors import NoProducers
 from schemathesis.core.failures import FailureGroup
 from schemathesis.generation.stateful.state_machine import BundleStateMachine
@@ -70,6 +74,20 @@ def test_repeated_as_state_machine_builds_same_rules(ctx):
     ]
     assert first is not second
     assert rules == [["Mutation_addBook", "Query_book"], ["Mutation_addBook", "Query_book"]]
+
+
+# Generated queries need more room than Hypothesis allows by default, even when no other Schemathesis test ran first.
+_BUFFER_PROBE = (
+    "import schemathesis; "
+    "from hypothesis.internal.conjecture import engine; "
+    "schemathesis.graphql.from_file('type Book { id: ID! } type Query { book(id: ID!): Book }').as_state_machine(); "
+    "print(engine.BUFFER_SIZE)"
+)
+
+
+def test_as_state_machine_raises_hypothesis_buffer_size():
+    output = subprocess.run([sys.executable, "-c", _BUFFER_PROBE], capture_output=True, text=True, check=True).stdout
+    assert output.strip() == str(INTERNAL_BUFFER_SIZE)
 
 
 @pytest.mark.parametrize(

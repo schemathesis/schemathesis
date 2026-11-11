@@ -180,8 +180,11 @@ class GraphQLSchema(BaseSchema):
 
     @override
     def as_state_machine(self) -> type[APIStateMachine]:
+        from schemathesis.generation.hypothesis import setup
         from schemathesis.specs.graphql.stateful import create_state_machine
 
+        # State machine rules generate queries directly, so Schemathesis' Hypothesis settings are applied here.
+        setup()
         return create_state_machine(self)
 
     @override

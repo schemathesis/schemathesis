@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Container
+from collections.abc import Container
 from dataclasses import dataclass
 from random import Random
 from typing import TYPE_CHECKING, Any, ClassVar, Final
@@ -16,18 +16,14 @@ from schemathesis.checks import CheckFunction
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 from schemathesis.core.errors import STATEFUL_TESTING_GUIDE_URL, NoLinksFound
 from schemathesis.core.failures import FailureGroup, as_reported_failure
-from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.case import Case
-from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
+from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL, StatefulCallbackMark, StatefulSchemaMark
 from schemathesis.generation.stateful.control import TransitionController
-
-StatefulSchemaMark = Mark["BaseSchema"](attr_name="stateful_schema")
-StatefulCallbackMark = Mark[Callable | None](attr_name="stateful_callback")
 
 if TYPE_CHECKING:
     import hypothesis
