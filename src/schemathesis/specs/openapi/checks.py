@@ -412,6 +412,7 @@ def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str)
     try:
         validator_cls = _get_openapi_schema(case).adapter.jsonschema_validator_cls
         validator = make_validator(alternative.optimized_schema, validator_cls)
+        properties = maybe_resolve_bundled(alternative.optimized_schema).get("properties", {})
         # A field missing from the wire was never received; empty lists and objects send nothing at all.
         sent: dict[str, object] = {
             name: value
@@ -424,13 +425,16 @@ def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str)
                 if name in body:
                     sent[name] = body[name]
                 continue
+            if _deep_object_member(name, properties) is not None:
+                # Object members are read as in a query: the text sent, or the repeated value that fits the member.
+                sent[name] = texts[0] if len(texts) == 1 else list(texts)
+                continue
             readings = [reading for text in texts for reading in _form_text_readings(cast(str, text))]
             # Servers read one of the repeated values and may parse it into the declared type.
             sent[name] = next(
                 (reading for reading in readings if not _has_errors_at(validator, {**sent, name: reading}, name)),
                 readings[0],
             )
-        properties = maybe_resolve_bundled(alternative.optimized_schema).get("properties", {})
         return validator.is_valid(_fold_bracketed_names(sent, properties, validator_cls, alternative.optimized_schema))
     except Exception:
         # Schemas the validator cannot read - can't tell whether the sent body is valid
@@ -813,19 +817,31 @@ def _fold_bracketed_names(
     """Read `name[key]` back into the object property `name`, as `deepObject` sends each member under such a name."""
     folded: dict[str, object] = {}
     for wire_name, value in values.items():
-        name, bracket, rest = wire_name.partition("[")
-        if bracket and rest.endswith("]") and wire_name not in properties and name in properties:
+        member = _deep_object_member(wire_name, properties)
+        if member is not None:
+            name, key = member
             members = folded.setdefault(name, {})
             if isinstance(members, dict):
-                key = rest[:-1]
                 if isinstance(value, list):
                     # Servers read one of the repeated values.
                     validator = make_validator(schema_with_bundle(properties[name], root_schema), validator_cls)
-                    value = next((item for item in value if not _has_errors_at(validator, {key: item}, key)), value)
+                    # A value valid alone goes first: `anyOf` reports a bad member at the object, not at the member.
+                    fitting = [item for item in value if validator.is_valid({key: item})] or [
+                        item for item in value if not _has_errors_at(validator, {key: item}, key)
+                    ]
+                    value = fitting[0] if fitting else value
                 members[key] = value
                 continue
         folded[wire_name] = value
     return folded
+
+
+def _deep_object_member(wire_name: str, properties: Mapping[str, JsonSchema]) -> tuple[str, str] | None:
+    """The declared object property and member key that a `deepObject` name like `name[key]` is sent under."""
+    name, bracket, rest = wire_name.partition("[")
+    if bracket and rest.endswith("]") and wire_name not in properties and name in properties:
+        return name, rest[:-1]
+    return None
 
 
 def _headers_as_read(headers: Mapping[str, object]) -> dict[str, object]:

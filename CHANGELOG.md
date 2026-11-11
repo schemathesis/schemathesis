@@ -21,6 +21,7 @@
 - Configured `Authorization` headers replaced by netrc credentials for the same host.
 - `ignored_auth` sending two extra requests per authenticated success in pytest and `call_and_validate()`.
 - Custom `encoding` ignored for form fields declared in `allOf` branches.
+- False positive `negative_data_rejection` for `deepObject` members sent more than once.
 - False positive `negative_data_rejection` for scalar values sent to form body array fields.
 - Coverage phase sending no valid body when `oneOf` branches overlap, e.g. `integer` and `number`.
 - Dictionary bindings on `[*]` paths repeating entries in `uniqueItems` arrays. [#6027](https://github.com/schemathesis/schemathesis/issues/6027)

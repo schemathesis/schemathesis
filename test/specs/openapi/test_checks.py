@@ -1438,8 +1438,17 @@ DEEP_OBJECT_COMPONENTS = {
 }
 DEEP_OBJECT_MEMBERS = pytest.mark.parametrize(
     ("member", "reported"),
-    [(None, False), (True, False), (12, False), ([], False), (2.7270633252329124e16, True)],
-    ids=["null", "boolean", "number", "empty-list", "too-long"],
+    [
+        (None, False),
+        (True, False),
+        (12, False),
+        ([], False),
+        (2.7270633252329124e16, True),
+        (["far too long", "ok"], False),
+        (["far too long", "also too long"], True),
+        ('["ok"]', True),
+    ],
+    ids=["null", "boolean", "number", "empty-list", "too-long", "repeated", "repeated-too-long", "json-array-text"],
 )
 
 
@@ -1483,6 +1492,17 @@ def _additional_properties_mutation(location, path, pointer, parameter=None):
                 "style": "deepObject",
                 "explode": True,
                 "schema": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/Member"}},
+            },
+            ("fields",),
+            "/properties/fields",
+        ),
+        (
+            {
+                "in": "query",
+                "name": "fields",
+                "style": "deepObject",
+                "explode": True,
+                "schema": {"anyOf": [DEEP_OBJECT_FIELDS, {"type": "string"}]},
             },
             ("fields",),
             "/properties/fields",
@@ -1538,24 +1558,13 @@ def _additional_properties_mutation(location, path, pointer, parameter=None):
         "query",
         "query-nested-ref",
         "query-member-ref",
+        "query-object-or-string",
         "querystring",
         "querystring-property-ref",
         "querystring-nested-ref",
     ],
 )
-@pytest.mark.parametrize(
-    ("member", "reported"),
-    [
-        (None, False),
-        (True, False),
-        (12, False),
-        ([], False),
-        (2.7270633252329124e16, True),
-        (["far too long", "ok"], False),
-        (["far too long", "also too long"], True),
-    ],
-    ids=["null", "boolean", "number", "empty-list", "too-long", "repeated", "repeated-too-long"],
-)
+@DEEP_OBJECT_MEMBERS
 def test_negative_data_rejection_reads_deep_object_query_members_as_sent(
     ctx, response_factory, parameter, path, pointer, member, reported
 ):
@@ -2817,10 +2826,28 @@ def test_negative_data_rejection_reports_form_scalars_invalid_when_sent(
 
 
 @pytest.mark.parametrize(
-    "schema", [DEEP_OBJECT_FORM, {"$ref": "#/components/schemas/Form"}], ids=["inline", "nested-ref"]
+    ("schema", "key"),
+    [
+        (DEEP_OBJECT_FORM, "V"),
+        (DEEP_OBJECT_FORM, ""),
+        (DEEP_OBJECT_FORM, "0"),
+        ({"$ref": "#/components/schemas/Form"}, "V"),
+        ({**DEEP_OBJECT_FORM, "additionalProperties": {"type": "array"}}, "V"),
+        ({**DEEP_OBJECT_FORM, "properties": {"fields": {"anyOf": [DEEP_OBJECT_FIELDS, {"type": "string"}]}}}, "V"),
+        ({**DEEP_OBJECT_FORM, "properties": {"fields": {**DEEP_OBJECT_FIELDS, "required": ["W"]}}}, "V"),
+    ],
+    ids=[
+        "inline",
+        "inline-empty-key",
+        "inline-digit-key",
+        "nested-ref",
+        "other-fields-are-arrays",
+        "object-or-string",
+        "required-member",
+    ],
 )
 @DEEP_OBJECT_MEMBERS
-def test_negative_data_rejection_reads_deep_object_form_members_as_sent(ctx, app_runner, schema, member, reported):
+def test_negative_data_rejection_reads_deep_object_form_members_as_sent(ctx, app_runner, schema, key, member, reported):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -2853,7 +2880,7 @@ def test_negative_data_rejection_reads_deep_object_form_members_as_sent(ctx, app
             generation_modes=[GenerationMode.NEGATIVE],
             mutations=(_additional_properties_mutation(ParameterLocation.BODY, (), ""),),
         ),
-        body={"fields": {"V": member, "W": "ok"}},
+        body={"fields": {key: member, "W": "ok"}},
         media_type=URLENCODED,
     )
 
