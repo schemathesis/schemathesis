@@ -4,34 +4,17 @@
 
 ### :bug: Fixed
 
-- Schema-level `examples` reached through `$ref` chains ignored in the examples phase.
-- `[[operations]]` auth and headers leaking to other operations.
+#### Inferred links
+
 - Links sending a scalar identifier into array fields like `customer_ids`.
 - Missing links for fields inside nullable request body arrays, e.g. `type: [array, null]`.
 - Missing links for fields inherited through `allOf` chains reusing a schema name across files.
-- `[generation] mode` from the config file ignored by `st run` and `st fuzz`.
-- False positive `negative_data_rejection` for form body values another `anyOf` branch accepts as text.
-- False positive `positive_data_acceptance` in pytest for required bodies with unresolvable references.
-- Send `content` parameters with `+json` or `charset` JSON media types as JSON text.
-- Collection error in pytest for all operations when one example `$ref` cannot be resolved.
 - Links treating `PUT` updaters as creators when the collection's `POST` is a path item `$ref`.
-- `after_validate` hook never called by `st run` and `st fuzz`.
-- `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
-- Class-based checks' `after_run` never called for `as_state_machine().TestCase` under pytest.
 - Links passing ids between unrelated resources whose `$ref` ends in `items` or `schema`.
-- `after_run` of class-based checks dropping failures under `pytest-xdist` and firing for deselected tests.
-- False `Content deserialization error` for WSGI app responses declaring a non-UTF-8 `charset`.
-- `TypeError` when building `schemathesis.CheckContext` without the `response_checks` keyword.
 - Links using HTML, PDF or `application/sdp` response bodies as the created resource id.
-- Coverage phase generating invalid or missing positive cases behind components that only reference another.
-- `ModuleNotFoundError` for the documented `from schemathesis.stateful import APIStateMachine`.
 - Missing links for fields inside request body arrays behind components that only reference another.
-- gRPC calls ignoring `request-retries` on connection errors and timeouts.
-- Silently unauthenticated gRPC calls with `auth.set_from_requests`; report it as unsupported.
 - Links copying a related resource's field into a request body field whose `enum` rejects it.
-- Internal error during generation for string schemas with a pattern and a huge `maxLength`.
 - Links treating array fields named like `customer_id` as a single identifier.
-- Coverage phase sending request bodies of tens of megabytes for arrays with a large `maxItems`.
 - Links filling a parent's `{id}` with a nested item's id, e.g. in `/options/{id}/entry/{entrypk}`.
 - No inferred links for responses whose schema lives in another file and references its siblings.
 - Links filling `*_name` header parameters with an unrelated `name` field.
@@ -44,29 +27,68 @@
 - Links passing path parameters like `{id}` between unrelated resources, e.g. a customer id into `/orders/{id}`.
 - Links reading values from fields no `oneOf` branch declares, e.g. `checkID` for `/checks/{checkID}`.
 - Links copying a fetched value into an update body field whose `$ref` enum rejects it.
-- Open API 3.2 media types referenced from another file leaving responses unvalidated and without links.
-- False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
-- `st fuzz` dropping generated request body fields next to the ones a link sets.
 - Links reading values from map properties named after the path, e.g. `tags` in `PATCH /orders/{id}/tags`.
-- `st replay` dropping recorded fields in top-level array request bodies next to linked ones.
-- `st replay` dropping recorded nested request body fields next to the ones a link sets.
-- Links learned from `Location` headers or body URLs reaching other operations sharing a `$ref` response.
-- Coverage and examples phases sending requests without credentials learned by auth inference.
-- Stateful testing failing when operations share a response defined in another file.
-- gRPC error details in `grpc-status-details-bin` shown as `<EMPTY>` in failure output.
 - Missing links for nested body fields and response fields named like `part_pk` or `customer-id`.
-- Resource pool forgetting live ids after a DELETE, e.g. the org after `DELETE /orgs/1/users/7`.
 - Links filling `format: uuid` parameters with the resource's integer `id`.
-- False positive `negative_data_rejection` for string bodies with text media types other than `text/plain`.
-- Strings skipping an optional `pattern` group never generated when `minLength` is set.
+
+#### Stateful testing and fuzzing
+
+- Links learned from `Location` headers or body URLs reaching other operations sharing a `$ref` response.
+- Stateful testing failing when operations share a response defined in another file.
+- Resource pool forgetting live ids after a DELETE, e.g. the org after `DELETE /orgs/1/users/7`.
 - Captured ids sent to the wrong resource when an operation documents several 2xx responses.
-- Stale constants recorded for form fields with a custom `encoding`.
-- False `JSON deserialization error` for `application/jwt` responses; send `+jwt` request bodies as text.
 - Fuzzing not reusing ids returned next to the resource, e.g. `{bookingid, booking}`.
-- `--auth-wfc` ignored and `--report wfc` writing an empty report for GraphQL schemas.
-- Internal error in failure output for gRPC OK responses with invalid well-known values.
+- `st fuzz` dropping generated request body fields next to the ones a link sets.
+
+#### Data generation
+
+- Schema-level `examples` reached through `$ref` chains ignored in the examples phase.
+- Send `content` parameters with `+json` or `charset` JSON media types as JSON text.
+- Coverage phase generating invalid or missing positive cases behind components that only reference another.
+- Internal error during generation for string schemas with a pattern and a huge `maxLength`.
+- Coverage phase sending request bodies of tens of megabytes for arrays with a large `maxItems`.
+- Strings skipping an optional `pattern` group never generated when `minLength` is set.
+- Stale constants recorded for form fields with a custom `encoding`.
 - Optional multipart fields with a custom `encoding` never generated.
+
+#### Checks and response validation
+
+- False positive `negative_data_rejection` for form body values another `anyOf` branch accepts as text.
+- False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
+- False positive `negative_data_rejection` for string bodies with text media types other than `text/plain`.
+- False `JSON deserialization error` for `application/jwt` responses; send `+jwt` request bodies as text.
+- False `Content deserialization error` for WSGI app responses declaring a non-UTF-8 `charset`.
+- Open API 3.2 media types referenced from another file leaving responses unvalidated and without links.
+
+#### CLI and configuration
+
+- `[[operations]]` auth and headers leaking to other operations.
+- `[generation] mode` from the config file ignored by `st run` and `st fuzz`.
+- `after_validate` hook never called by `st run` and `st fuzz`.
+- `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
+- Coverage and examples phases sending requests without credentials learned by auth inference.
+- `--auth-wfc` ignored and `--report wfc` writing an empty report for GraphQL schemas.
 - Sporadic `BlockingIOError` runtime errors with multiple workers on free-threaded Python.
+
+#### pytest and Python API
+
+- False positive `positive_data_acceptance` in pytest for required bodies with unresolvable references.
+- Collection error in pytest for all operations when one example `$ref` cannot be resolved.
+- Class-based checks' `after_run` never called for `as_state_machine().TestCase` under pytest.
+- `after_run` of class-based checks dropping failures under `pytest-xdist` and firing for deselected tests.
+- `TypeError` when building `schemathesis.CheckContext` without the `response_checks` keyword.
+- `ModuleNotFoundError` for the documented `from schemathesis.stateful import APIStateMachine`.
+
+#### gRPC
+
+- gRPC calls ignoring `request-retries` on connection errors and timeouts.
+- Silently unauthenticated gRPC calls with `auth.set_from_requests`; report it as unsupported.
+- gRPC error details in `grpc-status-details-bin` shown as `<EMPTY>` in failure output.
+- Internal error in failure output for gRPC OK responses with invalid well-known values.
+
+#### `st replay`
+
+- `st replay` dropping recorded request body fields next to the ones a link sets, including top-level arrays.
 
 ## [4.33.1](https://github.com/schemathesis/schemathesis/compare/v4.33.0...v4.33.1) - 2026-11-04
 
