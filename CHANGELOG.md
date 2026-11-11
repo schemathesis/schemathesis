@@ -8,38 +8,55 @@
 
 ### :bug: Fixed
 
-- Stateful links combining values from different list items, e.g. one item's `owner` with another's `id`.
-- Links from `2XX` or `default` responses followed on status codes another response declares.
-- Link calibration lowering correct links' reuse on 4xx responses unrelated to the linked values.
-- Internal error when a link targets an operation with an unresolvable `$ref`.
-- Stateful phase ending with an unlabeled error when one operation's schema cannot generate data.
+#### Inferred links
+
 - Links using Swagger 2.0 HTML or other non-identifier response bodies as the created resource id.
 - Links treating `anyOf`/`oneOf` array-or-null fields named like `customer_id` as a single identifier.
 - Missing links for request bodies declared as `anyOf`/`oneOf` of an array and `null`.
-- Links with `body.<name>` parameters sending only the linked fields as the request body.
 - Links filling `format: uuid` parameters from integer foreign keys or bare created ids.
 - Links filling JSON body fields with mistyped values or ids from same-named collections elsewhere.
 - Links learned from `Location` headers or body URLs leaking via shared responses in other files.
 - Links never learned from `Location` headers pointing to paths without a `GET` operation.
 - Links from response body URLs never learned once an operation returned 20 empty pages.
+
+#### Stateful testing and fuzzing
+
+- Stateful links combining values from different list items, e.g. one item's `owner` with another's `id`.
+- Links from `2XX` or `default` responses followed on status codes another response declares.
+- Link calibration lowering correct links' reuse on 4xx responses unrelated to the linked values.
+- Internal error when a link targets an operation with an unresolvable `$ref`.
+- Links with `body.<name>` parameters sending only the linked fields as the request body.
 - Stateful `--max-time` runs never learning links from their own `Location` headers or body URLs.
-- Cache replay sending requests without auth providers or `[auth.openapi]` credentials.
-- Configured `Authorization` headers replaced by netrc credentials for the same host.
-- `[parameters]` and `[[operations]]` headers ignored by `as_strategy()`, `as_state_machine()` and linked `st fuzz` steps.
-- `ignored_auth` sending two extra requests per authenticated success in pytest and `call_and_validate()`.
-- Blank argument values in Hypothesis failures of pytest sessions without Schemathesis tests.
+- Stateful phase ending with an unlabeled error when one operation's schema cannot generate data.
+
+#### Data generation
+
 - Custom `encoding` ignored for form fields declared in `allOf` branches.
+- Coverage phase sending no valid body when `oneOf` branches overlap, e.g. `integer` and `number`.
+- Dictionary bindings on `[*]` paths repeating entries in `uniqueItems` arrays. [#6027](https://github.com/schemathesis/schemathesis/issues/6027)
+- Dictionary bindings on body paths ignoring constraints outside the bound field, e.g. `contains` or `enum`.
+
+#### Checks and response validation
+
 - False positive `negative_data_rejection` for `deepObject` members sent more than once.
 - False positive `negative_data_rejection` for scalar values sent to form body array fields.
 - False positive and internal error in `negative_data_rejection` for `deepObject` members under `$ref`. [#6025](https://github.com/schemathesis/schemathesis/issues/6025) [#6028](https://github.com/schemathesis/schemathesis/issues/6028)
 - False positive `positive_data_acceptance` when a `body.*` override sets a field sharing its `$ref` with others. [#6026](https://github.com/schemathesis/schemathesis/issues/6026)
-- Coverage phase sending no valid body when `oneOf` branches overlap, e.g. `integer` and `number`.
 - False negatives and positives in `negative_data_rejection` for non-body parameters behind `$ref` or `allOf`.
-- Dictionary bindings on `[*]` paths repeating entries in `uniqueItems` arrays. [#6027](https://github.com/schemathesis/schemathesis/issues/6027)
-- Dictionary bindings on body paths ignoring constraints outside the bound field, e.g. `contains` or `enum`.
+- Internal names like `schema000001` in `negative_data_rejection` and response conformance failure messages.
+
+#### CLI and configuration
+
+- Configured `Authorization` headers replaced by netrc credentials for the same host.
+- Cache replay sending requests without auth providers or `[auth.openapi]` credentials.
+
+#### pytest and Python API
+
+- `[parameters]` and `[[operations]]` headers ignored by `as_strategy()`, `as_state_machine()` and linked `st fuzz` steps.
+- `ignored_auth` sending two extra requests per authenticated success in pytest and `call_and_validate()`.
+- Blank argument values in Hypothesis failures of pytest sessions without Schemathesis tests.
 - Missing pytest warnings for unresolvable references, unsupported regex patterns and other schema problems.
 - `FileNotFoundError` in pytest VCR, HAR and JUnit reports when their directory does not exist.
-- Internal names like `schema000001` in `negative_data_rejection` and response conformance failure messages.
 - Slow `pytest-xdist` runs with growing memory when any report is enabled.
 
 ## [4.33.2](https://github.com/schemathesis/schemathesis/compare/v4.33.1...v4.33.2) - 2026-11-11
