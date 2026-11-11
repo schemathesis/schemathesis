@@ -49,6 +49,7 @@ def extract_outputs(
             response_fields=extracted.response_fields,
             identifier_pointer=extracted.identifier_pointer,
             named_after_path=extracted.named_after_path,
+            value_types=extracted.value_types,
         )
 
     yield from _path_keyed_outputs(
