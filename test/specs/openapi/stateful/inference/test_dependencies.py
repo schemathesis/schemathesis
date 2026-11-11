@@ -5954,6 +5954,22 @@ def order_to_customer(pointer):
             [CREATED_CUSTOMER_TO_READ, order_to_customer("/shipping/customer_id")],
         ),
         ({"customer_id": component_ref("RecursiveId")}, [CREATED_CUSTOMER_TO_READ, order_to_customer("/customer_id")]),
+        ({"customer_id": CUSTOMER_IDS_OR_NULL}, [CREATED_CUSTOMER_TO_READ]),
+        ({"customer_id": {"oneOf": [CUSTOMER_IDS, {"type": "null"}]}}, [CREATED_CUSTOMER_TO_READ]),
+        ({"customer_id": component_ref("CustomerIdsOrNull")}, [CREATED_CUSTOMER_TO_READ]),
+        ({"shipping": nested_object("customer_id", CUSTOMER_IDS_OR_NULL)}, [CREATED_CUSTOMER_TO_READ]),
+        (
+            {"customer_id": {"anyOf": [{"type": "integer"}, {"type": "null"}]}},
+            [CREATED_CUSTOMER_TO_READ, order_to_customer("/customer_id")],
+        ),
+        (
+            {"customer_id": {"oneOf": [CUSTOMER_IDS, {"type": "integer"}]}},
+            [CREATED_CUSTOMER_TO_READ, order_to_customer("/customer_id")],
+        ),
+        (
+            {"shipping": nested_object("customer_id", {"anyOf": [{"type": "integer"}, {"type": "null"}]})},
+            [CREATED_CUSTOMER_TO_READ, order_to_customer("/shipping/customer_id")],
+        ),
     ],
     ids=[
         "array",
@@ -5971,6 +5987,13 @@ def order_to_customer(pointer):
         "nested-integer",
         "nested-unresolvable-ref",
         "recursive-ref",
+        "any-of-array-or-null",
+        "one-of-array-or-null",
+        "any-of-ref",
+        "nested-any-of-array-or-null",
+        "any-of-integer-or-null",
+        "one-of-array-or-integer",
+        "nested-any-of-integer-or-null",
     ],
 )
 def test_singular_fk_response_field_holding_an_array_does_not_fill_scalar_parameters(ctx, order, expected):
@@ -5987,6 +6010,44 @@ def test_singular_fk_response_field_holding_an_array_does_not_fill_scalar_parame
     }
     _, graph = analyze_dependencies(ctx, paths, version="3.1.0", components=CUSTOMER_COMPONENTS)
     assert inferred_links(graph) == expected
+
+
+@pytest.mark.parametrize(
+    ["common_schemas", "root_schemas", "expected"],
+    [
+        (
+            {"CustomerId": {"anyOf": [component_ref("Ids"), {"type": "null"}]}, "Ids": CUSTOMER_IDS},
+            {},
+            [CREATED_CUSTOMER_TO_READ],
+        ),
+        (
+            {"CustomerId": {"anyOf": [component_ref("Ids"), {"type": "null"}]}, "Ids": CUSTOMER_IDS},
+            {"Ids": {"type": "integer"}},
+            [CREATED_CUSTOMER_TO_READ],
+        ),
+        (
+            {"CustomerId": {"anyOf": [component_ref("Id"), {"type": "null"}]}, "Id": {"type": "integer"}},
+            {"Id": CUSTOMER_IDS},
+            [CREATED_CUSTOMER_TO_READ, order_to_customer("/customer_id")],
+        ),
+    ],
+    ids=["array-or-null", "array-or-null-shadowed-by-integer", "integer-or-null-shadowed-by-array"],
+)
+def test_fk_response_field_alternatives_in_other_file_resolve_from_that_file(
+    ctx, common_schemas, root_schemas, expected
+):
+    ctx.makefile({"components": {"schemas": common_schemas}}, filename="common")
+    order = {"type": "object", "properties": {"customer_id": ref("common.json#/components/schemas/CustomerId")}}
+    root = ctx.openapi.write_schema(
+        {
+            **CREATE_CUSTOMER,
+            **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id", "integer")]),
+            **operation("get", "/orders/{order_id}", "200", order, [path_param("order_id", "integer")]),
+        },
+        version="3.1.0",
+        components={"schemas": {"Customer": CUSTOMER_COMPONENTS["schemas"]["Customer"], **root_schemas}},
+    )
+    assert inferred_links(analyze(schemathesis.openapi.from_path(str(root)))) == expected
 
 
 LISTED_CUSTOMER_TO_READ = [
@@ -6075,6 +6136,7 @@ def order_to_listed_customers(pointer):
             CUSTOMER_IDS,
             [order_to_listed_customers("/customer_ids/*"), order_to_customer("/customer_ids/*")],
         ),
+        ({"customer_id": CUSTOMER_IDS_OR_NULL}, CUSTOMER_IDS, [order_to_listed_customers("/customer_id")]),
     ],
     ids=[
         "array",
@@ -6095,6 +6157,7 @@ def order_to_listed_customers(pointer):
         "boolean",
         "nested-scalar",
         "plural-array",
+        "source-any-of-array-or-null",
     ],
 )
 def test_singular_fk_response_field_holding_an_array_fills_array_parameters(ctx, order, ids, expected):
