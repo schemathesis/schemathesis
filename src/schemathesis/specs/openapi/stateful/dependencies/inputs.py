@@ -29,6 +29,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     ResourceMap,
     declared_types,
     find_input,
+    holds_only_array_values,
     holds_only_arrays,
     infer_fk_target,
     iter_all_of_chain,
@@ -669,7 +670,7 @@ def _container_fk_fields(
         if fk_info is None:
             continue
         target_resource_name, target_field, is_array = fk_info
-        takes_array = _holds_only_arrays(field_schema, scan.bundled)
+        takes_array = holds_only_array_values(field_schema, scan.bundled, _resolve_bundled)
         # A singular name on an array holds no single identifier to send.
         if not is_array and takes_array:
             continue
@@ -759,31 +760,9 @@ def _names_identifier_array(name: str, schema: JsonSchema, bundled: dict[str, An
     A plural name takes identifiers as array items, a singular one (`customer_id`) takes none; other fields give `None`.
     """
     fk_info = infer_fk_target(name)
-    if fk_info is None or not _holds_only_arrays(schema, bundled):
+    if fk_info is None or not holds_only_array_values(schema, bundled, _resolve_bundled):
         return None
     return fk_info[2]
-
-
-def _holds_only_arrays(schema: JsonSchema, bundled: dict[str, Any]) -> bool:
-    """Whether `schema` holds arrays and maybe `null`, nothing else: `type: [array, null]`, `anyOf: [array, null]`."""
-    chain = list(iter_all_of_chain(schema, bundled, _resolve_bundled))
-    return holds_only_arrays(chain) or any(
-        _alternatives_hold_only_arrays(node[keyword], bundled)
-        for node in chain
-        for keyword in ("anyOf", "oneOf")
-        if isinstance(node.get(keyword), list)
-    )
-
-
-_NULL_ONLY = frozenset({"null"})
-
-
-def _alternatives_hold_only_arrays(branches: list[JsonSchema], bundled: dict[str, Any]) -> bool:
-    """Whether one of `branches` holds only arrays and every other one holds only arrays or only `null`."""
-    chains = [list(iter_all_of_chain(branch, bundled, _resolve_bundled)) for branch in branches]
-    return any(map(holds_only_arrays, chains)) and all(
-        holds_only_arrays(chain) or _NULL_ONLY in map(declared_types, chain) for chain in chains
-    )
 
 
 def _resolve_bundled(schema: dict[str, Any], bundled: dict[str, Any]) -> tuple[dict[str, Any], object] | None:

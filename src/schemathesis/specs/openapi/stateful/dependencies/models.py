@@ -635,6 +635,14 @@ def iter_all_of_chain(
 
     `resolve` follows a `$ref` from the scope it appears in to the target and the target's scope.
     """
+    for _, node in _iter_scoped_all_of_chain(schema, scope, resolve):
+        yield node
+
+
+def _iter_scoped_all_of_chain(
+    schema: object, scope: Scope, resolve: Callable[[dict[str, Any], Scope], tuple[Scope, object] | None]
+) -> Iterator[tuple[Scope, dict[str, Any]]]:
+    """Each schema of the `allOf` chain of `schema` with the scope its own references resolve from."""
     pending: list[tuple[Scope, object]] = [(scope, schema)]
     # `allOf` chains may be recursive.
     seen: set[int] = set()
@@ -643,7 +651,7 @@ def iter_all_of_chain(
         if not isinstance(node, dict) or id(node) in seen:
             continue
         seen.add(id(node))
-        yield node
+        yield current_scope, node
         if "$ref" in node:
             target = resolve(node, current_scope)
             if target is not None:
@@ -651,6 +659,33 @@ def iter_all_of_chain(
         branches = node.get("allOf")
         if isinstance(branches, list):
             pending.extend((current_scope, branch) for branch in branches)
+
+
+def holds_only_array_values(
+    schema: object, scope: Scope, resolve: Callable[[dict[str, Any], Scope], tuple[Scope, object] | None]
+) -> bool:
+    """Whether `schema` holds arrays and maybe `null`, nothing else: `type: [array, null]`, `anyOf: [array, null]`."""
+    chain = list(_iter_scoped_all_of_chain(schema, scope, resolve))
+    return holds_only_arrays(node for _, node in chain) or any(
+        # Branch references resolve from the file the alternatives are written in.
+        _alternatives_hold_only_arrays(node[keyword], node_scope, resolve)
+        for node_scope, node in chain
+        for keyword in ("anyOf", "oneOf")
+        if isinstance(node.get(keyword), list)
+    )
+
+
+_NULL_ONLY = frozenset({"null"})
+
+
+def _alternatives_hold_only_arrays(
+    branches: list[JsonSchema], scope: Scope, resolve: Callable[[dict[str, Any], Scope], tuple[Scope, object] | None]
+) -> bool:
+    """Whether one of `branches` holds only arrays and every other one holds only arrays or only `null`."""
+    chains = [list(iter_all_of_chain(branch, scope, resolve)) for branch in branches]
+    return any(map(holds_only_arrays, chains)) and all(
+        holds_only_arrays(chain) or _NULL_ONLY in map(declared_types, chain) for chain in chains
+    )
 
 
 def _resolve_reference(schema: dict[str, Any], resolver: Resolver) -> tuple[Resolver, Mapping[str, Any]] | None:
@@ -679,8 +714,7 @@ def extract_fk_fields(properties: Mapping[str, tuple[Resolver, JsonSchema]]) -> 
                     target_resource=target_resource,
                     target_field=target_field,
                     is_array=is_array,
-                    holds_array=not is_array
-                    and holds_only_arrays(iter_all_of_chain(subschema, field_resolver, _resolve_reference)),
+                    holds_array=not is_array and holds_only_array_values(subschema, field_resolver, _resolve_reference),
                 )
             )
     return result
@@ -734,7 +768,7 @@ def extract_nested_fk_fields(
                         target_field=target_field,
                         is_array=is_array,
                         holds_array=not is_array
-                        and holds_only_arrays(iter_all_of_chain(field_schema, resolver, _resolve_reference)),
+                        and holds_only_array_values(field_schema, resolver, _resolve_reference),
                     )
                 )
             continue  # Don't recurse into FK fields
