@@ -46,6 +46,7 @@ from schemathesis.specs.openapi.stateful.dependencies.resources import (
     declared_field_values,
     write_only_fields,
 )
+from schemathesis.specs.openapi.stateful.dependencies.schemas import try_unwrap_all_of
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter
@@ -893,8 +894,24 @@ def _item_schemas(bodies: list[OpenApiBody], slot: InputSlot) -> frozenset[str] 
         for body in bodies
         if isinstance(body.raw_schema, dict)
         for node in _body_nodes(body.raw_schema, slot.body_path[:end])
-        if isinstance(node, dict) and isinstance(reference := node.get("$ref"), str)
+        if isinstance(node, dict)
+        for reference in _item_references(node)
     )
+
+
+def _item_references(node: JsonSchemaObject) -> Iterator[str]:
+    """References naming an object's schema: its `$ref`, a lone `allOf` reference, or any `anyOf` / `oneOf` branch's.
+
+    A branch adding keywords, as in `allOf: [$ref Base, {properties: ...}]`, makes another schema than `Base`.
+    """
+    candidates = [node, try_unwrap_all_of(node)]
+    for keyword in ("anyOf", "oneOf"):
+        branches = node.get(keyword)
+        if isinstance(branches, list):
+            candidates.extend(branches)
+    for candidate in candidates:
+        if isinstance(candidate, dict) and isinstance(reference := candidate.get("$ref"), str):
+            yield reference
 
 
 def _body_nodes(body: JsonSchemaObject, steps: BodyPath) -> list[object]:

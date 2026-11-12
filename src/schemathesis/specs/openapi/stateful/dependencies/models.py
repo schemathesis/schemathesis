@@ -109,6 +109,7 @@ class DependencyGraph:
         # All string work happens once here rather than inside the hot inner loop.
         path_resource_names, stripped_paths, id_collection_paths = _scope_guard_paths(self.operations.values())
         qualifiers = _collection_qualifiers(list(self.operations.values()))
+        item_keys = _item_keys(self.operations.values(), stripped_paths)
 
         # Index consumers by resource
         consumers_by_resource: dict[int, dict[int, tuple[OperationNode, list[InputSlot]]]] = defaultdict(dict)
@@ -164,7 +165,7 @@ class DependencyGraph:
                             or output_slot.is_primitive_identifier
                         ):
                             continue
-                        if not _keys_same_collection(input_slot, producer, consumer, stripped_paths):
+                        if not _keys_same_collection(input_slot, producer, consumer, stripped_paths, item_keys):
                             continue
                         # Scope guard: skip bare {id} links where the producer is from a
                         # different namespace. Triggered only when the resource name matches the
@@ -1542,22 +1543,34 @@ def _keys_same_collection(
     producer: OperationNode,
     consumer: OperationNode,
     stripped_paths: Mapping[int, str],
+    item_keys: Mapping[int, list[tuple[str, InputSlot]]],
 ) -> bool:
-    """Whether a producer may hold the item a body key identifies, when only paths name that item's resource.
+    """Whether a producer may hold the item a key identifies, when only paths name that item's resource.
 
     `{option: {option_id}}` sent to `/kits/options/add` identifies a kit option, so it takes keys from `/kits/options`
-    or `/options`, but options listed under `/variants/{sku}/options` share only a name with kit options.
+    or `/options`, but options listed under `/variants/{sku}/options` share only a name with kit options. So does
+    `{optionId}` in `/kits/options/{optionId}`, as operations on kit options send them as such objects.
     """
     resource = input_slot.resource
     if (
-        input_slot.item_schemas is None
+        (input_slot.parameter_location == ParameterLocation.BODY and input_slot.item_schemas is None)
         or input_slot.resource_field is None
         or resource.source != DefinitionSource.PARAMETER_INFERENCE
+        or id(resource) not in item_keys
     ):
         return True
     consumer_collection = named_collection(stripped_paths[id(consumer)], resource.name)
     if consumer_collection is None:
         return True
+    if input_slot.item_schemas is not None:
+        keys = [input_slot]
+    else:
+        # Only body keys of the collection's items tell which items a parameter identifies
+        keys = [
+            slot for collection, slot in item_keys[id(resource)] if _same_collection(collection, consumer_collection)
+        ]
+        if not keys:
+            return True
     producer_path = stripped_paths[id(producer)]
     producer_collection = named_collection(producer_path, resource.name)
     if producer_collection is not None:
@@ -1573,17 +1586,34 @@ def _keys_same_collection(
             return True
     # Collections elsewhere hold the same items when the producer writes an object of the same schema
     return any(
-        slot.body_path == input_slot.body_path
+        slot.body_path == key.body_path
         and slot.item_schemas
-        and not slot.item_schemas.isdisjoint(input_slot.item_schemas)
+        and key.item_schemas
+        and not slot.item_schemas.isdisjoint(key.item_schemas)
+        for key in keys
         for slot in producer.inputs
     )
 
 
+def _item_keys(
+    operations: Iterable[OperationNode], stripped_paths: Mapping[int, str]
+) -> dict[int, list[tuple[str, InputSlot]]]:
+    """Body keys inside an object named after their resource, by resource, with the collection their operation names."""
+    keys: dict[int, list[tuple[str, InputSlot]]] = {}
+    for operation in operations:
+        for slot in operation.inputs:
+            if slot.item_schemas is not None:
+                collection = named_collection(stripped_paths[id(operation)], slot.resource.name)
+                if collection is not None:
+                    keys.setdefault(id(slot.resource), []).append((collection, slot))
+    return keys
+
+
 def _same_collection(left: str, right: str) -> bool:
-    # A collection, the same one under a parent, and `/kits/{}/options` beside `/kits/options` hold the same items
-    left = left.replace("/{}", "")
-    right = right.replace("/{}", "")
+    # A collection, the same one under a parent, and `/kits/{}/options` beside `/kits/options` hold the same items.
+    # Both end in a segment naming one resource, `option` or `options`, so only what precedes it tells them apart.
+    left = left.replace("/{}", "").rsplit("/", 1)[0]
+    right = right.replace("/{}", "").rsplit("/", 1)[0]
     return left.endswith(right) or right.endswith(left)
 
 

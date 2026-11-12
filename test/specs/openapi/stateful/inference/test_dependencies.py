@@ -6713,6 +6713,256 @@ def test_body_key_of_a_collection_takes_only_keys_of_that_collection(ctx, produc
     assert inferred_links(graph) == ([] if expected is None else [link])
 
 
+OPTION_KEY = path_param("optionId", "integer")
+UPDATE_KIT_OPTION = operation_with_body("put", "/kits/options/{optionId}", "200", KIT_OPTION, parameters=[OPTION_KEY])
+
+
+def links_into(graph, operation_ref):
+    return [link for link in inferred_links(graph) if link[2]["operationRef"] == operation_ref]
+
+
+# Kit options are sent as `{option: {option_id}}`, so a kit option key in a path takes keys of kit options only.
+@pytest.mark.parametrize(
+    ("producer", "value"),
+    [
+        (operation("post", "/kits/options", "200", {"type": "integer"}), "$response.body#/"),
+        (operation("post", "/options", "200", {"type": "integer"}), "$response.body#/"),
+        (
+            operation("post", "/kits/{kitId}/options", "200", {"type": "integer"}, [path_param("kitId")]),
+            "$response.body#/",
+        ),
+        (
+            operation("post", "/shops/{shopId}/kits/options", "200", {"type": "integer"}, [path_param("shopId")]),
+            "$response.body#/",
+        ),
+        (operation("post", "/kits/option", "200", {"type": "integer"}), "$response.body#/"),
+        (operation("post", "/variants/{sku}/options", "200", {"type": "integer"}, [path_param("sku")]), None),
+        (
+            operation(
+                "put",
+                "/variants/{sku}/options/{id}",
+                "200",
+                {"type": "integer"},
+                [path_param("sku"), path_param("id", "integer")],
+            ),
+            None,
+        ),
+        (operation("post", "/products/options", "200", {"type": "integer"}), None),
+        (operation("post", "/kits/bundles/options", "200", {"type": "integer"}), None),
+        (operation_with_body("post", "/products/options", "200", KIT_OPTION, {"type": "object"}), None),
+        (
+            operation("post", "/kits/{sku}/links/{optionId}", "200", parameters=OPTION_KEYS),
+            "$request.path.optionId",
+        ),
+        (
+            {
+                **operation("post", "/variants/{sku}/links/{optionId}", "200", parameters=OPTION_KEYS),
+                **operation("get", "/variants/{sku}/options", "200", parameters=[path_param("sku")]),
+            },
+            None,
+        ),
+        (
+            operation("post", "/variants/{sku}/links/{optionId}", "200", parameters=OPTION_KEYS),
+            "$request.path.optionId",
+        ),
+    ],
+    ids=[
+        "same-collection",
+        "collection-nested-under-a-parent",
+        "collection-of-one-parent",
+        "same-collection-under-a-parent",
+        "singular-collection",
+        "collection-under-another-parent",
+        "item-under-another-parent",
+        "collection-under-another-prefix",
+        "sub-collection-of-the-collection",
+        "body-key-under-another-prefix",
+        "key-under-the-same-parent",
+        "key-under-another-parent",
+        "key-of-the-only-collection",
+    ],
+)
+def test_key_parameter_of_a_collection_takes_only_keys_of_that_collection(ctx, producer, value):
+    _, graph = analyze_dependencies(ctx, {**producer, **UPDATE_KIT_OPTION})
+    producer_path, producer_operations = next(iter(producer.items()))
+    link = [
+        f"#/paths/{producer_path.replace('/', '~1')}/{next(iter(producer_operations))}",
+        "200",
+        {
+            "operationRef": "#/paths/~1kits~1options~1{optionId}/put",
+            "parameters": {"path.optionId": value},
+            "requestBody": {"option": {"option_id": value}},
+            "x-schemathesis": {"is_inferred": True, "merge_body": True},
+        },
+    ]
+    assert links_into(graph, "#/paths/~1kits~1options~1{optionId}/put") == ([] if value is None else [link])
+
+
+@pytest.mark.parametrize(
+    ("consumer", "slot"),
+    [
+        (
+            operation("get", "/kits/{kitId}/options/{optionId}", "200", parameters=[path_param("kitId"), OPTION_KEY]),
+            "path.optionId",
+        ),
+        (
+            operation(
+                "get",
+                "/kits/options/search",
+                "200",
+                parameters=[{"name": "optionId", "in": "query", "schema": {"type": "integer"}}],
+            ),
+            "query.optionId",
+        ),
+    ],
+    ids=["path", "query"],
+)
+@pytest.mark.parametrize(
+    ("collection", "expected"), [("/kits/options", True), ("/products/options", False)], ids=["same", "other"]
+)
+def test_key_parameter_takes_keys_of_the_items_its_collection_sends(ctx, consumer, slot, collection, expected):
+    producer = operation("post", collection, "200", {"type": "integer"})
+    _, graph = analyze_dependencies(ctx, {**producer, **UPDATE_KIT_OPTION, **consumer})
+    [(consumer_path, consumer_operations)] = consumer.items()
+    operation_ref = f"#/paths/{consumer_path.replace('/', '~1')}/{next(iter(consumer_operations))}"
+    created = [
+        f"#/paths/{collection.replace('/', '~1')}/post",
+        "200",
+        {
+            "operationRef": operation_ref,
+            "parameters": {slot: "$response.body#/"},
+            "x-schemathesis": {"is_inferred": True},
+        },
+    ]
+    updated = [
+        "#/paths/~1kits~1options~1{optionId}/put",
+        "200",
+        {
+            "operationRef": operation_ref,
+            "parameters": {slot: "$request.path.optionId"},
+            "x-schemathesis": {"is_inferred": True},
+        },
+    ]
+    assert links_into(graph, operation_ref) == [created if expected else updated]
+
+
+# Paths alone do not tell videos listed under channels and groups apart from unrelated items sharing a name.
+def test_key_parameter_of_a_collection_sending_no_items_takes_keys_of_same_named_collections(ctx):
+    paths = {
+        **operation("post", "/channels/{channelId}/videos", "200", {"type": "integer"}, [path_param("channelId")]),
+        **operation(
+            "put",
+            "/groups/{groupId}/videos/{videoId}",
+            "200",
+            parameters=[path_param("groupId"), path_param("videoId", "integer")],
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1channels~1{channelId}~1videos/post",
+            "200",
+            {
+                "operationRef": "#/paths/~1groups~1{groupId}~1videos~1{videoId}/put",
+                "parameters": {"path.videoId": "$response.body#/"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+OPTION_REQUEST_SCHEMAS = {
+    "schemas": {
+        **OPTION_SCHEMAS["schemas"],
+        "KitOptionRequest": nested_object("option", component_ref("KitOption")),
+        "CustomOptionRequest": nested_object("option", component_ref("CustomOption")),
+        "OptionBase": nested_object("option_id", {"type": "integer"}),
+    }
+}
+
+
+def option_object(schema):
+    return nested_object("option", schema)
+
+
+@pytest.mark.parametrize(
+    ("body", "item_body", "expected"),
+    [
+        (option_object(component_ref("KitOption")), option_object(component_ref("KitOption")), True),
+        (option_object(component_ref("CustomOption")), option_object(component_ref("KitOption")), False),
+        (
+            option_object({"allOf": [component_ref("KitOption")]}),
+            option_object({"allOf": [component_ref("KitOption")]}),
+            True,
+        ),
+        (
+            option_object({"allOf": [component_ref("CustomOption")]}),
+            option_object({"allOf": [component_ref("KitOption")]}),
+            False,
+        ),
+        (
+            option_object({"allOf": [component_ref("KitOption"), {"description": "Kit option"}]}),
+            option_object(component_ref("KitOption")),
+            True,
+        ),
+        (
+            option_object({"allOf": [component_ref("OptionBase"), nested_object("price", {"type": "integer"})]}),
+            option_object({"allOf": [component_ref("OptionBase"), nested_object("qty", {"type": "integer"})]}),
+            False,
+        ),
+        (
+            option_object({"anyOf": [component_ref("KitOption"), {"type": "null"}]}),
+            option_object(component_ref("KitOption")),
+            True,
+        ),
+        (component_ref("KitOptionRequest"), component_ref("KitOptionRequest"), True),
+        (component_ref("CustomOptionRequest"), component_ref("KitOptionRequest"), False),
+    ],
+    ids=[
+        "ref",
+        "other-ref",
+        "all-of-ref",
+        "other-all-of-ref",
+        "annotated-all-of-ref",
+        "extensions-of-one-base",
+        "nullable-ref",
+        "root-ref",
+        "other-root-ref",
+    ],
+)
+def test_key_parameter_takes_keys_of_another_collection_writing_the_same_item_schema(ctx, body, item_body, expected):
+    paths = {
+        **operation_with_body("post", "/products/options", "200", body, {"type": "integer"}),
+        **operation_with_body("put", "/kits/options/{optionId}", "200", item_body, parameters=[OPTION_KEY]),
+    }
+    _, graph = analyze_dependencies(ctx, paths, version="3.1.0", components=OPTION_REQUEST_SCHEMAS)
+    assert inferred_links(graph) == (
+        [
+            [
+                "#/paths/~1products~1options/post",
+                "200",
+                {
+                    "operationRef": "#/paths/~1kits~1options~1{optionId}/put",
+                    "parameters": {"path.optionId": "$response.body#/"},
+                    "requestBody": {"option": {"option_id": "$response.body#/"}},
+                    "x-schemathesis": {"is_inferred": True, "merge_body": True},
+                },
+            ],
+            [
+                "#/paths/~1kits~1options~1{optionId}/put",
+                "200",
+                {
+                    "operationRef": "#/paths/~1products~1options/post",
+                    "requestBody": {"option": {"option_id": "$request.path.optionId"}},
+                    "x-schemathesis": {"is_inferred": True, "merge_body": True},
+                },
+            ],
+        ]
+        if expected
+        else []
+    )
+
+
 def test_body_key_of_a_flat_collection_fills_the_same_item_under_its_parent(ctx):
     update = operation_with_body(
         "put",

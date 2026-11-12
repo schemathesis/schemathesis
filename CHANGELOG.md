@@ -14,7 +14,7 @@
 - Links treating `anyOf`/`oneOf` array-or-null fields named like `customer_id` as a single identifier.
 - Missing links for request bodies declared as `anyOf`/`oneOf` of an array and `null`.
 - Links filling `format: uuid` parameters from integer foreign keys or bare created ids.
-- Links filling JSON body fields with mistyped values or ids from same-named collections elsewhere.
+- Links filling body fields and parameters with mistyped values or ids from same-named collections elsewhere.
 - Links learned from `Location` headers or body URLs leaking via shared responses in other files.
 - Links never learned from `Location` headers pointing to paths without a `GET` operation.
 - Links from response body URLs never learned once an operation returned 20 empty pages.
