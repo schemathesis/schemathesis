@@ -216,8 +216,14 @@ def _deserialize_json(_ctx: DeserializationContext, response: Response) -> Any:
 
 @deserializer(*media_types.YAML_MEDIA_TYPES)
 def _deserialize_yaml(_ctx: DeserializationContext, response: Response) -> Any:
+    import yaml
+
     encoding = response.encoding or "utf-8"
-    return deserialize_yaml(response.content.decode(encoding))
+    try:
+        return deserialize_yaml(response.content.decode(encoding))
+    except yaml.YAMLError as exc:
+        # Callers treat `ValueError` as an unreadable body, as with malformed JSON.
+        raise ValueError(str(exc)) from exc
 
 
 class ServerSentEvent(TypedDict):
