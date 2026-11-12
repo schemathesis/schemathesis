@@ -100,6 +100,12 @@ def parse(media_type: str) -> tuple[str, str]:
     return main_type.lower(), sub_type.lower()
 
 
+def parse_list(value: object) -> list[str]:
+    """Media types listed in one string separated by commas, e.g. `image/png, image/*`, or in a list of strings."""
+    items = value.split(",") if isinstance(value, str) else value if isinstance(value, list) else []
+    return [item.strip() for item in items if isinstance(item, str) and item.strip()]
+
+
 def is_json(value: str) -> bool:
     """Detect whether the content type is JSON-compatible.
 

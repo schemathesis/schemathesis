@@ -20,7 +20,8 @@ from urllib3.filepost import encode_multipart_formdata
 from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible, is_read_timeout, read_timeout_error
 from schemathesis.core.file_samples import MEDIA_TYPE_FILE_SAMPLES
-from schemathesis.core.jsonschema import get_type
+from schemathesis.core.jsonschema import get_type, resolve_with_root_bundle
+from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at, to_wire_text
@@ -491,10 +492,70 @@ def _encode_multipart(value: Any, boundary: str) -> bytes:
     return body.getvalue()
 
 
-def encode_non_object_multipart(value: Any) -> tuple[bytes, str]:
-    """Encode a body from an uncommon schema, e.g. `{"type": "string"}`, and return it with its Content-Type."""
+def encode_non_object_multipart(ctx: SerializationContext, value: Any) -> tuple[bytes, str]:
+    """Encode a body that is not a mapping of named parts and return it with its Content-Type."""
+    media_type = ctx.case.media_type or "multipart/form-data"
+    main, sub = media_types.parse(media_type)
+    if isinstance(value, list) and sub not in ("form-data", "*"):
+        # Parts of multipart types other than forms have no names, so each array item is one part, in order.
+        body = ctx.case.operation.get_body_for_media_type(media_type)
+        # A media type the operation does not declare gives every part the defaults for a value of any type.
+        encodings, schema = ({}, {}) if body is None else (body.definition, body.resolved_schema or {})
+        payload, boundary = _encode_positional_parts(ctx, value, encodings, schema, schema)
+        return payload, f"{main}/{sub}; boundary={boundary}"
+    # A body from an uncommon schema, e.g. `{"type": "string"}`
     boundary = choose_boundary()
     return _encode_multipart(value, boundary), f"multipart/form-data; boundary={boundary}"
+
+
+def _positional_entry(container: Mapping[str, object], prefix_key: str, rest_key: str, index: int) -> dict[str, object]:
+    """The entry for the array item at `index`: the one at its position, or else the one shared by the rest."""
+    prefix = container.get(prefix_key)
+    entry = prefix[index] if isinstance(prefix, list) and index < len(prefix) else container.get(rest_key)
+    return entry if isinstance(entry, dict) else {}
+
+
+def _default_part_content_type(schema: JsonSchemaObject, root_schema: JsonSchemaObject) -> str:
+    # An array item is one part, so an array of primitives is JSON too, unlike a named field sent as repeated parts.
+    if any(
+        all(_declares_structure(resolve_with_root_bundle(branch, root_schema)) for branch in group)
+        for group in _structure_groups(schema)
+    ):
+        return "application/json"
+    # Values of any type and encoded or binary strings are sent as bytes.
+    if "type" not in schema or "contentEncoding" in schema or schema.get("format") == "binary":
+        return "application/octet-stream"
+    return "text/plain"
+
+
+def _encode_positional_parts(
+    ctx: SerializationContext,
+    items: list[object],
+    encodings: Mapping[str, object],
+    schema: JsonSchemaObject,
+    root_schema: JsonSchemaObject,
+) -> tuple[bytes, str]:
+    """Encode array items as unnamed parts in their order, returning the payload and its boundary."""
+    boundary = choose_boundary()
+    payload = BytesIO()
+    for index, item in enumerate(items):
+        encoding = _positional_entry(encodings, "prefixEncoding", "itemEncoding", index)
+        item_schema = resolve_with_root_bundle(_positional_entry(schema, "prefixItems", "items", index), root_schema)
+        # Without a declared content type, the item schema picks the default; with several, the first is sent.
+        content_type = next(iter(media_types.parse_list(encoding.get("contentType"))), None)
+        content_type = content_type or _default_part_content_type(item_schema, root_schema)
+        content: Body
+        if isinstance(item, list) and media_types.is_multipart(content_type):
+            # A nested multipart document takes the encodings of its own parts from this item's encoding.
+            content, nested_boundary = _encode_positional_parts(ctx, item, encoding, item_schema, root_schema)
+            content_type = f"{content_type}; boundary={nested_boundary}"
+        else:
+            content, content_type = _serialize_part_value(ctx, item, item_schema, None, content_type)
+        payload.write(f"--{boundary}\r\nContent-Type: {content_type}\r\n\r\n".encode())
+        payload.write(serialize_binary(content))
+        payload.write(b"\r\n")
+    payload.write(f"--{boundary}--\r\n".encode())
+    return payload.getvalue(), boundary
 
 
 def _part_schema(schema: dict[str, Any]) -> dict[str, Any]:
@@ -536,7 +597,7 @@ def _structure_groups(schema: dict[str, Any]) -> list[list[dict[str, Any]]]:
     return groups
 
 
-def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
+def _collect_encoded_fields(ctx: SerializationContext, properties: Mapping[str, object]) -> dict[str, str]:
     """Return multipart field names mapped to the content-type declared via `encoding`."""
     operation = ctx.case.operation
     selected = ctx.case.multipart_content_types or {}
@@ -550,7 +611,7 @@ def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
         if content_type is not None:
             result[name] = content_type
     # Default nested-object / array form-parts to JSON so the wire payload is parsable.
-    for name, prop in body.form_properties.items():
+    for name, prop in properties.items():
         if name not in result and isinstance(prop, dict) and _is_structured_part(prop):
             result[name] = "application/json"
     return result
@@ -565,16 +626,16 @@ def _is_already_serialized(value: object) -> bool:
     return False
 
 
-def _property_schema(ctx: SerializationContext, name: str) -> dict[str, Any]:
-    """Return the schema of a multipart property, with `$ref` resolved."""
+def _form_properties(ctx: SerializationContext) -> dict[str, Any]:
+    """Return the schemas of multipart properties, with `$ref` resolved."""
     body = ctx.case.operation.get_body_for_media_type(ctx.case.media_type or "multipart/form-data")
-    assert body is not None
-    schema = body.form_properties.get(name)
-    return schema if isinstance(schema, dict) else {}
+    return {} if body is None else body.form_properties
 
 
-def _serialize_part_value(ctx: SerializationContext, value: Any, name: str, content_type: str) -> tuple[object, str]:
-    """Serialize a multipart field value for its content-type, returning the part content and its content-type."""
+def _serialize_part_value(
+    ctx: SerializationContext, value: Any, schema: JsonSchemaObject, resource_name: str | None, content_type: str
+) -> tuple[Body, str]:
+    """Serialize a multipart part value for its content-type, returning the part content and its content-type."""
     if _is_already_serialized(value) or media_types.is_plain_text(content_type):
         # Plain text parts are rendered like fields without an explicit content-type.
         return value, content_type
@@ -591,7 +652,7 @@ def _serialize_part_value(ctx: SerializationContext, value: Any, name: str, cont
         return content, f"{main}/{sub}; boundary={boundary}"
     pair = REQUESTS_TRANSPORT.get_first_matching_media_type(content_type)
     if pair is None:
-        if not isinstance(value, list) and "array" in get_type(_property_schema(ctx, name)):
+        if not isinstance(value, list) and "array" in get_type(schema):
             # An array's media type describes its items. A value of another type, e.g. `0` for a list of files,
             # has no items to encode, so it goes out as the text it would have without `encoding`.
             return value, content_type
@@ -599,7 +660,7 @@ def _serialize_part_value(ctx: SerializationContext, value: Any, name: str, cont
     _, serializer = pair
     if serializer is xml_serializer:
         # The part is its own XML document, so its root comes from the part schema.
-        result = serialize_xml_with_schema(value, _property_schema(ctx, name), resource_name=name)
+        result = serialize_xml_with_schema(value, schema, resource_name=resource_name)
     else:
         result = serializer(ctx, value)
     if "json" in result:
@@ -617,10 +678,14 @@ def prepare_multipart_parts(
     """Split a form payload into file parts and plain form fields."""
     # Fields are replaced with their wire form; the case body must keep its generated values.
     value = dict(value)
-    encoded_fields = _collect_encoded_fields(ctx)
+    properties = _form_properties(ctx)
+    encoded_fields = _collect_encoded_fields(ctx, properties)
     for name, content_type in encoded_fields.items():
         if name in value:
-            value[name], encoded_fields[name] = _serialize_part_value(ctx, value[name], name, content_type)
+            schema = properties.get(name)
+            value[name], encoded_fields[name] = _serialize_part_value(
+                ctx, value[name], schema if isinstance(schema, dict) else {}, name, content_type
+            )
     multipart = _prepare_form_data(value)
     # Surface auto-discovered per-part content types on the wire; case-level overrides still win.
     selected = {**encoded_fields, **(ctx.case.multipart_content_types or {})}
@@ -650,7 +715,7 @@ def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, An
             content_type = prepared.headers["Content-Type"].replace("multipart/form-data", "multipart/mixed", 1)
             return {"data": prepared.body, "headers": {"Content-Type": content_type}}
         return {"files": files, "data": data}
-    raw_data, content_type = encode_non_object_multipart(value)
+    raw_data, content_type = encode_non_object_multipart(ctx, value)
     return {"data": raw_data, "headers": {"Content-Type": content_type}}
 
 
