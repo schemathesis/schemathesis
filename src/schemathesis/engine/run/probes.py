@@ -15,9 +15,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import is_read_timeout
-from schemathesis.core.result import Ok
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
-from schemathesis.engine import Status, events
 from schemathesis.engine.errors import never_reached_server
 from schemathesis.transport.prepare import get_default_headers
 
@@ -26,27 +24,17 @@ if TYPE_CHECKING:
 
     from schemathesis.core.spec import SchemaMetadata
     from schemathesis.engine.context import EngineContext
-    from schemathesis.engine.events import EventGenerator
-    from schemathesis.engine.run import Phase
-    from schemathesis.engine.run.cache import CacheReport
 
 
-@dataclass(slots=True)
-class ProbePayload:
-    probes: list[ProbeRun]
-    cache: CacheReport | None = None
-
-
-def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
-    """Discover capabilities of the tested app."""
+def probe(ctx: EngineContext) -> list[ProbeRun]:
+    """Discover capabilities of the tested app and adapt generation to the ones it lacks."""
     probes = run(ctx)
     for result in probes:
         if isinstance(result.probe, NullByteInHeader) and result.is_failure:
             ctx.schema.adapt_to_null_byte_in_header_failure()
         elif isinstance(result.probe, UnsafePathDecoder) and result.is_failure:
             ctx.schema.adapt_to_path_decoder_rejection()
-    payload = Ok(ProbePayload(probes=probes, cache=ctx.cache.run()))
-    yield events.PhaseFinished(phase=phase, status=Status.SUCCESS, payload=payload)
+    return probes
 
 
 def run(ctx: EngineContext) -> list[ProbeRun]:

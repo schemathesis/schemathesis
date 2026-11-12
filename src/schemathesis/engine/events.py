@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.errors import InvalidSchema, RejectedSchemaDefinition
 from schemathesis.core.failures import Failure
-from schemathesis.core.result import Result
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.engine import Status
@@ -20,8 +19,7 @@ if TYPE_CHECKING:
     from queue import Queue
 
     from schemathesis.engine import StopReason
-    from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
-    from schemathesis.engine.run.probes import ProbePayload
+    from schemathesis.engine.run.setup import SetupPayload
 
 EventGenerator = Generator["EngineEvent", None, None]
 
@@ -90,13 +88,11 @@ class PhaseFinished(PhaseEvent):
     """End of an execution phase."""
 
     status: Status
-    payload: Result[ProbePayload, Exception] | AuthBootstrapPayload | None
+    payload: SetupPayload | None
 
     __slots__ = ("id", "timestamp", "phase", "status", "payload")
 
-    def __init__(
-        self, *, phase: Phase, status: Status, payload: Result[ProbePayload, Exception] | AuthBootstrapPayload | None
-    ) -> None:
+    def __init__(self, *, phase: Phase, status: Status, payload: SetupPayload | None) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase
@@ -105,8 +101,8 @@ class PhaseFinished(PhaseEvent):
 
 
 @dataclass
-class SchemaAnalysisWarnings(PhaseEvent):
-    """Schema analysis discovered warnings."""
+class SetupWarnings(PhaseEvent):
+    """Setup discovered warnings about the schema or the application code."""
 
     warnings: list[SchemaWarning]
 
@@ -231,7 +227,7 @@ class ScenarioFinished(ScenarioEvent):
     @property
     def is_test_scenario(self) -> bool:
         # Sign-up and login calls prepare the run; reports that count tests leave them out.
-        return self.phase is not PhaseName.AUTH_BOOTSTRAP
+        return self.phase is not PhaseName.SETUP
 
 
 def put_skipped_scenario(
