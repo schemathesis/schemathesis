@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any, Protocol
 
 from schemathesis.core.error_feedback.store import (
@@ -15,7 +16,7 @@ from schemathesis.core.error_feedback.store import (
     SizeBoundPayload,
     TypeMismatchPayload,
 )
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, maybe_resolve_bundled, resolve_bundled_ref
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, matches_pattern, maybe_resolve_bundled, resolve_bundled_ref
 from schemathesis.core.jsonschema.patterns import is_valid_python_regex, normalize_regex
 from schemathesis.core.jsonschema.types import ALL_TYPES, JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
@@ -80,6 +81,125 @@ def apply_adjustments(
             observations=relevant,
         )
     return current
+
+
+def _forbids_path(
+    schema: dict[str, Any], path: ParameterPath, bundled: object, visited: dict[tuple[int, ParameterPath], bool]
+) -> bool:
+    """Whether no value valid against `schema` can hold `path`, because a closed object on the way omits its key."""
+    if not path:
+        return False
+    schema = resolve_bundled_ref(schema, bundled)
+    key = (id(schema), path)
+    if key not in visited:
+        # A schema that reaches itself through its own branches adds nothing on the second visit.
+        visited[key] = False
+        visited[key] = _closes_path(schema, path, bundled, visited)
+    return visited[key]
+
+
+def _closes_path(
+    schema: dict[str, Any], path: ParameterPath, bundled: object, visited: dict[tuple[int, ParameterPath], bool]
+) -> bool:
+    # A value satisfies one member of every group, so a group whose members all forbid the path forbids it.
+    return _closes_key(schema, path[0], bundled) or any(
+        all(_forbids_path(member, member_path, bundled, visited) for member, member_path in group)
+        for group in _path_groups(schema, path)
+    )
+
+
+def _closes_key(schema: dict[str, Any], step: str | int, bundled: object) -> bool:
+    """Whether `schema` itself rejects an object holding the key `step`."""
+    if not isinstance(step, str):
+        return False
+    if schema.get("additionalProperties") is False and not _names_property(schema, step):
+        return True
+    return schema.get("unevaluatedProperties") is False and not _declares_name(schema, step, bundled)
+
+
+def _path_groups(schema: dict[str, Any], path: ParameterPath) -> list[list[tuple[dict[str, Any], ParameterPath]]]:
+    """Subschemas a value at `schema` must hold `path` against, grouped so that each group needs one of its members.
+
+    The declared property holds the rest of the path and each `allOf` branch the whole path; a `oneOf`/`anyOf`
+    group needs one of its branches.
+    """
+    step, rest = path[0], path[1:]
+    properties = schema.get("properties")
+    declared = properties.get(step) if isinstance(step, str) and isinstance(properties, dict) else None
+    groups = [[(declared, rest)]] if rest and isinstance(declared, dict) else []
+    all_of = schema.get("allOf")
+    if isinstance(all_of, list):
+        groups.extend([(branch, path)] for branch in all_of if isinstance(branch, dict))
+    for keyword in ("oneOf", "anyOf"):
+        branches = schema.get(keyword)
+        # A boolean branch is never inspected, so its group cannot be trusted to forbid the path.
+        if isinstance(branches, list) and branches and all(isinstance(branch, dict) for branch in branches):
+            groups.append([(branch, path) for branch in branches])
+    return groups
+
+
+def _names_property(schema: dict[str, Any], name: str) -> bool:
+    """Whether `name` is in `properties` of `schema` or matches one of its `patternProperties` patterns."""
+    properties = schema.get("properties")
+    if isinstance(properties, dict) and name in properties:
+        return True
+    patterns = schema.get("patternProperties")
+    return isinstance(patterns, dict) and any(
+        isinstance(pattern, str) and matches_pattern(pattern)(name) for pattern in patterns
+    )
+
+
+def _declares_name(schema: dict[str, Any], name: str, bundled: object) -> bool:
+    """Whether `schema` or a branch it composes names `name` through `properties` or `patternProperties`."""
+    return any(_names_property(candidate, name) for candidate in _composed_schemas(schema, bundled, set()))
+
+
+def _composed_schemas(schema: dict[str, Any], bundled: object, seen: set[int]) -> Iterator[dict[str, Any]]:
+    """`schema` and every schema its `allOf`/`oneOf`/`anyOf` branches reach, each once."""
+    schema = resolve_bundled_ref(schema, bundled)
+    key = id(schema)
+    if key in seen:
+        return
+    seen.add(key)
+    yield schema
+    for branch in _composed_branches(schema):
+        yield from _composed_schemas(branch, bundled, seen)
+
+
+def _composed_branches(schema: dict[str, Any]) -> list[dict[str, Any]]:
+    branches: list[dict[str, Any]] = []
+    for keyword in ("allOf", "oneOf", "anyOf"):
+        value = schema.get(keyword)
+        if isinstance(value, list):
+            branches.extend(branch for branch in value if isinstance(branch, dict))
+    return branches
+
+
+def _targets_allowing_path(
+    location: ParameterLocation,
+    root: dict[str, Any],
+    targets: list[dict[str, Any]],
+    path: ParameterPath,
+    bundled: object,
+) -> list[dict[str, Any]]:
+    """The `targets` that a valid value can extend along `path`, or none when the container as a whole forbids it."""
+    if _forbids_path(_container_as_declared(root, location), path, bundled, {}):
+        return []
+    # The root was just checked as the container.
+    return [target for target in targets if target is root or not _forbids_path(target, path, bundled, {})]
+
+
+def _container_as_declared(root: dict[str, Any], location: ParameterLocation) -> dict[str, Any]:
+    if location is ParameterLocation.BODY:
+        return root
+    # Parameter containers are closed only to keep generation to declared parameters; servers may require others.
+    return {key: value for key, value in root.items() if key != "additionalProperties"}
+
+
+def _require_unless_closed(obj: dict[str, Any], leaf: str, bundled: object) -> None:
+    """Mark `leaf` as required on `obj` unless `obj` forbids it as an undeclared property."""
+    if not _forbids_path(obj, (leaf,), bundled, {}):
+        _ensure_required_in_object(obj, leaf)
 
 
 def _is_object_schema(schema: dict[str, Any]) -> bool:
@@ -159,7 +279,7 @@ def _walk_and_apply(schema: dict[str, Any], path: ParameterPath, bundled: object
     assert isinstance(leaf, str)
     if any(isinstance(step, int) for step in prefix):
         for target in _walk_to_properties(schema, tuple(prefix), bundled):
-            _ensure_required_in_object(target, leaf)
+            _require_unless_closed(target, leaf, bundled)
         return
     current = schema
     for step in prefix:
@@ -590,6 +710,7 @@ class RequiredFieldAdjustment:
     """Mark fields the server told us are mandatory as `required` with `minLength: 1`.
 
     Applied to the root object schema and to each object branch of `oneOf`/`anyOf`/`allOf`.
+    An object that forbids undeclared properties never gains one.
     """
 
     handles = frozenset({ObservationKind.MUST_NOT_BE_BLANK})
@@ -609,9 +730,12 @@ class RequiredFieldAdjustment:
         if not targets:
             return schema
 
+        bundled = schema.get(BUNDLE_STORAGE_KEY)
+        root = maybe_resolve_bundled(schema)
         for observation in observations:
-            for target in targets:
-                _walk_and_apply(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY))
+            path = observation.parameter_path
+            for target in _targets_allowing_path(location, root, targets, path, bundled):
+                _walk_and_apply(target, path, bundled)
 
         return schema
 

@@ -1233,3 +1233,43 @@ def restler_planted_bug() -> OpenAPIApp:
         return "", 500
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def envelope_wrapped_closed_body() -> OpenAPIApp:
+    # Field errors arrive as `{"error": ..., "details": {<field>: [...]}}`; the body is closed and extra keys get a 400.
+    spec = build_schema(
+        {
+            "/api/redeem": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"token": {"type": "string", "minLength": 1}},
+                                    "required": ["token"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}},
+                }
+            }
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/api/redeem", methods=["POST"])
+    def redeem() -> Any:
+        body = request.get_json(silent=True)
+        unexpected = {key: ["Unexpected field."] for key in body if key != "token"}
+        if unexpected:
+            return jsonify({"error": "validation_failed", "details": unexpected}), 400
+        if len(body["token"]) < 3:
+            # A rule the schema cannot express, reported with a message the parsers recognize.
+            return jsonify({"error": "validation_failed", "details": {"token": ["This field may not be blank."]}}), 422
+        return jsonify({"ok": True})
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")

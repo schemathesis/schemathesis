@@ -8,7 +8,8 @@ from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
     RegexHandler,
-    location_for_parameter,
+    location_for_method,
+    location_for_name,
     numeric_bound,
     size_bound,
 )
@@ -23,6 +24,7 @@ from schemathesis.core.error_feedback.store import (
 from schemathesis.core.transforms import as_index_or_key
 
 if TYPE_CHECKING:
+    from schemathesis.core.parameters import ParameterLocation
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
@@ -169,6 +171,17 @@ def _unwrap_detail_envelope(operation: APIOperation, body: object) -> object:
     return body
 
 
+def _locate_field(operation: APIOperation, path: ParameterPath, case: Case) -> tuple[ParameterPath, ParameterLocation]:
+    """`path` without leading error-envelope keys like `details`, and where the request carries that field."""
+    # Envelope keys are neither sent nor declared, so the field's own path starts at the first key that is.
+    for index, step in enumerate(path):
+        if isinstance(step, str):
+            location = location_for_name(operation, step, case)
+            if location is not None:
+                return path[index:], location
+    return path, location_for_method(operation.method)
+
+
 @PARSERS.register
 class DRFParser:
     """Parser for Django REST Framework `ValidationError` envelopes — `{<field>: ["...message..."], ...}`."""
@@ -193,11 +206,12 @@ class DRFParser:
             if classification is None:
                 continue
             kind, payload = classification
+            field_path, location = _locate_field(operation, path, case)
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location_for_parameter(operation, path, case),
-                    parameter_path=path,
+                    location=location,
+                    parameter_path=field_path,
                     kind=kind,
                     raw_message=message,
                     payload=payload,
