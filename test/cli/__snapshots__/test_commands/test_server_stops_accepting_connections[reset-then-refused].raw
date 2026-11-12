@@ -43,6 +43,8 @@ http://127.0.0.1 stopped responding. Last requests before it went away:
 
     curl -X POST -H 'Content-Type: application/json' -d '{"size": 99999}' http://127.0.0.1/collections
 
+    curl -X POST -H 'Content-Type: application/json' -d '{"size": 0}' http://127.0.0.1/collections
+
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 

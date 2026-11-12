@@ -1626,7 +1626,7 @@ def test_csv_validation(case):
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines(
         [
-            r".*/api/success\?format=csv.*",
+            r".*/api/success\?format=json.*",
         ]
     )
     assert "generation/hypothesis/builder.py" not in result.stdout.str()

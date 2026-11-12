@@ -32,7 +32,7 @@ from schemathesis.generation.hypothesis.marks import (
     MissingPathParameters,
     UnserializablePayloadMark,
 )
-from schemathesis.generation.meta import content_type_probes_first
+from schemathesis.generation.meta import order_for_lifo_execution
 from schemathesis.generation.overrides import Override
 from schemathesis.hooks import HookDispatcher, HookDispatcherMark
 from schemathesis.schemas import APIOperation
@@ -329,7 +329,7 @@ def add_coverage(
     )
 
     def generate() -> list:
-        examples = _as_explicit_examples(content_type_probes_first(generator))
+        examples = _as_explicit_examples(order_for_lifo_execution(generator))
         unserializable = generator.controller.unserializable_media_types
         if unserializable:
             UnserializablePayloadMark.set(test, sorted(unserializable))
