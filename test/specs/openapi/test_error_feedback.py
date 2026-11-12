@@ -545,6 +545,88 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
                 },
             },
         ),
+        (
+            {"type": "object", "properties": {"token": {"type": "string"}}, "additionalProperties": False},
+            [("details", "token")],
+            {"type": "object", "properties": {"token": {"type": "string"}}, "additionalProperties": False},
+        ),
+        (
+            {"type": "object", "properties": {"token": {"type": "string"}}, "additionalProperties": False},
+            [("email",)],
+            {"type": "object", "properties": {"token": {"type": "string"}}, "additionalProperties": False},
+        ),
+        (
+            {"type": "object", "properties": {"token": {"type": "string"}}, "unevaluatedProperties": False},
+            [("details", "token")],
+            {"type": "object", "properties": {"token": {"type": "string"}}, "unevaluatedProperties": False},
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"address": {"type": "object", "properties": {}, "additionalProperties": False}},
+            },
+            [("address", "zip")],
+            {
+                "type": "object",
+                "properties": {"address": {"type": "object", "properties": {}, "additionalProperties": False}},
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"items": {"type": "array", "items": {"type": "object", "additionalProperties": False}}},
+            },
+            [("items", 0, "name")],
+            {
+                "type": "object",
+                "properties": {"items": {"type": "array", "items": {"type": "object", "additionalProperties": False}}},
+            },
+        ),
+        (
+            {"type": "object", "properties": {"token": {"type": "string"}}, "additionalProperties": False},
+            [("token",)],
+            {
+                "type": "object",
+                "properties": {"token": {"type": "string", "minLength": 1}},
+                "required": ["token"],
+                "additionalProperties": False,
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"address": {"type": "object", "properties": {"zip": {"type": "string"}}}},
+                "additionalProperties": False,
+            },
+            [("address", "zip")],
+            {
+                "type": "object",
+                "properties": {
+                    "address": {
+                        "type": "object",
+                        "properties": {"zip": {"type": "string", "minLength": 1}},
+                        "required": ["zip"],
+                    }
+                },
+                "additionalProperties": False,
+            },
+        ),
+        (
+            {"type": "object", "properties": {"token": {"type": "string"}}, "additionalProperties": {"type": "object"}},
+            [("details", "token")],
+            {
+                "type": "object",
+                "properties": {
+                    "token": {"type": "string"},
+                    "details": {
+                        "type": "object",
+                        "properties": {"token": {"type": "string", "minLength": 1}},
+                        "required": ["token"],
+                    },
+                },
+                "additionalProperties": {"type": "object"},
+            },
+        ),
     ],
     ids=[
         "string-property-bump-minlength",
@@ -568,6 +650,14 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
         "non-string-leaf-skipped",
         "existing-required-kept",
         "nested-path-under-object-without-properties",
+        "closed-object-keeps-undeclared-intermediate-out",
+        "closed-object-keeps-undeclared-leaf-out",
+        "unevaluated-closed-object-keeps-undeclared-intermediate-out",
+        "closed-nested-object-keeps-undeclared-leaf-out",
+        "closed-array-item-keeps-undeclared-leaf-out",
+        "closed-object-declared-leaf-still-required",
+        "closed-object-declared-intermediate-still-walked",
+        "schema-valued-additional-properties-is-open",
     ],
 )
 def test_required_field_adjustment_applies_correctly(input_schema, paths, expected, case_factory):

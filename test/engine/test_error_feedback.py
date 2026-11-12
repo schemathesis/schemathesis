@@ -62,6 +62,52 @@ def test_drf_detail_envelope_does_not_add_detail_query_parameter(ctx, app_runner
     assert "detail" not in query_keys
 
 
+def test_wrapped_field_error_does_not_add_property_to_closed_body(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/redeem": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"token": {"type": "string", "minLength": 1}},
+                                    "required": ["token"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/redeem", methods=["POST"])
+    def redeem():
+        body = request.get_json(silent=True)
+        if isinstance(body, dict) and isinstance(body.get("token"), str) and len(body["token"]) < 3:
+            # The field error sits under an envelope key the schema does not declare.
+            return jsonify({"error": "validation_failed", "details": {"token": ["This field may not be blank."]}}), 422
+        return jsonify({"ok": True})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["coverage", "fuzzing"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=30)
+
+    body_keys = set()
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.FUZZING:
+            for case_node in event.recorder.cases.values():
+                if isinstance(case_node.value.body, dict):
+                    body_keys.update(case_node.value.body)
+    assert body_keys == {"token"}
+
+
 def test_stale_example_evicted_after_format_inference(ctx):
     api = ctx.openapi.serve(error_feedback_apps.commit_date_with_example())
     schema = schemathesis.openapi.from_url(api.schema_url)

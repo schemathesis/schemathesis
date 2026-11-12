@@ -42,6 +42,7 @@
 - False positive `negative_data_rejection` for scalar values sent to form body array fields.
 - False positive and internal error in `negative_data_rejection` for `deepObject` members under `$ref`. [#6025](https://github.com/schemathesis/schemathesis/issues/6025) [#6028](https://github.com/schemathesis/schemathesis/issues/6028)
 - False positive `positive_data_acceptance` when a `body.*` override sets a field sharing its `$ref` with others. [#6026](https://github.com/schemathesis/schemathesis/issues/6026)
+- False positive `positive_data_acceptance` when error feedback adds undeclared fields to `additionalProperties: false` bodies. [#6056](https://github.com/schemathesis/schemathesis/issues/6056)
 - False negatives and positives in `negative_data_rejection` for non-body parameters behind `$ref` or `allOf`.
 - Internal names like `schema000001` in `negative_data_rejection` and response conformance failure messages.
 

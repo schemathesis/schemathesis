@@ -122,8 +122,24 @@ def _collect_property_names_through_all_of(schema: dict[str, Any], bundled: obje
     return names
 
 
+def _admits_property(obj: dict[str, Any], name: str) -> bool:
+    """Whether `obj` can gain `name` as a property without accepting a key its schema closed off.
+
+    `patternProperties` is not consulted, so a name only a pattern admits is refused: skipping an
+    adjustment is cheaper than generating bodies the server rejects.
+    """
+    properties = obj.get("properties")
+    if isinstance(properties, dict) and name in properties:
+        return True
+    return obj.get("additionalProperties") is not False and obj.get("unevaluatedProperties") is not False
+
+
 def _ensure_required_in_object(obj: dict[str, Any], leaf: str) -> None:
     """Mark `leaf` as required on `obj`, injecting a non-blank string property when absent."""
+    if not _admits_property(obj, leaf):
+        # The error names a key the closed object does not declare, e.g. one nested under an
+        # error envelope; requiring it would make every positive body invalid.
+        return
     properties = obj.setdefault("properties", {})
     existing_required = obj.get("required")
     required = existing_required if isinstance(existing_required, list) else []
@@ -151,7 +167,8 @@ def _walk_and_apply(schema: dict[str, Any], path: ParameterPath, bundled: object
 
     Missing intermediate objects under `properties` are synthesized only on string-only
     paths; a path through an array element needs the declared `items` schema, since
-    synthesizing one requires knowing the element shape, which we don't have.
+    synthesizing one requires knowing the element shape, which we don't have. A path
+    that would add an undeclared property to a closed object is skipped.
     """
     if not path or not isinstance(path[-1], str):
         return
@@ -164,6 +181,8 @@ def _walk_and_apply(schema: dict[str, Any], path: ParameterPath, bundled: object
     current = schema
     for step in prefix:
         assert isinstance(step, str)
+        if not _admits_property(current, step):
+            return
         properties = current.setdefault("properties", {})
         nested = properties.get(step)
         if not isinstance(nested, dict):
