@@ -9,7 +9,7 @@ from urllib.parse import quote, unquote
 from schemathesis.core import Body
 from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference_with_uri
-from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue
 from schemathesis.core.parameters import DelimitedValue, EncodedPath
 from schemathesis.core.transforms import to_wire_string, to_wire_text, transform
 
@@ -44,7 +44,7 @@ def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
 
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Iterator
 
     from schemathesis.generation.case import Case
 
@@ -197,7 +197,11 @@ def _resolve_xml_schema(resolver: Resolver, schema: dict[str, Any]) -> tuple[Res
     xml: dict[str, Any] = {}
     seen: set[str] = set()
     while "$ref" in schema:
-        xml = {**schema.get("xml", {}), **xml}
+        hints = schema.get("xml", {})
+        # Next to `$ref`, `nodeType: none` is the default and leaves the node type to the referenced schema
+        if hints.get("nodeType") == "none":
+            hints = {key: value for key, value in hints.items() if key != "nodeType"}
+        xml = {**hints, **xml}
         uri, target_resolver, target = resolve_reference_with_uri(resolver, schema["$ref"])
         # A chain that loops back ends at the last schema before the loop
         if uri in seen:
@@ -270,19 +274,16 @@ def _write_object(
     if "namespace" in options:
         _write_namespace(buffer, options)
 
-    attribute_namespaces = {}
+    namespaces: dict[str, str] = {}
     attributes = {}
     children_buffer = StringIO()
-    properties = (schema or {}).get("properties", {})
-    # Attribute namespaces are declared on this element, so their prefixes stay bound only until it closes.
+    # Attribute and `nodeType: none` namespaces are declared on this element, so they stay bound only until it closes.
     depth = len(stack)
     # Elements go out after every attribute is read, so they can use any attribute's prefix regardless of order.
     elements = []
-    for child_name, value in obj.items():
-        property_schema = properties.get(child_name, {})
-        child_resolver = resolver
-        if "$ref" in property_schema:
-            child_resolver, property_schema = _resolve_xml_schema(resolver, property_schema)
+    for child_name, value, property_schema, child_resolver in _iter_child_nodes(
+        obj, schema, resolver, stack, namespaces
+    ):
         child_options = property_schema.get("xml", {})
         child_tag = child_options.get("name", child_name)
 
@@ -293,7 +294,7 @@ def _write_object(
                 prefix = child_options["prefix"]
                 attr_name = f"{prefix}:{_sanitize_xml_name(child_tag)}"
                 # Store namespace declaration
-                attribute_namespaces[prefix] = child_options["namespace"]
+                namespaces[prefix] = child_options["namespace"]
             else:
                 attr_name = _sanitize_xml_name(child_tag)
 
@@ -315,8 +316,8 @@ def _write_object(
         _write_xml(children_buffer, value, child_tag, property_schema, stack, child_resolver)
         pop_namespace_if_any(stack, child_options)
 
-    # Write namespace declarations for attributes
-    for prefix, namespace in attribute_namespaces.items():
+    # Write namespace declarations for attributes and `nodeType: none` objects
+    for prefix, namespace in namespaces.items():
         buffer.write(f' xmlns:{prefix}="{namespace}"')
 
     if attributes:
@@ -326,6 +327,31 @@ def _write_object(
     buffer.write(f"</{tag}>")
     del stack[depth:]
     pop_namespace_if_any(stack, options)
+
+
+def _iter_child_nodes(
+    obj: dict[str, JsonValue],
+    schema: JsonSchemaObject | None,
+    resolver: Resolver,
+    stack: list[str],
+    namespaces: dict[str, str],
+) -> Iterator[tuple[str, JsonValue, JsonSchemaObject, Resolver]]:
+    properties = (schema or {}).get("properties", {})
+    for child_name, value in obj.items():
+        property_schema = properties.get(child_name, {})
+        child_resolver = resolver
+        if "$ref" in property_schema:
+            child_resolver, property_schema = _resolve_xml_schema(resolver, property_schema)
+        options = property_schema.get("xml", {})
+        # An object with `nodeType: none` has no element of its own; its nodes belong to the enclosing element
+        if options.get("nodeType") == "none" and isinstance(value, dict):
+            # Its children may use its prefix, so the enclosing element binds it unless that prefix is already bound
+            if "namespace" in options and "prefix" in options and options["prefix"] not in stack:
+                stack.append(options["prefix"])
+                namespaces[options["prefix"]] = options["namespace"]
+            yield from _iter_child_nodes(value, property_schema, child_resolver, stack, namespaces)
+        else:
+            yield child_name, value, property_schema, child_resolver
 
 
 def _write_array(

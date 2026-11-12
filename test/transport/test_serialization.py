@@ -2803,6 +2803,108 @@ def _with_child(child):
         (
             {
                 "type": "object",
+                "xml": {"name": "item"},
+                "properties": {
+                    "meta": {"type": "object", "xml": {"nodeType": "none"}, "properties": {"a": {"type": "integer"}}}
+                },
+            },
+            {},
+            "3.2.0",
+            {"meta": {"a": 1}},
+            b"<item><a>1</a></item>",
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "item"},
+                "properties": {
+                    "meta": {
+                        "type": "object",
+                        "xml": {"nodeType": "none"},
+                        "properties": {
+                            "id": {"type": "integer", "xml": {"nodeType": "attribute"}},
+                            "note": {"type": "string", "xml": {"nodeType": "text"}},
+                        },
+                    }
+                },
+            },
+            {},
+            "3.2.0",
+            {"meta": {"id": 1, "note": "x"}},
+            b'<item id="1">x</item>',
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "item"},
+                "properties": {
+                    "meta": {
+                        "type": "object",
+                        "xml": {"nodeType": "none", "namespace": "http://x", "prefix": "x"},
+                        "properties": {"a": {"type": "integer", "xml": {"prefix": "x"}}},
+                    }
+                },
+            },
+            {},
+            "3.2.0",
+            {"meta": {"a": 1}},
+            b'<item xmlns:x="http://x"><x:a>1</x:a></item>',
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "item", "namespace": "http://x", "prefix": "x"},
+                "properties": {
+                    "meta": {
+                        "type": "object",
+                        "xml": {"nodeType": "none", "namespace": "http://x", "prefix": "x"},
+                        "properties": {"a": {"type": "integer", "xml": {"prefix": "x"}}},
+                    }
+                },
+            },
+            {},
+            "3.2.0",
+            {"meta": {"a": 1}},
+            b'<x:item xmlns:x="http://x"><x:a>1</x:a></x:item>',
+        ),
+        (
+            {"type": "object", "xml": {"name": "docs"}, "properties": {"doc": {"$ref": "#/components/schemas/Doc"}}},
+            {
+                "Doc": {
+                    "type": "object",
+                    "xml": {"nodeType": "none"},
+                    "properties": {"content": {"type": "string", "xml": {"nodeType": "cdata"}}},
+                }
+            },
+            "3.2.0",
+            {"doc": {"content": "<b>x</b>"}},
+            b"<docs><![CDATA[<b>x</b>]]></docs>",
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "root"},
+                "properties": {"pet": {"$ref": "#/components/schemas/Pet", "xml": {"nodeType": "none"}}},
+            },
+            {"Pet": {"type": "object", "properties": {"a": {"type": "integer"}}}},
+            "3.2.0",
+            {"pet": {"a": 1}},
+            b"<root><pet><a>1</a></pet></root>",
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "item"},
+                "properties": {"s": {"type": "string", "xml": {"nodeType": "none"}}},
+            },
+            {},
+            "3.2.0",
+            {"s": "v"},
+            b"<item><s>v</s></item>",
+        ),
+        (
+            {
+                "type": "object",
                 "properties": {
                     "flag": {"type": "boolean"},
                     "note": {"type": "null"},
@@ -2962,6 +3064,13 @@ def _with_child(child):
         "node-type-text",
         "node-type-cdata",
         "node-type-text-container-written-as-element",
+        "node-type-none-object",
+        "node-type-none-object-attribute-and-text",
+        "node-type-none-object-namespace-declared-on-parent",
+        "node-type-none-object-namespace-already-bound-by-parent",
+        "node-type-none-referenced-object",
+        "node-type-none-next-to-reference-is-default",
+        "node-type-none-scalar-written-as-element",
         "boolean-and-null-use-json-spelling",
         "referenced-property-schema",
         "referenced-array-items",
