@@ -991,6 +991,11 @@ _EXTRA_PROPERTY_HINT = (
             id="declared-field-blamed-by-flattened-pydantic-error",
         ),
         pytest.param(b'{"extra": ["This field may not be blank."]}', _EXTRA_PROPERTY_HINT, id="extra-property-blamed"),
+        pytest.param(
+            b'{"error": "validation_failed", "details": {"name": ["This field may not be blank."]}}',
+            "",
+            id="declared-field-blamed-inside-envelope",
+        ),
         pytest.param(b'{"detail": "Bad request"}', _EXTRA_PROPERTY_HINT, id="no-field-blamed"),
     ],
 )

@@ -64,6 +64,22 @@ def test_feedback_unmasks_planted_bug_via_missing_request_body(ctx, cli, snapsho
     )
 
 
+def test_feedback_keeps_closed_body_closed_behind_error_envelope(ctx, cli, snapshot_cli):
+    api = ctx.openapi.serve(error_feedback_apps.envelope_wrapped_closed_body())
+    assert (
+        cli.run(
+            api.schema_url,
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "-c",
+            "positive_data_acceptance",
+            config={"checks": {"positive_data_acceptance": {"expected-statuses": ["2xx", "422"]}}},
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.parametrize(
     ("factory", "max_examples"),
     [

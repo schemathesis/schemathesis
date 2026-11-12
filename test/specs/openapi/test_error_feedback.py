@@ -179,13 +179,19 @@ def test_drf_parser_detail_message_is_not_an_envelope(ctx, case_factory, body, e
     assert [observation.parameter_path for observation in observations] == expected_paths
 
 
-def test_drf_detail_envelope_refines_declared_query_parameter(ctx, case_factory):
+@pytest.mark.parametrize(
+    "body",
+    [
+        DRF_DETAIL_WRAPPED_BODY,
+        {"error": "validation_failed", "details": {"tags": ["This field may not be blank."]}},
+    ],
+    ids=["detail", "details-next-to-error-code"],
+)
+def test_drf_detail_envelope_refines_declared_query_parameter(ctx, response_factory, body):
     operation = _drf_query_operation(ctx, [{"name": "tags", "in": "query", "schema": {"type": "string"}}])
+    response = Response.from_any(response_factory.requests(content=json.dumps(body).encode(), status_code=400))
     store = ErrorFeedbackStore()
-    for observation in DRFParser().parse(
-        operation=operation, body=DRF_DETAIL_WRAPPED_BODY, case=case_factory(operation=operation)
-    ):
-        store.record(observation)
+    record_response(store=store, operation=operation, case=operation.Case(query={"tags": "x"}), response=response)
     schema = operation.query.schema
     adjusted = apply_adjustments(operation=operation, location=ParameterLocation.QUERY, schema=schema, store=store)
     _assert_valid_schema_object(schema, adjusted)
@@ -197,7 +203,66 @@ def test_drf_detail_envelope_refines_declared_query_parameter(ctx, case_factory)
     }
 
 
-def test_pipeline_locates_aspnet_post_errors_in_declared_query_parameters(ctx, response_factory):
+_CLOSED_FILTER = {"type": "object", "properties": {"a": {"type": "string"}}, "additionalProperties": False}
+
+
+# Undeclared query parameters are still sent, so a server may require one; a closed `deepObject` value gains no member.
+@pytest.mark.parametrize(
+    ("parameter", "query", "body", "expected"),
+    [
+        (
+            {"name": "tags", "in": "query", "schema": {"type": "string"}},
+            {"tags": "rock"},
+            {"page": ["This field is required."]},
+            {
+                "type": "object",
+                "properties": {"tags": {"type": "string"}, "page": {"type": "string", "minLength": 1}},
+                "additionalProperties": False,
+                "required": ["page"],
+            },
+        ),
+        (
+            {"name": "filter", "in": "query", "style": "deepObject", "explode": True, "schema": _CLOSED_FILTER},
+            {"filter": {"a": "x"}},
+            {"filter": {"b": ["This field is required."]}},
+            {"type": "object", "properties": {"filter": _CLOSED_FILTER}, "additionalProperties": False},
+        ),
+    ],
+    ids=["undeclared-parameter-learned", "closed-deep-object-unchanged"],
+)
+def test_required_undeclared_query_parameter_is_learned(ctx, response_factory, parameter, query, body, expected):
+    operation = _drf_query_operation(ctx, [parameter])
+    response = Response.from_any(response_factory.requests(content=json.dumps(body).encode(), status_code=400))
+    store = ErrorFeedbackStore()
+    record_response(store=store, operation=operation, case=operation.Case(query=query), response=response)
+    schema = operation.query.schema
+    adjusted = apply_adjustments(operation=operation, location=ParameterLocation.QUERY, schema=schema, store=store)
+    _assert_valid_schema_object(schema, adjusted)
+    assert adjusted == expected
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {
+            "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+            "title": "One or more validation errors occurred.",
+            "status": 400,
+            "errors": {"limit": ["The field limit must be between 1 and 10."]},
+        },
+        {
+            "error": "validation_failed",
+            "details": {
+                "limit": [
+                    "Ensure this value is greater than or equal to 1.",
+                    "Ensure this value is less than or equal to 10.",
+                ]
+            },
+        },
+    ],
+    ids=["aspnet", "envelope"],
+)
+def test_pipeline_locates_post_errors_in_declared_query_parameters(ctx, response_factory, body):
     operation = ctx.openapi.load_operation(
         "POST /api/items",
         {
@@ -211,19 +276,7 @@ def test_pipeline_locates_aspnet_post_errors_in_declared_query_parameters(ctx, r
         },
     )
     case = operation.Case(query={"limit": 100}, body={"name": "item"}, _meta=meta_for(GenerationMode.POSITIVE))
-    response = Response.from_any(
-        response_factory.requests(
-            content=json.dumps(
-                {
-                    "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
-                    "title": "One or more validation errors occurred.",
-                    "status": 400,
-                    "errors": {"limit": ["The field limit must be between 1 and 10."]},
-                }
-            ).encode(),
-            status_code=400,
-        )
-    )
+    response = Response.from_any(response_factory.requests(content=json.dumps(body).encode(), status_code=400))
     store = ErrorFeedbackStore()
     record_response(store=store, operation=operation, case=case, response=response)
 
@@ -318,6 +371,10 @@ def test_pipeline_prefers_sent_body_field_over_declared_path_parameter(
         (observation.location, observation.parameter_path, observation.kind)
         for observation in parse_observations(operation=operation, case=case, response=response)
     ] == [(ParameterLocation.PATH, ("id",), kind) for kind in expected_kinds]
+
+
+_CLOSED_TOKEN_BODY = {"type": "object", "properties": {"token": {"type": "string"}}, "additionalProperties": False}
+_CLOSED_CODE_BODY = {"type": "object", "properties": {"code": {"type": "string"}}, "additionalProperties": False}
 
 
 def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...]:
@@ -545,6 +602,262 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
                 },
             },
         ),
+        (
+            _CLOSED_TOKEN_BODY,
+            [("email",), ("details", "token")],
+            _CLOSED_TOKEN_BODY,
+        ),
+        (
+            _CLOSED_TOKEN_BODY,
+            [("token",)],
+            {**_CLOSED_TOKEN_BODY, "properties": {"token": {"type": "string", "minLength": 1}}, "required": ["token"]},
+        ),
+        (
+            {"type": "object", "additionalProperties": False},
+            [("email",)],
+            {"type": "object", "additionalProperties": False},
+        ),
+        (
+            {"type": "object", "properties": {"token": {"type": "string"}}, "unevaluatedProperties": False},
+            [("email",)],
+            {"type": "object", "properties": {"token": {"type": "string"}}, "unevaluatedProperties": False},
+        ),
+        (
+            {"type": "object", "properties": {"address": _CLOSED_TOKEN_BODY}},
+            [("address", "email"), ("address", "details", "token")],
+            {"type": "object", "properties": {"address": _CLOSED_TOKEN_BODY}},
+        ),
+        (
+            {"type": "object", "properties": {"items": {"type": "array", "items": _CLOSED_TOKEN_BODY}}},
+            [("items", 0, "email")],
+            {"type": "object", "properties": {"items": {"type": "array", "items": _CLOSED_TOKEN_BODY}}},
+        ),
+        (
+            {"allOf": [_CLOSED_TOKEN_BODY, {"type": "object", "properties": {"name": {"type": "string"}}}]},
+            [("email",)],
+            {"allOf": [_CLOSED_TOKEN_BODY, {"type": "object", "properties": {"name": {"type": "string"}}}]},
+        ),
+        (
+            {"type": "object", "properties": {"token": {"type": "string"}}, "allOf": [_CLOSED_TOKEN_BODY]},
+            [("email",)],
+            {"type": "object", "properties": {"token": {"type": "string"}}, "allOf": [_CLOSED_TOKEN_BODY]},
+        ),
+        (
+            {"oneOf": [_CLOSED_TOKEN_BODY, {"type": "object", "properties": {}}]},
+            [("email",)],
+            {
+                "oneOf": [
+                    _CLOSED_TOKEN_BODY,
+                    {
+                        "type": "object",
+                        "properties": {"email": {"type": "string", "minLength": 1}},
+                        "required": ["email"],
+                    },
+                ]
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"address": {"$ref": "#/x-bundled/schema1"}},
+                BUNDLE_STORAGE_KEY: {"schema1": _CLOSED_TOKEN_BODY},
+            },
+            [("address", "email")],
+            {
+                "type": "object",
+                "properties": {"address": {"$ref": "#/x-bundled/schema1"}},
+                BUNDLE_STORAGE_KEY: {"schema1": _CLOSED_TOKEN_BODY},
+            },
+        ),
+        (
+            {"$ref": "#/x-bundled/schema1", BUNDLE_STORAGE_KEY: {"schema1": _CLOSED_TOKEN_BODY}},
+            [("email",)],
+            {"$ref": "#/x-bundled/schema1", BUNDLE_STORAGE_KEY: {"schema1": _CLOSED_TOKEN_BODY}},
+        ),
+        (
+            {
+                "$ref": "#/x-bundled/schema1",
+                BUNDLE_STORAGE_KEY: {"schema1": {"type": "object", "allOf": [{"$ref": "#/x-bundled/schema1"}]}},
+            },
+            [("email",)],
+            {
+                "$ref": "#/x-bundled/schema1",
+                BUNDLE_STORAGE_KEY: {
+                    "schema1": {
+                        "type": "object",
+                        "allOf": [{"$ref": "#/x-bundled/schema1"}],
+                        "properties": {"email": {"type": "string", "minLength": 1}},
+                        "required": ["email"],
+                    }
+                },
+            },
+        ),
+        (
+            {"type": "object", "oneOf": [_CLOSED_TOKEN_BODY, _CLOSED_CODE_BODY]},
+            [("email",)],
+            {"type": "object", "oneOf": [_CLOSED_TOKEN_BODY, _CLOSED_CODE_BODY]},
+        ),
+        (
+            {"type": "object", "anyOf": [_CLOSED_TOKEN_BODY]},
+            [("email",)],
+            {"type": "object", "anyOf": [_CLOSED_TOKEN_BODY]},
+        ),
+        (
+            {
+                "type": "object",
+                "oneOf": [{"$ref": "#/x-bundled/schema1"}, {"$ref": "#/x-bundled/schema2"}],
+                BUNDLE_STORAGE_KEY: {"schema1": _CLOSED_TOKEN_BODY, "schema2": _CLOSED_CODE_BODY},
+            },
+            [("email",)],
+            {
+                "type": "object",
+                "oneOf": [{"$ref": "#/x-bundled/schema1"}, {"$ref": "#/x-bundled/schema2"}],
+                BUNDLE_STORAGE_KEY: {"schema1": _CLOSED_TOKEN_BODY, "schema2": _CLOSED_CODE_BODY},
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "oneOf": [{"$ref": "#/x-bundled/schema1"}, {"$ref": "#/x-bundled/schema2"}],
+                BUNDLE_STORAGE_KEY: {
+                    "schema1": {"allOf": [{"$ref": "#/x-bundled/schema3"}]},
+                    "schema2": {"allOf": [{"$ref": "#/x-bundled/schema3"}], "required": ["token"]},
+                    "schema3": _CLOSED_TOKEN_BODY,
+                },
+            },
+            [("email",)],
+            {
+                "type": "object",
+                "oneOf": [{"$ref": "#/x-bundled/schema1"}, {"$ref": "#/x-bundled/schema2"}],
+                BUNDLE_STORAGE_KEY: {
+                    "schema1": {"allOf": [{"$ref": "#/x-bundled/schema3"}]},
+                    "schema2": {"allOf": [{"$ref": "#/x-bundled/schema3"}], "required": ["token"]},
+                    "schema3": _CLOSED_TOKEN_BODY,
+                },
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "allOf": [{"type": "object", "properties": {"address": _CLOSED_TOKEN_BODY}, "required": ["address"]}],
+            },
+            [("address", "email")],
+            {
+                "type": "object",
+                "allOf": [{"type": "object", "properties": {"address": _CLOSED_TOKEN_BODY}, "required": ["address"]}],
+            },
+        ),
+        (
+            {
+                "oneOf": [
+                    {"type": "object", "properties": {"address": _CLOSED_TOKEN_BODY}},
+                    {"type": "object", "properties": {"address": {"type": "object", "properties": {}}}},
+                ]
+            },
+            [("address", "details", "token")],
+            {
+                "oneOf": [
+                    {"type": "object", "properties": {"address": _CLOSED_TOKEN_BODY}},
+                    {
+                        "type": "object",
+                        "properties": {
+                            "address": {
+                                "type": "object",
+                                "properties": {
+                                    "details": {
+                                        "type": "object",
+                                        "properties": {"token": {"type": "string", "minLength": 1}},
+                                        "required": ["token"],
+                                    }
+                                },
+                            }
+                        },
+                    },
+                ]
+            },
+        ),
+        (
+            {**_CLOSED_TOKEN_BODY, "patternProperties": {"^x-": {"type": "string"}}},
+            [("x-trace",)],
+            {
+                **_CLOSED_TOKEN_BODY,
+                "patternProperties": {"^x-": {"type": "string"}},
+                "properties": {"token": {"type": "string"}, "x-trace": {"type": "string", "minLength": 1}},
+                "required": ["x-trace"],
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "allOf": [{"patternProperties": {"^x-": {"type": "string"}}}],
+                "unevaluatedProperties": False,
+            },
+            [("x-trace",)],
+            {
+                "type": "object",
+                "allOf": [{"patternProperties": {"^x-": {"type": "string"}}}],
+                "unevaluatedProperties": False,
+                "properties": {"x-trace": {"type": "string", "minLength": 1}},
+                "required": ["x-trace"],
+            },
+        ),
+        (
+            {
+                "$ref": "#/x-bundled/schema1",
+                BUNDLE_STORAGE_KEY: {
+                    "schema1": {
+                        "type": "object",
+                        "allOf": [{"$ref": "#/x-bundled/schema1"}],
+                        "unevaluatedProperties": False,
+                    }
+                },
+            },
+            [("email",)],
+            {
+                "$ref": "#/x-bundled/schema1",
+                BUNDLE_STORAGE_KEY: {
+                    "schema1": {
+                        "type": "object",
+                        "allOf": [{"$ref": "#/x-bundled/schema1"}],
+                        "unevaluatedProperties": False,
+                    }
+                },
+            },
+        ),
+        (
+            {
+                "oneOf": [
+                    {"type": "object", "allOf": [{"properties": {"address": _CLOSED_TOKEN_BODY}}]},
+                    {"type": "object", "properties": {}},
+                ]
+            },
+            [("address", "email")],
+            {
+                "oneOf": [
+                    {"type": "object", "allOf": [{"properties": {"address": _CLOSED_TOKEN_BODY}}]},
+                    {
+                        "type": "object",
+                        "properties": {
+                            "address": {
+                                "type": "object",
+                                "properties": {"email": {"type": "string", "minLength": 1}},
+                                "required": ["email"],
+                            }
+                        },
+                    },
+                ]
+            },
+        ),
+        (
+            {"type": "object", "anyOf": [_CLOSED_TOKEN_BODY, True]},
+            [("email",)],
+            {
+                "type": "object",
+                "anyOf": [_CLOSED_TOKEN_BODY, True],
+                "properties": {"email": {"type": "string", "minLength": 1}},
+                "required": ["email"],
+            },
+        ),
     ],
     ids=[
         "string-property-bump-minlength",
@@ -568,6 +881,29 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
         "non-string-leaf-skipped",
         "existing-required-kept",
         "nested-path-under-object-without-properties",
+        "closed-object-gains-no-property",
+        "closed-object-declared-property-required",
+        "closed-object-without-properties-gains-none",
+        "unevaluated-properties-closed-object-gains-no-property",
+        "closed-nested-object-gains-no-property",
+        "closed-array-items-gain-no-property",
+        "closed-all-of-branch-blocks-root",
+        "closed-all-of-branch-blocks-its-parent",
+        "closed-one-of-branch-skipped-open-branch-kept",
+        "closed-object-behind-ref-gains-no-property",
+        "closed-root-behind-ref-gains-no-property",
+        "self-referencing-all-of-open-object",
+        "closed-one-of-branches-block-root",
+        "closed-any-of-branch-blocks-root",
+        "closed-one-of-ref-branches-block-root",
+        "one-of-branches-sharing-a-closed-base-block-root",
+        "closed-nested-object-in-all-of-branch-blocks-root",
+        "closed-nested-object-in-one-of-branch-skipped-open-branch-kept",
+        "closed-object-pattern-property-required",
+        "unevaluated-properties-pattern-property-in-all-of-branch-required",
+        "self-referencing-all-of-closed-by-unevaluated-properties",
+        "closed-nested-object-in-all-of-of-one-of-branch-skipped-open-branch-kept",
+        "boolean-any-of-branch-keeps-root-open",
     ],
 )
 def test_required_field_adjustment_applies_correctly(input_schema, paths, expected, case_factory):
@@ -2513,6 +2849,168 @@ def test_framework_field_paths_reach_nested_properties(ctx, case_factory, respon
     schema = operation.body[0].optimized_schema
     adjusted = apply_adjustments(operation=operation, location=ParameterLocation.BODY, schema=schema, store=store)
     _assert_valid_schema_object(schema, adjusted)
+    assert adjusted == expected
+
+
+_TOKEN_TOO_SHORT = ["Ensure this field has at least 3 characters."]
+_TOKEN_BLANK = ["This field may not be blank."]
+_OPEN_TOKEN_BODY = {"type": "object", "properties": {"token": {"type": "string"}}}
+_CLOSED_ADDRESS_IN_ALL_OF_BODY = {
+    "type": "object",
+    "allOf": [{"type": "object", "properties": {"address": _CLOSED_TOKEN_BODY}, "required": ["address"]}],
+}
+_OPEN_ID_NAME_BODY = {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}}
+_OWNER_ID_REQUIRED_BODY = {
+    "type": "object",
+    "properties": {
+        **_OPEN_ID_NAME_BODY["properties"],
+        "owner": {"type": "object", "properties": {"id": {"type": "string", "minLength": 1}}, "required": ["id"]},
+    },
+}
+_SENT_TOKEN = {"token": "ab"}
+_SENT_ADDRESS = {"address": {"token": "ab"}}
+_SENT_OWNER = {"id": "x", "owner": {"id": "y"}}
+_SENT_ID_NAME = {"id": "x", "name": "y"}
+# Constraint code of a violation list entry for a blank value.
+_NOT_BLANK_CODE = "c1051bb4-d103-4f74-8988-acbcafc7fdc3"
+
+
+@pytest.mark.parametrize(
+    ("schema", "sent", "body", "expected"),
+    [
+        (
+            _CLOSED_TOKEN_BODY,
+            _SENT_TOKEN,
+            {"error": "validation_failed", "details": {"token": _TOKEN_BLANK}},
+            {**_CLOSED_TOKEN_BODY, "properties": {"token": {"type": "string", "minLength": 1}}, "required": ["token"]},
+        ),
+        (
+            _OPEN_TOKEN_BODY,
+            _SENT_TOKEN,
+            {"error": "validation_failed", "details": {"token": _TOKEN_BLANK}},
+            {**_OPEN_TOKEN_BODY, "properties": {"token": {"type": "string", "minLength": 1}}, "required": ["token"]},
+        ),
+        (
+            _CLOSED_TOKEN_BODY,
+            _SENT_TOKEN,
+            {"error": "validation_failed", "details": {"token": _TOKEN_TOO_SHORT}},
+            {**_CLOSED_TOKEN_BODY, "properties": {"token": {"type": "string", "minLength": 3}}},
+        ),
+        (
+            _CLOSED_TOKEN_BODY,
+            _SENT_TOKEN,
+            {"errors": {"token": _TOKEN_TOO_SHORT}},
+            {**_CLOSED_TOKEN_BODY, "properties": {"token": {"type": "string", "minLength": 3}}},
+        ),
+        (
+            _CLOSED_TOKEN_BODY,
+            _SENT_TOKEN,
+            {"data": {"token": _TOKEN_TOO_SHORT}},
+            {**_CLOSED_TOKEN_BODY, "properties": {"token": {"type": "string", "minLength": 3}}},
+        ),
+        (
+            _CLOSED_TOKEN_BODY,
+            _SENT_TOKEN,
+            {"error": {"code": "invalid", "details": {"token": _TOKEN_TOO_SHORT}}},
+            {**_CLOSED_TOKEN_BODY, "properties": {"token": {"type": "string", "minLength": 3}}},
+        ),
+        (
+            _CLOSED_TOKEN_BODY,
+            _SENT_TOKEN,
+            {"status": "error", "errors": [{"token": _TOKEN_TOO_SHORT}]},
+            {**_CLOSED_TOKEN_BODY, "properties": {"token": {"type": "string", "minLength": 3}}},
+        ),
+        (
+            _CLOSED_TOKEN_BODY,
+            _SENT_TOKEN,
+            {"error": "validation_failed", "details": {"code": ["This field is required."]}},
+            _CLOSED_TOKEN_BODY,
+        ),
+        (
+            _CLOSED_ADDRESS_IN_ALL_OF_BODY,
+            _SENT_ADDRESS,
+            {"error": "validation_failed", "details": {"address": {"email": ["This field is required."]}}},
+            _CLOSED_ADDRESS_IN_ALL_OF_BODY,
+        ),
+        (
+            _OPEN_ID_NAME_BODY,
+            _SENT_OWNER,
+            {"owner": {"id": ["A valid integer is required."]}},
+            _OPEN_ID_NAME_BODY,
+        ),
+        (
+            _OPEN_ID_NAME_BODY,
+            _SENT_OWNER,
+            {"owner": {"name": ["This field is required."]}},
+            {
+                "type": "object",
+                "properties": {
+                    **_OPEN_ID_NAME_BODY["properties"],
+                    "owner": {
+                        "type": "object",
+                        "properties": {"name": {"type": "string", "minLength": 1}},
+                        "required": ["name"],
+                    },
+                },
+            },
+        ),
+        (
+            _OPEN_ID_NAME_BODY,
+            _SENT_ID_NAME,
+            {"message": "The owner.id field is required.", "errors": {"owner.id": ["The owner.id field is required."]}},
+            _OWNER_ID_REQUIRED_BODY,
+        ),
+        (
+            _OPEN_ID_NAME_BODY,
+            _SENT_ID_NAME,
+            {"errors": [{"field": "owner.id", "defaultMessage": "must not be blank"}]},
+            _OWNER_ID_REQUIRED_BODY,
+        ),
+        (
+            _OPEN_ID_NAME_BODY,
+            _SENT_ID_NAME,
+            {"owner.id": ["can't be blank"]},
+            _OWNER_ID_REQUIRED_BODY,
+        ),
+        (
+            _OPEN_ID_NAME_BODY,
+            _SENT_ID_NAME,
+            [{"propertyPath": "owner.id", "message": "This value should not be blank.", "code": _NOT_BLANK_CODE}],
+            _OWNER_ID_REQUIRED_BODY,
+        ),
+    ],
+    ids=[
+        "details-required-closed",
+        "details-required-open",
+        "details-min-length",
+        "errors",
+        "data",
+        "two-levels",
+        "list-of-errors",
+        "undeclared-field-in-closed-body",
+        "undeclared-field-in-closed-nested-object-of-all-of-branch",
+        "sent-key-is-no-envelope-for-type",
+        "sent-key-is-no-envelope-for-required",
+        "dotted-field-name-in-errors-map",
+        "dotted-field-name-in-errors-list",
+        "dotted-field-name-as-key",
+        "dotted-property-path-in-violations",
+    ],
+)
+def test_envelope_wrapped_field_errors_reach_declared_properties(ctx, response_factory, schema, sent, body, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /redeem",
+        {
+            "requestBody": {"required": True, "content": {"application/json": {"schema": schema}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    response = Response.from_any(response_factory.requests(content=json.dumps(body).encode(), status_code=400))
+    store = ErrorFeedbackStore()
+    record_response(store=store, operation=operation, case=operation.Case(body=sent), response=response)
+    body_schema = operation.body[0].optimized_schema
+    adjusted = apply_adjustments(operation=operation, location=ParameterLocation.BODY, schema=body_schema, store=store)
+    _assert_valid_schema_object(body_schema, adjusted)
     assert adjusted == expected
 
 
