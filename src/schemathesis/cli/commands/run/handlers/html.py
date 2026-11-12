@@ -155,10 +155,10 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         entries = self.errors.setdefault(event.label, {})
         if event.related_to_operation:
             self.errored_labels.add(event.label)
-        if type(event.value) not in entries:
-            entries[type(event.value)] = _error_entry(event.info, base_url_is_set=base_url_is_set)
+        if event.error_type not in entries:
+            entries[event.error_type] = _error_entry(event.info, base_url_is_set=base_url_is_set)
         if event.phase is not None:
-            self.phase_errors.setdefault(event.phase, set()).add((event.label, type(event.value)))
+            self.phase_errors.setdefault(event.phase, set()).add((event.label, event.error_type))
 
     def _record(self, recorder: RecordedScenario) -> None:
         for node in recorder.cases.values():

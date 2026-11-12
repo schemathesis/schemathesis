@@ -1,0 +1,81 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       4 selected / 4 total
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ 🚫  Coverage (in 0.00s)
+
+     ✅ 3 passed  🚫 1 error
+
+ 🚫  Fuzzing (in 0.00s)
+
+     ✅ 3 passed  🚫 1 error
+
+ 🚫  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 2 selected / 2 total (2 inferred)
+
+     ✅ N passed
+
+==================================== ERRORS ====================================
+_________________________________ POST /items __________________________________
+Schema Error
+
+Invalid `items` definition
+
+Location:
+    items
+
+Problematic definition:
+    {
+        "required": true,
+        "type": "string"
+    }
+
+Error details:
+    The provided definition doesn't match any of the expected formats or types.
+
+Ensure that the definition complies with the OpenAPI specification
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 4/4
+  Tested: 3
+  Errored: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  🚫 Coverage
+  🚫 Fuzzing
+  🚫 Stateful
+
+Errors:
+  🚫 Schema Error: 1
+
+Test cases:
+  N generated, N passed
+
+Reports:
+  - JUnit: /tmp/junit.xml
+  - HTML: /tmp/report/index.html
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

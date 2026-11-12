@@ -49,6 +49,7 @@
 
 - Configured `Authorization` headers replaced by netrc credentials for the same host.
 - Cache replay sending requests without auth providers or `[auth.openapi]` credentials.
+- Same schema error repeated for one operation in CLI output, JUnit and HTML reports.
 
 #### pytest and Python API
 
