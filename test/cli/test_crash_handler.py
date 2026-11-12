@@ -107,7 +107,7 @@ def test_passing_operation_removes_only_stale_crash(case_factory, response_facto
 def _crash_files(directory: Path) -> list[Path]:
     if not directory.exists():
         return []
-    return [path for path in directory.iterdir() if path.suffix == ".json" and path.name != MANIFEST_FILENAME]
+    return [path for path in directory.rglob("*.json") if path.name != MANIFEST_FILENAME]
 
 
 def test_crash_file_written_on_failure(cli, ctx, tmp_path):

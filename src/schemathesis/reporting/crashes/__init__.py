@@ -292,6 +292,11 @@ class CrashWriter:
                 pass
 
 
+def schema_crash_directory(crashes_directory: Path, schema_location: str) -> Path:
+    """Crash files of each schema location live in their own subdirectory, so runs against other APIs keep them."""
+    return crashes_directory / hashlib.sha256(schema_location.encode()).hexdigest()[:12]
+
+
 def load_manifest(directory: Path) -> CrashManifest | None:
     manifest_path = directory / MANIFEST_FILENAME
     try:

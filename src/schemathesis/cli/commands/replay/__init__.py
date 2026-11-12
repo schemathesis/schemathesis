@@ -70,11 +70,14 @@ def replay(
         if target.is_file():
             units = [(target.parent, [target], str(target))]
         elif target.is_dir():
-            files = _crash_files_in(target)
-            if not files:
+            units = [
+                (directory, files, str(directory))
+                for directory in _with_schema_directories(target)
+                if (files := _crash_files_in(directory))
+            ]
+            if not units:
                 click.echo("No crash files found.")
                 return
-            units = [(target, files, str(target))]
         elif not target.suffix:
             found = _find_by_case_id(ctx, path)
             if found is None:
@@ -250,17 +253,24 @@ def _merge_by_case(crashes: list[CrashFile], paths: list[Path]) -> list[_ReplayU
 def _all_crash_dirs(ctx: click.Context) -> list[Path]:
     cache_directory = ctx.obj.cache.directory
     if cache_directory is not None:
-        return [cache_directory / "crashes"]
-    if not storage.DEFAULT_ROOT.is_dir():
+        roots = [cache_directory / "crashes"]
+    elif storage.DEFAULT_ROOT.is_dir():
+        roots = sorted(storage.DEFAULT_ROOT.glob("*/cache/crashes"))
+    else:
+        roots = []
+    return [directory for root in roots for directory in _with_schema_directories(root)]
+
+
+def _with_schema_directories(crashes_directory: Path) -> list[Path]:
+    # Crash files sit in one subdirectory per schema location, or directly inside for older versions.
+    if not crashes_directory.is_dir():
         return []
-    return sorted(p for p in storage.DEFAULT_ROOT.glob("*/cache/crashes") if p.is_dir())
+    return [crashes_directory, *sorted(p for p in crashes_directory.iterdir() if p.is_dir())]
 
 
 def _crash_files_in(directory: Path) -> list[Path]:
     from schemathesis.reporting.crashes import MANIFEST_FILENAME
 
-    if not directory.is_dir():
-        return []
     return sorted(f for f in directory.iterdir() if f.suffix == ".json" and f.name != MANIFEST_FILENAME)
 
 

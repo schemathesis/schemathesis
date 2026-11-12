@@ -443,6 +443,47 @@ def test_replay_by_case_id_without_aliases(cli, app_runner, ctx, crash_factory, 
     assert (result.exit_code, crash_file.exists()) == (0, False), result.output
 
 
+def _passing_failure_route(ctx, app_runner):
+    # Another API with the same `GET /api/failure` label, where the operation passes.
+    app, _ = ctx.openapi.make_flask_app({"/api/failure": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/failure")
+    def failure():
+        return jsonify({})
+
+    return app_runner.openapi_url(app)
+
+
+@pytest.mark.parametrize(
+    "other_api",
+    [
+        lambda ctx, app_runner: ctx.openapi.apps.success().schema_url,
+        _passing_failure_route,
+    ],
+    ids=["different-operations", "same-operation-passing"],
+)
+def test_replay_case_after_run_against_another_api(cli, app_runner, ctx, snapshot_cli, other_api):
+    run = cli.run(ctx.openapi.apps.failure().schema_url, "--max-examples=1", "--phases=fuzzing")
+    case_id = re.search(r"st replay (\S+)", run.stdout).group(1)
+    cli.run(other_api(ctx, app_runner), "--max-examples=1", "--phases=fuzzing")
+
+    assert cli.main("replay", case_id, "--keep") == snapshot_cli
+
+
+def test_replay_file_schema_from_another_directory(cli, ctx, tmp_path, monkeypatch):
+    api = ctx.openapi.apps.failure()
+    (tmp_path / "openapi.json").write_text(json.dumps(api.spec))
+    cli.run("openapi.json", f"--url={api.base_url}", "--max-examples=1", "--phases=fuzzing")
+    monkeypatch.chdir(tmp_path / ".schemathesis")
+
+    result = cli.main("replay", str(crash_cache_dir(tmp_path)), "--keep")
+
+    assert (result.exit_code, re.findall(r"^  ([+x!] [A-Z]+) (.+)$", result.stdout, re.MULTILINE)) == (
+        1,
+        [("x FAILED", "GET /api/failure")],
+    ), result.output
+
+
 def test_replay_applies_per_operation_headers(cli, app_runner, ctx, crash_factory, tmp_path):
     received = []
 
@@ -498,7 +539,7 @@ def test_build_case_drops_stale_cookie_header(ctx, crash_factory):
 
 
 def _list_crash_files(directory: Path) -> list[Path]:
-    return sorted(f for f in directory.glob("*.json") if f.name != MANIFEST_FILENAME)
+    return sorted(f for f in directory.rglob("*.json") if f.name != MANIFEST_FILENAME)
 
 
 def test_replay_applies_terminal_step_link(cli, app_runner, ctx, tmp_path, crash_factory):
