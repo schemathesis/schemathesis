@@ -12,7 +12,6 @@ from schemathesis.cli.commands.replay.executor import (
     ReplayOutcome,
     ReplayStatus,
     bodies_equal,
-    status_label,
 )
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.output import (
@@ -27,7 +26,7 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.failures import case_header, format_failures
 from schemathesis.core.output import pluralize, truncate_text
 from schemathesis.core.transforms import UNRESOLVABLE
-from schemathesis.core.transport import StatusClass
+from schemathesis.core.transport import StatusClass, status_label
 from schemathesis.generation.meta import report_label
 from schemathesis.reporting.crashes import CrashFile, CrashStep
 
@@ -281,10 +280,16 @@ def _print_step_chain(
         row.append("  ")
         # Show a single status when the step reproduced identically; only spell out
         # `recorded -> replayed` when the status actually drifted.
-        row.append(status_label(schema, step.response_status), style=_status_style(schema, step.response_status))
+        row.append(
+            status_label(step.response_status, schema.status_name_for_code),
+            style=_status_style(schema, step.response_status),
+        )
         if actual.status_code != step.response_status:
             row.append(f" {ARROW} ", style="dim")
-            row.append(status_label(schema, actual.status_code), style=_status_style(schema, actual.status_code))
+            row.append(
+                status_label(actual.status_code, schema.status_name_for_code),
+                style=_status_style(schema, actual.status_code),
+            )
         if delta is not None:
             row.append("  ")
             row.append(GLYPH_CHANGED, style=delta)

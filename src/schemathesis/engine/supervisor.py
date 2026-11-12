@@ -6,7 +6,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from schemathesis.core.cache import CacheWriter, Kind, request_from_case
-from schemathesis.core.transport import CallOutcome
+from schemathesis.core.transport import CallOutcome, status_label
 from schemathesis.core.warnings import SchemathesisWarning
 
 if TYPE_CHECKING:
@@ -77,7 +77,7 @@ class Supervisor:
         status_code = response.status_code
         not_served_status = None
         if schema.classify_call_outcome(case, response) is CallOutcome.NOT_SERVED:
-            not_served_status = schema.status_name_for_code(status_code) or str(status_code)
+            not_served_status = status_label(status_code, schema.status_name_for_code)
         self.record_response(
             operation_label=case.operation.label,
             status_code=status_code,

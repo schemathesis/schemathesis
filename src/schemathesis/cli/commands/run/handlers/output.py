@@ -45,7 +45,7 @@ from schemathesis.core.output import format_response_payload, pluralize
 from schemathesis.core.output.sanitization import sanitized
 from schemathesis.core.result import Ok
 from schemathesis.core.timing import Instant
-from schemathesis.core.transport import StatusClass
+from schemathesis.core.transport import StatusClass, status_label
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.errors import never_reached_server
@@ -170,8 +170,7 @@ def _status_name(ctx: ExecutionContext, status_code: int) -> str:
 
 
 def _short_status(ctx: ExecutionContext, status_code: int) -> str:
-    name = ctx.status_name(status_code)
-    return str(status_code) if name is None else name
+    return status_label(status_code, ctx.status_name)
 
 
 def _status_codes_are_uninformative(ctx: ExecutionContext) -> bool:
