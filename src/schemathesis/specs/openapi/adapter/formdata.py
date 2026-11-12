@@ -50,14 +50,36 @@ def prepare_multipart_v2(
 
 def _is_file_part(property_schema: object) -> bool:
     """Whether a form property is sent as a file, carrying a filename in its `Content-Disposition`."""
-    if not isinstance(property_schema, dict):
+    return any(_declares_file(schema) for schema in _alternatives(property_schema))
+
+
+def _holds_file_items(property_schema: object) -> bool:
+    """Whether a form array property sends each item as a file."""
+    return any(
+        _declares_file(schema.get("items")) for schema in _alternatives(property_schema) if isinstance(schema, dict)
+    )
+
+
+def _alternatives(property_schema: object) -> list[object]:
+    # Optional uploads declare the file in one `anyOf` branch next to `null`.
+    alternatives = [property_schema]
+    if isinstance(property_schema, dict):
+        for keyword in ("anyOf", "oneOf", "allOf"):
+            branches = property_schema.get(keyword)
+            if isinstance(branches, list):
+                alternatives.extend(branches)
+    return alternatives
+
+
+def _declares_file(schema: object) -> bool:
+    if not isinstance(schema, dict):
         return False
     # OpenAPI 3.1 spells `format: binary` as `contentMediaType: application/octet-stream` and `format: byte` as
     # `contentEncoding: base64`. Any other media type annotates string content and stays a plain form field.
     return (
-        property_schema.get("format") in ("binary", "base64")
-        or property_schema.get("contentMediaType") == "application/octet-stream"
-        or property_schema.get("contentEncoding") == "base64"
+        schema.get("format") in ("binary", "base64")
+        or schema.get("contentMediaType") == "application/octet-stream"
+        or schema.get("contentEncoding") == "base64"
     )
 
 
@@ -89,7 +111,7 @@ def prepare_multipart_v3(
         if isinstance(property_schema, dict):
             declared = body_param.get_property_filename(name) if body_param else None
             if isinstance(value, list):
-                if _is_file_part(property_schema.get("items")):
+                if _holds_file_items(property_schema):
                     for item in value:
                         filename = declared or _filename(name, item)
                         if content_type:
