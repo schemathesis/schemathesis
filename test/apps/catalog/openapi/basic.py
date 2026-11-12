@@ -88,6 +88,19 @@ def ignored_auth() -> OpenAPIApp:
     return flask_app(schemas.ignored_auth(), handlers.register_ignored_auth, components=_HEISEN_AUTH_SCHEME)
 
 
+def linked_get_server_error() -> OpenAPIApp:
+    # POST creates an item and links to its GET, which always fails with 500.
+    return flask_app(schemas.linked_get_server_error(), handlers.register_linked_get_server_error)
+
+
+def failure_and_linked_get_server_error() -> OpenAPIApp:
+    return flask_app(
+        {**schemas.failure(), **schemas.linked_get_server_error()},
+        handlers.register_failure,
+        handlers.register_linked_get_server_error,
+    )
+
+
 _NODE_DEFINITION = {
     "type": "object",
     "properties": {"children": {"type": "array", "items": {"$ref": "#/x-definitions/Node"}}},

@@ -104,6 +104,20 @@ def test_decode_response_text(response_factory, content, charset, expected):
 
 
 @pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        # The recorded prefix ends inside the sixth character.
+        ("é".encode() * 100, "ééééé"),
+        (b"\xff\xfe" * 100, BINARY_PAYLOAD),
+    ],
+    ids=["text-cut-inside-character", "binary"],
+)
+def test_format_truncated_response_payload(response_factory, content, expected):
+    response = response_factory.core(content=content, content_type="text/plain; charset=utf-8").truncated(11)
+    assert format_response_payload(response, config=OutputConfig()) == expected
+
+
+@pytest.mark.parametrize(
     ("render_content", "expected"),
     [(bytes.hex, "fffe"), (None, BINARY_PAYLOAD)],
     ids=["renderer", "no-renderer"],

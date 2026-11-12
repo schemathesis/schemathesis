@@ -362,6 +362,24 @@ def test_response_body_charset_in_reports(ctx, cli, cassette_path, charset, body
     ]
 
 
+def test_har_url_with_credentials_is_sanitized(ctx, cli, cassette_path):
+    api = ctx.openapi.apps.success()
+    har_path = cassette_path.with_suffix(".har")
+    host = api.base_url.removeprefix("http://")
+
+    cli.run(
+        api.schema_url,
+        f"--url=http://user:pw@{host}",
+        f"--report-har-path={har_path}",
+        "--max-examples=1",
+        "--phases=fuzzing",
+    )
+
+    assert [entry["request"]["url"] for entry in load_json_or_fail(har_path)["log"]["entries"]] == [
+        f"http://[Filtered]@{host}/api/success"
+    ]
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [

@@ -1,5 +1,6 @@
 import json
 
+import httpx
 import pytest
 import requests
 from werkzeug.test import Client
@@ -54,6 +55,28 @@ def test_empty_wsgi_response_encoding(headers, expected):
 
     response = Response.from_any(Client(app).get("/"))
     assert (response.status_code, response.content, response.encoding) == (204, b"", expected)
+
+
+def _empty_wsgi_app(environ, start_response):
+    start_response("204 No Content", [])
+    return []
+
+
+@pytest.mark.parametrize(
+    ("send", "expected"),
+    [
+        (
+            lambda: httpx.Client(transport=httpx.WSGITransport(app=_empty_wsgi_app)).get(
+                "http://127.0.0.1/items?q=v&q=w"
+            ),
+            "http://127.0.0.1/items?q=v&q=w",
+        ),
+        (lambda: Client(_empty_wsgi_app).get("/items?q=v&q=w"), "http://localhost/items?q=v&q=w"),
+    ],
+    ids=["httpx", "wsgi"],
+)
+def test_converted_request_keeps_query_as_sent(send, expected):
+    assert Response.from_any(send()).request.url == expected
 
 
 def test_wsgi_response_encoding(response_factory):

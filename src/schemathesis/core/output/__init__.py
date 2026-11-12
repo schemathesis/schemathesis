@@ -81,7 +81,10 @@ def decode_response_text(response: Response) -> str | None:
         return response.render_content(response.content)
     try:
         return response.text
-    except UnicodeDecodeError:
+    except UnicodeDecodeError as exc:
+        # A body kept as a prefix can end inside a character; only that cut is undecodable.
+        if response.is_truncated and exc.end == len(response.content):
+            return response.content[: exc.start].decode(exc.encoding)
         return None
     except (LookupError, ValueError):
         # Unknown or broken codec names (including embedded NULs) — decode lossily instead of raising.

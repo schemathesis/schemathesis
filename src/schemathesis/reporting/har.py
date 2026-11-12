@@ -6,7 +6,7 @@ from io import StringIO
 from pathlib import Path
 from types import TracebackType
 from typing import IO, TYPE_CHECKING
-from urllib.parse import parse_qsl, urlparse
+from urllib.parse import parse_qsl
 
 import harfile
 
@@ -57,7 +57,8 @@ class HarWriter:
                 uri = sanitize_url(interaction.request.uri, config=config.sanitization)
             else:
                 uri = interaction.request.uri
-            query_params = urlparse(uri).query
+            # A sanitized authority such as `[Filtered]@host` is not a valid netloc, so split the query off textually.
+            query_params = uri.partition("#")[0].partition("?")[2]
             if interaction.request.body is not None:
                 post_data = harfile.PostData(
                     mimeType=interaction.request.headers.get("Content-Type", [""])[0],
