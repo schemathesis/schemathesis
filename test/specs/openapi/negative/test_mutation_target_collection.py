@@ -2,6 +2,7 @@ from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.negative.mutations import (
     MAX_WALK_DEPTH,
+    MutationTargetDescriptor,
     WalkStep,
     compute_mutation_targets,
 )
@@ -130,4 +131,26 @@ def test_walk_terminates_at_max_depth():
         leaf = child
     descriptors = compute_mutation_targets(schema)
     deepest = max(len(d.walk) for d in descriptors)
-    assert deepest <= MAX_WALK_DEPTH, f"walk reached depth {deepest}, exceeding cap {MAX_WALK_DEPTH}"
+    assert deepest == MAX_WALK_DEPTH
+
+
+def test_self_referencing_schema_yields_one_descriptor():
+    schema: dict = {"type": "object", "properties": {}}
+    schema["properties"]["self"] = schema
+    assert compute_mutation_targets(schema) == (MutationTargetDescriptor(walk=()),)
+
+
+def test_tuple_items_and_any_of_branches_become_descriptors():
+    schema = {"type": "array", "items": [{"type": "string"}, {"type": "integer"}], "anyOf": [{"minItems": 1}]}
+    assert compute_mutation_targets(schema) == (
+        MutationTargetDescriptor(walk=()),
+        MutationTargetDescriptor(walk=(WalkStep("items", 0),)),
+        MutationTargetDescriptor(walk=(WalkStep("items", 1),)),
+        MutationTargetDescriptor(walk=(WalkStep("anyOf", 0),)),
+    )
+
+
+def test_bundled_ref_without_bundle_keeps_wrapper_descriptor():
+    assert compute_mutation_targets({"$ref": "#/x-bundled/missing", "minLength": 1}) == (
+        MutationTargetDescriptor(walk=()),
+    )
