@@ -5918,6 +5918,25 @@ def test_allow_header_conformance_repeated_header(ctx, response_factory):
     assert allow_header_conformance(check_context(), Response.from_requests(raw, verify=True), case) is None
 
 
+@pytest.mark.parametrize("allow", ["DELETE, OPTIONS, POST", "OPTIONS, POST"], ids=["with-sibling", "own-only"])
+def test_allow_header_conformance_templated_sibling_path(ctx, response_factory, allow):
+    # Routers may also advertise methods of a path template that matches the requested URL.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/import": {"post": {"responses": {"201": {"description": "Created"}}}},
+            "/items/{slug}": {
+                "parameters": [{"name": "slug", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "delete": {"responses": {"204": {"description": "Deleted"}}},
+            },
+        }
+    )
+    case = schema["/items/import"]["POST"].Case()
+    response = Response.from_requests(
+        response_factory.requests(headers={"Allow": allow}, method="OPTIONS"), verify=True
+    )
+    assert allow_header_conformance(check_context(), response, case) is None
+
+
 def _negative_case(operation, location, parameter, mutation=None, phase=TestPhase.FUZZING, **kwargs):
     return operation.Case(
         _meta=build_metadata(

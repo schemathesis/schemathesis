@@ -5,12 +5,15 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+from urllib.parse import unquote
 
 from packaging import version
 
 from schemathesis.core import string_to_boolean
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, resolve_bundled_ref
+from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, resolve_bundled_ref
 from schemathesis.core.jsonschema.types import ALL_TYPES, JsonSchema, get_type, to_json_type_name
+from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 
 if TYPE_CHECKING:
     from schemathesis.core.parameters import ParameterLocation
@@ -138,3 +141,41 @@ def compile_path_template(path: str) -> PathTemplate:
     parts = _PATH_PARAMETER.split(path)
     pattern = "".join(re.escape(part) if index % 2 == 0 else "([^/]+)" for index, part in enumerate(parts))
     return PathTemplate(path=path, pattern=re.compile(pattern), names=tuple(parts[1::2]))
+
+
+def declared_methods(operation: APIOperation, sent_path: str) -> set[str]:
+    """Methods the schema routes to the sent URL, including through templated sibling paths."""
+    schema = operation.schema
+    methods = set(schema[operation.path])
+    for template in schema.path_templates:
+        if template.path == operation.path:
+            continue
+        match = template.pattern.fullmatch(sent_path)
+        if match is None:
+            continue
+        # Routers decode path segments before handing them to the handler.
+        values = {name: unquote(value) for name, value in zip(template.names, match.groups(), strict=True)}
+        path_item = schema[template.path]
+        for method in path_item:
+            if method in methods or method not in HTTP_METHODS_SCHEMA:
+                continue
+            try:
+                sibling = path_item[method]
+            except InvalidSchema:
+                continue
+            if _segments_fit_parameters(sibling, values):
+                methods.add(method)
+    return methods
+
+
+def _segments_fit_parameters(operation: APIOperation, values: dict[str, str]) -> bool:
+    # A segment the parameter schema rejects may still be routed elsewhere, so the method stays undeclared.
+    for parameter in operation.path_parameters:
+        value = values.get(parameter.name)
+        if value is None:
+            continue
+        schema = parameter.validation_schema
+        validator = make_validator(schema, parameter.adapter.jsonschema_validator_cls)
+        if not sent_text_is_valid(value, validator.is_valid, parameter_types(schema)):
+            return False
+    return True
