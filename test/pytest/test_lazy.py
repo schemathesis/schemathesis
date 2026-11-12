@@ -579,7 +579,7 @@ def test_(case):
     result = testdir.runpytest()
     result.assert_outcomes(passed=1, failed=1)
     stdout = result.stdout.str()
-    assert "[504] Gateway Timeout" in stdout
+    assert "[500] Internal Server Error" in stdout
     # And internal frames should not be displayed
     assert "def run_subtest" not in stdout
 

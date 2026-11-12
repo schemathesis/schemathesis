@@ -27,9 +27,11 @@ Schemathesis dev
 ____________________________________ Server ____________________________________
 Server Unavailable
 
-http://127.0.0.1 stopped responding. Last request before it went away:
+http://127.0.0.1 stopped responding. Last requests before it went away:
 
     curl -X POST -H 'Content-Type: application/json' -d '{"size": 99999}' http://127.0.0.1/collections
+
+    curl -X POST -H 'Content-Type: application/json' -d '{"size": 0}' http://127.0.0.1/collections
 
 Tip: If the server crashed, the request that caused it may be older than these.
 Record every request sent with `--report=har`.

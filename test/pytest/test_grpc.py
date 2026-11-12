@@ -16,7 +16,7 @@ pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
             ("-n", "2"),
             "",
             '<span class="status"><span class="status-code">OK</span></span>',
-            ["{\n  &quot;name&quot;: &quot;u2147483647&quot;\n}"],
+            ["{\n  &quot;name&quot;: &quot;u0&quot;\n}"],
         ),
         (
             (),

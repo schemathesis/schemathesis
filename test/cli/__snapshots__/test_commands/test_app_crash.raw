@@ -17,7 +17,7 @@ Schemathesis dev
 
  🚫  Coverage (in 0.00s)
 
-     🚫 1 error  🚫 server stopped responding
+     🚫 1 error
 
 ==================================== ERRORS ====================================
 __________________________________ GET /crash __________________________________
@@ -30,20 +30,6 @@ Connection failed
 Reproduce with:
 
     curl -X GET --insecure http://127.0.0.1/crash
-____________________________________ Server ____________________________________
-Server Unavailable
-
-http://127.0.0.1 stopped responding. Last requests before it went away:
-
-    curl -X GET --insecure http://127.0.0.1/crash
-
-    curl -X DELETE --insecure http://127.0.0.1/crash
-
-    curl -X OPTIONS --insecure http://127.0.0.1/crash
-
-    curl -X PATCH --insecure http://127.0.0.1/crash
-
-    curl -X POST --insecure http://127.0.0.1/crash
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -52,7 +38,8 @@ Need more help?
 
 API Operations:
   Selected: 1/1
-  Tested: 1
+  Tested: 0
+  Errored: 1
 
 Test Phases:
   ⏭  Examples (disabled)
@@ -62,11 +49,10 @@ Test Phases:
 
 Errors:
   🚫 Network Error: 1
-  🚫 Server Unavailable: 1
 
 Test cases:
-  N generated, N passed
+  N generated
 
 Seed: 42
 
-============================== 2 errors in 1.00s ===============================
+=============================== 1 error in 1.00s ===============================

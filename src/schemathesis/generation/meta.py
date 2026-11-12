@@ -580,9 +580,23 @@ def report_label(*, operation_label: str, method: str, path: str, scenario: str 
     return operation_label
 
 
-def content_type_probes_first(cases: Iterable[Case]) -> list[Case]:
-    """Order cases so that Content-Type probes run last under LIFO execution.
+def order_for_lifo_execution(cases: Iterable[Case]) -> list[Case]:
+    """Order cases for LIFO execution: the unmodified valid coverage request first, Content-Type probes last.
 
-    Ordinary requests then keep reporting failures that every request triggers.
+    A failure ends the operation, so the valid request is always sent, and ordinary requests keep reporting
+    failures that every request triggers.
     """
-    return sorted(cases, key=lambda case: coverage_scenario(case) not in CONTENT_TYPE_PROBES)
+    ordered = list(cases)
+    # The coverage phase generates the unmodified valid request first, unless positive cases are disabled.
+    valid = ordered[:1] if ordered and _is_positive_coverage_case(ordered[0]) else []
+    rest = sorted(ordered[len(valid) :], key=lambda case: coverage_scenario(case) not in CONTENT_TYPE_PROBES)
+    return [*rest, *valid]
+
+
+def _is_positive_coverage_case(case: Case) -> bool:
+    meta = case._meta
+    return (
+        meta is not None
+        and isinstance(meta.phase.data, CoveragePhaseData)
+        and meta.generation.mode == GenerationMode.POSITIVE
+    )
