@@ -1282,6 +1282,22 @@ def test_non_string_path_parameter_name_recovered_from_template(ctx):
         assert case.formatted_path == "/foo/ALPHA"
 
 
+@pytest.mark.parametrize("name", ["c.d", "a:b", "a!b", "a[0]"], ids=["dot", "colon", "exclamation", "brackets"])
+def test_path_parameter_name_with_format_syntax_characters(ctx, name):
+    operation = ctx.openapi.load_operation(
+        f"GET /p/{{{name}}}",
+        {
+            "parameters": [{"in": "path", "name": name, "required": True, "schema": {"type": "string", "enum": ["v"]}}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+
+    @run_given(case=operation.as_strategy(), max_examples=1)
+    def test(case):
+        assert case.path_parameters == {name: "v"}
+        assert case.formatted_path == "/p/v"
+
+
 @pytest.mark.parametrize("version", ["2.0", "3.0.2", "3.1.0"])
 def test_undeclared_path_parameter_is_a_required_non_empty_string(ctx, version):
     operation = ctx.openapi.load_operation(

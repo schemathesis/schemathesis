@@ -13,7 +13,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import deepclone, to_wire_text
+from schemathesis.core.transforms import TEMPLATE_PLACEHOLDER, deepclone, to_wire_text
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, FuzzingPhaseData, StatefulPhaseData
 
@@ -180,35 +180,27 @@ def _client_host(app: object) -> str:
     return asgi.HOST if is_asgi_app(app) else wsgi.HOST
 
 
-_PATH_PLACEHOLDER = re.compile(r"\{([^{}]+)\}")
+@lru_cache
+def _split_path_template(path: str) -> tuple[tuple[str, ...], bool]:
+    # Literal text and placeholder names alternate; a brace left in the literal text makes the template malformed.
+    parts = tuple(TEMPLATE_PLACEHOLDER.split(path))
+    return parts, any("{" in literal or "}" in literal for literal in parts[::2])
 
 
 def prepare_path(path: str, parameters: dict[str, Any] | None) -> str:
     if "{" not in path and "}" not in path:
         return path
     params = parameters or {}
-    try:
-        return path.format(**params)
-    except KeyError as exc:
-        raise InvalidSchema(f"Path parameter {exc} is not defined") from exc
-    except (IndexError, ValueError):
-        # `str.format` rejects placeholders like `{.format}` (RFC 6570 label expansion).
-        pass
-    missing: list[str] = []
-
-    def _substitute(match: re.Match[str]) -> str:
-        name = match.group(1)
-        if name in params:
-            return str(params[name])
-        missing.append(name)
-        return match.group(0)
-
-    result = _PATH_PLACEHOLDER.sub(_substitute, path)
-    if missing:
-        raise InvalidSchema(f"Path parameter '{missing[0]}' is not defined")
-    if "{" in result or "}" in result:
+    parts, is_malformed = _split_path_template(path)
+    pieces = list(parts)
+    for index in range(1, len(pieces), 2):
+        name = pieces[index]
+        if name not in params:
+            raise InvalidSchema(f"Path parameter '{name}' is not defined")
+        pieces[index] = str(params[name])
+    if is_malformed:
         raise InvalidSchema(f"Malformed path template: `{path}`")
-    return result
+    return "".join(pieces)
 
 
 def prepare_request(
