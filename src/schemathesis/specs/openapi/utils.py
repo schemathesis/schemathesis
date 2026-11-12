@@ -13,7 +13,6 @@ from schemathesis.core import string_to_boolean
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, resolve_bundled_ref
 from schemathesis.core.jsonschema.types import ALL_TYPES, JsonSchema, get_type, to_json_type_name
-from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 
 if TYPE_CHECKING:
     from schemathesis.core.parameters import ParameterLocation
@@ -144,9 +143,9 @@ def compile_path_template(path: str) -> PathTemplate:
 
 
 def declared_methods(operation: APIOperation, sent_path: str) -> set[str]:
-    """Methods the schema routes to the sent URL, including through templated sibling paths."""
+    """Lowercase methods the schema routes to the sent URL, including through templated sibling paths."""
     schema = operation.schema
-    methods = set(schema[operation.path])
+    methods = {method.lower() for method in schema[operation.path]}
     for template in schema.path_templates:
         if template.path == operation.path:
             continue
@@ -157,14 +156,14 @@ def declared_methods(operation: APIOperation, sent_path: str) -> set[str]:
         values = {name: unquote(value) for name, value in zip(template.names, match.groups(), strict=True)}
         path_item = schema[template.path]
         for method in path_item:
-            if method in methods or method not in HTTP_METHODS_SCHEMA:
+            if method.lower() in methods:
                 continue
             try:
                 sibling = path_item[method]
             except InvalidSchema:
                 continue
             if _segments_fit_parameters(sibling, values):
-                methods.add(method)
+                methods.add(method.lower())
     return methods
 
 

@@ -475,10 +475,18 @@ def _without_empty_operations(document: dict[str, Any]) -> dict[str, Any]:
     # An operation with an empty definition is reached by the parsing walks, but is neither a lookup entry
     # nor a selected operation.
     paths = {
-        path: {key: value for key, value in item.items() if value != {} or key not in HTTP_METHODS_SCHEMA}
+        path: {
+            key: _non_empty_values(value) if key == "additionalOperations" else value
+            for key, value in item.items()
+            if value != {} or key not in HTTP_METHODS_SCHEMA
+        }
         for path, item in document["paths"].items()
     }
     return {**document, "paths": paths}
+
+
+def _non_empty_values(operations: dict[str, Any]) -> dict[str, Any]:
+    return {method: definition for method, definition in operations.items() if definition != {}}
 
 
 def _walker_labels(schema: OpenApiSchema) -> dict[str, list[str]]:
@@ -498,12 +506,7 @@ def _walker_labels(schema: OpenApiSchema) -> dict[str, list[str]]:
         "iter_operations": sorted(
             f"{method.upper()} {path}" for method, path, _ in schema._operations.iter_operations()
         ),
-        "path_and_method_maps": sorted(
-            f"{method.upper()} {path}"
-            for path in list(schema)
-            for method in schema[path]
-            if method in HTTP_METHODS_SCHEMA
-        ),
+        "path_and_method_maps": sorted(f"{method.upper()} {path}" for path in list(schema) for method in schema[path]),
         "operation_lookup": sorted(
             f"{entry.method.upper()} {entry.path}"
             for entry in schema._operation_lookup._get_operations_by_reference().values()

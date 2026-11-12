@@ -525,9 +525,23 @@ def test_method_suggestion_without_parameters(swagger_20):
         swagger_20["/users"]["PUT"]
 
 
+def test_method_suggestion_lists_additional_operations(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/files": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "additionalOperations": {"COPY": {"responses": {"201": {"description": "Copied"}}}},
+            }
+        },
+        version="3.2.0",
+    )
+    with pytest.raises(LookupError, match="Method `PUT` not found. Available methods: GET, COPY$"):
+        schema["/files"]["PUT"]
+
+
 def test_method_lookup_on_path_without_operations(ctx):
     schema = ctx.openapi.load_schema({"/users": {"parameters": []}})
-    assert len(schema["/users"]) == 1
+    assert len(schema["/users"]) == 0
     with pytest.raises(LookupError, match="^Method `GET` not found.$"):
         schema["/users"]["GET"]
 

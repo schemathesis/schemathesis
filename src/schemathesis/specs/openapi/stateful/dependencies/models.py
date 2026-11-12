@@ -21,6 +21,7 @@ from schemathesis.core.transforms import (
 )
 from schemathesis.resources.descriptors import Cardinality
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
+from schemathesis.specs.openapi.operations import operation_reference
 from schemathesis.specs.openapi.stateful.dependencies.naming import (
     KeyKind,
     collection_path,
@@ -102,7 +103,7 @@ class DependencyGraph:
         consume them. For example: `POST /users` (creates `User`) -> `GET /users/{id}`
         (needs `User.id` parameter).
         """
-        encoded_paths = {id(op): encode_pointer(op.path) for op in self.operations.values()}
+        references = {id(op): operation_reference(op.path, op.method) for op in self.operations.values()}
         template_fields = {id(op): get_template_fields(op.path) for op in self.operations.values()}
 
         # Precomputed data for the cross-namespace scope guard (bare {id} collision check).
@@ -131,7 +132,7 @@ class DependencyGraph:
                     path_identifiers.setdefault(input_slot.resource.name, set()).add(input_slot.resource_field)
 
         for producer in self.operations.values():
-            producer_path = encoded_paths[id(producer)]
+            producer_reference = references[id(producer)]
             producer_id = id(producer)
             qualifier = qualifiers.get(producer_id)
 
@@ -147,7 +148,7 @@ class DependencyGraph:
                     if consumer_id == producer_id:
                         continue
 
-                    consumer_path = encoded_paths[consumer_id]
+                    consumer_reference = references[consumer_id]
                     links: dict[str, LinkDefinition] = {}
                     # Keys this consumer gives to another namespace's items, so the producer's own are not forwarded
                     foreign_keys: set[str | int] = set()
@@ -310,7 +311,7 @@ class DependencyGraph:
                             existing.request_body = merge_request_body(existing.request_body, request_body)
                             continue
                         links[link_name] = LinkDefinition(
-                            operation_ref=f"#/paths/{consumer_path}/{consumer.method}",
+                            operation_ref=consumer_reference,
                             parameters=parameters,
                             request_body=request_body,
                         )
@@ -365,15 +366,15 @@ class DependencyGraph:
                                 link_def.parameters[f"path.{param}"] = f"$request.path.{param}"
 
                         yield ResponseLinks(
-                            producer_operation_ref=f"#/paths/{producer_path}/{producer.method}",
+                            producer_operation_ref=producer_reference,
                             status_code=output_slot.status_code,
                             links=links,
                         )
 
         # Generate links from FK fields (e.g., customer_id -> GET /customers/{id})
-        yield from self._iter_fk_links(encoded_paths)
+        yield from self._iter_fk_links(references)
 
-    def _iter_fk_links(self, encoded_paths: dict[int, str]) -> Iterator[ResponseLinks]:
+    def _iter_fk_links(self, references: dict[int, str]) -> Iterator[ResponseLinks]:
         """Generate links from foreign key fields in producer responses.
 
         For example, if GET /orders/{id} returns {"id": "...", "customer_id": "..."},
@@ -394,7 +395,7 @@ class DependencyGraph:
                 consumers[consumer_id][1].append(input_slot)
 
         for producer in self.operations.values():
-            producer_path = encoded_paths[id(producer)]
+            producer_reference = references[id(producer)]
             producer_id = id(producer)
 
             for output_slot in producer.outputs:
@@ -431,7 +432,7 @@ class DependencyGraph:
                         if consumer_id == producer_id:
                             continue
 
-                        consumer_path = encoded_paths[consumer_id]
+                        consumer_reference = references[consumer_id]
 
                         for input_slot in input_slots:
                             if not input_slot.takes_foreign_key(fk_field):
@@ -451,7 +452,7 @@ class DependencyGraph:
                             parameters = {
                                 f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
                             }
-                            operation_ref = f"#/paths/{consumer_path}/{consumer.method}"
+                            operation_ref = consumer_reference
                             link_name = _unique_link_name(
                                 f"{consumer.method.capitalize()}{fk_field.target_resource}",
                                 fk_links,
@@ -481,7 +482,7 @@ class DependencyGraph:
                         if consumer_id == producer_id:
                             continue
 
-                        consumer_path = encoded_paths[consumer_id]
+                        consumer_reference = references[consumer_id]
 
                         for input_slot in input_slots:
                             if not input_slot.takes_foreign_key(nested_fk):
@@ -495,7 +496,7 @@ class DependencyGraph:
                             if nested_fk.is_array:
                                 body_pointer += "/*"
 
-                            operation_ref = f"#/paths/{consumer_path}/{consumer.method}"
+                            operation_ref = consumer_reference
                             link_name = _unique_link_name(
                                 f"{consumer.method.capitalize()}{nested_fk.target_resource}",
                                 fk_links,
@@ -515,7 +516,7 @@ class DependencyGraph:
 
                 if fk_links:
                     yield ResponseLinks(
-                        producer_operation_ref=f"#/paths/{producer_path}/{producer.method}",
+                        producer_operation_ref=producer_reference,
                         status_code=output_slot.status_code,
                         links=fk_links,
                     )

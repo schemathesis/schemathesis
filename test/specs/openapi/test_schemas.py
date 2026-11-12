@@ -161,6 +161,42 @@ def test_query_method_operation_is_discovered(ctx):
     assert operations[0].ok().method == "query"
 
 
+FILE_ID_PARAMETER = {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}
+
+
+def files_with_additional_operations(additional_operations):
+    return {
+        "/files/{id}": {
+            "parameters": [FILE_ID_PARAMETER],
+            "get": {"operationId": "getFile", "responses": {"200": {"description": "OK"}}},
+            "additionalOperations": additional_operations,
+        }
+    }
+
+
+@pytest.mark.parametrize(
+    ("additional_operations", "expected"),
+    [
+        (
+            {
+                "COPY": {"responses": {"200": {"description": "OK"}}},
+                "PURGE": {"responses": {"200": {"description": "OK"}}},
+            },
+            ["GET /files/{id}", "COPY /files/{id}", "PURGE /files/{id}"],
+        ),
+        ({"Purge": {"responses": {"200": {"description": "OK"}}}}, ["GET /files/{id}", "PURGE /files/{id}"]),
+        ({"GET": {"responses": {"200": {"description": "OK"}}}}, ["GET /files/{id}"]),
+    ],
+    ids=["uppercase", "mixed-case", "fixed-field-method"],
+)
+def test_additional_operations_are_discovered(ctx, additional_operations, expected):
+    schema = ctx.openapi.load_schema(files_with_additional_operations(additional_operations), version="3.2.0")
+    assert [
+        (result.ok().label, [parameter.definition for parameter in result.ok().path_parameters])
+        for result in schema.get_all_operations()
+    ] == [(label, [FILE_ID_PARAMETER]) for label in expected]
+
+
 def test_external_file_ref_in_body_raises_invalid_schema(ctx):
     schema = ctx.openapi.load_schema(
         {
@@ -450,6 +486,75 @@ def test_every_lookup_returns_the_same_operation(ctx):
             schema.find_operation_by_reference("#/paths/~1users/post"),
         )
     ] == [True] * 5
+
+
+def test_every_lookup_returns_the_same_additional_operation(ctx):
+    schema = ctx.openapi.load_schema(
+        files_with_additional_operations(
+            {"COPY": {"operationId": "copyFile", "responses": {"200": {"description": "OK"}}}}
+        ),
+        version="3.2.0",
+    )
+    operation = next(result.ok() for result in schema.get_all_operations() if result.ok().label == "COPY /files/{id}")
+
+    assert [
+        found is operation
+        for found in (
+            schema["/files/{id}"]["COPY"],
+            schema["/files/{id}"]["copy"],
+            schema.find_operation_by_label("COPY /files/{id}"),
+            schema.find_operation_by_id("copyFile"),
+            schema.find_operation_by_reference("#/paths/~1files~1{id}/additionalOperations/COPY"),
+            schema.find_operation_by_path("COPY", "/files/42"),
+        )
+    ] == [True] * 6
+
+
+@pytest.mark.parametrize(
+    "reference",
+    ["#/paths/~1files~1{id}/additionalOperations/COPY", "#/paths/~1files~1%7Bid%7D/additionalOperations/COPY"],
+    ids=["canonical", "percent-encoded"],
+)
+def test_additional_operation_found_by_reference_keeps_path_parameters(ctx, reference):
+    schema = ctx.openapi.load_schema(
+        files_with_additional_operations({"COPY": {"responses": {"200": {"description": "OK"}}}}), version="3.2.0"
+    )
+    operation = schema.find_operation_by_reference(reference)
+    assert (operation.label, [parameter.definition for parameter in operation.path_parameters]) == (
+        "COPY /files/{id}",
+        [FILE_ID_PARAMETER],
+    )
+
+
+@pytest.mark.parametrize(
+    "filters",
+    [{"method": "COPY"}, {"method": "copy"}, {"name": "COPY /files/{id}"}, {"operation_id": "copyFile"}],
+    ids=["method", "lowercase-method", "name", "operation-id"],
+)
+def test_filters_select_additional_operations(ctx, filters):
+    schema = ctx.openapi.load_schema(
+        files_with_additional_operations(
+            {
+                "COPY": {"operationId": "copyFile", "responses": {"200": {"description": "OK"}}},
+                "PURGE": {"responses": {"200": {"description": "OK"}}},
+            }
+        ),
+        version="3.2.0",
+    ).include(**filters)
+    statistic = schema.statistic
+    assert (
+        [result.ok().label for result in schema.get_all_operations()],
+        statistic.operations.selected,
+        statistic.operations.total,
+        statistic.unmatched_filters,
+    ) == (["COPY /files/{id}"], 1, 3, [])
+
+
+def test_find_operation_by_path_matches_additional_operation_without_operation_id(ctx):
+    schema = ctx.openapi.load_schema(
+        files_with_additional_operations({"COPY": {"responses": {"200": {"description": "OK"}}}}), version="3.2.0"
+    )
+    assert schema.find_operation_by_path("COPY", "/files/42") is schema["/files/{id}"]["COPY"]
 
 
 def test_before_init_operation_runs_once_per_operation(ctx):

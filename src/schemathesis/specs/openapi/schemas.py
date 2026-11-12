@@ -68,7 +68,13 @@ from . import checks, expressions
 from ._hypothesis import openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
-from .operations import SCHEMA_PARSING_ERRORS, OperationLoader, RawSchemaVersion, resolve_path_item
+from .operations import (
+    SCHEMA_PARSING_ERRORS,
+    OperationLoader,
+    RawSchemaVersion,
+    iter_path_item_operations,
+    resolve_path_item,
+)
 from .serialization import _build_urlencoded_serializer
 from .stateful import LinkedBody, collect_transitions, create_state_machine
 from .utils import PathTemplate, compile_path_template, parse_spec_version, read_from_wire
@@ -100,6 +106,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
     from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters, SecurityRequirements
     from schemathesis.specs.openapi.auth_flow.bootstrap import OpenApiAuthFlow
+    from schemathesis.specs.openapi.types import OperationObject
 
     OpenApiOperation: TypeAlias = APIOperation[
         OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters, "OpenApiSchema"
@@ -151,7 +158,7 @@ class OpenApiSchema(BaseSchema):
         self.response_schema_cache = ResponseSchemaCache()
         self.request_body_schema_cache = RequestBodySchemaCache()
         self.raw_schema_version = RawSchemaVersion()
-        self._operation_lookup = OperationLookup(self, HTTP_METHODS_SCHEMA)
+        self._operation_lookup = OperationLookup(self)
         self._operations = OperationLoader(self)
         # Path-level dedup of undeclared-method coverage probes for callers that pass no run-scoped session.
         self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
@@ -588,7 +595,10 @@ class OpenApiSchema(BaseSchema):
             path_resolver, path_item = self.root_resolver, {}
         scope = path_resolver.base_uri
         dispatch_before_process_path(self, HookContext(), path, path_item)
-        return APIOperationMap(self, MethodMap(self, path_resolver, scope, path, CaseInsensitiveDict(path_item)))
+        raw_path_item = path_item if isinstance(path_item, dict) else {}
+        return APIOperationMap(
+            self, MethodMap(self, path_resolver, scope, path, CaseInsensitiveDict(path_item), raw_path_item)
+        )
 
     @override
     def find_operation_by_label(self, label: str) -> APIOperation | None:
@@ -837,18 +847,29 @@ class MethodMap(Mapping):
     _path: str
     # Storage for definitions
     _path_item: CaseInsensitiveDict
+    # Path Item as declared, so its operations are found under the same keys as when loading all operations
+    _raw_path_item: Mapping[str, Any]
 
-    __slots__ = ("_schema", "_resolver", "_scope", "_path", "_path_item")
+    __slots__ = ("_schema", "_resolver", "_scope", "_path", "_path_item", "_raw_path_item")
 
     def __len__(self) -> int:
-        return len(self._path_item)
+        return sum(1 for _ in self)
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._path_item)
+        return (method for method, _ in iter_path_item_operations(self._raw_path_item))
+
+    def _find_additional_operation(self, method: str) -> tuple[HttpMethodSchema, OperationObject]:
+        for declared, definition in iter_path_item_operations(self._raw_path_item):
+            if declared.lower() == method:
+                return declared, definition
+        raise KeyError(method)
 
     def _init_operation(self, method: str) -> APIOperation:
         method = method.lower()
-        operation = self._path_item[method]
+        if method in HTTP_METHODS_SCHEMA:
+            operation = self._path_item[method]
+        else:
+            method, operation = self._find_additional_operation(method)
         schema = self._schema
         path = self._path
         loader = schema._operations
@@ -875,7 +896,7 @@ class MethodMap(Mapping):
         try:
             return self._init_operation(item)
         except LookupError as exc:
-            available_methods = ", ".join(key.upper() for key in self if key in HTTP_METHODS_SCHEMA)
+            available_methods = ", ".join(key.upper() for key in self)
             message = f"Method `{item.upper()}` not found."
             if available_methods:
                 message += f" Available methods: {available_methods}"
