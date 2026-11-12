@@ -510,6 +510,9 @@ The cache lives at `.schemathesis/<project-slug>/cache/` in the working director
 
 Sensitive headers, cookies, and body fields are stripped before persistence, following the same `output.sanitization` rules used elsewhere.
 
+!!! info "CLI Only"
+    `schemathesis run` uses both keys for this cache and for [crash files](../guides/crash-reproduction.md). `schemathesis fuzz` uses them only for crash files; it neither replays nor writes this cache. `schemathesis replay` looks for crash files in `cache.directory`.
+
 #### `cache.enabled`
 
 !!! note ""
