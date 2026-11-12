@@ -128,6 +128,16 @@ def register_ignored_auth(app: Flask) -> None:
         return jsonify({"has_auth": "Authorization" in request.headers})
 
 
+def register_linked_get_server_error(app: Flask) -> None:
+    @app.route("/api/items", methods=["POST"])
+    def create_item() -> Any:
+        return jsonify({"id": 1}), 201
+
+    @app.route("/api/items/<int:item_id>", methods=["GET"])
+    def get_item(item_id: int) -> Any:
+        return jsonify({}), 500
+
+
 _SUCCESS_RESPONSE = {"read": "success!"}
 
 

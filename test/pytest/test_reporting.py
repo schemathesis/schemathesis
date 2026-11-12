@@ -4,6 +4,7 @@ from xml.etree import ElementTree
 
 import pytest
 
+from test.apps.catalog.openapi import basic
 from test.pytest.utils import allure_outcomes, make_pytest_outcome_test
 from test.utils import allure_results, load_json_or_fail, load_yaml_or_fail
 
@@ -860,3 +861,147 @@ def test_api(case):
     )
     testdir.runpytest(*(("-n", "2") if xdist else ())).assert_outcomes(failed=1)
     assert _junit_outcomes(junit_path) == {"GET /failure": ("failure", "ST101, ST103")}
+
+
+# Tests using an async client send requests themselves and only validate the responses.
+@pytest.mark.parametrize("xdist", [False, True], ids=["single-process", "xdist"])
+def test_reports_record_responses_from_own_client(testdir, ctx, xdist):
+    api = ctx.openapi.apps.failure()
+    junit_path = str(testdir.tmpdir.join("report.xml"))
+    har_path = str(testdir.tmpdir.join("report.har"))
+    _make_xdist_test(
+        ctx,
+        testdir,
+        f"""
+import requests
+
+schema.config.reports.update(junit_path=r"{junit_path}", har_path=r"{har_path}")
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_api(case):
+    case.validate_response(requests.request(**case.as_transport_kwargs()))
+""",
+        base_url=f"{api.base_url}/api",
+        paths={"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    )
+    testdir.runpytest(*(("-n", "2") if xdist else ())).assert_outcomes(failed=1)
+
+    assert (
+        _junit_outcomes(junit_path),
+        {entry["request"]["url"] for entry in load_json_or_fail(har_path)["log"]["entries"]},
+    ) == ({"GET /failure": ("failure", "ST101, ST103")}, {f"{api.base_url}/api/failure"})
+
+
+def test_junit_report_keeps_parametrized_and_stateful_results(ctx, testdir):
+    api = ctx.openapi.serve(basic.failure_and_linked_get_server_error())
+    report_path = str(testdir.tmpdir.join("report.xml"))
+    _make_xdist_test(
+        ctx,
+        testdir,
+        f"""
+schema.config.reports.update(junit_path=r"{report_path}")
+
+@schema.include(path="/api/failure").parametrize()
+@settings(max_examples=1)
+def test_api(case):
+    case.call_and_validate()
+
+TestCase = schema.include(path_regex="^/api/items").as_state_machine().TestCase
+""",
+        base_url=api.base_url,
+        paths=api.spec["paths"],
+    )
+    testdir.runpytest().assert_outcomes(failed=2)
+
+    assert _junit_outcomes(report_path) == {
+        "GET /api/failure": ("failure", "ST101"),
+        "Stateful tests": ("failure", "ST101, ST103"),
+    }
+
+
+@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
+def test_junit_report_attributes_calls_to_the_test_that_made_them(ctx, testdir, xdist):
+    api = ctx.openapi.apps.success_and_failure()
+    report_path = str(testdir.tmpdir.join("report.xml"))
+    _make_xdist_test(
+        ctx,
+        testdir,
+        f"""
+import pytest
+from schemathesis.core.failures import FailureGroup
+
+schema.config.reports.update(junit_path=r"{report_path}")
+
+@schema.include(path="/api/success").parametrize()
+@settings(max_examples=1)
+def test_success(case):
+    case.call_and_validate()
+    with pytest.raises(FailureGroup):
+        schema["/api/failure"]["GET"].Case().call_and_validate()
+
+@schema.include(path="/api/failure").parametrize()
+@settings(max_examples=1)
+def test_failure(case):
+    pass
+""",
+        base_url=api.base_url,
+        paths=api.spec["paths"],
+    )
+    testdir.runpytest(*(("-n", "1") if xdist else ())).assert_outcomes(passed=2)
+
+    assert _junit_outcomes(report_path) == {"GET /api/success": ("failure", "ST101")}
+
+
+def test_har_report_keeps_stateful_calls_out_of_later_parametrized_tests(ctx, testdir):
+    api = ctx.openapi.serve(basic.linked_get_server_error())
+    har_path = str(testdir.tmpdir.join("report.har"))
+    _make_xdist_test(
+        ctx,
+        testdir,
+        f"""
+schema.config.reports.update(har_path=r"{har_path}")
+
+TestCase = schema.as_state_machine().TestCase
+
+@schema.include(method="GET").parametrize()
+@settings(max_examples=1)
+def test_api(case):
+    pass
+""",
+        base_url=api.base_url,
+        paths=api.spec["paths"],
+    )
+    testdir.runpytest().assert_outcomes(passed=1, failed=1)
+
+    assert [
+        (entry["request"]["method"], entry["request"]["url"].removeprefix(api.base_url))
+        for entry in load_json_or_fail(har_path)["log"]["entries"]
+    ] == [("POST", "/api/items"), ("GET", "/api/items/1")]
+
+
+def test_reports_without_allure_extra(ctx, testdir):
+    api = ctx.openapi.apps.failure()
+    report_path = str(testdir.tmpdir.join("report.xml"))
+    testdir.makepyfile(
+        f"""
+import sys
+
+sys.modules["allure_commons"] = None
+
+import schemathesis
+from hypothesis import settings
+
+schema = schemathesis.openapi.from_url("{api.schema_url}")
+schema.config.update(base_url="{api.base_url}")
+schema.config.reports.update(junit_path=r"{report_path}")
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_api(case):
+    case.call_and_validate()
+"""
+    )
+    testdir.runpytest_subprocess("-p", "no:allure_pytest").assert_outcomes(failed=1)
+
+    assert _junit_outcomes(report_path) == {"GET /api/failure": ("failure", "ST101")}
