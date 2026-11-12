@@ -1606,6 +1606,64 @@ def test_multipart_array_parts_follow_items_type(ctx, case_factory, items, encod
     assert REQUESTS_TRANSPORT.serialize_case(case)["files"] == expected
 
 
+META = {"type": "object", "properties": {"a": {"type": "integer"}}}
+
+
+@pytest.mark.parametrize(
+    ("meta", "value", "expected"),
+    [
+        ({"anyOf": [META, {"type": "null"}]}, {"a": 1}, [("meta", (None, b'{"a": 1}', "application/json"))]),
+        ({"oneOf": [META, {"type": "null"}]}, {"a": 1}, [("meta", (None, b'{"a": 1}', "application/json"))]),
+        (
+            {"anyOf": [{"$ref": "#/components/schemas/Meta"}, {"type": "null"}]},
+            {"a": 1},
+            [("meta", (None, b'{"a": 1}', "application/json"))],
+        ),
+        (
+            {"allOf": [{"$ref": "#/components/schemas/Meta"}], "description": "Metadata"},
+            {"a": 1},
+            [("meta", (None, b'{"a": 1}', "application/json"))],
+        ),
+        (
+            {"anyOf": [{"type": "array", "items": META}, {"type": "null"}]},
+            [{"a": 1}],
+            [("meta", (None, b'[{"a": 1}]', "application/json"))],
+        ),
+        (
+            {"anyOf": [{"type": "array", "items": {"type": "string"}}, {"type": "null"}]},
+            ["x", "y"],
+            [("meta", (None, "x")), ("meta", (None, "y"))],
+        ),
+        ({"anyOf": [{"type": "string"}, META]}, "text", [("meta", (None, "text"))]),
+    ],
+    ids=[
+        "optional-object",
+        "one-of-object",
+        "ref-branch",
+        "all-of-ref",
+        "optional-array-of-objects",
+        "optional-array-of-strings",
+        "string-or-object",
+    ],
+)
+def test_multipart_optional_structured_parts_are_json(ctx, case_factory, meta, value, expected):
+    # Optional fields declare their structure in an `anyOf` branch next to `null`.
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"multipart/form-data": {"schema": {"type": "object", "properties": {"meta": meta}}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.1.0",
+        components={"schemas": {"Meta": META}},
+    )
+    case = case_factory(operation=operation, method="POST", body={"meta": value}, media_type="multipart/form-data")
+    assert REQUESTS_TRANSPORT.serialize_case(case)["files"] == expected
+
+
 def test_unknown_multipart_fields_openapi3(ctx):
     operation = ctx.openapi.load_operation(
         "POST /test",

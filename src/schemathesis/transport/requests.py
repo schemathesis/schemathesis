@@ -502,6 +502,28 @@ def _declares_structure(schema: dict[str, Any]) -> bool:
     return "properties" in schema or "items" in schema or "additionalProperties" in schema
 
 
+def _is_structured_part(schema: dict[str, Any]) -> bool:
+    return any(
+        all(_declares_structure(_part_schema(branch)) for branch in group) for group in _structure_groups(schema)
+    )
+
+
+def _structure_groups(schema: dict[str, Any]) -> list[list[dict[str, Any]]]:
+    """Schemas whose members all declaring structure make a part structured."""
+    groups = [[schema]]
+    all_of = schema.get("allOf")
+    if isinstance(all_of, list):
+        groups.extend([branch] for branch in all_of if isinstance(branch, dict))
+    # Optional fields declare their structure in an `anyOf` branch next to `null`; a mixed union may hold raw text.
+    for keyword in ("anyOf", "oneOf"):
+        branches = schema.get(keyword)
+        if isinstance(branches, list):
+            alternatives = [branch for branch in branches if isinstance(branch, dict) and branch.get("type") != "null"]
+            if alternatives:
+                groups.append(alternatives)
+    return groups
+
+
 def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
     """Return multipart field names mapped to the content-type declared via `encoding`."""
     operation = ctx.case.operation
@@ -517,7 +539,7 @@ def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
             result[name] = content_type
     # Default nested-object / array form-parts to JSON so the wire payload is parsable.
     for name, prop in body.form_properties.items():
-        if name not in result and isinstance(prop, dict) and _declares_structure(_part_schema(prop)):
+        if name not in result and isinstance(prop, dict) and _is_structured_part(prop):
             result[name] = "application/json"
     return result
 
