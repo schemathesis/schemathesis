@@ -264,6 +264,12 @@ def http_status_class(status_code: int) -> StatusClass:
     return StatusClass.OTHER
 
 
+def status_label(status_code: int, status_name: Callable[[int], str | None]) -> str:
+    """The protocol's name for a status, or the bare code when the code alone says it."""
+    name = status_name(status_code)
+    return str(status_code) if name is None else name
+
+
 class CallOutcome(enum.Enum):
     """What an API did with a request carrying positive test data."""
 

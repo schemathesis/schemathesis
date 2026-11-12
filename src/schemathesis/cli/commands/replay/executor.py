@@ -13,6 +13,7 @@ from schemathesis.core.media_types import is_json
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import UNRESOLVABLE, iter_decoded_pointer_segments
+from schemathesis.core.transport import status_label
 from schemathesis.reporting.crashes import CrashCheck, CrashFile, CrashLink, CrashStep
 
 if TYPE_CHECKING:
@@ -332,8 +333,8 @@ def _replay_sequence(
         ):
             rejected = RejectedStep(
                 number=index + 1,
-                status=status_label(schema, response.status_code),
-                recorded_status=status_label(schema, step.response_status),
+                status=status_label(response.status_code, schema.status_name_for_code),
+                recorded_status=status_label(step.response_status, schema.status_name_for_code),
             )
 
         for parameter in _masked_parameters(step, replacement):
@@ -617,11 +618,6 @@ def _missing_credentials_message(missing: list[tuple[ParameterLocation, str]]) -
     if len(missing) == 1:
         return f"{names} was masked in the crash file; provide it via config, -H, --auth or an auth hook"
     return f"{names} were masked in the crash file; provide them via config, -H, --auth or an auth hook"
-
-
-def status_label(schema: BaseSchema, status_code: int) -> str:
-    name = schema.status_name_for_code(status_code)
-    return name or str(status_code)
 
 
 def _rejected_credentials_message(rejected: RejectedStep, *, steps: int) -> str:

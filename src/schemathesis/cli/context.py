@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from schemathesis.config import ProjectConfig
     from schemathesis.core import Specification
     from schemathesis.core.statistic import ApiStatistic
-    from schemathesis.schemas import APIOperation
+    from schemathesis.schemas import APIOperation, BaseSchema
 
 
 @dataclass
@@ -29,8 +29,7 @@ class BaseExecutionContext:
     config: ProjectConfig
     find_operation_by_label: Callable[[str], APIOperation | None] | None = None
     status_name_for_code: Callable[[int], str | None] | None = None
-    classify_status: Callable[[int], StatusClass] = http_status_class
-    status_code_for: Callable[[StatusClass], int] = HTTP_STATUS_CODES_BY_CLASS.__getitem__
+    api_schema: BaseSchema | None = None
     specification: Specification | None = None
     api_statistic: ApiStatistic | None = None
     statistic: Statistic = field(default_factory=Statistic)
@@ -71,6 +70,18 @@ class BaseExecutionContext:
             return None
         return self.status_name_for_code(status_code)
 
+    def classify_status(self, status_code: int) -> StatusClass:
+        """What `status_code` says about the call; HTTP classes before the schema is loaded."""
+        if self.api_schema is None:
+            return http_status_class(status_code)
+        return self.api_schema.classify_status(status_code)
+
+    def status_code_for(self, status_class: StatusClass) -> int:
+        """The status code standing for `status_class`; HTTP codes before the schema is loaded."""
+        if self.api_schema is None:
+            return HTTP_STATUS_CODES_BY_CLASS[status_class]
+        return self.api_schema.status_code_for(status_class)
+
     def add_initialization_line(self, line: str | Generator[str, None, None]) -> None:
         self.initialization_lines.append(line)
 
@@ -102,8 +113,7 @@ class BaseExecutionContext:
         if isinstance(event, LoadingFinished):
             self.find_operation_by_label = event.find_operation_by_label
             self.status_name_for_code = event.status_name_for_code
-            self.classify_status = event.classify_status
-            self.status_code_for = event.status_code_for
+            self.api_schema = event.api_schema
             self.specification = event.specification
             self.api_statistic = event.statistic
             self.warning_collector.on_unmatched_filters(event.statistic)
