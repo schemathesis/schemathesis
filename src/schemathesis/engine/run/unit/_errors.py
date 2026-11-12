@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, TypeGuard
 
 import hypothesis.errors
 from jsonschema_rs import ValidationError
@@ -76,29 +76,20 @@ def translate_iteration_exception(
 ) -> events.NonFatalError:
     """Translate an iteration-time exception into a `NonFatalError`."""
     if isinstance(exc, hypothesis.errors.Unsatisfiable):
-        return non_fatal_error(
-            build_unsatisfiable_error(operation, with_tip=False, filter_tracker=operation.filter_case_tracker)
-        )
+        return _unsatisfiable_error(operation, non_fatal_error)
     if isinstance(exc, hypothesis.errors.InvalidArgument):
         return non_fatal_error(exc)
     if isinstance(exc, ValidationError):
-        if is_regex_validation_error(exc):
-            return non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(exc))
-        code_sample = state.get_code_sample_for(exc)
-        return non_fatal_error(exc, code_sample=code_sample)
+        return _from_validation_error(exc, state=state, non_fatal_error=non_fatal_error)
     if isinstance(
         exc,
         (InvalidSchema, SerializationNotPossible, UnresolvableReference, InvalidHeadersExample),
     ):
         return non_fatal_error(prefer_spec_error(exc, operation))
     clear_hypothesis_notes(exc)
-    if str(exc) == "first argument must be string or compiled pattern":
-        return non_fatal_error(
-            InvalidRegexType(
-                "Invalid `pattern` value: expected a string. "
-                "If your schema is in YAML, ensure `pattern` values are quoted",
-            )
-        )
+    pattern_error = _non_string_pattern_error(exc)
+    if pattern_error is not None:
+        return non_fatal_error(pattern_error)
     code_sample = state.get_code_sample_for(exc)
     return non_fatal_error(exc, code_sample=code_sample)
 
@@ -131,43 +122,59 @@ def classify_test_exception(
         return Status.ERROR, [non_fatal_error(build_health_check_error(operation, exc, with_tip=False))]
     if isinstance(exc, hypothesis.errors.Unsatisfiable):
         # We need more clear error message here
-        return Status.ERROR, [
-            non_fatal_error(
-                build_unsatisfiable_error(operation, with_tip=False, filter_tracker=operation.filter_case_tracker)
-            )
-        ]
+        return Status.ERROR, [_unsatisfiable_error(operation, non_fatal_error)]
     if isinstance(exc, AuthenticationError):
         return Status.ERROR, [non_fatal_error(exc)]
     if isinstance(exc, AssertionError):
         # Comes from `hypothesis`
         return Status.ERROR, [_from_assertion_error(exc, operation=operation, non_fatal_error=non_fatal_error)]
     if isinstance(exc, hypothesis.errors.InvalidArgument):
-        if is_empty_strategy_error(exc):
-            return Status.ERROR, [non_fatal_error(build_unsatisfiable_error(operation, with_tip=False))]
-        health_check = build_health_check_error(operation, exc, with_tip=False)
-        if isinstance(health_check, hypothesis.errors.FailedHealthCheck):
-            return Status.ERROR, [non_fatal_error(health_check)]
-        return Status.ERROR, [non_fatal_error(exc)]
+        return Status.ERROR, [_from_invalid_argument(exc, operation=operation, non_fatal_error=non_fatal_error)]
     if isinstance(exc, hypothesis.errors.DeadlineExceeded):
         return Status.ERROR, [non_fatal_error(DeadlineExceeded.from_exc(exc))]
     if isinstance(exc, ValidationError):
-        if is_regex_validation_error(exc):
-            return Status.ERROR, [non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(exc))]
-        return Status.ERROR, [non_fatal_error(exc, code_sample=state.get_code_sample_for(exc))]
+        return Status.ERROR, [_from_validation_error(exc, state=state, non_fatal_error=non_fatal_error)]
     clear_hypothesis_notes(exc)
-    # Likely a YAML parsing issue. E.g. `00:00:00.00` (without quotes) is parsed as float `0.0`
-    if str(exc) == "first argument must be string or compiled pattern":
-        return Status.ERROR, [
-            non_fatal_error(
-                InvalidRegexType(
-                    "Invalid `pattern` value: expected a string. "
-                    "If your schema is in YAML, ensure `pattern` values are quoted",
-                )
-            )
-        ]
+    pattern_error = _non_string_pattern_error(exc)
+    if pattern_error is not None:
+        return Status.ERROR, [non_fatal_error(pattern_error)]
     return Status.ERROR, [
         non_fatal_error(prefer_spec_error(exc, operation), code_sample=state.get_code_sample_for(exc))
     ]
+
+
+def _unsatisfiable_error(operation: APIOperation, non_fatal_error: NonFatalErrorFactory) -> events.NonFatalError:
+    return non_fatal_error(
+        build_unsatisfiable_error(operation, with_tip=False, filter_tracker=operation.filter_case_tracker)
+    )
+
+
+def _from_invalid_argument(
+    exc: hypothesis.errors.InvalidArgument, *, operation: APIOperation, non_fatal_error: NonFatalErrorFactory
+) -> events.NonFatalError:
+    if is_empty_strategy_error(exc):
+        return non_fatal_error(build_unsatisfiable_error(operation, with_tip=False))
+    health_check = build_health_check_error(operation, exc, with_tip=False)
+    if isinstance(health_check, hypothesis.errors.FailedHealthCheck):
+        return non_fatal_error(health_check)
+    return non_fatal_error(exc)
+
+
+def _from_validation_error(
+    exc: ValidationError, *, state: TestingState, non_fatal_error: NonFatalErrorFactory
+) -> events.NonFatalError:
+    if is_regex_validation_error(exc):
+        return non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(exc))
+    return non_fatal_error(exc, code_sample=state.get_code_sample_for(exc))
+
+
+def _non_string_pattern_error(exc: Exception) -> InvalidRegexType | None:
+    # Likely a YAML parsing issue. E.g. `00:00:00.00` (without quotes) is parsed as float `0.0`
+    if str(exc) != "first argument must be string or compiled pattern":
+        return None
+    return InvalidRegexType(
+        "Invalid `pattern` value: expected a string. If your schema is in YAML, ensure `pattern` values are quoted",
+    )
 
 
 def _classify_flaky(
@@ -203,7 +210,7 @@ def _iter_group_errors(
     state: TestingState,
     non_fatal_error: NonFatalErrorFactory,
 ) -> Iterator[events.NonFatalError]:
-    unexplained = []
+    unexplained: list[Exception] = []
     reported = False
     seen_schema_errors: set[tuple[str, str, str]] = set()
     for sub_exc in exc.exceptions:
@@ -212,7 +219,7 @@ def _iter_group_errors(
             yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(sub_exc))
         elif isinstance(sub_exc, InvalidSchema):
             reported = True
-            identity = (sub_exc.message, sub_exc.method or operation.method, sub_exc.path or operation.path)
+            identity = _schema_error_identity(sub_exc, operation)
             if identity not in seen_schema_errors:
                 seen_schema_errors.add(identity)
                 yield non_fatal_error(sub_exc)
@@ -223,14 +230,22 @@ def _iter_group_errors(
                 clear_hypothesis_notes(sub_exc)
                 yield non_fatal_error(sub_exc, code_sample=code_sample)
             # Check failures and errors raised while testing a case are recorded when they happen
-            elif isinstance(sub_exc, Exception) and not isinstance(sub_exc, (Failure, FailureGroup, UnexpectedError)):
+            elif _is_unrecorded_error(sub_exc):
                 unexplained.append(sub_exc)
     # Other errors often restate a schema error reported above, so they are shown only when nothing else is
     if not reported:
-        for sub_exc in unexplained:
-            yield translate_iteration_exception(
-                sub_exc, operation=operation, state=state, non_fatal_error=non_fatal_error
-            )
+        yield from (
+            translate_iteration_exception(sub_exc, operation=operation, state=state, non_fatal_error=non_fatal_error)
+            for sub_exc in unexplained
+        )
+
+
+def _schema_error_identity(error: InvalidSchema, operation: APIOperation) -> tuple[str, str, str]:
+    return (error.message, error.method or operation.method, error.path or operation.path)
+
+
+def _is_unrecorded_error(exc: BaseException) -> TypeGuard[Exception]:
+    return isinstance(exc, Exception) and not isinstance(exc, (Failure, FailureGroup, UnexpectedError))
 
 
 def _from_assertion_error(

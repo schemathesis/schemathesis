@@ -77,33 +77,39 @@ class LayeredScheduler:
                 try:
                     operation = next(self.current_layer_iterator)
                 except StopIteration:
-                    layer_index = self.current_layer_index
-                    if layer_index + 1 >= len(self.layers):
-                        # No more layers
-                        self.current_layer_iterator = None
-                        break
-                    # Wait for the layer to drain, unless another worker already advanced it
-                    while self.in_flight and layer_index == self.current_layer_index:
-                        self.lock.wait()
-                    if layer_index == self.current_layer_index:
-                        self.current_layer_index += 1
-                        self.current_layer_iterator = iter(self.layers[self.current_layer_index])
+                    self._advance_layer()
                     continue
                 self.in_flight += 1
                 self._dispatched.active = True
                 return Ok(operation)
+            return self._next_error()
 
-            # All layers exhausted - return schema errors if any
-            if self.error_iterator is None and self.errors:
-                self.error_iterator = iter(self.errors)
+    def _advance_layer(self) -> None:
+        # Called with the lock held, once the current layer has nothing left to dispatch
+        layer_index = self.current_layer_index
+        if layer_index + 1 >= len(self.layers):
+            # No more layers
+            self.current_layer_iterator = None
+            return
+        # Wait for the layer to drain, unless another worker already advanced it
+        while self.in_flight and layer_index == self.current_layer_index:
+            self.lock.wait()
+        if layer_index == self.current_layer_index:
+            self.current_layer_index += 1
+            self.current_layer_iterator = iter(self.layers[self.current_layer_index])
 
-            if self.error_iterator is not None:
-                try:
-                    return Err(next(self.error_iterator))
-                except StopIteration:
-                    return None
+    def _next_error(self) -> Result[APIOperation, InvalidSchema] | None:
+        # All layers exhausted - return schema errors if any
+        if self.error_iterator is None and self.errors:
+            self.error_iterator = iter(self.errors)
 
-            return None
+        if self.error_iterator is not None:
+            try:
+                return Err(next(self.error_iterator))
+            except StopIteration:
+                return None
+
+        return None
 
     def release(self) -> None:
         """Mark this worker's operation as finished, for workers that stop asking for more."""
