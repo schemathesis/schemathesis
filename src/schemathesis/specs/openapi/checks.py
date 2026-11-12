@@ -36,7 +36,6 @@ from schemathesis.core.parameters import (
 )
 from schemathesis.core.transport import (
     AUTH_REJECTION_STATUSES,
-    HTTP_METHODS_SCHEMA,
     SAFE_METHODS,
     Response,
     expand_status_code,
@@ -1265,9 +1264,8 @@ def allow_header_conformance(ctx: CheckContext, response: Response, case: Case) 
     if not advertised:
         return None
     declared = {method.lower() for method in case.operation.schema[case.operation.path]}
-    declared &= HTTP_METHODS_SCHEMA
     # Templated paths matching the same URL may add methods, but a router that prefers the exact path need not list them.
-    routed = declared | (declared_methods(case.operation, case.formatted_path) & HTTP_METHODS_SCHEMA)
+    routed = declared | declared_methods(case.operation, case.formatted_path)
     missing = sorted(declared - advertised - IMPLICIT_METHODS)
     undocumented = sorted(advertised - routed - IMPLICIT_METHODS)
     if not missing and not undocumented:

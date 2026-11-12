@@ -1,0 +1,81 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.2.0
+     Operations:       3 selected / 3 total
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  3 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ✅ 2 passed  ❌ 1 failed
+
+ ❌  Fuzzing (in 0.00s)
+
+     ✅ 2 passed  ❌ 1 failed
+
+ ❌  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 2 selected / 2 total
+
+     ✅ N passed  ❌ 1 failed
+
+=================================== FAILURES ===================================
+_______________________________ COPY /files/{id} _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- ST101 Server error
+
+- ST103 Undocumented status code
+
+    Received: 500
+    Documented: 201, 404
+
+[500] Internal Server Error:
+
+    `{}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 3/3
+  Tested: 3
+
+Test Phases:
+  ⏭  Examples
+  ❌ Coverage
+  ❌ Fuzzing
+  ❌ Stateful
+
+Failures:
+  ❌ ST101 Server error: 1
+  ❌ ST103 Undocumented status code: 1
+
+For more information, run `st explain <code>` for ST101, ST103.
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================= 2 failures in 1.00s ==============================

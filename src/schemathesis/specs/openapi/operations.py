@@ -23,7 +23,7 @@ from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
 from schemathesis.core.parameters import ParameterLocation, SkippedParameter
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.statistic import ApiStatistic
-from schemathesis.core.transforms import decode_pointer, get_template_fields
+from schemathesis.core.transforms import decode_pointer, encode_pointer, get_template_fields
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA, is_http_method_schema
 from schemathesis.filters import FilterUsage, OperationContext
 from schemathesis.hooks import HookContext, dispatch_before_init_operation, dispatch_before_process_path
@@ -61,6 +61,20 @@ def _is_specification_extension(path: object) -> bool:
     return isinstance(path, str) and path.startswith("x-")
 
 
+def iter_path_item_operations(path_item: Mapping[str, Any]) -> Iterator[tuple[HttpMethodSchema, OperationObject]]:
+    """Method and definition of every operation a Path Item declares, `additionalOperations` included."""
+    for method, definition in path_item.items():
+        if is_http_method_schema(method):
+            yield method, definition
+    additional_operations = path_item.get("additionalOperations")
+    if isinstance(additional_operations, dict):
+        for method, definition in additional_operations.items():
+            # Methods that have a Path Item field of their own are declared only there.
+            if method.lower() not in HTTP_METHODS_SCHEMA:
+                # Kept as declared, as the operation's reference is built from it.
+                yield cast("HttpMethodSchema", method), definition
+
+
 def is_parsable_operation(definition: object) -> bool:
     """Whether an operation node carries something the adapters can read."""
     return isinstance(definition, dict) and bool(definition)
@@ -73,14 +87,27 @@ def resolve_path_item(resolver: Resolver, path_item: object) -> tuple[Resolver, 
     return resolver, path_item
 
 
+def split_operation_reference(reference: str) -> tuple[str, str]:
+    """Reference to the Path Item an operation reference points into, and its method segment."""
+    path_item_reference, method = reference.rsplit("/", maxsplit=1)
+    return path_item_reference.removesuffix("/additionalOperations"), method
+
+
 def parse_operation_reference(reference: str) -> tuple[str, str]:
     """Path and method an `operationRef` like `#/paths/~1users~1%7Bid%7D/get` points to."""
     _, separator, suffix = reference.partition("#/paths/")
     if not separator:
         raise OperationNotFound(f"Operation '{reference}' not found", reference)
-    encoded_path, method = suffix.rsplit("/", maxsplit=1)
+    encoded_path, method = split_operation_reference(suffix)
     # A URI fragment is percent-decoded before its JSON Pointer escapes (RFC 6901, section 6).
-    return decode_pointer(unquote(encoded_path)), method
+    return decode_pointer(unquote(encoded_path)), decode_pointer(unquote(method))
+
+
+def operation_reference(path: str, method: str) -> str:
+    """Local `operationRef` of the operation declared for `method` under `path`."""
+    if is_http_method_schema(method):
+        return f"#/paths/{encode_pointer(path)}/{method}"
+    return f"#/paths/{encode_pointer(path)}/additionalOperations/{encode_pointer(method)}"
 
 
 def _drop_malformed_media_types(
@@ -209,9 +236,7 @@ class OperationLoader:
                 if not isinstance(path_item, dict):
                     raise InvalidSchema("Path item must be an object", path=path)
                 shared_parameters = path_item.get("parameters", [])
-                for method, entry in path_item.items():
-                    if not is_http_method_schema(method):
-                        continue
+                for method, entry in iter_path_item_operations(path_item):
                     try:
                         if filters_active and should_skip(path, method, entry):
                             continue
@@ -235,7 +260,7 @@ class OperationLoader:
             except SCHEMA_PARSING_ERRORS as exc:
                 yield self._into_err(exc, path, method)
 
-    def iter_operations(self) -> Iterator[tuple[str, str, dict[str, Any]]]:
+    def iter_operations(self) -> Iterator[tuple[str, str, OperationObject]]:
         """Yield `(method, path, definition)` for each selected operation."""
         schema = self.schema
         paths = schema._get_paths()
@@ -251,9 +276,7 @@ class OperationLoader:
                 _, path_item = resolve_path_item(root_resolver, path_item)
                 if not isinstance(path_item, dict):
                     continue
-                for method, definition in path_item.items():
-                    if method not in HTTP_METHODS_SCHEMA:
-                        continue
+                for method, definition in iter_path_item_operations(path_item):
                     if filters_active and should_skip(path, method, definition):
                         continue
                     if self._serves_schema_document(path, method, definition):
@@ -291,9 +314,7 @@ class OperationLoader:
                 if not isinstance(path_item, dict):
                     complete_walk = False
                     continue
-                for method, definition in path_item.items():
-                    if method not in HTTP_METHODS_SCHEMA:
-                        continue
+                for method, definition in iter_path_item_operations(path_item):
                     # A malformed node is still an operation the document declares; it just cannot be parsed.
                     if not is_parsable_operation(definition):
                         complete_walk = False
@@ -382,9 +403,7 @@ class OperationLoader:
             statistic.unmatched_filters = usage.results()
         return statistic
 
-    def _should_skip(self, path: str, method: str, definition: OperationObject) -> bool:
-        if not is_http_method_schema(method):
-            return True
+    def _should_skip(self, path: str, method: HttpMethodSchema, definition: OperationObject) -> bool:
         schema = self.schema
         if schema.filter_set.is_empty():
             return False
