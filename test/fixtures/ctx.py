@@ -88,6 +88,9 @@ class OpenAPIApps:
     def identical_query_parameters(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.identical_query_parameters())
 
+    def resource_pool(self, *, existing_ids: frozenset[int] = frozenset({12}), secured: bool = False) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.resource_pool(existing_ids, secured=secured))
+
     def flaky(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.flaky())
 
