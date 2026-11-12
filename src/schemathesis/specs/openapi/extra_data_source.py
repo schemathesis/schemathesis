@@ -76,12 +76,14 @@ class VariantUsageTracker:
 
         shuffled_weights = [weights[i] for i in indices]
         total = sum(shuffled_weights)
+        # Drawn unconditionally: the number of draws must not depend on weights, which Hypothesis cannot see.
+        point = random.random()
 
         if total == 0:
             # Every variant was just drawn
             return indices[0]
 
-        r = random.random() * total
+        r = point * total
         cumulative = 0.0
         for i, w in enumerate(shuffled_weights):
             cumulative += w
@@ -89,6 +91,11 @@ class VariantUsageTracker:
                 return indices[i]
 
         return indices[-1]
+
+    def get_weight(self, variant_key: str) -> float:
+        """Return the current selection weight for a variant."""
+        with self._lock:
+            return self._get_weight_unlocked(variant_key)
 
     def _get_weight_unlocked(self, variant_key: str) -> float:
         """The caller must hold the lock."""
