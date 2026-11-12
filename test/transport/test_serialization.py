@@ -366,7 +366,15 @@ def test_serialization_not_possible_manual(ctx):
 
 @pytest.mark.parametrize(
     "media_type",
-    ["application/json", "text/yaml", "application/x-www-form-urlencoded", "text/plain", "multipart/form-data"],
+    [
+        "application/json",
+        "text/yaml",
+        "application/x-www-form-urlencoded",
+        "text/plain",
+        "multipart/form-data",
+        "application/jsonl",
+        "application/json-seq",
+    ],
 )
 def test_binary_data(ctx, media_type):
     operation = ctx.openapi.load_operation(
@@ -396,6 +404,37 @@ def test_binary_data(ctx, media_type):
             assert kwargs["headers"]["Content-Type"] == media_type
     # And it is OK to send it over the network
     assert_requests_call(case)
+
+
+@pytest.mark.parametrize(
+    ("media_type", "body", "expected"),
+    [
+        ("application/jsonl", [{"id": 1}, {"id": 2}], b'{"id":1}\n{"id":2}\n'),
+        ("application/x-ndjson", [{"id": 1}, {"id": 2}], b'{"id":1}\n{"id":2}\n'),
+        ("application/json-seq", [{"id": 1}, {"id": 2}], b'\x1e{"id":1}\n\x1e{"id":2}\n'),
+        ("application/geo+json-seq", [{"id": 1}], b'\x1e{"id":1}\n'),
+        ("application/jsonl", [], b""),
+        ("application/jsonl", {"id": 1}, b'{"id":1}\n'),
+        ("application/json-seq", "a\nb", b'\x1e"a\\nb"\n'),
+    ],
+    ids=["jsonl", "ndjson", "json-seq", "json-seq-suffix", "empty", "jsonl-non-list", "json-seq-non-list"],
+)
+def test_json_sequence_body(ctx, media_type, body, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": {media_type: {"itemSchema": {"type": "object"}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.2.0",
+    )
+    case = operation.Case(body=body, media_type=media_type)
+    transports = (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT)
+
+    assert [
+        (kwargs["data"], kwargs["headers"]["Content-Type"])
+        for kwargs in (transport.serialize_case(case) for transport in transports)
+    ] == [(expected, media_type)] * 3
 
 
 @pytest.mark.parametrize(

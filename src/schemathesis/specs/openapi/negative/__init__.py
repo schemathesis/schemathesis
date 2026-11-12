@@ -23,7 +23,7 @@ from schemathesis.core.jsonschema import (
     schema_with_bundle,
 )
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue
-from schemathesis.core.media_types import is_json
+from schemathesis.core.media_types import is_json, is_json_sequence
 from schemathesis.core.mutations import MutationMetadata, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone, to_wire_string
@@ -42,7 +42,7 @@ from schemathesis.specs.openapi.negative.mutations import (
 )
 from schemathesis.specs.openapi.negative.value_channel import apply_value_channel, collect_value_targets
 from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
-from schemathesis.transport.serialization import Binary, contains_binary
+from schemathesis.transport.serialization import Binary, contains_binary, json_sequence_readings
 
 SYNTAX_FUZZING_PROBABILITY = 0.05
 VALUE_CHANNEL_PROBABILITY = 0.15
@@ -305,6 +305,8 @@ def negative_schema(
 
     # Parameters reach the server as text, so a mutated one that spells an accepted value is not negative.
     is_sent_as_text = location != ParameterLocation.BODY
+    # A JSON sequence body is negative only if every way a server may read it is
+    is_sent_as_sequence = location == ParameterLocation.BODY and is_json_sequence(media_type)
     if is_sent_as_text:
         container = validation_schema if validation_schema is not None else schema
         assert isinstance(container, dict)
@@ -375,6 +377,10 @@ def negative_schema(
                         cast("dict[str, Any]", value), metadata, parameter_validator
                     )
                 )
+            )
+        elif is_sent_as_sequence:
+            strategy = strategy.filter(
+                lambda value: all(filter_values(reading, chosen) for reading in json_sequence_readings(value))
             )
         else:
             strategy = strategy.filter(lambda value: filter_values(value, chosen))

@@ -43,6 +43,7 @@ from schemathesis.transport.serialization import (
     Binary,
     serialize_binary,
     serialize_json,
+    serialize_json_sequence,
     serialize_xml,
     serialize_xml_with_schema,
     serialize_yaml,
@@ -420,6 +421,17 @@ REQUESTS_TRANSPORT = RequestsTransport()
 @REQUESTS_TRANSPORT.serializer("application/json", "text/json")
 def json_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return serialize_json(value)
+
+
+@REQUESTS_TRANSPORT.serializer("application/jsonl", "application/x-ndjson")
+def json_lines_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
+    return {"data": serialize_json_sequence(value, record_start="")}
+
+
+@REQUESTS_TRANSPORT.serializer("application/json-seq")
+def json_text_sequence_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
+    # RFC 7464 starts every record with the ASCII record separator
+    return {"data": serialize_json_sequence(value, record_start="\x1e")}
 
 
 @REQUESTS_TRANSPORT.serializer(

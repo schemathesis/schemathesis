@@ -754,12 +754,16 @@ def _media_type_schema(
     elif media_types.is_json_sequence(media_type):
         item_schema = media_type_object.get("itemSchema")
         if item_schema is not None:
-            # The records are validated as one array, with `schema` covering the whole sequence
-            sequence: JsonSchemaObject = {"type": "array", "items": item_schema}
-            if schema is not None:
-                sequence["allOf"] = [schema]
-            return sequence
+            return json_sequence_schema(item_schema, schema)
     return schema
+
+
+def json_sequence_schema(item_schema: JsonSchema, schema: JsonSchema | None) -> JsonSchemaObject:
+    """A JSON sequence read as one array of `item_schema` records, with `schema` covering the whole sequence."""
+    sequence: JsonSchemaObject = {"type": "array", "items": item_schema}
+    if schema is not None:
+        sequence["allOf"] = [schema]
+    return sequence
 
 
 @dataclass(slots=True)

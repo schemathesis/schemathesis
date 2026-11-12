@@ -34,7 +34,7 @@ from schemathesis.core.jsonschema import (
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, as_object_schema, get_type
-from schemathesis.core.media_types import FORM_MEDIA_TYPES
+from schemathesis.core.media_types import FORM_MEDIA_TYPES, is_json_sequence
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation, SkippedParameter
 from schemathesis.core.transforms import deepclone, format_body_path, jsonify_python_specific_types
 from schemathesis.core.validation import check_header_name
@@ -59,6 +59,7 @@ from schemathesis.specs.openapi.adapter.references import (
     resolve_example_references,
     resolve_media_type_object,
 )
+from schemathesis.specs.openapi.adapter.responses import json_sequence_schema
 from schemathesis.specs.openapi.adapter.validators import ensure_object
 from schemathesis.specs.openapi.converter import permit_forbidden_properties, to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
@@ -1699,6 +1700,9 @@ class OpenApiBody(OpenApiComponent):
             if is_binary_format(schema):
                 # Any bytes are a binary string, so only its other constraints can be violated on the wire.
                 schema = {key: value for key, value in schema.items() if key not in ("type", "format")}
+            elif isinstance(schema, dict) and schema.get("type") == "array" and is_json_sequence(self.media_type):
+                # A non-array value goes out as one record, which may read as a valid one-item array.
+                schema = {key: value for key, value in schema.items() if key != "type"}
             self._is_negatable = isinstance(schema, dict) and can_negate(schema)
         assert not isinstance(self._is_negatable, NotSet)
         return self._is_negatable
@@ -2418,6 +2422,10 @@ def iter_parameters_v3(
             except RefResolutionError as exc:
                 skipped.append(_skipped_body(exc, required=required))
                 continue
+            item_schema = content.get("itemSchema")
+            if item_schema is not None and is_json_sequence(media_type):
+                # The body is the array of the records `itemSchema` describes
+                content = {**content, "schema": json_sequence_schema(item_schema, content.get("schema"))}
             resource_name = None
             schema = content.get("schema")
             name_to_uri = {}

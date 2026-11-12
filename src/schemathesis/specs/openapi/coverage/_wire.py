@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
 
-from schemathesis.core.media_types import is_form_parts, is_xml_parts
+from schemathesis.core.media_types import is_form_parts, is_json_sequence_parts, is_xml_parts
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import jsonify_python_specific_types, to_wire_string
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
@@ -109,6 +109,13 @@ class WireSemantics:
 
     def xml_body(self) -> bool:
         return self.location == ParameterLocation.BODY and self.media_type is not None and is_xml_parts(self.media_type)
+
+    def json_sequence_body(self) -> bool:
+        return (
+            self.location == ParameterLocation.BODY
+            and self.media_type is not None
+            and is_json_sequence_parts(self.media_type)
+        )
 
     def required_form_body(self) -> bool:
         # `{}` serializes to no content, which violates a required form body.

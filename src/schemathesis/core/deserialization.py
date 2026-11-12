@@ -316,7 +316,7 @@ def _deserialize_sse(_ctx: DeserializationContext, response: Response) -> list[S
 
 def parse_json_sequence(content: bytes, media_type: str) -> list[JsonValue]:
     """Values of a JSON Lines or JSON Text Sequence body, one per line or record."""
-    separator = "\x1e" if media_types.parse(media_type)[1].endswith("json-seq") else "\n"
+    separator = "\x1e" if media_types.is_json_text_sequence(media_type) else "\n"
     text = content.decode("utf-8-sig")
     values: list[JsonValue] = []
     offset = 0
