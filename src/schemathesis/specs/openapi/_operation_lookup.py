@@ -6,8 +6,14 @@ from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.core.errors import InvalidSchema, OperationNotFound, RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
-from schemathesis.core.transforms import encode_pointer
-from schemathesis.specs.openapi.operations import is_parsable_operation, parse_operation_reference, resolve_path_item
+from schemathesis.specs.openapi.operations import (
+    is_parsable_operation,
+    iter_path_item_operations,
+    operation_reference,
+    parse_operation_reference,
+    resolve_path_item,
+    split_operation_reference,
+)
 
 if TYPE_CHECKING:
     from schemathesis.core.transport import HttpMethodSchema
@@ -31,14 +37,12 @@ class OperationLookup:
 
     __slots__ = (
         "schema",
-        "_http_methods",
         "_operations_by_id",
         "_operations_by_reference",
     )
 
-    def __init__(self, schema: OpenApiSchema, http_methods: Collection[str]) -> None:
+    def __init__(self, schema: OpenApiSchema) -> None:
         self.schema = schema
-        self._http_methods = http_methods
         self._operations_by_id: dict[str, OperationLookupEntry] | None = None
         self._operations_by_reference: dict[str, OperationLookupEntry] | None = None
 
@@ -93,14 +97,12 @@ class OperationLookup:
             if not isinstance(resolved_path_item, dict):
                 continue
             shared_parameters = tuple(resolved_path_item.get("parameters", []))
-            for method, definition in resolved_path_item.items():
-                if method not in self._http_methods:
-                    continue
+            for method, definition in iter_path_item_operations(resolved_path_item):
                 if not is_parsable_operation(definition):
                     continue
                 entry = OperationLookupEntry(
                     path=path,
-                    method=cast("HttpMethodSchema", method),
+                    method=method,
                     scope=scope,
                     resolver=resolved_resolver if "$ref" in path_item else root_resolver,
                     definition=definition,
@@ -110,8 +112,7 @@ class OperationLookup:
                 operation_id = definition.get("operationId")
                 if operation_id is not None:
                     operations_by_id[operation_id] = entry
-                reference = self._canonical_operation_reference(path, method)
-                operations_by_reference[reference] = entry
+                operations_by_reference[operation_reference(path, method)] = entry
         self._operations_by_id = operations_by_id
         self._operations_by_reference = operations_by_reference
 
@@ -122,7 +123,7 @@ class OperationLookup:
             raise OperationNotFound(f"Operation '{reference}' not found", reference) from None
         scope = resolved_resolver.base_uri
         path, method = parse_operation_reference(reference)
-        parent_ref, _ = reference.rsplit("/", maxsplit=1)
+        parent_ref, _ = split_operation_reference(reference)
         _, path_item = resolve_reference(self.schema.root_resolver, parent_ref)
         shared_parameters = tuple(path_item.get("parameters", []))
         entry = OperationLookupEntry(
@@ -136,8 +137,7 @@ class OperationLookup:
         )
         operations_by_reference = self._get_operations_by_reference()
         operations_by_reference[reference] = entry
-        canonical_reference = self._canonical_operation_reference(path, method)
-        operations_by_reference.setdefault(canonical_reference, entry)
+        operations_by_reference.setdefault(operation_reference(path, method), entry)
         operations_by_id = self._get_operations_by_id()
         operation_id = definition.get("operationId") if isinstance(definition, Mapping) else None
         if operation_id is not None:
@@ -159,7 +159,3 @@ class OperationLookup:
             resolver=entry.resolver,
             path_item=entry.path_item,
         )
-
-    @staticmethod
-    def _canonical_operation_reference(path: str, method: str) -> str:
-        return f"#/paths/{encode_pointer(path)}/{method}"

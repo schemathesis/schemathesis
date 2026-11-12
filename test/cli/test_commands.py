@@ -5514,3 +5514,59 @@ def test_interrupt_counts_each_operation_once(ctx, cli, workers):
     module = ctx.write_pymodule(INTERRUPT_ON_EVERY_EXAMPLES_SETUP)
     result = cli.main("run", api.schema_url, f"--workers={workers}", "--phases=examples", hooks=module)
     assert re.findall(r"⏭\s+(\d+) skipped", result.stdout) == ["2"]
+
+
+def test_additional_operations_are_tested(ctx, cli, snapshot_cli):
+    file = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
+    not_found = {"description": "Not found"}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/files": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {"application/json": {"schema": file}},
+                            "links": {
+                                "CopyFile": {
+                                    "operationRef": "#/paths/~1files~1{id}/additionalOperations/COPY",
+                                    "parameters": {"id": "$response.body#/id"},
+                                },
+                                "PurgeFile": {"operationId": "purgeFile", "parameters": {"id": "$response.body#/id"}},
+                            },
+                        }
+                    }
+                }
+            },
+            "/files/{id}": {
+                "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "additionalOperations": {
+                    "COPY": {"responses": {"201": {"description": "Copied"}, "404": not_found}},
+                    "PURGE": {
+                        "operationId": "purgeFile",
+                        "responses": {"204": {"description": "Purged"}, "404": not_found},
+                    },
+                },
+            },
+        },
+        version="3.2.0",
+    )
+    files = set()
+    ids = count(1)
+
+    @app.route("/files", methods=["POST"])
+    def create_file():
+        file_id = next(ids)
+        files.add(file_id)
+        return jsonify({"id": file_id}), 201
+
+    @app.route("/files/<int:file_id>", methods=["COPY", "PURGE"])
+    def change_file(file_id):
+        if file_id not in files:
+            return jsonify({}), 404
+        if request.method == "COPY":
+            return jsonify({}), 500
+        files.discard(file_id)
+        return "", 204
+
+    assert cli.run_openapi_app(app, "--max-examples=10") == snapshot_cli

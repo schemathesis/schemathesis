@@ -5910,6 +5910,40 @@ def test_allow_header_conformance(ctx, response_factory, headers, method, expect
             allow_header_conformance(context, response, case)
 
 
+@pytest.mark.parametrize(
+    ("allow", "expected"),
+    [
+        ("GET, COPY", None),
+        ("GET, COPY, PURGE", None),
+        ("GET", "`Allow: GET` does not match the schema. Missing documented methods: COPY"),
+    ],
+    ids=["match", "templated-sibling", "missing-additional-method"],
+)
+def test_allow_header_conformance_additional_operations(ctx, response_factory, allow, expected):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "additionalOperations": {"COPY": {"responses": {"201": {"description": "Copied"}}}},
+            },
+            "/{collection}": {
+                "parameters": [{"name": "collection", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "additionalOperations": {"PURGE": {"responses": {"204": {"description": "Purged"}}}},
+            },
+        },
+        version="3.2.0",
+    )
+    case = schema["/items"]["GET"].Case()
+    response = Response.from_requests(
+        response_factory.requests(headers={"Allow": allow}, method="OPTIONS"), verify=True
+    )
+    if expected is None:
+        assert allow_header_conformance(check_context(), response, case) is None
+    else:
+        with pytest.raises(AllowHeaderMismatch, match=re.escape(expected)):
+            allow_header_conformance(check_context(), response, case)
+
+
 def test_allow_header_conformance_repeated_header(ctx, response_factory):
     raw = response_factory.requests(method="OPTIONS")
     raw.raw.headers.add("Allow", "GET")

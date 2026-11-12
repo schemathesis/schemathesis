@@ -21,7 +21,7 @@ from urllib.parse import urlsplit
 from werkzeug.exceptions import MethodNotAllowed, NotFound
 from werkzeug.routing import Map, MapAdapter, RequestRedirect, Rule
 
-from schemathesis.core.transforms import encode_pointer
+from schemathesis.specs.openapi.operations import operation_reference
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
 if TYPE_CHECKING:
@@ -93,8 +93,7 @@ class LinkInferencer:
             if operation_id:
                 operation = OperationById(operation_id, method=method, path=path)
             else:
-                encoded_path = encode_pointer(path)
-                operation = OperationByRef(f"#/paths/{encoded_path}/{method}", method=method, path=path)
+                operation = OperationByRef(operation_reference(path, method), method=method, path=path)
 
             operations.append(operation)
 

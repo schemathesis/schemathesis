@@ -4217,6 +4217,31 @@ def test_path_param_named_after_collection_links_create_to_read(ctx):
     ]
 
 
+def test_links_point_into_additional_operations(ctx):
+    file = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    paths = {
+        **operation("post", "/files", "201", file),
+        "/files/{id}": {
+            "parameters": [path_param("id")],
+            "additionalOperations": {
+                "COPY": {"responses": {"201": {"content": {"application/json": {"schema": file}}}}}
+            },
+        },
+    }
+    _, graph = analyze_dependencies(ctx, paths, version="3.2.0")
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1files/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1files~1{id}/additionalOperations/COPY",
+                "parameters": {"path.id": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
 LINK_PARAMETERS_SCRIPT = """
 import json, sys
 import schemathesis
