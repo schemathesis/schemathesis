@@ -35,3 +35,32 @@ def test_schema_index_leaf_string_id_fields():
     assert not index.has_object_type("Missing")
     assert index.leaf_string_id_fields("Project") == frozenset({"id", "fullPath"})
     assert index.leaf_string_id_fields("Missing") == frozenset()
+
+
+@pytest.mark.parametrize(
+    ("sdl", "type_name", "expected"),
+    [
+        (
+            "type Note { id: ID! } type DeleteNote { id: ID! } type Query { note: Note }"
+            " type Mutation { deleteNote(id: ID!): DeleteNote }",
+            "DeleteNote",
+            "Note",
+        ),
+        (
+            "type Session { id: ID! } type UpdateUserSession { id: ID! } type Query { session: Session }"
+            " type Mutation { updateUserSession: UpdateUserSession }",
+            "UpdateUserSession",
+            None,
+        ),
+        (
+            "type Note { id: ID! } type NewNote { id: ID! } type NewNoteEdge { node: NewNote }"
+            " type NewNoteConnection { edges: [NewNoteEdge] } type Query { newNotes: NewNoteConnection }"
+            " type Mutation { newNote: NewNote }",
+            "NewNote",
+            None,
+        ),
+    ],
+    ids=["delete-result", "update-result-never-names-head-noun", "readable-through-relay-connection"],
+)
+def test_envelope_resource(sdl, type_name, expected):
+    assert SchemaIndex(graphql.build_schema(sdl)).envelope_resource(type_name) == expected

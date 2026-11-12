@@ -74,12 +74,18 @@ def test_collect_id_typed_object_types(sdl, expected):
     assert collect_id_typed_object_types(graphql.build_schema(sdl)) == expected
 
 
-def test_introspection_types_excluded():
+def _introspection_types_first(schema):
+    introspection = graphql.introspection_from_schema(schema)
+    introspection["__schema"]["types"].sort(key=lambda type_: not type_["name"].startswith("__"))
+    return graphql.build_client_schema(introspection)
+
+
+@pytest.mark.parametrize("load", [lambda schema: schema, _introspection_types_first], ids=["sdl", "introspection"])
+def test_introspection_types_excluded(load):
     # `__Schema`, `__Type`, etc. expose `name` fields and would otherwise look like Object types.
     schema = graphql.build_schema("""
         type Book { id: ID! }
         type Query { book(id: ID!): Book }
         type Mutation { _: Boolean }
     """)
-    result = collect_id_typed_object_types(schema)
-    assert all(not name.startswith("__") for name in result)
+    assert collect_id_typed_object_types(load(schema)) == {"Book"}

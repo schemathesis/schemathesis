@@ -148,6 +148,12 @@ class AnyString:
         ({"enum": [1, 2]}, ["AAA", 0.5, "true", "null", ["null", "null"]]),
         ({"enum": [1, 2, {}]}, ["AAA", 0.5, "true", "null", ["null", "null"]]),
         ({"enum": ["a", "b"]}, ["AAA", 0, 0.5, "true", "null", ["null", "null"]]),
+        # Enum entries outside the declared type are negatives; integers fit `number`, "true" reads as a boolean.
+        (
+            {"type": "number", "enum": [2.5, 1, "a", "a", True]},
+            ["true", "null", "AAA", ["null", "null"], "", -58800, "a", True],
+        ),
+        ({"type": "boolean", "enum": ["true", True, "x"]}, [2, 0.5, "null", "AAA", ["null", "null"], -58800, "x"]),
         ({"multipleOf": 2}, lambda x: x % 2 != 0),
         ({"format": "date-time"}, [AnyString()]),
         ({"format": "hostname"}, [AnyString()]),
@@ -174,6 +180,85 @@ def test_negative_primitive_schemas(nctx, schema, expected):
         assert covered == expected
     assert_unique(covered)
     assert_not_conform(covered, schema)
+
+
+@pytest.mark.parametrize(
+    ("media_type", "schema", "expected"),
+    [
+        (
+            None,
+            {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "integer", "nullable": True}}},
+            [
+                0,
+                False,
+                None,
+                "AAA",
+                [None, None],
+                *({"a": value, "b": 0} for value in (2.5890419884777833e-42, False, None, "AAA", [None, None], {})),
+                *({"a": 0, "b": value} for value in (2.5890419884777833e-42, False, "AAA", [None, None], {})),
+            ],
+        ),
+        (("application", "xml"), {"type": ["object", "null"]}, [0, 0.5, True, [None, None]]),
+        (("application", "xml"), {"type": ["object", "string"]}, []),
+        (("application", "octet-stream"), {"type": "string", "format": "binary"}, []),
+        (("application", "octet-stream"), {"type": "string", "format": "byte"}, []),
+        (("application", "octet-stream"), {"type": "string"}, [0, False, None, [None, None], {}]),
+        (("application", "json"), {"type": "string", "format": "binary"}, [0, False, None, [None, None], {}]),
+    ],
+    ids=["nullable-sibling", "xml-nullable", "xml-string", "binary", "byte", "octet-string", "json-binary"],
+)
+def test_negative_type_body_values(ctx_factory, media_type, schema, expected):
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY, media_type=media_type, generation_modes=[GenerationMode.NEGATIVE]
+    )
+    assert scenario_values(ctx, schema, CoverageScenario.INCORRECT_TYPE) == expected
+
+
+# Form and XML bodies send property values as text; a negative value whose text is still valid is dropped.
+@pytest.mark.parametrize(
+    ("media_type", "expected"),
+    [
+        (
+            ("application", "xml"),
+            [
+                0,
+                0.5,
+                True,
+                [None, None],
+                {"a": 0, "b": 0.0},
+                {"a": None, "b": 0.0},
+                {"a": "0", "b": 0.0},
+                *({"a": "00", "b": value} for value in (True, None, "AAA", [None, None], {}, 6)),
+                {"b": 0.0},
+                {"a": "00"},
+            ],
+        ),
+        (
+            ("application", "x-www-form-urlencoded"),
+            [{"a": "0", "b": 0.0}, *({"a": "00", "b": value} for value in (True, "AAA", 6)), {"b": 0.0}, {"a": "00"}],
+        ),
+        (
+            ("multipart", "form-data"),
+            [
+                {"a": "0", "b": 0.0},
+                *({"a": "00", "b": value} for value in (True, None, "AAA", [None, None], {}, 6)),
+                {"b": 0.0},
+                {"a": "00"},
+            ],
+        ),
+    ],
+    ids=["xml", "urlencoded", "multipart"],
+)
+def test_negative_properties_for_text_bodies(ctx_factory, media_type, expected):
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY, media_type=media_type, generation_modes=[GenerationMode.NEGATIVE]
+    )
+    schema = {
+        "type": "object",
+        "properties": {"a": {"type": "string", "minLength": 2}, "b": {"type": "number", "maximum": 5}},
+        "required": ["a", "b"],
+    }
+    assert cover_schema(ctx, schema) == expected
 
 
 def test_negative_const(ctx_factory):
@@ -259,6 +344,7 @@ def test_unexpected_parameters_control(ctx_factory, location, allow_extra_parame
         ({"type": "string", "minLength": 5, "maxLength": 10}, {5, 6, 9, 10}),
         ({"type": "string", "minLength": 5, "maxLength": 6}, {5, 6}),
         ({"type": "string", "minLength": 5, "maxLength": 5}, {5}),
+        ({"type": "string", "maxLength": 0}, {0}),
         ({"type": "string", "minLength": 0, "maxLength": 512, "pattern": r"^[\w\W]+$"}, {1}),
         # Nullable string: union type must not leak into boundary generation,
         # otherwise generation may pick null and skip both length variants.
@@ -281,6 +367,14 @@ def test_positive_string(ctx_factory, schema, lengths):
     assert_conform(covered, schema)
 
 
+# An empty XML element reads back as null, so positive XML strings start at one character.
+def test_positive_xml_string_is_never_empty(ctx_factory):
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY, media_type=("application", "xml"), generation_modes=[GenerationMode.POSITIVE]
+    )
+    assert cover_schema(ctx, {"type": "string", "maxLength": 3}) == ["0", "00", "000"]
+
+
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
@@ -298,6 +392,26 @@ def test_positive_string(ctx_factory, schema, lengths):
         ),
         ({"type": "string", "pattern": "^[0-9]"}, ["true", "null", ["null", "null"], AnyString()]),
         ({"type": "string", "format": "date-time"}, [0, 0.5, "true", "null", ["null", "null"], ""]),
+        (
+            {"type": "string", "minLength": 3, "enum": ["abc", "defg"]},
+            [0, 0.5, "true", "null", ["null", "null"], "00", "AAA"],
+        ),
+        ({"type": "string", "minLength": 3, "const": "abc"}, [0, "00"]),
+        (
+            {"type": "string", "maxLength": 3, "enum": ["abc", "ab"]},
+            [0, 0.5, "true", "null", ["null", "null"], "0000", "AAA"],
+        ),
+        ({"type": "string", "maxLength": 3, "const": "abc"}, ["true", "null", ["null", "null"], "0000"]),
+        ({"type": "integer", "maxLength": 3}, [0.5, "true", "null", "AAA", ["null", "null"], ""]),
+        (
+            {"type": "string", "pattern": "^a+$", "minLength": 3, "maxLength": 3},
+            [0, 0.5, "true", "null", ["null", "null"], "000", "aa", "aaaa"],
+        ),
+        ({"type": "string", "pattern": "^a+$", "maxLength": 0}, [0, 0.5, "true", "null", ["null", "null"], "", "a"]),
+        (
+            {"type": "string", "format": "uuid", "pattern": f"^{UUID_PATTERN}$"},
+            [0, 0.5, "true", "null", ["null", "null"], ""],
+        ),
     ],
 )
 def test_negative_string(nctx, schema, expected):
@@ -348,6 +462,53 @@ def test_negative_maxitems_sends_one_oversized_string(ctx_factory, items):
     ]
     copies = json.dumps(value).count(OVERSIZED)
     assert copies == 1
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        ({"type": "array", "maxItems": 2}, [None, None, None]),
+        ({"type": "array", "maxItems": 2, "items": {"type": "integer", "minimum": 5}}, [5, 5, 5]),
+        ({"type": "array", "maxItems": 2, "uniqueItems": True, "items": {"type": "integer"}}, [0, 1, -1]),
+        ({"type": "array", "maxItems": 2, "contains": {"const": 7}}, [7, None, None]),
+        (
+            {"type": "array", "maxItems": 2, "prefixItems": [{"const": "a"}], "items": {"type": "integer"}},
+            ["a", 0, 0],
+        ),
+        ({"type": "array", "maxItems": 20}, [None] * 21),
+        ({"type": "array", "maxItems": 20, "items": {"type": "boolean"}}, ([True, 0, False, None] * 6)[:21]),
+    ],
+    ids=["no-items", "items", "unique", "contains", "prefix-items", "large", "large-items"],
+)
+def test_negative_max_items_values(ctx_factory, schema, expected):
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.NEGATIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    assert scenario_values(ctx, schema, CoverageScenario.ARRAY_ABOVE_MAX_ITEMS) == [expected]
+
+
+@pytest.mark.parametrize(
+    ("location", "schema", "expected"),
+    [
+        (ParameterLocation.BODY, {"minItems": 3}, [[None, None]]),
+        (ParameterLocation.BODY, {"type": "array", "minItems": 3, "maxItems": 6}, [[None, None]]),
+        *(
+            (
+                ParameterLocation.BODY,
+                {"type": "array", "minItems": 3, "items": {"type": "integer"}, key: value},
+                [[0, 0]],
+            )
+            for key, value in (("example", [1, 2, 3]), ("examples", [[1, 2, 3]]), ("default", [1, 2, 3]))
+        ),
+        (ParameterLocation.PATH, {"type": "array", "minItems": 1}, []),
+    ],
+    ids=["untyped", "bounded", "example", "examples", "default", "empty-path"],
+)
+def test_negative_min_items_values(ctx_factory, location, schema, expected):
+    ctx = ctx_factory(location=location, generation_modes=[GenerationMode.NEGATIVE])
+    assert scenario_values(ctx, schema, CoverageScenario.ARRAY_BELOW_MIN_ITEMS) == expected
 
 
 def test_negative_pattern_for_header_with_permissive_pattern(ctx_factory):
@@ -1240,6 +1401,65 @@ def test_positive_other(pctx, schema, expected):
                 },
             ],
         ),
+        (
+            {
+                "type": "object",
+                "properties": {"a": {"type": "null"}},
+                "required": ["a"],
+                "additionalProperties": {"type": "integer"},
+            },
+            [
+                0,
+                0.5,
+                "true",
+                "null",
+                "AAA",
+                ["null", "null"],
+                {"a": 0},
+                {"a": 0.5},
+                {"a": "true"},
+                {"a": "AAA"},
+                {},
+                *(
+                    {"a": None, "x-schemathesis-additional": value}
+                    for value in (0.5, "true", "null", "AAA", ["null", "null"])
+                ),
+            ],
+        ),
+        (
+            {"type": "object", "maxProperties": 0},
+            [0, 0.5, "true", "null", "AAA", ["null", "null"], {"x-schemathesis-additional": 42}],
+        ),
+        (
+            {"type": "object", "maxProperties": 2, "properties": {"a": {"type": "null"}}, "required": ["a"]},
+            [
+                0,
+                0.5,
+                "true",
+                "null",
+                "AAA",
+                ["null", "null"],
+                {"a": None, "x-schemathesis-additional": 42, "x-schemathesis-additional1": 42},
+                {"a": 0},
+                {"a": 0.5},
+                {"a": "true"},
+                {"a": "AAA"},
+                {},
+            ],
+        ),
+        (
+            {"type": "object", "maxProperties": 1, "additionalProperties": {"type": "integer"}},
+            [
+                0,
+                0.5,
+                "true",
+                "null",
+                "AAA",
+                ["null", "null"],
+                {"x-schemathesis-additional": 0, "x-schemathesis-additional1": 0},
+                *({"x-schemathesis-additional": value} for value in (0.5, "true", "null", "AAA", ["null", "null"])),
+            ],
+        ),
     ],
 )
 def test_negative_objects(nctx, schema, expected):
@@ -1923,6 +2143,389 @@ def test_negative_prefix_items_locations(ctx_factory):
         "/prefixItems/1/minLength",
         "/type",
     }
+
+
+# Scenario, description and location are what failure reports show for a generated value.
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (
+            {"type": "array", "minItems": 1, "maxItems": 2},
+            {
+                (CoverageScenario.ARRAY_ABOVE_MAX_ITEMS, "Array with more items than allowed by maxItems", "/maxItems"),
+                (
+                    CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
+                    "Array with fewer items than allowed by minItems",
+                    "/minItems",
+                ),
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+            },
+        ),
+        (
+            {"type": "array", "minItems": 3, "maxItems": 200, "uniqueItems": True, "items": {"type": "integer"}},
+            {
+                (CoverageScenario.ARRAY_ABOVE_MAX_ITEMS, "Array with more items than allowed by maxItems", "/maxItems"),
+                (
+                    CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
+                    "Array with fewer items than allowed by minItems",
+                    "/minItems",
+                ),
+                (CoverageScenario.INCORRECT_TYPE, "Array with invalid items: Incorrect type", "/items/type"),
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.NON_UNIQUE_ITEMS, "Non-unique items", "/uniqueItems"),
+            },
+        ),
+        (
+            {"type": "string", "minLength": 1, "maxLength": 4},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.STRING_ABOVE_MAX_LENGTH, "String larger than maxLength", "/maxLength"),
+                (CoverageScenario.STRING_BELOW_MIN_LENGTH, "String smaller than minLength", "/minLength"),
+            },
+        ),
+        (
+            {"type": "string", "minLength": 3, "pattern": "^a+$"},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.INVALID_PATTERN, "Value not matching the '^a+$' pattern", "/pattern"),
+                (CoverageScenario.STRING_BELOW_MIN_LENGTH, "String smaller than minLength", "/minLength"),
+            },
+        ),
+        (
+            {"type": "number", "minimum": 1, "maximum": 10, "multipleOf": 0.5},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.NOT_MULTIPLE_OF, "Non-multiple of 0.5", "/multipleOf"),
+                (CoverageScenario.VALUE_ABOVE_MAXIMUM, "Value greater than maximum", "/maximum"),
+                (CoverageScenario.VALUE_BELOW_MINIMUM, "Value smaller than minimum", "/minimum"),
+            },
+        ),
+        (
+            {"type": "number", "exclusiveMinimum": 1, "exclusiveMaximum": 10},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.VALUE_ABOVE_MAXIMUM, "Value greater than maximum", "/exclusiveMaximum"),
+                (CoverageScenario.VALUE_BELOW_MINIMUM, "Value smaller than minimum", "/exclusiveMinimum"),
+            },
+        ),
+        (
+            {"type": "string", "enum": ["a", 1]},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Enum value with type mismatching the declared 'type'", "/enum"),
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.INVALID_ENUM_VALUE, "Invalid enum value", "/enum"),
+            },
+        ),
+        (
+            {"type": "object", "patternProperties": {"^x": {"type": "integer"}}, "propertyNames": {"maxLength": 3}},
+            {
+                (
+                    CoverageScenario.INCORRECT_TYPE,
+                    "Object with invalid pattern key 'x' ('^x') value: Incorrect type",
+                    "/patternProperties/^x/type",
+                ),
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (
+                    CoverageScenario.OBJECT_INVALID_PROPERTY_NAME,
+                    "Object with property name violating propertyNames: String larger than maxLength",
+                    "/propertyNames/maxLength",
+                ),
+            },
+        ),
+        (
+            {"type": "string", "format": "date"},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.INVALID_FORMAT, "Value not matching the 'date' format", "/format"),
+            },
+        ),
+        (
+            {"type": "string", "pattern": "^a+$"},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.INVALID_PATTERN, "Value not matching the '^a+$' pattern", "/pattern"),
+            },
+        ),
+        (
+            {"type": "integer", "items": {"type": "string"}},
+            {
+                (
+                    CoverageScenario.INCORRECT_TYPE,
+                    "Array value for a schema whose declared type forbids arrays",
+                    "/items",
+                ),
+                (CoverageScenario.INCORRECT_TYPE, "Array with invalid items: Incorrect type", "/items/type"),
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+            },
+        ),
+        (
+            {"type": "string", "properties": {"a": {"type": "string"}}},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.INCORRECT_TYPE, "Object body where non-object type expected", "/properties"),
+                (CoverageScenario.INCORRECT_TYPE, "a: Incorrect type", "/properties/a/type"),
+            },
+        ),
+        (
+            {"type": "object", "minProperties": 2, "properties": {"a": {"type": "string"}}},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.INCORRECT_TYPE, "a: Incorrect type", "/properties/a/type"),
+                (
+                    CoverageScenario.OBJECT_BELOW_MIN_PROPERTIES,
+                    "Object with fewer properties than allowed by minProperties",
+                    "/minProperties",
+                ),
+            },
+        ),
+        (
+            {"type": "object", "maxProperties": 1},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (
+                    CoverageScenario.OBJECT_ABOVE_MAX_PROPERTIES,
+                    "Object with more properties than allowed by maxProperties",
+                    "/maxProperties",
+                ),
+            },
+        ),
+        (
+            {"type": "object", "properties": {"a": {"type": "string"}}, "additionalProperties": False},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.INCORRECT_TYPE, "a: Incorrect type", "/properties/a/type"),
+                (
+                    CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES,
+                    "Object with unexpected properties",
+                    "/additionalProperties",
+                ),
+            },
+        ),
+        (
+            {"type": "array", "items": {"type": "string", "minLength": 2}},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Array with invalid items: Incorrect type", "/items/type"),
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (
+                    CoverageScenario.STRING_BELOW_MIN_LENGTH,
+                    "Array with invalid items: String smaller than minLength",
+                    "/items/minLength",
+                ),
+            },
+        ),
+        (
+            {"type": "integer", "uniqueItems": True},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.NON_UNIQUE_ITEMS, "Non-unique items", "/uniqueItems"),
+                (CoverageScenario.UNIQUE_ITEMS_ARRAY, "Unique items array", "/uniqueItems"),
+            },
+        ),
+        (
+            {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}}},
+            {
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+                (CoverageScenario.INCORRECT_TYPE, "a: Incorrect type", "/properties/a/type"),
+                (CoverageScenario.INCORRECT_TYPE, "b: Incorrect type", "/properties/b/type"),
+            },
+        ),
+        (
+            {"type": "array", "prefixItems": [{"type": "string"}]},
+            {
+                (
+                    CoverageScenario.INCORRECT_TYPE,
+                    "Array with invalid item at index 0: Incorrect type",
+                    "/prefixItems/0/type",
+                ),
+                (CoverageScenario.INCORRECT_TYPE, "Incorrect type", "/type"),
+            },
+        ),
+    ],
+    ids=[
+        "array-bounds",
+        "unique-integer-array",
+        "string-length",
+        "string-pattern-and-min-length",
+        "number-bounds-and-multiple-of",
+        "number-exclusive-bounds",
+        "enum-type-mismatch",
+        "pattern-properties-and-names",
+        "format",
+        "pattern",
+        "items-on-non-array",
+        "properties-on-non-object",
+        "min-properties",
+        "max-properties",
+        "no-additional-properties",
+        "invalid-items",
+        "unique-items-on-non-array",
+        "two-properties",
+        "prefix-items",
+    ],
+)
+def test_negative_value_scenario_description_and_location(ctx_factory, schema, expected):
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.NEGATIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    assert {(value.scenario, value.description, value.location) for value in cover_schema_iter(ctx, schema)} == expected
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (
+            {"type": "array", "minItems": 1, "maxItems": 3, "items": {"type": "boolean"}},
+            {
+                (CoverageScenario.MAXIMUM_ITEMS_ARRAY, "Maximum items array"),
+                (CoverageScenario.NEAR_BOUNDARY_ITEMS_ARRAY, "Near-boundary items array"),
+                (CoverageScenario.VALID_ARRAY, "Single-item array: Valid boolean value"),
+                (CoverageScenario.VALID_ARRAY, "Valid array"),
+            },
+        ),
+        (
+            {"type": "array", "items": {"enum": ["a", "b"]}},
+            {
+                (CoverageScenario.ENUM_VALUE_ITEMS_ARRAY, "Enum value from available for items array"),
+                (CoverageScenario.VALID_ARRAY, "Valid array"),
+            },
+        ),
+        (
+            {"type": "array", "minItems": 2, "maxItems": 5, "items": {"type": "integer"}},
+            {
+                (CoverageScenario.MAXIMUM_ITEMS_ARRAY, "Maximum items array"),
+                (CoverageScenario.NEAR_BOUNDARY_ITEMS_ARRAY, "Near-boundary items array"),
+                (CoverageScenario.VALID_ARRAY, "Valid array"),
+            },
+        ),
+        (
+            {"type": "string", "minLength": 2, "maxLength": 5},
+            {
+                (CoverageScenario.MAXIMUM_LENGTH_STRING, "Maximum length string"),
+                (CoverageScenario.MINIMUM_LENGTH_STRING, "Minimum length string"),
+                (CoverageScenario.NEAR_BOUNDARY_LENGTH_STRING, "Near-boundary length string"),
+            },
+        ),
+        (
+            {"type": "number", "minimum": 1, "maximum": 10},
+            {
+                (CoverageScenario.MAXIMUM_VALUE, "Maximum value"),
+                (CoverageScenario.MINIMUM_VALUE, "Minimum value"),
+                (CoverageScenario.NEAR_BOUNDARY_NUMBER, "Near-boundary number"),
+            },
+        ),
+        (
+            {"type": "integer", "exclusiveMinimum": 1, "exclusiveMaximum": 10},
+            {
+                (CoverageScenario.MAXIMUM_VALUE, "Maximum value"),
+                (CoverageScenario.MINIMUM_VALUE, "Minimum value"),
+                (CoverageScenario.NEAR_BOUNDARY_NUMBER, "Near-boundary number"),
+            },
+        ),
+        (
+            {"type": "object", "required": ["a"], "properties": {"a": {"type": "boolean"}, "b": {"type": "null"}}},
+            {
+                (CoverageScenario.OBJECT_ONLY_REQUIRED, "Object with only required properties"),
+                (CoverageScenario.VALID_OBJECT, "Object with valid 'a' value: Valid boolean value"),
+                (CoverageScenario.VALID_OBJECT, "Valid object"),
+            },
+        ),
+        (
+            {"type": "object", "properties": {"a": {"type": "boolean"}}, "additionalProperties": {"type": "boolean"}},
+            {
+                (CoverageScenario.OBJECT_ADDITIONAL_PROPERTY, "Object with additional property: Valid boolean value"),
+                (CoverageScenario.OBJECT_ONLY_REQUIRED, "Object with only required properties"),
+                (CoverageScenario.VALID_OBJECT, "Object with valid 'a' value: Valid boolean value"),
+                (CoverageScenario.VALID_OBJECT, "Valid object"),
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"a": {"type": "boolean"}},
+                "example": {"a": True},
+                "default": {"a": False},
+            },
+            {
+                (CoverageScenario.DEFAULT_VALUE, "Default value"),
+                (CoverageScenario.EXAMPLE_VALUE, "Example value"),
+                (CoverageScenario.OBJECT_ONLY_REQUIRED, "Object with only required properties"),
+                (CoverageScenario.VALID_OBJECT, "Object with valid 'a' value: Valid boolean value"),
+            },
+        ),
+        (
+            {"type": "string", "examples": ["x", "y"], "default": "z"},
+            {
+                (CoverageScenario.DEFAULT_VALUE, "Default value"),
+                (CoverageScenario.EXAMPLE_VALUE, "Example value"),
+                (CoverageScenario.OVERSIZED_STRING, "String longer than common implicit limits"),
+            },
+        ),
+        (
+            {"type": "string", "example": "e"},
+            {
+                (CoverageScenario.EXAMPLE_VALUE, "Example value"),
+                (CoverageScenario.OVERSIZED_STRING, "String longer than common implicit limits"),
+            },
+        ),
+        ({"const": 5}, {(CoverageScenario.CONST_VALUE, "Const value")}),
+        ({"enum": [1, 2]}, {(CoverageScenario.ENUM_VALUE, "Enum value")}),
+        ({"type": "boolean"}, {(CoverageScenario.VALID_BOOLEAN, "Valid boolean value")}),
+        (
+            {"type": "string"},
+            {
+                (CoverageScenario.OVERSIZED_STRING, "String longer than common implicit limits"),
+                (CoverageScenario.VALID_STRING, "Valid string"),
+            },
+        ),
+        (
+            {"type": "number"},
+            {
+                (CoverageScenario.LARGE_NUMBER, "Number beyond common integer widths"),
+                (CoverageScenario.VALID_NUMBER, "Valid number"),
+            },
+        ),
+        (
+            {"type": "string", "minLength": 2, "maxLength": 3},
+            {
+                (CoverageScenario.MINIMUM_LENGTH_STRING, "Minimum length string"),
+                (CoverageScenario.NEAR_BOUNDARY_LENGTH_STRING, "Near-boundary length string"),
+            },
+        ),
+    ],
+    ids=[
+        "array-bounds-with-single-item",
+        "enum-items",
+        "array-bounds",
+        "string-length",
+        "number-bounds",
+        "integer-exclusive-bounds",
+        "required-property",
+        "additional-properties",
+        "object-example-and-default",
+        "string-examples-and-default",
+        "string-example",
+        "const",
+        "enum",
+        "boolean",
+        "string",
+        "number",
+        "adjacent-length-bounds",
+    ],
+)
+def test_positive_value_scenario_and_description(ctx_factory, schema, expected):
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    assert {(value.scenario, value.description) for value in cover_schema_iter(ctx, schema)} == expected
+
+
+def test_positive_null_scenario(ctx_factory):
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    assert [value.scenario for value in cover_schema_iter(ctx, {"type": "null"})] == [CoverageScenario.NULL_VALUE]
 
 
 @pytest.mark.parametrize(
@@ -3451,8 +4054,8 @@ def test_positive_object_omits_optional_property_whose_schema_requires_an_undecl
 # A float32-parsing server narrows the value; the boundary negative must still fall outside after narrowing.
 @pytest.mark.parametrize(
     ("keyword", "bound"),
-    [("maximum", 1e10), ("minimum", -1e10), ("maximum", 10000000000)],
-    ids=["maximum", "minimum", "integer-spelled-maximum"],
+    [("maximum", 1e10), ("minimum", -1e10), ("maximum", 10000000000), ("maximum", 20000000.0)],
+    ids=["maximum", "minimum", "integer-spelled-maximum", "float32-spacing-two"],
 )
 def test_negative_float_boundary_survives_float32_narrowing(nctx, keyword, bound):
     schema = {"type": "number", "format": "float", keyword: bound}
@@ -3462,6 +4065,25 @@ def test_negative_float_boundary_survives_float32_narrowing(nctx, keyword, bound
     for value in values:
         narrowed = to_float32(float(value))
         assert narrowed > to_float32(bound) if keyword == "maximum" else narrowed < to_float32(bound), value
+
+
+# Integer bounds step to the next integer inside the type; no value lies past the largest finite float.
+@pytest.mark.parametrize(
+    ("schema", "above", "below"),
+    [
+        ({"type": ["integer", "null"], "maximum": 5.5, "minimum": 1.5}, [6], [1]),
+        ({"type": "integer", "maximum": 5.5, "minimum": 1.5}, [6], [1]),
+        ({"type": "number", "maximum": 2.5, "minimum": 0.5}, [3.5], [-0.5]),
+        ({"type": "number", "format": "float", "maximum": 1e10, "minimum": -1e10}, [10000001024.0], [-10000001024.0]),
+        ({"type": "number", "format": "float", "minimum": -3.4028234663852886e38}, [], []),
+        ({"type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308}, [], []),
+    ],
+    ids=["integer-union", "integer", "number", "float32", "float32-lowest", "float64-extremes"],
+)
+def test_negative_numeric_bound_values(ctx_factory, schema, above, below):
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE])
+    assert scenario_values(ctx, schema, CoverageScenario.VALUE_ABOVE_MAXIMUM) == above
+    assert scenario_values(ctx, schema, CoverageScenario.VALUE_BELOW_MINIMUM) == below
 
 
 # `minProperties` only constrains objects; a negative built without pinning the type may be a valid non-object.
@@ -4233,6 +4855,125 @@ def test_repeated_object_elements_are_independent(pctx):
     for array in arrays:
         array[0]["name"] = "edited"
         assert array[1]["name"] != "edited", array[:2]
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        ({"type": "array", "contains": {"const": 1}, "minContains": 2}, [[1, 1], [1, 1, None]]),
+        ({"type": "array", "contains": {"const": 1}}, [[1]]),
+        ({"type": "array", "maxItems": 1}, [[], [None]]),
+        ({"type": "array", "maxItems": 2}, [[], [None, None], [None]]),
+        ({"type": "array", "minItems": 1, "maxItems": 2}, [[None], [None, None]]),
+        (
+            {"type": "array", "uniqueItems": True, "maxItems": 2, "items": {"enum": ["a", "b", "c"]}},
+            [["a"], [], ["a", "b"], ["b"], ["c"]],
+        ),
+        (
+            {"type": "array", "prefixItems": [{"const": "a"}], "items": {"type": "boolean"}, "maxItems": 2},
+            [["a", True], [], ["a", False], ["a"]],
+        ),
+    ],
+    ids=["min-contains", "contains", "max-one", "max-two", "min-max", "unique-enum", "prefix-items"],
+)
+def test_positive_array_values(ctx_factory, schema, expected):
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    assert cover_schema(ctx, schema) == expected
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (
+            {
+                "type": "object",
+                "properties": {"a": {"type": "null"}, "b": {"type": "null"}, "c": {"type": "null"}},
+                "minProperties": 1,
+            },
+            [{"a": None, "b": None, "c": None}, {"a": None}, {"b": None}, {"c": None}, {"a": None, "b": None}],
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"b": {"type": "boolean"}, "a": {"type": "boolean"}},
+                "required": ["a"],
+                "maxProperties": 1,
+            },
+            [{"a": False}, {"a": True}],
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"a": {"type": "boolean"}},
+                "examples": [{"a": True}],
+                "default": {"a": True},
+            },
+            [{"a": True}, {}, {"a": False}],
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"a": {"type": "boolean"}},
+                "required": ["a"],
+                "maxProperties": 1,
+                "additionalProperties": {"type": "null"},
+            },
+            [{"a": False}, {"a": True}],
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"b": {"type": "boolean"}, "a": {"type": "boolean"}},
+                "propertyNames": {"pattern": "^a$"},
+            },
+            [{}, {"a": True}, {"a": False}],
+        ),
+    ],
+    ids=["min-properties", "max-properties", "default-among-examples", "no-room-for-additional", "property-names"],
+)
+def test_positive_object_values(ctx_factory, schema, expected):
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    assert cover_schema(ctx, schema) == expected
+
+
+# A property's hints seed the object template only when they satisfy the property's own format.
+@pytest.mark.parametrize(
+    ("property_schema", "expected"),
+    [
+        ({"type": "string", "example": "ex", "default": "d"}, "ex"),
+        ({"type": "string", "default": "d"}, "d"),
+        ({"type": "string", "examples": ["e1", "e2"]}, "e1"),
+        ({"type": "string", "format": "date", "default": "nope", "examples": ["bad", "2020-01-02"]}, "2020-01-02"),
+        ({"type": "string", "format": "date", "example": "nope"}, "2000-01-01"),
+        ({"type": "string", "format": "date", "default": "nope"}, "2000-01-01"),
+        ({"type": "string", "format": "date", "examples": ["nope"]}, "2000-01-01"),
+        ({"type": "object", "properties": {"b": {"type": "integer"}}}, {"b": 0}),
+        ({"properties": {"b": {"type": "integer"}, "c": {"not": {}}}}, {"b": 0}),
+    ],
+    ids=[
+        "example",
+        "default",
+        "examples",
+        "valid-example-among-invalid",
+        "invalid-example",
+        "invalid-default",
+        "invalid-examples",
+        "nested-object",
+        "implied-object",
+    ],
+)
+def test_positive_object_template_from_property_hints(ctx_factory, property_schema, expected):
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    schema = {"type": "object", "properties": {"a": property_schema}, "required": ["a"]}
+    assert next(cover_schema_iter(ctx, schema)).value == {"a": expected}
 
 
 def test_unique_items_array_is_not_filled_by_repetition(pctx):

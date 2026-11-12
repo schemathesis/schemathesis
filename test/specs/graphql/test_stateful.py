@@ -91,7 +91,7 @@ def test_stateful_consumers_mostly_target_created_resources(ctx, cli):
         "-c",
         "not_a_server_error",
     )
-    assert updates["existing"] / (updates["existing"] + updates["unknown"]) > 0.7, updates
+    assert updates["unknown"] > 0 and updates["existing"] / (updates["existing"] + updates["unknown"]) > 0.7, updates
 
 
 def test_stateful_feeds_ids_captured_through_mutation_payloads(ctx, cli):

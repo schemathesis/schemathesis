@@ -44,6 +44,7 @@ type Author {
 input OrderInput {
   currency: String!
   quantity: Int!
+  tags: [String!]
 }
 
 type Order {
@@ -60,6 +61,7 @@ type Query {
 
 type Mutation {
   createOrder(input: OrderInput!): Order!
+  rateOrder(score: Float!): Order!
 }
 """
 
@@ -300,6 +302,97 @@ def substitute(schema, query, *, root="Query", field="bookByTitle"):
 )
 def test_substitution_across_selection_shapes(ctx, query, expected):
     assert [draw.value for draw in substitute(load(ctx, TITLE_BINDING), query)] == expected
+
+
+def _draw(dictionary, value, parameter_name, body_path, *, entry_index=0, source_kind="values", source_path=None):
+    return DictionaryDraw(
+        dictionary=dictionary,
+        source_kind=source_kind,
+        source_path=source_path,
+        entry_index=entry_index,
+        operation_label="Mutation.createOrder",
+        parameter_location="body",
+        parameter_name=parameter_name,
+        value=value,
+        matches_schema=True,
+        body_path=body_path,
+    )
+
+
+def substitute_printed(ctx, config, query, *, root="Mutation", field="createOrder"):
+    schema = load(ctx, config)
+    operation = schema[root][field]
+    node, draws = substitute_dictionaries(
+        operation_node=graphql.parse(query).definitions[0],
+        client_schema=schema.client_schema,
+        bindings=resolve_bindings(operation, schema.config.generation_for(operation=operation, phase="fuzzing")),
+        operation_label=operation.label,
+        random=random.Random(0),
+    )
+    return graphql.print_ast(node), draws
+
+
+def test_substitution_fills_list_elements_inside_input_objects(ctx, tmp_path):
+    tags = tmp_path / "tags.dict"
+    tags.write_text('"sale"\n')
+    config = {
+        "dictionaries": {"tags": {"from-file": str(tags)}, "quantities": {"values": [5, 2**31]}},
+        "parameters": {
+            "Mutation.createOrder.input.tags[*]": {"dictionary": "tags"},
+            "Mutation.createOrder.input.quantity": {"dictionary": "quantities"},
+        },
+    }
+    query = (
+        'mutation { ... on Mutation { createOrder(input: {currency: "x", quantity: 1}) { id } } __typename '
+        'createOrder(input: {currency: "x", quantity: 1, tags: ["a", "b"]}) { id } }'
+    )
+    printed, draws = substitute_printed(ctx, config, query)
+    assert printed == graphql.print_ast(
+        graphql.parse(
+            'mutation { ... on Mutation { createOrder(input: {currency: "x", quantity: 1}) { id } } __typename '
+            'createOrder(input: {currency: "x", quantity: 5, tags: ["sale", "sale"]}) { id } }'
+        )
+    )
+    file_draw = _draw("tags", "sale", "tags", "/createOrder/input/tags", source_kind="from-file", source_path=str(tags))
+    assert draws == [
+        _draw("quantities", 5, "quantity", "/createOrder/input/quantity"),
+        file_draw,
+        file_draw,
+    ]
+
+
+@pytest.mark.parametrize(
+    ("config", "query", "field"),
+    [
+        (
+            {
+                "dictionaries": {"currencies": {"values": ["USD"]}},
+                "parameters": {"Mutation.createOrder.input.currency": {"dictionary": "currencies"}},
+            },
+            "mutation { createOrder(input: null) { id } }",
+            "createOrder",
+        ),
+        (
+            {
+                "dictionaries": {"tags": {"values": ["sale"]}},
+                "parameters": {"Mutation.createOrder.input.tags[*]": {"dictionary": "tags"}},
+            },
+            'mutation { createOrder(input: {currency: "x", quantity: 1, tags: null}) { id } }',
+            "createOrder",
+        ),
+        (
+            {
+                "dictionaries": {"scores": {"values": [10**400]}},
+                "parameters": {"Mutation.rateOrder.score": {"dictionary": "scores"}},
+            },
+            "mutation { rateOrder(score: 1.0) { id } }",
+            "rateOrder",
+        ),
+    ],
+    ids=["null-input-object", "null-list", "float-overflowing-entry"],
+)
+def test_substitution_keeps_literals_without_a_fitting_entry(ctx, config, query, field):
+    assert substitute_printed(ctx, config, query, field=field) == (graphql.print_ast(graphql.parse(query)), [])
 
 
 @pytest.mark.hypothesis_nested
