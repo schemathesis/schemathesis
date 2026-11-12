@@ -14,7 +14,7 @@ from urllib.parse import unquote
 import jsonschema_rs
 
 from schemathesis.config import GenerationConfig
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.adapter import OperationParameter
 from schemathesis.core.errors import InvalidSchema, RefResolutionError, unresolvable_reference
 from schemathesis.core.file_samples import iter_media_type_file_samples
@@ -1803,10 +1803,7 @@ class OpenApiBody(OpenApiComponent):
     def get_property_content_types(self, property_name: str) -> list[str]:
         """Get media types a form property declares via `encoding.contentType`."""
         encoding = self.definition.get("encoding", {})
-        raw = encoding.get(property_name, {}).get("contentType")
-        # A string may list several media types separated by commas.
-        items = raw.split(",") if isinstance(raw, str) else raw if isinstance(raw, list) else []
-        return [item.strip() for item in items if isinstance(item, str) and item.strip()]
+        return media_types.parse_list(encoding.get(property_name, {}).get("contentType"))
 
     def iter_file_samples(self, media_type: str) -> Iterator[tuple[str, bytes]]:
         """Concrete media types for a raw-file body sent as `media_type`, with a file of each format."""

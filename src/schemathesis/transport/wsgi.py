@@ -291,11 +291,11 @@ def _to_werkzeug_parts(files: list | None, data: dict[str, Any] | None) -> dict[
     return parts
 
 
-def _serialize_non_object_multipart(value: Body) -> dict[str, Any]:
-    # A raw payload is sent verbatim; other values are wrapped into a single part
+def _serialize_non_object_multipart(ctx: SerializationContext, value: Body) -> dict[str, Any]:
+    # A raw payload is sent verbatim; other values are encoded into parts
     if value is None or isinstance(value, (str, bytes)):
         return {"data": value}
-    raw_data, content_type = encode_non_object_multipart(value)
+    raw_data, content_type = encode_non_object_multipart(ctx, value)
     return {"data": raw_data, "content_type": content_type}
 
 
@@ -303,7 +303,7 @@ def _serialize_non_object_multipart(value: Body) -> dict[str, Any]:
 def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     if isinstance(value, dict):
         return _serialize_multipart_parts(ctx, value)
-    return _serialize_non_object_multipart(value)
+    return _serialize_non_object_multipart(ctx, value)
 
 
 def _serialize_multipart_parts(ctx: SerializationContext, value: dict[str, Any]) -> dict[str, Any]:

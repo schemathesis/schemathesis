@@ -859,6 +859,146 @@ def test_multipart_part_encoded_with_its_content_type(
     assert case.call().json() == expected
 
 
+@pytest.mark.parametrize("transport", ["wsgi", "http"])
+@pytest.mark.parametrize(
+    ("version", "media_type_object", "body", "expected"),
+    [
+        (
+            "3.2.0",
+            {
+                "schema": {"type": "array", "prefixItems": [{"type": "object"}, {}], "items": {"type": "string"}},
+                "prefixEncoding": [{}, {"contentType": "image/png"}],
+                "itemEncoding": {"contentType": "text/csv"},
+            },
+            [{"author": "x"}, b"PNG", "a,b", "c,d"],
+            [
+                [None, "application/json", '{"author": "x"}'],
+                [None, "image/png", "PNG"],
+                [None, "text/csv", "a,b"],
+                [None, "text/csv", "c,d"],
+            ],
+        ),
+        (
+            "3.2.0",
+            {
+                "schema": {
+                    "type": "array",
+                    "prefixItems": [
+                        {"type": "array"},
+                        {"type": "array", "prefixItems": [{"$ref": "#/components/schemas/Item"}, {"type": "string"}]},
+                    ],
+                },
+                "prefixEncoding": [
+                    {},
+                    {
+                        "contentType": "multipart/mixed",
+                        "prefixEncoding": [{"contentType": "application/xml"}, {}, {"contentType": "image/png"}],
+                    },
+                ],
+            },
+            [[1], [{"x": "1"}, "text", b"PNG"]],
+            [
+                [None, "application/json", "[1]"],
+                [
+                    None,
+                    "multipart/mixed",
+                    [
+                        [None, "application/xml", "<item><x>1</x></item>"],
+                        [None, "text/plain", "text"],
+                        [None, "image/png", "PNG"],
+                    ],
+                ],
+            ],
+        ),
+        (
+            "3.1.0",
+            {
+                "schema": {
+                    "type": "array",
+                    "prefixItems": [
+                        {"type": "string"},
+                        {"type": "integer"},
+                        {"type": "array"},
+                        {"type": "string", "contentEncoding": "base64"},
+                        {"type": "string", "format": "binary"},
+                        {"anyOf": [{"type": "object"}, {"type": "null"}]},
+                        {"allOf": [{"$ref": "#/components/schemas/Item"}]},
+                        {"anyOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "null"}]},
+                    ],
+                }
+            },
+            ["text", 5, [1, 2], "aGk=", b"bin", {"a": 1}, {"x": "1"}, [3], b"raw"],
+            [
+                [None, "text/plain", "text"],
+                [None, "text/plain", "5"],
+                [None, "application/json", "[1, 2]"],
+                [None, "application/octet-stream", "aGk="],
+                [None, "application/octet-stream", "bin"],
+                [None, "application/json", '{"a": 1}'],
+                [None, "application/json", '{"x": "1"}'],
+                [None, "application/json", "[3]"],
+                [None, "application/octet-stream", "raw"],
+            ],
+        ),
+        (
+            "3.0.2",
+            {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Item"}}},
+            [{"x": "1"}, {"x": "2"}],
+            [[None, "application/json", '{"x": "1"}'], [None, "application/json", '{"x": "2"}']],
+        ),
+    ],
+    ids=["by-position", "nested", "defaults", "ref-items"],
+)
+def test_multipart_mixed_array_items_are_unnamed_parts(
+    ctx, app_runner, transport, version, media_type_object, body, expected
+):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"multipart/mixed": media_type_object}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+        components={"schemas": {"Item": {"type": "object", "xml": {"name": "item"}}}},
+    )
+
+    @app.route("/upload", methods=["POST"])
+    def upload():
+        header = f"Content-Type: {request.content_type}\r\n\r\n".encode()
+        message = BytesParser(policy=HTTP).parsebytes(header + request.get_data())
+        return jsonify([request.mimetype, [_received_part(part) for part in message.iter_parts()]])
+
+    if transport == "wsgi":
+        loaded = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    else:
+        loaded = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    case = loaded["/upload"]["POST"].Case(body=body, media_type="multipart/mixed")
+    assert case.call().json() == ["multipart/mixed", expected]
+
+
+def test_multipart_mixed_array_body_for_undeclared_media_type(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {"content": {"application/json": {"schema": {}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(body=[{"a": 1}, "x"], media_type="multipart/mixed")
+    kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
+    boundary = kwargs["headers"]["Content-Type"].removeprefix("multipart/mixed; boundary=")
+    assert (
+        kwargs["data"]
+        == (
+            f'--{boundary}\r\nContent-Type: application/octet-stream\r\n\r\n{{"a": 1}}\r\n'
+            f"--{boundary}\r\nContent-Type: application/octet-stream\r\n\r\nx\r\n--{boundary}--\r\n"
+        ).encode()
+    )
+
+
 def test_multipart_array_part_items_need_a_serializer(ctx):
     operation = ctx.openapi.load_operation(
         "POST /upload",
