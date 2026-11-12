@@ -34,7 +34,6 @@ from schemathesis.core.jsonschema.types import JsonSchema, JsonValue, as_object_
 from schemathesis.core.media_types import (
     FORM_MEDIA_TYPES,
     find_media_type_strategy,
-    iter_matching_media_type_strategies,
 )
 from schemathesis.core.mutations import MutationMetadata
 from schemathesis.core.parameters import ParameterLocation
@@ -614,11 +613,11 @@ def _build_form_strategy_with_encoding(
         if content_types:
             if generation_mode.is_negative and is_binary_format(properties[property_name]):
                 continue
-            strategies_for_types = []
-            for ct in content_types:
-                for media_type, strategy in iter_matching_media_type_strategies(ct):
-                    # Pair strategy with its content type so we know which was selected
-                    strategies_for_types.append(st.tuples(st.just(media_type), strategy))
+            # Pair strategy with its content type so we know which was selected
+            strategies_for_types = [
+                st.tuples(st.just(media_type), strategy)
+                for media_type, strategy in parameter.iter_property_media_type_strategies(property_name)
+            ]
 
             if strategies_for_types:
                 # Store strategy that returns (content_type, data) tuple

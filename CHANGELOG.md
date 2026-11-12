@@ -35,6 +35,7 @@
 - Coverage phase sending no valid body when `oneOf` branches overlap, e.g. `integer` and `number`.
 - Dictionary bindings on `[*]` paths repeating entries in `uniqueItems` arrays. [#6027](https://github.com/schemathesis/schemathesis/issues/6027)
 - Dictionary bindings on body paths ignoring constraints outside the bound field, e.g. `contains` or `enum`.
+- Custom media type strategies for array multipart fields sending one part without a filename. [#6057](https://github.com/schemathesis/schemathesis/issues/6057)
 
 #### Checks and response validation
 

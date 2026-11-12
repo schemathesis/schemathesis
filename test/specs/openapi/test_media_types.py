@@ -411,3 +411,57 @@ def test_multipart_encoding_required_body_parameter_coverage(ctx):
     }
     cases = _pdf_upload_coverage_cases(ctx, PDF_MULTIPART, [count], [GenerationMode.POSITIVE])
     assert {case.query["count"] for case in cases} == {"1", "2", "9", "10"}
+
+
+PDF_ARRAY_MULTIPART = {
+    "multipart/form-data": {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "array",
+                    "items": {"type": "string", "format": "binary"},
+                    "minItems": 2,
+                    "maxItems": 3,
+                }
+            },
+            "required": ["files"],
+        },
+        "encoding": {"files": {"contentType": "application/pdf"}},
+    },
+}
+
+
+def assert_sent_as_pdf_files(case):
+    files = case.body["files"]
+    assert isinstance(files, list)
+    assert 2 <= len(files) <= 3
+    parts = case.as_transport_kwargs(base_url="http://127.0.0.1")["files"]
+    # Each item is a file part with a filename
+    assert [part for part in parts if part[0] == "files"] == [
+        ("files", ("files.pdf", b"%PDF-1.4", "application/pdf"))
+    ] * len(files)
+
+
+def test_multipart_encoding_with_custom_strategy_for_array_fuzzing_phase(ctx):
+    # GH-6057: every array item is a file part, not one part holding the strategy's single draw
+    schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {"content": PDF_ARRAY_MULTIPART, "required": True},
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+
+    @run_given(operation.as_strategy(), max_examples=100)
+    def test(case):
+        assert_sent_as_pdf_files(case)
+
+
+def test_multipart_encoding_with_custom_strategy_for_array_in_coverage_phase(ctx):
+    # GH-6057
+    cases = _pdf_upload_coverage_cases(ctx, PDF_ARRAY_MULTIPART, [], [GenerationMode.POSITIVE])
+    assert cases
+    for case in cases:
+        assert_sent_as_pdf_files(case)

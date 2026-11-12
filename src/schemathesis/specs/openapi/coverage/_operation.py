@@ -656,12 +656,10 @@ def _generate_multipart_body_from_custom_strategies(
     content_types: dict[str, str] = {}
 
     for prop_name in properties:
-        for ct in body.get_property_content_types(prop_name):
-            match = next(iter_matching_media_type_strategies(ct), None)
-            if match is not None:
-                content_types[prop_name], strategy = match
-                result[prop_name] = examples.generate_one(strategy)
-                break
+        match = next(body.iter_property_media_type_strategies(prop_name), None)
+        if match is not None:
+            content_types[prop_name], strategy = match
+            result[prop_name] = examples.generate_one(strategy)
 
     if not content_types:
         return None

@@ -34,7 +34,7 @@ from schemathesis.core.jsonschema import (
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, as_object_schema, get_type
-from schemathesis.core.media_types import FORM_MEDIA_TYPES
+from schemathesis.core.media_types import FORM_MEDIA_TYPES, iter_matching_media_type_strategies
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation, SkippedParameter
 from schemathesis.core.transforms import deepclone, format_body_path, jsonify_python_specific_types
 from schemathesis.core.validation import check_header_name
@@ -1603,6 +1603,18 @@ class RequestBodySchemaCache:
         return schema
 
 
+def _array_part_count(property_schema: object) -> tuple[int, int | None] | None:
+    """Bounds on the number of parts an array form property is sent as, or `None` when it is not an array."""
+    if not isinstance(property_schema, dict) or property_schema.get("type") != "array":
+        return None
+    min_items = property_schema.get("minItems")
+    max_items = property_schema.get("maxItems")
+    # An empty array sends no part at all, which reads as a missing field.
+    min_size = max(min_items, 1) if isinstance(min_items, int) else 1
+    max_size = max(max_items, min_size) if isinstance(max_items, int) else None
+    return min_size, max_size
+
+
 @dataclass
 class OpenApiBody(OpenApiComponent):
     """OpenAPI request body."""
@@ -1779,6 +1791,25 @@ class OpenApiBody(OpenApiComponent):
         # A string may list several media types separated by commas.
         items = raw.split(",") if isinstance(raw, str) else raw if isinstance(raw, list) else []
         return [item.strip() for item in items if isinstance(item, str) and item.strip()]
+
+    def iter_property_media_type_strategies(self, property_name: str) -> Iterator[tuple[str, st.SearchStrategy]]:
+        """Registered strategies for the media types a form property declares, with the media type each one matched.
+
+        An array property gets lists of the strategy's values, so each item is sent as its own part.
+        """
+        from hypothesis import strategies as st
+
+        content_types = self.get_property_content_types(property_name)
+        if not content_types:
+            return
+        part_count = _array_part_count(self.form_properties.get(property_name))
+        for content_type in content_types:
+            for media_type, strategy in iter_matching_media_type_strategies(content_type):
+                if part_count is None:
+                    yield media_type, strategy
+                else:
+                    min_size, max_size = part_count
+                    yield media_type, st.lists(strategy, min_size=min_size, max_size=max_size)
 
     def iter_file_samples(self, media_type: str) -> Iterator[tuple[str, bytes]]:
         """Concrete media types for a raw-file body sent as `media_type`, with a file of each format."""
