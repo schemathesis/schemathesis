@@ -12,9 +12,9 @@ Schemathesis records every failing case to disk during a run. `st replay` re-sen
 
 ## Recording happens automatically
 
-When `st run` or `st fuzz` finds a failing case, it writes that case to a crash file under the project cache directory - `.schemathesis/<project-slug>/cache/crashes/` by default, where the slug is `default` unless your config names the project. Set `cache.directory` in `schemathesis.toml` to move it. No flag turns recording on.
+When `st run` or `st fuzz` finds a failing case, it writes that case to a crash file under the project cache directory - `.schemathesis/<project-slug>/cache/crashes/` by default, where the slug is `default` unless your config names the project. Each schema location gets its own subdirectory there, so runs against different APIs from one directory keep their crashes apart. Set `cache.directory` in `schemathesis.toml` to move it. No flag turns recording on.
 
-A single case that broke several checks becomes one crash file per check, all sharing the same case ID. A later run that finds the same failure replaces the file with its own case; `st replay` still accepts case IDs from up to 20 earlier runs. Each crash also stores the schema location and base URL from the run, so replay can reload the schema on its own. Crash files for operations that pass on a later run are removed.
+A single case that broke several checks becomes one crash file per check, all sharing the same case ID. A later run that finds the same failure replaces the file with its own case; `st replay` still accepts case IDs from up to 20 earlier runs. Each crash also stores the schema location and base URL from the run, so replay can reload the schema on its own. Crash files for operations that pass on a later run against the same schema are removed.
 
 !!! tip "Add it to `.gitignore`"
     Crash files live alongside the rest of the per-project cache. Ignore `.schemathesis/` unless you deliberately want to share captured failures.
@@ -30,7 +30,7 @@ uvx schemathesis replay
 Every case gets a one-line status; the ones that still fail are detailed below under `FAILURES`, exactly as `st run` reports them:
 
 ```
-Replaying 2 cases from .schemathesis/default/cache/crashes
+Replaying 2 cases from .schemathesis/default/cache/crashes/3f2a9c1b07de
 
   + FIXED  GET /users
   x FAILED POST /orders
@@ -109,7 +109,7 @@ Reproduce with:
 You can also point at a single crash file or a directory of them:
 
 ```bash
-uvx schemathesis replay .schemathesis/default/cache/crashes/POST_orders_not_a_server_error_c64d116c.json
+uvx schemathesis replay .schemathesis/default/cache/crashes/3f2a9c1b07de/POST_orders_not_a_server_error_c64d116c.json
 ```
 
 ## Replay against a different environment

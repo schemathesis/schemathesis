@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from queue import Queue
 
+import pytest
 from flask import jsonify, request
 
 from schemathesis.cli.commands.run.handlers.crashes import (
@@ -69,8 +70,7 @@ def test_passing_scenario_does_not_delete_failing_crash(case_factory, response_f
 
     _drive(queue, crashes_dir)
 
-    files = [f for f in crashes_dir.iterdir() if f.name != MANIFEST_FILENAME]
-    assert len(files) == 1
+    assert len(_crash_files(crashes_dir)) == 1
 
 
 def test_fuzz_crash_records_real_operation_not_phase_label(case_factory, response_factory, tmp_path):
@@ -81,7 +81,8 @@ def test_fuzz_crash_records_real_operation_not_phase_label(case_factory, respons
 
     _drive(queue, crashes_dir)
 
-    crash = json.loads(next(f for f in crashes_dir.iterdir() if f.name != MANIFEST_FILENAME).read_text())
+    (crash_file,) = _crash_files(crashes_dir)
+    crash = json.loads(crash_file.read_text())
     assert crash["operation"] == "GET /users"
 
 
@@ -94,20 +95,39 @@ def test_passing_operation_removes_only_stale_crash(case_factory, response_facto
     )
     writer_queue.put(None)
     _drive(writer_queue, crashes_dir)
-    assert [f for f in crashes_dir.iterdir() if f.name != MANIFEST_FILENAME]
+    assert _crash_files(crashes_dir)
 
     heal_queue: Queue = Queue()
     heal_queue.put(_Process(recorder=_passing_recorder(case_factory, label="GET /users"), success=True))
     heal_queue.put(None)
     _drive(heal_queue, crashes_dir)
 
-    assert not [f for f in crashes_dir.iterdir() if f.name != MANIFEST_FILENAME]
+    assert not _crash_files(crashes_dir)
 
 
 def _crash_files(directory: Path) -> list[Path]:
     if not directory.exists():
         return []
-    return [path for path in directory.iterdir() if path.suffix == ".json" and path.name != MANIFEST_FILENAME]
+    return [path for path in directory.rglob("*.json") if path.name != MANIFEST_FILENAME]
+
+
+@pytest.mark.parametrize("same_schema", [True, False], ids=["same-schema", "another-schema"])
+def test_run_moves_crash_files_of_older_versions_into_its_schema_directory(cli, ctx, tmp_path, same_schema):
+    schema_url = ctx.openapi.apps.failure().schema_url
+    cli.run(schema_url, "--max-examples=1", "--phases=fuzzing")
+    crashes = crash_cache_dir(tmp_path)
+    (schema_directory,) = [path for path in crashes.iterdir() if path.is_dir()]
+    # Older versions kept crash files directly in the crashes directory.
+    for path in schema_directory.iterdir():
+        path.rename(crashes / path.name)
+    schema_directory.rmdir()
+    flat = sorted(path.name for path in crashes.glob("*.json"))
+
+    cli.run(
+        schema_url if same_schema else ctx.openapi.apps.success().schema_url, "--max-examples=1", "--phases=fuzzing"
+    )
+
+    assert sorted(path.name for path in crashes.glob("*.json")) == ([] if same_schema else flat)
 
 
 def test_crash_file_written_on_failure(cli, ctx, tmp_path):

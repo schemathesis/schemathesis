@@ -1,0 +1,25 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from <PLACEHOLDER>
+
+  x FAILED GET /api/failure
+
+=================================== FAILURES ===================================
+_______________________________ GET /api/failure _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- ST101 Server error
+
+[500] Internal Server Error:
+
+    `500: Internal Server Error`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+============================== 1 failed in 1.00s ===============================

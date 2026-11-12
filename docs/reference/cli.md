@@ -887,7 +887,7 @@ $ st replay [OPTIONS] [PATH]
     ```console
     $ st replay
     $ st replay Xt9Kp2
-    $ st replay .schemathesis/myapi/cache/crashes/abc123.json
+    $ st replay .schemathesis/myapi/cache/crashes/3f2a9c1b07de/abc123.json
     ```
 
 ### Options

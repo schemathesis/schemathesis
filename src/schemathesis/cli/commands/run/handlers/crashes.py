@@ -11,7 +11,12 @@ from schemathesis.cli.events import LoadingFinished
 from schemathesis.core.cache.io import effective_directory
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import RecordedScenario
-from schemathesis.reporting.crashes import CrashWriter, build_crashes_from_recorder
+from schemathesis.reporting.crashes import (
+    CrashWriter,
+    adopt_flat_crashes,
+    build_crashes_from_recorder,
+    schema_crash_directory,
+)
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
@@ -72,7 +77,9 @@ def _run(
     queue: Queue[_Process | None],
 ) -> None:
     try:
-        writer = CrashWriter(directory=directory)
+        schema_directory = schema_crash_directory(directory, schema_location)
+        adopt_flat_crashes(directory, schema_directory, schema_location)
+        writer = CrashWriter(directory=schema_directory)
         writer.open(schema_location=schema_location, base_url=base_url, tls_verify=tls_verify)
 
         failed: set[str] = set()
