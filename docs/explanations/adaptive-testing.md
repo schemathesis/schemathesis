@@ -67,7 +67,7 @@ This switches off constraint learning for the whole run, not only for the fuzzin
 
 ## Carrying observations between runs
 
-Schemathesis keeps a per-project [cache](../reference/configuration.md#cache) of discoveries: rejected requests that produced error-feedback observations, operations that need authentication beyond what the spec declares, and operations that return `405 Method Not Allowed`. On the next run it replays the cached requests during probing and keeps the observations the server still confirms, so learned constraints apply from the start of the run. The CLI shows how many requests were replayed in the `Cache:` row. Disable the cache with `cache.enabled = false`, or delete its directory to start from scratch.
+Schemathesis keeps a per-project [cache](../reference/configuration.md#cache) of discoveries: rejected requests that produced error-feedback observations, operations that need authentication beyond what the spec declares, and operations that return `405 Method Not Allowed`. On the next run it replays the cached requests during setup and keeps the observations the server still confirms, so learned constraints apply from the start of the run. The CLI shows how many requests were replayed in the `Cache:` row. Disable the cache with `cache.enabled = false`, or delete its directory to start from scratch.
 
 ## Related
 

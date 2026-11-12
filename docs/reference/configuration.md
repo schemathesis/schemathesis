@@ -504,7 +504,7 @@ Rules:
 
 ### Cache
 
-Schemathesis caches discoveries that survive across runs — error-feedback observations parsed from 4xx bodies, operations that require authentication beyond what the spec declares, and operations that consistently return `405 Method Not Allowed`. On startup the cache is replayed during the probing phase so subsequent phases skip rediscovery.
+Schemathesis caches discoveries that survive across runs — error-feedback observations parsed from 4xx bodies, operations that require authentication beyond what the spec declares, and operations that consistently return `405 Method Not Allowed`. On startup the cache is replayed during the setup phase so subsequent phases skip rediscovery.
 
 The cache lives at `.schemathesis/<project-slug>/cache/` in the working directory by default. The directory is created on first write; consider adding it to `.gitignore`. The cache is advisory — any read/write failure degrades to a no-op for the run.
 

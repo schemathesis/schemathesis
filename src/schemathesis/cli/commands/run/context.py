@@ -52,8 +52,8 @@ class ExecutionContext(BaseExecutionContext):
             self.config = event.config
             collector.config = event.config
         super().on_event(event)
-        if isinstance(event, events.SchemaAnalysisWarnings):
-            collector.on_schema_warnings(event)
+        if isinstance(event, events.SetupWarnings):
+            collector.on_setup_warnings(event)
         elif isinstance(event, events.PhaseFinished):
             # A phase repeats under a time budget; a later pass that ran out of budget or was cut short
             # must not downgrade what an earlier one already found.
@@ -63,8 +63,9 @@ class ExecutionContext(BaseExecutionContext):
             if (
                 event.phase.is_enabled
                 and event.status in (Status.FAILURE, Status.ERROR)
-                # A failed sign-up leaves the run unauthenticated; the missing-auth warning reports its effect.
-                and event.phase.name is not PhaseName.AUTH_BOOTSTRAP
+                # Setup problems that should fail the run report their own error; a failed sign-up only leaves
+                # the run unauthenticated, and the missing-auth warning reports its effect.
+                and event.phase.name is not PhaseName.SETUP
             ):
                 self.exit_code = ExitCode.FAILURES
         elif isinstance(event, events.ScenarioFinished) and event.is_test_scenario:

@@ -155,8 +155,8 @@ def test_unreachable_api_does_not_narrow_generation(ctx, unreachable_url):
     )
     schema.config.update(base_url=unreachable_url)
     stream = EventStream(schema, phases=[PhaseName.EXAMPLES], request_timeout=0.3).execute()
-    probing = stream.find(events.PhaseFinished, phase=lambda phase: phase.name == PhaseName.PROBING)
-    assert [(type(run.probe), run.outcome) for run in probing.payload.ok().probes] == [
+    setup = stream.find(events.PhaseFinished, phase=lambda phase: phase.name == PhaseName.SETUP)
+    assert [(type(run.probe), run.outcome) for run in setup.payload.probes] == [
         (probes.NullByteInHeader, probes.ProbeOutcome.SKIP),
         (probes.UnsafePathDecoder, probes.ProbeOutcome.SKIP),
     ]

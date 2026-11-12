@@ -75,7 +75,7 @@ def test_analyze_phases_recorded(analyzer_ndjson):
     run = analyze(analyzer_ndjson)
     names = {phase.name for phase in run.phases}
     assert names >= {"coverage", "fuzzing"}
-    assert names.isdisjoint({"probing", "schema_analysis"})
+    assert "setup" not in names
     for phase in run.phases:
         assert phase.duration_seconds >= 0.0
         assert phase.truncated is False

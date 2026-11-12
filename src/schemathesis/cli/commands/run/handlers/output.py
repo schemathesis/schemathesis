@@ -43,7 +43,6 @@ from schemathesis.core import SpecificationFeature
 from schemathesis.core.failures import case_header, reason_phrase
 from schemathesis.core.output import format_response_payload, pluralize
 from schemathesis.core.output.sanitization import sanitized
-from schemathesis.core.result import Ok
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import StatusClass
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -581,11 +580,11 @@ def extraction_failure_steps(failure: ExtractionFailure) -> list[tuple[int, str]
 
 
 @dataclass(slots=True)
-class ProbingProgressManager(SpinnerProgressManager):
+class SetupProgressManager(SpinnerProgressManager):
     def __init__(self, console: Console) -> None:
         from rich.text import Text
 
-        SpinnerProgressManager.__init__(self, console, Text("Probing API capabilities", style="bright_white"))
+        SpinnerProgressManager.__init__(self, console, Text("Setting up", style="bright_white"))
 
     def get_completion_message(self) -> Text:
         """Generate completion message including duration."""
@@ -596,7 +595,7 @@ class ProbingProgressManager(SpinnerProgressManager):
         if self.is_interrupted:
             return Text.assemble(
                 ("⚡  ", Style(color="yellow")),
-                (f"API probing interrupted after {duration}", Style(color="white")),
+                (f"Setup interrupted after {duration}", Style(color="white")),
             )
         return Text.assemble(
             ("✅  ", Style(color="green")),
@@ -1008,7 +1007,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
     config: ProjectConfig
 
     loading_manager: LoadingProgressManager | None = None
-    probing_manager: ProbingProgressManager | None = None
+    setup_manager: SetupProgressManager | None = None
     unit_tests_manager: UnitTestProgressManager | None = None
     stateful_tests_manager: StatefulProgressManager | None = None
     # How many times each phase has started; under a time limit they repeat.
@@ -1074,8 +1073,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self.stateful_tests_manager.stop()
         if self.loading_manager is not None:
             self.loading_manager.stop()
-        if self.probing_manager is not None:
-            self.probing_manager.stop()
+        if self.setup_manager is not None:
+            self.setup_manager.stop()
 
     def _on_non_fatal_error(self, event: events.NonFatalError) -> None:
         from schemathesis.engine.errors import ServerUnavailable
@@ -1132,8 +1131,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
     def _on_phase_started(self, ctx: ExecutionContext, event: events.PhaseStarted) -> None:
         phase = event.phase
-        if phase.name == PhaseName.PROBING and phase.is_enabled:
-            self._start_probing()
+        if phase.name == PhaseName.SETUP and phase.is_enabled:
+            self._start_setup()
         elif phase.name in UNIT_PHASES and phase.is_enabled:
             self._start_unit_tests(ctx, event)
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
@@ -1208,9 +1207,9 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self.pending_coverage = None
             self._print_unit_completion(manager, self.repeat_statuses.pop(PhaseName.COVERAGE))
 
-    def _start_probing(self) -> None:
-        self.probing_manager = ProbingProgressManager(console=self.console)
-        self.probing_manager.start()
+    def _start_setup(self) -> None:
+        self.setup_manager = SetupProgressManager(console=self.console)
+        self.setup_manager.start()
 
     def _start_unit_tests(self, ctx: ExecutionContext, event: events.PhaseStarted) -> None:
         assert ctx.api_statistic is not None
@@ -1287,14 +1286,13 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
         phase = event.phase
 
-        if phase.name == PhaseName.PROBING:
-            assert self.probing_manager is not None
-            self.probing_manager.stop()
-            self.probing_manager = None
+        if phase.name == PhaseName.SETUP:
+            assert self.setup_manager is not None
+            self.setup_manager.stop()
+            self.setup_manager = None
 
-            if event.status == Status.SUCCESS:
-                assert isinstance(event.payload, Ok)
-                payload = event.payload.ok()
+            payload = event.payload
+            if payload is not None:
                 cache_row = _format_cache_row(payload.cache)
                 # Specifications without HTTP probes have nothing to report unless the cache does.
                 if payload.probes or cache_row is not None:
@@ -1336,14 +1334,11 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                     if table.row_count:
                         self.console.print(Indent(table))
                         self.console.print()
-        elif (
-            isinstance(event.payload, AuthBootstrapPayload)
-            and event.payload.spec is not None
-            # Users who supply credentials gain nothing from hearing that sign-up was skipped.
-            and event.status != Status.SKIP
-        ):
-            self.console.print(Indent(_auth_bootstrap_line(event.payload, event.payload.spec)))
-            self.console.print()
+                auth = payload.auth
+                # Users who supply credentials gain nothing from hearing that sign-up was skipped.
+                if auth is not None and auth.spec is not None and auth.status != Status.SKIP:
+                    self.console.print(Indent(_auth_bootstrap_line(auth, auth.spec)))
+                    self.console.print()
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and self.stateful_tests_manager is not None:
             manager = self.stateful_tests_manager
             self.stateful_tests_manager = None
@@ -1493,12 +1488,12 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             message = Indent(self.loading_manager.get_completion_message())
             self.console.print(message)
             self.console.print()
-        elif self.probing_manager is not None:
-            self.probing_manager.interrupt()
-            message = Indent(self.probing_manager.get_completion_message())
+        elif self.setup_manager is not None:
+            self.setup_manager.interrupt()
+            message = Indent(self.setup_manager.get_completion_message())
             self.console.print(message)
             self.console.print()
-            self.probing_manager = None
+            self.setup_manager = None
 
     def display_warnings(self, ctx: ExecutionContext) -> None:
         display_warning_blocks(warning_blocks(ctx))
@@ -1580,7 +1575,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         self._flush_coverage()
         self._stop_cycle_line()
         assert self.loading_manager is None
-        assert self.probing_manager is None
+        assert self.setup_manager is None
         assert self.unit_tests_manager is None
         assert self.stateful_tests_manager is None
         if ctx.errors:

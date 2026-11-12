@@ -459,7 +459,7 @@ def _clean_lines(data: str) -> str:
         # Rich Live progress widgets leave extra blank lines on non-TTY consoles;
         # collapse runs of consecutive blanks to one. Triggers on st fuzz output
         # (after "Stop reason:") and on the st run path where nothing was generated,
-        # where the probing progress doesn't clean up identically across platforms.
+        # where the setup progress doesn't clean up identically across platforms.
         lines = _collapse_blank_runs(lines)
     lines = clean_unit_tests(lines)
     lines = clean_stateful_tests(lines)
@@ -472,8 +472,8 @@ def clean_unit_tests(lines):
         if "API capabilities" in line:
             capabilities_idx = idx
             break
-        if "API probing" in line:
-            # No capability block follows; probing failed/skipped.
+        if "Setup interrupted" in line:
+            # No capability block follows; setup was interrupted.
             probing_idx = idx + 2
             break
     else:
