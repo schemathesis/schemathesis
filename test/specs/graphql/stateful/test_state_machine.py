@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import uuid
 
+import graphql
 import hypothesis
 import pytest
+import strawberry
 from hypothesis.stateful import RuleBasedStateMachine
 
 import schemathesis
 from schemathesis.core import INTERNAL_BUFFER_SIZE
 from schemathesis.core.errors import NoProducers
 from schemathesis.core.failures import FailureGroup
+from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful.state_machine import BundleStateMachine
 from schemathesis.specs.graphql.stateful import GraphQLStateMachine, create_state_machine
 from test.apps.catalog.graphql import bookstore
@@ -134,7 +138,7 @@ def test_cleanup_with_multiple_id_args_wires_secondary_bundles(ctx):
         ctx.graphql.load_sdl("""
             type Book { id: ID! }
             type Author { id: ID! }
-            type Query { _: Int }
+            type Query { pair(bookId: ID!, authorId: ID!): Boolean }
             type Mutation {
                 addBook(title: String!): Book!
                 addAuthor(name: String!): Author!
@@ -142,8 +146,21 @@ def test_cleanup_with_multiple_id_args_wires_secondary_bundles(ctx):
             }
         """)
     )
-    assert "Mutation_removeBookFromAuthor" in cls.__dict__
-    assert "Mutation_removeBookFromAuthor_double" in cls.__dict__
+    assert {
+        name: {
+            argument: (bundle.name, bundle.consume)
+            for argument, bundle in cls.__dict__[name].hypothesis_stateful_rule.arguments.items()
+            if argument != "data"
+        }
+        for name in ("Mutation_removeBookFromAuthor", "Mutation_removeBookFromAuthor_double", "Query_pair_on_deleted")
+    } == {
+        "Mutation_removeBookFromAuthor": {"bookId": ("Book_ids", True), "authorId": ("Author_ids", False)},
+        "Mutation_removeBookFromAuthor_double": {
+            "bookId": ("deleted_Book_ids", True),
+            "authorId": ("Author_ids", False),
+        },
+        "Query_pair_on_deleted": {"bookId": ("deleted_Book_ids", False), "authorId": ("Author_ids", False)},
+    }
 
 
 @pytest.mark.parametrize(
@@ -237,8 +254,12 @@ def test_init_raises_NoProducers_when_no_rules(ctx):
             type Mutation { _: Boolean }
         """)
     )
-    with pytest.raises(NoProducers, match="producer"):
+    with pytest.raises(NoProducers) as exc_info:
         cls()
+    assert str(exc_info.value) == (
+        "GraphQL stateful testing requires at least one producer mutation "
+        "(a mutation returning an Object type with an `id` field)."
+    )
 
 
 @pytest.mark.parametrize(
@@ -290,3 +311,153 @@ def test_saved_scenarios_are_kept_per_schema(ctx):
     assert keys == saved_example_keys(schemathesis.graphql.from_url(use_after_create).as_state_machine())
     use_after_delete = ctx.graphql.serve(bookstore.use_after_delete()).schema_url
     assert keys.isdisjoint(saved_example_keys(schemathesis.graphql.from_url(use_after_delete).as_state_machine()))
+
+
+@strawberry.type
+class _Book:
+    id: strawberry.ID
+    title: str
+
+
+@strawberry.type
+class _Project:
+    id: strawberry.ID
+    fullPath: str
+
+
+def _crud_with_non_id_handle() -> strawberry.Schema:
+    books: set[str] = set()
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def book(self, id: strawberry.ID) -> _Book | None:
+            return _Book(id=id, title="t") if id in books else None
+
+        @strawberry.field
+        def projects(self) -> list[_Project]:
+            return [_Project(id=strawberry.ID("1"), fullPath="acme/web")]
+
+    @strawberry.type
+    class Mutation:
+        @strawberry.mutation
+        def addBook(self, title: str) -> _Book:
+            book_id = str(uuid.uuid4())
+            books.add(book_id)
+            return _Book(id=strawberry.ID(book_id), title=title)
+
+        @strawberry.mutation
+        def deleteBook(self, id: strawberry.ID) -> bool:
+            books.discard(id)
+            return True
+
+        @strawberry.mutation
+        def moveIssue(self, projectPath: str) -> bool:
+            return False
+
+    return strawberry.Schema(Query, Mutation)
+
+
+def _selected_fields(case):
+    field = graphql.parse(case.body).definitions[0].selection_set.selections[0]
+    return {selection.name.value for selection in field.selection_set.selections}
+
+
+def test_every_rule_kind_records_its_parent_step_and_applies_hooks(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.from_schema(_crud_with_non_id_handle()).schema_url)
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+
+    @schema.hook
+    def map_headers(context, headers):
+        return {"X-Hook": "1"}
+
+    captured_fields = {"Mutation.addBook": "id", "Query.projects": "fullPath"}
+    steps = set()
+
+    class Recording(schema.as_state_machine()):
+        def after_call(self, response, case):
+            super().after_call(response, case)
+            node = self.recorder.cases[case.id]
+            transition = node.transition
+            if transition is None:
+                step = (captured_fields[case.operation.label] in _selected_fields(case),)
+            else:
+                parent = self.recorder.cases[node.parent_id].value
+                derived = self.control.statistic.get(parent.operation.label, {}).get(parent.id, {})
+                step = (
+                    transition.id,
+                    parent.operation.label,
+                    transition.parent_id == node.parent_id,
+                    transition.is_inferred,
+                    derived.get(case.operation.label, 0) > 0,
+                )
+            steps.add(
+                (case.operation.label, step, node.is_transition_applied, case.headers["X-Hook"], case.meta.phase.name)
+            )
+
+    Recording.run(
+        settings=hypothesis.settings(
+            max_examples=10,
+            deadline=None,
+            database=None,
+            derandomize=True,
+            phases=[hypothesis.Phase.generate],
+            suppress_health_check=list(hypothesis.HealthCheck),
+        )
+    )
+    assert steps == {
+        ("Mutation.addBook", (True,), False, "1", TestPhase.STATEFUL),
+        ("Query.projects", (True,), False, "1", TestPhase.STATEFUL),
+        ("Query.book", ("Query_book", "Mutation.addBook", True, False, True), True, "1", TestPhase.STATEFUL),
+        (
+            "Mutation.deleteBook",
+            ("Mutation_deleteBook", "Mutation.addBook", True, False, True),
+            True,
+            "1",
+            TestPhase.STATEFUL,
+        ),
+        (
+            "Query.book",
+            ("Query_book_on_deleted", "Mutation.deleteBook", True, False, False),
+            True,
+            "1",
+            TestPhase.STATEFUL,
+        ),
+        (
+            "Mutation.deleteBook",
+            ("Mutation_deleteBook_double", "Mutation.deleteBook", True, False, False),
+            True,
+            "1",
+            TestPhase.STATEFUL,
+        ),
+        (
+            "Mutation.moveIssue",
+            ("Mutation_moveIssue", "Query.projects", True, False, True),
+            True,
+            "1",
+            TestPhase.STATEFUL,
+        ),
+    }
+
+
+def test_rules_cover_every_handle_kind_and_skip_unseedable_consumers(ctx):
+    cls = create_state_machine(
+        ctx.graphql.load_sdl("""
+            type Book { id: ID! }
+            type Project { id: ID! fullPath: String! }
+            type Repo { id: ID! slug: String! }
+            type Query { repo(slug: String!): Repo }
+            type Mutation {
+                addBook(title: String!): Book!
+                createProject(name: String!): Project!
+                moveIssue(projectPath: String!): Boolean
+                starRepo(repoSlug: String!): Boolean
+            }
+        """)
+    )
+    assert sorted(name for name in cls.__dict__ if name.startswith(("Query_", "Mutation_"))) == [
+        "Mutation_addBook",
+        "Mutation_createProject",
+        "Mutation_createProject__fullPath",
+        "Mutation_moveIssue",
+    ]

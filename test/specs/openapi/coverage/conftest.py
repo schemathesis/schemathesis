@@ -15,6 +15,7 @@ def ctx_factory():
     def _factory(
         *,
         location: ParameterLocation = ParameterLocation.QUERY,
+        media_type: tuple[str, str] | None = None,
         generation_modes: list[GenerationMode] | None = None,
         is_required: bool = True,
         allow_extra_parameters: bool = True,
@@ -25,7 +26,7 @@ def ctx_factory():
         return CoverageContext(
             root_schema=root_schema or {},
             location=location,
-            media_type=None,
+            media_type=media_type,
             generation_modes=generation_modes,
             is_required=is_required,
             custom_formats=get_default_format_strategies(),

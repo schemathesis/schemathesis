@@ -150,6 +150,14 @@ _NO_PRODUCER = """
             [("Mutation.createNote", "Query.note"), ("Mutation.createNote", "Mutation.updateNote")],
         ),
         (_NO_PRODUCER, []),
+        (
+            """
+            type Book { id: ID! }
+            type Query { _: Int }
+            type Mutation { cloneBook(id: ID!): Book! addBook(title: String!): Book! }
+            """,
+            [("Mutation.addBook", "Mutation.cloneBook")],
+        ),
     ],
     ids=[
         "producer-to-reader",
@@ -163,6 +171,7 @@ _NO_PRODUCER = """
         "multi-word-envelope",
         "update-envelope-binds-to-resource",
         "no-producer-no-edges",
+        "producer-consuming-its-own-handle",
     ],
 )
 def test_transition_edges(ctx, sdl, expected_edges):
@@ -196,4 +205,17 @@ def test_readable_verb_prefixed_resource_keeps_its_id_handle(ctx):
     assert {summary.label: summary.consumed for summary in analysis.summaries} == {
         "Query.importJob": {"id": Handle("ImportJob", "id")},
         "Mutation.startImportJob": {},
+    }
+
+
+def test_bundle_sources_name_producers_of_alive_and_deleted_bundles(ctx):
+    transitions = ctx.graphql.load_sdl("""
+        type Project { id: ID! fullPath: String! }
+        type Query { projects: [Project!]! }
+        type Mutation { createProject(name: String!): Project! moveIssue(projectPath: String!): Boolean }
+    """).analysis.transitions
+    assert transitions.bundle_sources == {
+        "Project_ids": ["Mutation.createProject"],
+        "deleted_Project_ids": ["Mutation.createProject"],
+        "Project__fullPath": ["Query.projects", "Mutation.createProject"],
     }

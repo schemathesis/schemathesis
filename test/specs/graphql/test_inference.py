@@ -41,6 +41,7 @@ from schemathesis.specs.graphql.inference import OperationRole, RootType, classi
         ("customerUpdate", RootType.MUTATION, OperationRole.MUTATOR),
         ("orderDelete", RootType.MUTATION, OperationRole.CLEANUP),
         ("subscribe", RootType.MUTATION, OperationRole.MUTATOR),
+        ("xDelete", RootType.MUTATION, OperationRole.CLEANUP),
     ],
     ids=lambda v: v.name if isinstance(v, enum.Enum) else str(v),
 )

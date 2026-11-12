@@ -139,6 +139,15 @@ def _discover(sdl: str) -> set[Handle]:
             Handle("Project", "fullPath"),
             True,
         ),
+        (
+            """
+            type Project { id: ID! projectCode: String! }
+            type Query { project(code: String!): Project }
+            type Mutation { moveIssue(projectCode: String!): Boolean }
+            """,
+            Handle("Project", "projectCode"),
+            False,
+        ),
     ],
     ids=[
         "seedable-via-token-arg",
@@ -154,6 +163,7 @@ def _discover(sdl: str) -> set[Handle]:
         "dropped-mutation-result-envelope",
         "verb-prefixed-resource-kept",
         "seedable-via-mutation-payload",
+        "dropped-only-producer-requires-it-by-bare-name",
     ],
 )
 def test_discover_handles(sdl, handle, present):

@@ -12,6 +12,9 @@ type ProductConnection { edges: [ProductEdge!]! }
 type Brand { edges: [String!]! }
 type Bag { edges: [BagEdge!]! }
 type BagEdge { cursor: String }
+interface Node { id: ID! }
+type ThingEdge { node: Node }
+type ThingConnection { edges: [ThingEdge!]! }
 type Query { _: Boolean }
 """
 
@@ -23,8 +26,9 @@ type Query { _: Boolean }
         ("Product", None),
         ("Brand", None),
         ("Bag", None),
+        ("ThingConnection", None),
     ],
-    ids=["connection-yields-node", "plain-object", "edges-not-objects", "edges-without-node"],
+    ids=["connection-yields-node", "plain-object", "edges-not-objects", "edges-without-node", "interface-node"],
 )
 def test_relay_node_type(type_name, expected):
     node = relay_node_type(graphql.build_schema(_SDL).type_map[type_name])

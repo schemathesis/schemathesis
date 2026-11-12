@@ -25,6 +25,17 @@ def test_layers_partition_by_role(operations):
     ]
 
 
+def test_query_named_like_a_producer_stays_a_reader(ctx):
+    schema = ctx.graphql.load_sdl(
+        "type Book { id: ID! } type Query { createToken: String } type Mutation { addBook: Book }"
+    )
+    operations = [schema["Query"]["createToken"], schema["Mutation"]["addBook"]]
+    assert [[op.label for op in layer] for layer in compute_graphql_layers(operations)] == [
+        ["Mutation.addBook"],
+        ["Query.createToken"],
+    ]
+
+
 def test_empty_operations_returns_empty_list():
     assert compute_graphql_layers([]) == []
 

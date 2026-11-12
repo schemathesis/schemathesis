@@ -644,7 +644,12 @@ def _parse_graphql(query):
 
 
 _GRAPHQL_SCALAR_SCHEMA = graphql.build_schema(
-    "type Query { lookup(code: String): Boolean byNumber(n: Int): Boolean byRatio(r: Float): Boolean }"
+    "input Filter { code: String tags: [String] }"
+    " type Item { code(x: String): String }"
+    " union SearchResult = Item"
+    " type Query { lookup(code: String): Boolean byNumber(n: Int): Boolean byRatio(r: Float): Boolean"
+    " byId(id: ID): Boolean byTags(tags: [String]): Boolean byFilter(filter: Filter): Boolean"
+    " search: SearchResult }"
 )
 
 
@@ -703,6 +708,68 @@ def test_graphql_float_scalar_rejects_overflowing_integer_constant():
         probability=1.0,
     )
     assert draws == []
+
+
+def _substitute_graphql_constants(query, pool):
+    operation, draws = substitute_constants(
+        operation_node=_parse_graphql(query),
+        client_schema=_GRAPHQL_SCALAR_SCHEMA,
+        pool=pool,
+        random=random.Random(0),
+        probability=1.0,
+    )
+    return graphql.print_ast(operation), draws
+
+
+def test_graphql_constants_fill_list_elements_and_input_fields():
+    assert _substitute_graphql_constants(
+        '{ ... on Query { lookup(code: "f") } __typename byTags(tags: ["a", "b"]) '
+        'byFilter(filter: {code: "c", tags: ["d"]}) search { ... on Item { code } } }',
+        _source("string", "S"),
+    ) == (
+        graphql.print_ast(
+            _parse_graphql(
+                '{ ... on Query { lookup(code: "f") } __typename byTags(tags: ["S", "S"]) '
+                'byFilter(filter: {code: "S", tags: ["S"]}) search { ... on Item { code } } }'
+            )
+        ),
+        [
+            _constant_draw("tags", "S", body_path="/byTags/tags"),
+            _constant_draw("tags", "S", body_path="/byTags/tags"),
+            _constant_draw("code", "S", body_path="/byFilter/filter/code"),
+            _constant_draw("tags", "S", body_path="/byFilter/filter/tags"),
+        ],
+    )
+
+
+def test_graphql_constants_leave_null_literals_alone():
+    query = "{ byTags(tags: null) byFilter(filter: null) }"
+    assert _substitute_graphql_constants(query, _source("string", "S")) == (
+        graphql.print_ast(_parse_graphql(query)),
+        [],
+    )
+
+
+@pytest.mark.parametrize(
+    ("query", "pool", "expected"),
+    [
+        ("{ byNumber(n: 0) }", _source("integer", 2**40, 7), "{ byNumber(n: 7) }"),
+        ("{ byRatio(r: 1.0) }", _source("integer", 10**400, 7), "{ byRatio(r: 7.0) }"),
+        ('{ byId(id: "x") }', _source("integer", 42), '{ byId(id: "42") }'),
+    ],
+    ids=["int-skips-out-of-range", "float-skips-overflowing", "id-renders-integer-as-string"],
+)
+def test_graphql_constants_render_type_compatible_values(query, pool, expected):
+    printed, _ = _substitute_graphql_constants(query, pool)
+    assert printed == graphql.print_ast(_parse_graphql(expected))
+
+
+def test_graphql_constant_without_origin_records_no_origin():
+    pool = ConstantsPool()
+    pool.add(ConstantEntry(value="S", type="string", origins=()))
+    assert _substitute_graphql_constants('{ lookup(code: "x") }', pool)[1] == [
+        ConstantDraw(location="body", parameter_name="code", value="S", origin=None, body_path="/lookup/code")
+    ]
 
 
 def test_stateful_prune_keeps_non_body_constant_draws():

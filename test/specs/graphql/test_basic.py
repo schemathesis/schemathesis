@@ -15,7 +15,7 @@ import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError
-from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup
+from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup, MalformedJson
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import USER_AGENT, CallOutcome
 from schemathesis.generation import GenerationMode
@@ -820,16 +820,18 @@ def test_negative_mode_fallback_to_positive(ctx):
 
 
 def _make_graphql_case_with_mode(
-    schema, mode, *, operation=None, body='{ addBook(title: "test", author: "test") { id } }'
+    schema, mode, *, operation=None, body='{ addBook(title: "test", author: "test") { id } }', description=None
 ):
     operation = operation if operation is not None else schema["Mutation"]["addBook"]
+    if description is None:
+        description = "Negative test case" if mode == GenerationMode.NEGATIVE else "Positive test case"
     meta = CaseMetadata(
         generation=GenerationInfo(time=0.0, mode=mode),
         components={ParameterLocation.BODY: ComponentInfo(mode=mode)},
         phase=PhaseInfo(
             name=TestPhase.FUZZING,
             data=FuzzingPhaseData(
-                description="Negative test case" if mode == GenerationMode.NEGATIVE else "Positive test case",
+                description=description,
                 parameter=None,
                 parameter_location=ParameterLocation.BODY,
                 location=None,
@@ -1040,16 +1042,67 @@ def test_not_a_server_error_graphql_positive_mode_server_side_extensions_code_ra
         not_a_server_error(check_ctx, response, case)
 
 
-def test_negative_data_rejection_graphql_includes_description(ctx, response_factory):
+@pytest.mark.parametrize(
+    ("description", "suffix"),
+    [("Negative test case", "\nNegative test case"), ("", "")],
+    ids=["with-description", "without-description"],
+)
+def test_negative_data_rejection_graphql_includes_description(ctx, response_factory, description, suffix):
     schema = _books_schema(ctx)
-    case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
+    case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE, description=description)
     response = response_factory.core(content=json.dumps({"data": {"addBook": {"id": "1"}}}).encode())
     check_ctx = check_context()
 
     with pytest.raises(AcceptedNegativeData) as exc_info:
         negative_data_rejection(check_ctx, response, case)
 
-    assert "Negative test case" in exc_info.value.message
+    failure = exc_info.value
+    assert (failure.operation, failure.message, failure.status_code, failure.expected_statuses) == (
+        "Mutation.addBook",
+        f"Invalid data should have been rejected by GraphQL schema validation{suffix}",
+        200,
+        [],
+    )
+
+
+@pytest.mark.parametrize(
+    ("payload", "failure", "message"),
+    [
+        ([], UnexpectedGraphQLResponse, "GraphQL response is not a JSON object"),
+        (CLIENT_ERROR, GraphQLClientError, "Field 'addBook' argument 'title' is required"),
+        (RESOLVER_ERROR, GraphQLServerError, "Internal error in resolver"),
+        (
+            {
+                "data": None,
+                "errors": [{"message": "Cannot return null for non-nullable field Book.id.", "path": ["x"]}],
+            },
+            GraphQLSchemaViolation,
+            "Cannot return null for non-nullable field Book.id.",
+        ),
+    ],
+    ids=["non-object", "client-error", "server-error", "schema-violation"],
+)
+def test_validate_graphql_response_failure(ctx, payload, failure, message):
+    case = _books_schema(ctx)["Mutation"]["addBook"].Case()
+    with pytest.raises(failure) as exc:
+        validate_graphql_response(case, payload)
+    assert (exc.value.operation, exc.value.message) == ("Mutation.addBook", message)
+
+
+def test_validate_graphql_response_accepts_empty_errors(ctx):
+    case = _books_schema(ctx)["Mutation"]["addBook"].Case()
+    assert validate_graphql_response(case, {"data": {"addBook": None}, "errors": []}) is None
+
+
+# A 5xx is reported by its status, so its body is not judged as GraphQL.
+def test_non_json_response_body_is_judged_only_below_500(ctx, response_factory):
+    case = _books_schema(ctx)["Mutation"]["addBook"].Case()
+    server_error = response_factory.requests(status_code=500, content=b"oops", content_type="text/plain")
+    assert response_schema_conformance(check_context(), server_error, case) is None
+    success = response_factory.requests(status_code=200, content=b"oops", content_type="text/plain")
+    with pytest.raises(MalformedJson, match="JSON deserialization error") as exc:
+        response_schema_conformance(check_context(), success, case)
+    assert exc.value.operation == "Mutation.addBook"
 
 
 def test_positive_data_acceptance_graphql_without_meta(ctx, response_factory):

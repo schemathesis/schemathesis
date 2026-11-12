@@ -147,9 +147,13 @@ def test_capture_uses_real_field_name_for_aliased_selections(pool, rng):
     assert pool.draw(handle=Handle("Book", "id"), random=rng) == "real-id"
 
 
-def test_per_key_cap_evicts_oldest(gql_schema, rng):
+@pytest.mark.parametrize("tombstoned", [None, "0"], ids=["captures-only", "cap-survives-tombstone"])
+def test_per_key_cap_evicts_oldest(gql_schema, rng, tombstoned):
     pool = _make_pool(gql_schema, max_per_key=3)
     operation = _parse("query { authors { id } }")
+    pool.capture(operation_node=operation, response_data={"authors": [{"id": "0"}]})
+    if tombstoned is not None:
+        pool.tombstone(handle=Handle("Author", "id"), value=tombstoned)
     for chunk in [["1", "2"], ["3", "4"], ["5"]]:
         pool.capture(operation_node=operation, response_data={"authors": [{"id": v} for v in chunk]})
     drawn = set()
@@ -599,13 +603,16 @@ def test_tombstone_preserves_other_values(pool, rng):
 
 _TOMBSTONE_SDL = """
 scalar BookID
-input BookRef { id: BookID! }
+input BookRef { id: BookID! bookId: ID }
 type Book { id: BookID! }
+type Note { id: ID! }
 type Query { _: Int }
 type Mutation {
     addBook(title: String!): Book!
     deleteBook(id: BookID!): Boolean
     deleteBooks(ids: [BookID!]!): Boolean
+    removeBooks(bookIds: [ID!]!): Boolean
+    deleteNote(ids: [ID!]!): Boolean
     deleteBookByRef(ref: BookRef!): Boolean
     deleteByName(name: String!): Boolean
 }
@@ -615,9 +622,11 @@ _TOMBSTONE_NESTED_SDL = """
 scalar AuthorID
 scalar BookID
 type Author { id: AuthorID! }
-type Book { id: BookID! relatedAuthor(authorId: AuthorID!): Author }
+type Book { id: BookID! relatedAuthor(authorId: AuthorID!): Author deleteTag(id: ID!): Boolean previous(id: ID!): RemoveTag }
+type Tag { id: ID! }
+type RemoveTag { id: ID! }
 type Query { _: Int }
-type Mutation { deleteBook(id: BookID!): Book }
+type Mutation { deleteBook(id: BookID!): Book removeTag(id: ID!): RemoveTag }
 """
 
 _TOMBSTONE_SUBSCRIPTION_SDL = """
@@ -657,6 +666,29 @@ type Subscription { event(id: ID!): String! }
             [(Handle("Book", "id"), "x")],
         ),
         (_TOMBSTONE_SUBSCRIPTION_SDL, 'subscription { event(id: "abc") }', []),
+        (
+            _TOMBSTONE_SDL,
+            'mutation { ... on Mutation { deleteBook(id: "y") } deleteBook(id: "x") }',
+            [(Handle("Book", "id"), "x")],
+        ),
+        (_TOMBSTONE_SDL, "mutation { deleteBooks(ids: null) deleteBookByRef(ref: null) }", []),
+        (_TOMBSTONE_SDL, 'mutation { removeBooks(bookIds: ["a"]) }', [(Handle("Book", "id"), "a")]),
+        (_TOMBSTONE_SDL, 'mutation { deleteNote(ids: ["a"]) }', [(Handle("Note", "id"), "a")]),
+        (
+            _TOMBSTONE_SDL,
+            'mutation { deleteBookByRef(ref: {noise: "y", id: "x", bookId: "z"}) }',
+            [(Handle("Book", "id"), "x"), (Handle("Book", "id"), "z")],
+        ),
+        (
+            _TOMBSTONE_NESTED_SDL,
+            'mutation { deleteBook(id: "x") { deleteTag(id: "t") } }',
+            [(Handle("Book", "id"), "x")],
+        ),
+        (
+            _TOMBSTONE_NESTED_SDL,
+            'mutation { deleteBook(id: "x") { previous(id: "p") { id } } }',
+            [(Handle("Book", "id"), "x"), (Handle("Tag", "id"), "p")],
+        ),
     ],
     ids=[
         "scalar",
@@ -671,6 +703,13 @@ type Subscription { event(id: ID!): String! }
         "fragment-spread-skipped",
         "unknown-nested-field",
         "subscription",
+        "inline-fragment-skipped",
+        "null-literals",
+        "id-list-named-by-argument",
+        "id-list-named-by-cleanup-verb",
+        "input-fields-after-unknown",
+        "nested-cleanup-verb-is-not-a-mutation",
+        "nested-envelope-names-its-resource",
     ],
 )
 def test_iter_operation_pool_values(sdl, query, expected):
@@ -782,3 +821,120 @@ def test_successful_delete_evicts_id_before_its_response_is_recorded(
         operation=delete, case=delete.Case(body=f'mutation {{ deleteNote(id: "note-1"){selection} }}')
     )
     assert pool.draw(handle=Handle("Note", "id"), random=rng) is None
+
+
+def test_query_named_like_a_delete_keeps_ids(ctx, response_factory, rng):
+    schema = ctx.graphql.load_sdl(
+        "type Note { id: ID! } type Query { removeNote(id: ID!): Note }"
+        " type Mutation { createNote(title: String): Note }"
+    )
+    pool = _make_pool(schema)
+    create = schema["Mutation"]["createNote"]
+    pool.record_response(
+        operation=create,
+        response=response_factory.core(content=b'{"data": {"createNote": {"id": "note-1"}}}'),
+        case=create.Case(body='mutation { createNote(title: "x") { id } }'),
+    )
+    query = schema["Query"]["removeNote"]
+    pool.record_successful_delete(operation=query, case=query.Case(body='{ removeNote(id: "note-1") { id } }'))
+    assert pool.draw(handle=Handle("Note", "id"), random=rng) == "note-1"
+
+
+_SHAPES_SDL = """
+input Ref { bookId: ID projectPath: String }
+type Book { id: ID! related(projectPath: String): Boolean deleteTag(id: ID!): Boolean }
+type Project { id: ID! fullPath: String! }
+type Repo { slug: String! }
+type Tag { id: ID! }
+type Note { id: ID! }
+type DeleteNote { id: ID! }
+union Result = Book
+type Query {
+    book(id: ID!): Book
+    bookByToken(token: ID!): Book
+    books(ids: [ID!]!): [Book!]!
+    projects: [Project!]!
+    tags: [Tag!]!
+    notes: [Note!]!
+    repo(slug: String!): Repo
+    search: Result
+    lookup(ref: Ref, refs: [Ref!]): Boolean
+    byPaths(projectPath: [String!]): Boolean
+    removeTag(id: ID!): Boolean
+}
+type Mutation { addBook(title: String!): Book! deleteBook(id: ID!): Project deleteNote(id: ID!): DeleteNote }
+"""
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        (
+            'query { ... on Query { book(id: "a") { id } } book(unknown: "k", id: "a") { id } }',
+            'query { ... on Query { book(id: "a") { id } } book(unknown: "k", id: "book-1") { id } }',
+        ),
+        ("query { search { ... on Book { id } } }", "query { search { ... on Book { id } } }"),
+        ("query { lookup(ref: null, refs: null) }", "query { lookup(ref: null, refs: null) }"),
+        (
+            'query { lookup(ref: {unknown: "x", bookId: "a", projectPath: "p"}) }',
+            'query { lookup(ref: {unknown: "x", bookId: "book-1", projectPath: "acme/web"}) }',
+        ),
+        ('query { books(ids: ["a"]) { id } }', 'query { books(ids: ["book-1"]) { id } }'),
+        ('query { byPaths(projectPath: ["p"]) }', 'query { byPaths(projectPath: ["acme/web"]) }'),
+        (
+            'query { book(id: "a") { related(projectPath: "p") deleteTag(id: "t") } }',
+            'query { book(id: "book-1") { related(projectPath: "acme/web") deleteTag(id: "t") } }',
+        ),
+        (
+            'query { removeTag(id: "t") bookByToken(token: "t") { id } }',
+            'query { removeTag(id: "t") bookByToken(token: "t") { id } }',
+        ),
+        ('query { repo(slug: "s") { slug } }', 'query { repo(slug: "repo-1") { slug } }'),
+        ('mutation { deleteBook(id: "a") { id } }', 'mutation { deleteBook(id: "project-1") { id } }'),
+        ('mutation { deleteNote(id: "n") { id } }', 'mutation { deleteNote(id: "note-1") { id } }'),
+    ],
+    ids=[
+        "inline-fragment-and-unknown-argument-first",
+        "union-selection-kept",
+        "null-literals",
+        "input-fields-after-unknown-one",
+        "list-of-bare-ids",
+        "list-of-non-id-handles",
+        "nested-field-arguments",
+        "query-named-like-a-delete",
+        "bare-identifier-of-type-without-id",
+        "delete-returning-another-record",
+        "delete-returning-an-envelope",
+    ],
+)
+def test_pool_substitution_across_argument_shapes(query, expected):
+    schema = graphql.build_schema(_SHAPES_SDL)
+    index = SchemaIndex(schema)
+    pool = GraphQLResourcePool(
+        client_schema=schema,
+        index=index,
+        handles={
+            Handle("Book", "id"),
+            Handle("Project", "id"),
+            Handle("Project", "fullPath"),
+            Handle("Repo", "slug"),
+            Handle("Tag", "id"),
+            Handle("Note", "id"),
+        },
+    )
+    pool.capture(
+        operation_node=_parse(
+            'query { books(ids: []) { id } projects { id fullPath } tags { id } notes { id } repo(slug: "") { slug } }'
+        ),
+        response_data={
+            "notes": [{"id": "note-1"}],
+            "books": [{"id": "book-1"}],
+            "projects": [{"id": "project-1", "fullPath": "acme/web"}],
+            "tags": [{"id": "tag-1"}],
+            "repo": {"slug": "repo-1"},
+        },
+    )
+    operation = substitute_pool_values(
+        operation_node=_parse(query), client_schema=schema, pool=pool, random=random.Random(0), schema_index=index
+    )
+    assert graphql.print_ast(operation) == graphql.print_ast(_parse(expected))

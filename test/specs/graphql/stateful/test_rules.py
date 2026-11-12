@@ -16,39 +16,46 @@ def _operation(query: str) -> graphql.OperationDefinitionNode:
     return node
 
 
-def test_inject_field_adds_missing_field():
-    operation = _operation("query { projects { id } }")
-    operation = _inject_field("projects", ("fullPath",))(operation, random.Random(0))
-    assert "fullPath" in graphql.print_ast(operation)
-
-
-def test_inject_field_idempotent_when_present():
-    operation = _operation("query { projects { fullPath } }")
-    operation = _inject_field("projects", ("fullPath",))(operation, random.Random(0))
-    assert graphql.print_ast(operation).count("fullPath") == 1
-
-
-def test_inject_field_through_relay_connection():
-    operation = _operation("query { products { totalCount } }")
-    operation = _inject_field("products", ("edges", "node", "slug"))(operation, random.Random(0))
-    printed = graphql.print_ast(operation)
-    assert "edges" in printed and "node" in printed and "slug" in printed
-
-
-def test_inject_field_reuses_existing_edges_node():
-    operation = _operation("query { products { edges { node { id } } } }")
-    operation = _inject_field("products", ("edges", "node", "slug"))(operation, random.Random(0))
-    printed = graphql.print_ast(operation)
-    assert printed.count("edges") == 1 and printed.count("node") == 1 and "slug" in printed
-
-
-def test_inject_field_through_mutation_payload():
-    operation = _operation("mutation { createNote { clientMutationId } }")
-    operation = _inject_field("createNote", ("note", "id"))(operation, random.Random(0))
-    assert (
-        graphql.print_ast(operation)
-        == "mutation {\n  createNote {\n    clientMutationId\n    note {\n      id\n    }\n  }\n}"
-    )
+@pytest.mark.parametrize(
+    ("query", "field_name", "path", "expected"),
+    [
+        (
+            "query { other { x } projects { id } }",
+            "projects",
+            ("fullPath",),
+            "query { other { x } projects { id fullPath } }",
+        ),
+        ("query { projects { fullPath } }", "projects", ("fullPath",), "query { projects { fullPath } }"),
+        (
+            "query { products { totalCount } }",
+            "products",
+            ("edges", "node", "slug"),
+            "query { products { totalCount edges { node { slug } } } }",
+        ),
+        (
+            "query { products { edges { node { id } } } }",
+            "products",
+            ("edges", "node", "slug"),
+            "query { products { edges { node { id slug } } } }",
+        ),
+        (
+            "mutation { createNote { clientMutationId } }",
+            "createNote",
+            ("note", "id"),
+            "mutation { createNote { clientMutationId note { id } } }",
+        ),
+    ],
+    ids=[
+        "adds-missing-field",
+        "idempotent-when-present",
+        "through-relay-connection",
+        "reuses-edges-node",
+        "through-payload",
+    ],
+)
+def test_inject_field(query, field_name, path, expected):
+    operation = _inject_field(field_name, path)(_operation(query), random.Random(0))
+    assert graphql.print_ast(operation) == graphql.print_ast(_operation(expected))
 
 
 def test_operation_summaries_unwrap_mutation_payloads(ctx):
@@ -122,6 +129,7 @@ def test_operation_summaries_unwrap_mutation_payloads(ctx):
         ("book", ()),
         ("addBook", ()),
         ("delete", ()),
+        ("_deleteBook", ()),
     ],
     ids=[
         "verb-first-camel",
@@ -133,6 +141,7 @@ def test_operation_summaries_unwrap_mutation_payloads(ctx):
         "single-token",
         "non-cleanup-prefix",
         "verb-only",
+        "leading-underscore",
     ],
 )
 def test_entity_candidates(field_name, expected):
