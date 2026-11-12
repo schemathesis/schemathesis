@@ -449,9 +449,9 @@ class Response:
 
         request = requests.Request(
             method=response.request.method,
+            # The URL already carries the query string.
             url=str(response.request.url),
             headers=dict(response.request.headers),
-            params=dict(response.request.url.params),
             data=response.request.content,
         ).prepare()
         return Response(
@@ -478,9 +478,9 @@ class Response:
         encoding = response.mimetype_params.get("charset", getattr(response, "charset", "utf-8"))
         request = requests.Request(
             method=response.request.method,
+            # The URL already carries the query string.
             url=str(response.request.url),
             headers=dict(response.request.headers),
-            params=dict(response.request.args),
             # Request body is not available
             data=b"",
         ).prepare()

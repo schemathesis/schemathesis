@@ -148,6 +148,40 @@ def ignored_auth() -> dict[str, Any]:
     }
 
 
+def linked_get_server_error() -> dict[str, Any]:
+    return {
+        "/api/items": {
+            "post": {
+                "operationId": "createItem",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["id"],
+                                    "properties": {"id": {"type": "integer"}},
+                                }
+                            }
+                        },
+                        "links": {
+                            "GetItem": {"operationId": "getItem", "parameters": {"item_id": "$response.body#/id"}}
+                        },
+                    }
+                },
+            }
+        },
+        "/api/items/{item_id}": {
+            "get": {
+                "operationId": "getItem",
+                "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+    }
+
+
 def multipart() -> dict[str, Any]:
     return {
         "/api/multipart": {
