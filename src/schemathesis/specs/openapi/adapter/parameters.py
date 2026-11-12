@@ -879,16 +879,37 @@ def _prune_modified_constants(
     )
 
 
+def _captured_values_fill_whole_case(
+    operation: APIOperation, location: ParameterLocation, captured_variants: list[CapturedVariant]
+) -> bool:
+    """Whether a captured variant leaves nothing in the case to generate."""
+    from schemathesis.specs.openapi._auth_retry import get_security_parameters
+
+    if operation.body:
+        return False
+    # Credentials are rejected before the resource is looked up, so varying them does not vary the case.
+    security = {(parameter.name, parameter.location) for parameter in get_security_parameters(operation)}
+    return all(
+        parameter.location == location and all(parameter.name in variant.overlay for variant in captured_variants)
+        for parameter in operation.iter_parameters()
+        if (parameter.name, parameter.location) not in security
+    )
+
+
 def build_hybrid_strategy(
     original_strategy: st.SearchStrategy,
     captured_variants: list[CapturedVariant],
     usage_tracker: VariantUsageTracker,
     container_schema: JsonSchema | None = None,
     validator_cls: type[jsonschema_rs.Validator] | None = None,
+    decay_reuse: bool = True,
 ) -> st.SearchStrategy:
     """Overlay partial captured variants on generated values, preferring variants drawn least recently.
 
     A chosen variant yields a `GeneratedValue` with its provenance; a merge breaking ``container_schema`` is reverted.
+
+    ``decay_reuse`` lowers the reuse rate for recently used variants. Disable it when other inputs of
+    the case are generated, so reusing a value still produces distinct cases.
     """
     from hypothesis import strategies as st
 
@@ -899,16 +920,26 @@ def build_hybrid_strategy(
     )
 
     variant_keys = [jsonschema_rs.canonical.json.to_string(v.overlay) for v in captured_variants]
-    n_variants = len(captured_variants)
+
+    def select_variant(random: Random) -> int:
+        return usage_tracker.weighted_select(variant_keys, random) if len(variant_keys) > 1 else 0
 
     @st.composite
     def hybrid(draw: st.DrawFn) -> Any:
         random = draw(st.randoms())
 
-        if random.random() >= CAPTURED_VALUES_PROBABILITY:
-            return draw(original_strategy)
+        idx: int | None = None
+        if decay_reuse:
+            idx = select_variant(random)
+            # A value used recently counts less, so a small pool does not replace most generated values.
+            use_captured = random.random() < CAPTURED_VALUES_PROBABILITY * usage_tracker.get_weight(variant_keys[idx])
+        else:
+            # Selecting a variant shuffles the whole pool, so draws that do not reuse one skip it.
+            use_captured = random.random() < CAPTURED_VALUES_PROBABILITY
 
         drawn = draw(original_strategy)
+        if not use_captured:
+            return drawn
 
         # Upstream overlays may wrap the value in `GeneratedValue`; unwrap to merge and combine provenance
         base_meta = None
@@ -929,11 +960,8 @@ def build_hybrid_strategy(
         if not isinstance(base, (dict, list)):
             return base
 
-        if n_variants == 1:
-            idx = 0
-        else:
-            # Selection shuffles indices first: Hypothesis biases cumulative selection toward early ones
-            idx = usage_tracker.weighted_select(variant_keys, random)
+        if idx is None:
+            idx = select_variant(random)
         chosen = captured_variants[idx]
         overlay = chosen.overlay
         pool_draws = chosen.draws
@@ -1823,6 +1851,8 @@ class OpenApiBody(OpenApiComponent):
             *captured,
             container_schema=schema if isinstance(schema, dict) else None,
             validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+            # Captured values fill only some body fields; the rest is generated.
+            decay_reuse=False,
         )
 
     def _build_base_strategy(
@@ -1968,6 +1998,7 @@ class OpenApiBody(OpenApiComponent):
             usage_tracker,
             container_schema=schema if isinstance(schema, dict) else None,
             validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+            decay_reuse=False,
         )
         return _mix_negative_into_positive(positive_strategy, negative_strategy)
 
@@ -2649,7 +2680,13 @@ class OpenApiParameterSet(ParameterSet):
             strategy, operation, self.location, schema, generation_config, generation_mode, paired
         )
         if captured is not None:
-            strategy = build_hybrid_strategy(strategy, *captured)
+            variants, usage_tracker = captured
+            strategy = build_hybrid_strategy(
+                strategy,
+                variants,
+                usage_tracker,
+                decay_reuse=_captured_values_fill_whole_case(operation, self.location, variants),
+            )
         return _serialize_for_location(
             strategy,
             self.location,
