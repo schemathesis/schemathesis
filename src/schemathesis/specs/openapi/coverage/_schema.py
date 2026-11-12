@@ -107,7 +107,7 @@ from schemathesis.specs.openapi.coverage._wire import (
 )
 from schemathesis.specs.openapi.formats import format_length_bounds, format_lengths_for
 from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
-from schemathesis.transport.serialization import Binary, contains_binary
+from schemathesis.transport.serialization import Binary, contains_binary, json_sequence_readings
 
 # A string where these alone surround `format`: nothing else can widen what the generator produces.
 _FORMAT_WITH_LENGTH_KEYS = frozenset({"format", "maxLength", "minLength", "type"})
@@ -3084,8 +3084,13 @@ def drop_negatives_any_draft_admits(
 ) -> Generator[GeneratedValue, None, None]:
     """Negatives a judge of any draft rejects; a value one reading admits is a valid request under it."""
     judges = [judge for (judge,) in _make_branch_validators([schema], ctx, strict=False)]
+    is_sent_as_sequence = ctx.wire.json_sequence_body()
     for value in values:
-        if value.generation_mode == GenerationMode.NEGATIVE and _admitted_by_any(judges, value.value):
+        if value.generation_mode == GenerationMode.NEGATIVE and (
+            any(_admitted_by_any(judges, reading) for reading in json_sequence_readings(value.value))
+            if is_sent_as_sequence
+            else _admitted_by_any(judges, value.value)
+        ):
             continue
         yield value
 

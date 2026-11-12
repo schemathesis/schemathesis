@@ -18,6 +18,7 @@ import schemathesis
 from schemathesis.config import GenerationConfig
 from schemathesis.core import string_to_boolean
 from schemathesis.core.control import SkipTest
+from schemathesis.core.deserialization import parse_json_sequence
 from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, _is_valid_uuid, make_validator
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind
@@ -49,6 +50,7 @@ from schemathesis.specs.openapi.negative.mutations import (
     remove_required_property,
 )
 from schemathesis.specs.openapi.negative.utils import can_negate
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from test.utils import assert_requests_call, find_first, run_given
 
 MAX_EXAMPLES = 15
@@ -985,6 +987,46 @@ def test_openapi_31_prefix_items_body_negative_generation(ctx):
     @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=1)
     def test(case):
         pass
+
+
+def test_negative_json_sequence_body_reads_as_an_invalid_stream(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": {"application/jsonl": {"itemSchema": {"type": "integer"}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.2.0",
+    )
+    validator = jsonschema_rs.validator_for({"type": "array", "items": {"type": "integer"}})
+
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=10, derandomize=True)
+    def test(case):
+        records = parse_json_sequence(REQUESTS_TRANSPORT.serialize_case(case)["data"], case.media_type)
+        assert not validator.is_valid(records), f"Reads as a valid stream: {case.body!r}"
+
+
+@pytest.mark.parametrize(
+    ("version", "media_type_object", "expected"),
+    [
+        ("3.2.0", {"itemSchema": {}}, False),
+        ("3.2.0", {"itemSchema": True}, False),
+        ("3.2.0", {"itemSchema": {"type": "integer"}}, True),
+        ("3.1.0", {"schema": {"type": "object"}}, True),
+    ],
+    ids=["any-item", "true-item", "integer-item", "single-record-object"],
+)
+def test_json_sequence_body_is_negatable_only_with_violations_on_the_wire(ctx, version, media_type_object, expected):
+    # A non-array value goes out as one record, so with every item allowed any body reads as a valid stream.
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": {"application/jsonl": media_type_object}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        version=version,
+    )
+    assert [body.is_negatable for body in operation.body] == [expected]
 
 
 @pytest.mark.hypothesis_nested

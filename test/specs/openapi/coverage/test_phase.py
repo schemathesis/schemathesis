@@ -16,6 +16,7 @@ from schemathesis import GenerationMode
 from schemathesis.checks import not_a_server_error
 from schemathesis.config import SanitizationConfig, SchemathesisConfig
 from schemathesis.core import NOT_SET
+from schemathesis.core.deserialization import parse_json_sequence
 from schemathesis.core.error_feedback.store import (
     ErrorFeedbackStore,
     Observation,
@@ -568,6 +569,25 @@ def test_negative_bodies_survive_a_required_parameter_without_positive_values(ct
         (GenerationMode.NEGATIVE, "Missing required property: a"),
         (GenerationMode.NEGATIVE, "Missing request body"),
     }
+
+
+def test_negative_json_sequence_bodies_read_as_invalid_streams(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": {"application/jsonl": {"itemSchema": {"type": "integer"}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.2.0",
+    )
+    validator = jsonschema_rs.validator_for({"type": "array", "items": {"type": "integer"}})
+    streams = [
+        parse_json_sequence(REQUESTS_TRANSPORT.serialize_case(case)["data"], case.media_type)
+        for case in iter_cases(operation, GenerationMode.NEGATIVE)
+        if case.body is not NOT_SET
+    ]
+    assert streams
+    assert [stream for stream in streams if validator.is_valid(stream)] == []
 
 
 @pytest.mark.parametrize("media_type", ["application/x-www-form-urlencoded", "multipart/form-data"])

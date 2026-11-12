@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import jsonschema_rs
 import pytest
 import yaml
 from flask import jsonify
@@ -7,6 +8,7 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.core import NOT_SET
+from schemathesis.core.deserialization import parse_json_sequence
 from schemathesis.core.file_samples import file_extension
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
 from schemathesis.generation import GenerationMode
@@ -231,6 +233,56 @@ def test_jose_jwe_generation(ctx):
         assert case.media_type == "application/jose+jwe"
         assert case.body == {"payload": 42}
         assert REQUESTS_TRANSPORT.serialize_case(case)["json"] == {"payload": 42}
+
+
+JSON_SEQUENCE_ITEM = {
+    "type": "object",
+    "properties": {"id": {"type": "integer"}},
+    "required": ["id"],
+    "additionalProperties": False,
+}
+
+
+@pytest.mark.parametrize(
+    ("version", "media_type", "media_type_object", "expected"),
+    [
+        (
+            "3.2.0",
+            "application/jsonl",
+            {"itemSchema": JSON_SEQUENCE_ITEM},
+            {"type": "array", "items": JSON_SEQUENCE_ITEM},
+        ),
+        (
+            "3.2.0",
+            "application/json-seq",
+            {"itemSchema": {"$ref": "#/components/schemas/Item"}, "schema": {"maxItems": 2}},
+            {"type": "array", "items": JSON_SEQUENCE_ITEM, "maxItems": 2},
+        ),
+        (
+            "3.1.0",
+            "application/x-ndjson",
+            {"schema": {"type": "array", "items": JSON_SEQUENCE_ITEM}},
+            {"type": "array", "items": JSON_SEQUENCE_ITEM},
+        ),
+    ],
+    ids=["item-schema", "item-schema-and-schema", "schema-before-3.2"],
+)
+def test_json_sequence_body_generation(ctx, version, media_type, media_type_object, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": {media_type: media_type_object}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        version=version,
+        components={"schemas": {"Item": JSON_SEQUENCE_ITEM}},
+    )
+    validator = jsonschema_rs.validator_for(expected)
+
+    @run_given(operation.as_strategy(), max_examples=10)
+    def test(case):
+        assert validator.is_valid(case.body), f"Invalid body: {case.body!r}"
+        assert parse_json_sequence(REQUESTS_TRANSPORT.serialize_case(case)["data"], media_type) == case.body
 
 
 def test_multipart_encoding_multiple_content_types(ctx):

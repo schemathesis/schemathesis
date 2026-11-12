@@ -150,10 +150,21 @@ def is_json_sequence(value: str | None) -> bool:
     if value is None:
         return False
     try:
-        main, sub = parse(value)
+        return is_json_sequence_parts(parse(value))
     except MalformedMediaType:
         return False
+
+
+def is_json_sequence_parts(media_type: tuple[str, str]) -> bool:
+    """Detect JSON Lines and JSON Text Sequences from a parsed tuple."""
+    main, sub = media_type
     return main == "application" and (sub in ("jsonl", "x-ndjson", "json-seq") or sub.endswith("+json-seq"))
+
+
+def is_json_text_sequence(value: str) -> bool:
+    """Detect JSON Text Sequences, whose records each start with the ASCII record separator."""
+    main, sub = parse(value)
+    return main == "application" and (sub == "json-seq" or sub.endswith("+json-seq"))
 
 
 def is_form_urlencoded(value: str | None) -> bool:
@@ -234,4 +245,6 @@ def matches_either(first: tuple[str, str], second: tuple[str, str]) -> bool:
 
 def same_family(first: str, second: str) -> bool:
     """Whether both media types are variations of the same well-known type, e.g. `application/json` and `+json`."""
-    return any(check(first) and check(second) for check in (is_json, is_xml, is_plain_text, is_yaml))
+    return any(
+        check(first) and check(second) for check in (is_json, is_xml, is_plain_text, is_yaml, is_json_text_sequence)
+    )

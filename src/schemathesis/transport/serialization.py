@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from io import StringIO
 from typing import TYPE_CHECKING, Any
@@ -114,6 +115,20 @@ def serialize_json(value: Body) -> dict[str, Any]:
         # Therefore we explicitly create such payload
         return {"data": b"null"}
     return {"json": value}
+
+
+def serialize_json_sequence(value: Body, record_start: str) -> bytes:
+    """Encode a list as one compact JSON record per item, and any other value as a single record."""
+    if isinstance(value, bytes):
+        # Possible to get via explicit examples, e.g. `externalValue`
+        return value
+    records = value if isinstance(value, list) else [value]
+    return "".join(f"{record_start}{json.dumps(record, separators=(',', ':'))}\n" for record in records).encode()
+
+
+def json_sequence_readings(value: object) -> list[object]:
+    """Values a server may read from a JSON sequence body: a non-array value is also a one-item array."""
+    return [value] if isinstance(value, list) else [value, [value]]
 
 
 def _replace_binary(value: dict) -> dict:
