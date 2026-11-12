@@ -992,10 +992,11 @@ def test_parameter_containers_for_locations_without_parameters(ctx):
     assert list(operation.get_bodies_for_media_type("application/json")) == []
 
 
-def test_formatted_path(ctx):
+@pytest.mark.parametrize("value", ["test", "{x}", "a}b"], ids=["plain", "braces", "closing-brace"])
+def test_formatted_path(ctx, value):
     operation = ctx.openapi.load_operation("GET /users/{name}", {"responses": {"200": {"description": "OK"}}})
-    case = operation.Case(path_parameters={"name": "test"})
-    assert case.formatted_path == "/users/test"
+    case = operation.Case(path_parameters={"name": value})
+    assert case.formatted_path == f"/users/{value}"
 
 
 def test_formatted_path_missing_parameter(ctx):

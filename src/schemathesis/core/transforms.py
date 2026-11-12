@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import string
+import re
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from functools import lru_cache
 from typing import Any, overload
@@ -13,21 +13,21 @@ from schemathesis.core.jsonschema.types import JsonValue
 deepclone = jsonschema_rs.canonical.schema.clone
 
 
+# Any character but braces may appear in a placeholder name, including `.`, `:`, `!` and `[`.
+TEMPLATE_PLACEHOLDER = re.compile(r"\{([^{}]+)\}")
+
+
 @lru_cache
 def get_template_fields(template: str) -> tuple[str, ...]:
     """Extract named placeholders from a string template, in the order they appear.
 
     "/users/{userId}/posts/{postId}" -> ("userId", "postId")
     """
-    try:
-        parameters = tuple(
-            dict.fromkeys(name for _, name, _, _ in string.Formatter().parse(template) if name is not None)
-        )
-        # Check for malformed params to avoid injecting them
-        template.format(**dict.fromkeys(parameters, ""))
-        return parameters
-    except (ValueError, IndexError):
+    remainder = TEMPLATE_PLACEHOLDER.sub("", template)
+    # Malformed templates have no reliable placeholders to inject
+    if "{" in remainder or "}" in remainder:
         return ()
+    return tuple(dict.fromkeys(TEMPLATE_PLACEHOLDER.findall(template)))
 
 
 def to_wire_string(value: object) -> str:
