@@ -4,6 +4,7 @@ import re
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
+from schemathesis.core.error_feedback.field_inference import infer_path_from_request
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import parse_number, split_field_path
 from schemathesis.core.error_feedback.store import (
@@ -119,6 +120,13 @@ _TYPE_COERCION = re.compile(
 # rejection (query). Custom envelopes occasionally use single quotes.
 _UNRECOGNIZED_FIELD = re.compile(r"Unrecognized field:?\s*['\"](?P<name>[^'\"]+)['\"]")
 _UNEXPECTED_PARAMETER = re.compile(r"parameter name [\"'](?P<name>[^\"']+)[\"'] is not allowed")
+
+# Java's `NumberFormatException` names the radix only when it is not 10.
+_NUMBER_FORMAT = re.compile(r'For input string: "(?P<value>[^"]*)"(?: under radix (?P<radix>\d+))?')
+# MongoDB driver rejecting a string that is not a 24-digit hex ObjectId.
+_OBJECT_ID = re.compile(r"invalid hexadecimal representation of an ObjectId: \[(?P<value>[^\]]*)\]")
+_HEX_PATTERN = PatternPayload(regex="^[0-9a-fA-F]+$")
+_OBJECT_ID_PATTERN = PatternPayload(regex="^[0-9a-f]{24}$")
 
 
 # Custom `@ControllerAdvice` shape: each entry of `messages: [...]` is a string
@@ -278,6 +286,8 @@ class SpringParser:
                 or _TYPE_COERCION.search(text)
                 or _UNRECOGNIZED_FIELD.search(text)
                 or _UNEXPECTED_PARAMETER.search(text)
+                or _NUMBER_FORMAT.search(text)
+                or _OBJECT_ID.search(text)
             ):
                 return True
         return False
@@ -299,6 +309,7 @@ class SpringParser:
         observations.extend(self._extract_field_errors(operation, body))
         observations.extend(self._extract_top_level_message(operation, body))
         observations.extend(self._extract_unexpected_properties(operation, body))
+        observations.extend(self._extract_value_parse_errors(operation, body, case))
         return tuple(observations)
 
     @staticmethod
@@ -456,3 +467,36 @@ class SpringParser:
                     kind=ObservationKind.UNEXPECTED_PROPERTY,
                     raw_message=message,
                 )
+
+    @staticmethod
+    def _extract_value_parse_errors(operation: APIOperation, body: dict, case: Case) -> Iterable[Observation]:
+        # Number and ObjectId parse errors name the rejected value but not the field, so find the slot that sent it.
+        for key in _TOP_LEVEL_KEYS:
+            message = body.get(key)
+            # A coercion message with a field name is already handled.
+            if not isinstance(message, str) or _TYPE_COERCION.search(message):
+                continue
+            for value, kind, payload in _iter_value_parse_errors(message):
+                slot = infer_path_from_request(case=case, rejected_value=value)
+                if slot is None:
+                    continue
+                location, path = slot
+                yield Observation(
+                    operation_label=operation.label,
+                    location=location,
+                    parameter_path=path,
+                    kind=kind,
+                    raw_message=message,
+                    payload=payload,
+                )
+
+
+def _iter_value_parse_errors(message: str) -> Iterable[tuple[str, ObservationKind, ObservationPayload]]:
+    for match in _NUMBER_FORMAT.finditer(message):
+        radix = match.group("radix")
+        if radix is None:
+            yield match.group("value"), ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name="integer")
+        elif radix == "16":
+            yield match.group("value"), ObservationKind.PATTERN, _HEX_PATTERN
+    for match in _OBJECT_ID.finditer(message):
+        yield match.group("value"), ObservationKind.PATTERN, _OBJECT_ID_PATTERN

@@ -689,6 +689,58 @@ def test_spring_parser_skips_type_coercion_without_method_parameter_prefix(make_
     )
 
 
+_HEX_PATTERN = PatternPayload(regex="^[0-9a-fA-F]+$")
+_OBJECT_ID_PATTERN = PatternPayload(regex="^[0-9a-f]{24}$")
+
+
+@pytest.mark.parametrize(
+    ("message", "case_kwargs", "expected"),
+    [
+        (
+            'For input string: "zq7w" under radix 16',
+            {"body": {"spender": "zq7w", "amount": "100"}},
+            [(("spender",), ParameterLocation.BODY, ObservationKind.PATTERN, _HEX_PATTERN)],
+        ),
+        (
+            'For input string: "abcd"',
+            {"path_parameters": {"id": "abcd"}},
+            [
+                (
+                    ("id",),
+                    ParameterLocation.PATH,
+                    ObservationKind.TYPE_MISMATCH,
+                    TypeMismatchPayload(type_name="integer"),
+                )
+            ],
+        ),
+        (
+            "invalid hexadecimal representation of an ObjectId: [zq7wUx]",
+            {"path_parameters": {"id": "zq7wUx"}},
+            [(("id",), ParameterLocation.PATH, ObservationKind.PATTERN, _OBJECT_ID_PATTERN)],
+        ),
+        ('For input string: "zq7w" under radix 8', {"query": {"mode": "zq7w"}}, []),
+        ('For input string: "zq7w" under radix 16', {"query": {"mode": "other"}}, []),
+    ],
+    ids=["hex-body-field", "decimal-path-parameter", "object-id-path-parameter", "octal-skipped", "value-not-sent"],
+)
+def test_spring_parser_attributes_number_and_object_id_parse_errors_by_value(
+    message, case_kwargs, expected, make_operation, case_factory
+):
+    body = {
+        "timestamp": "2026-05-12T10:14:03.112+00:00",
+        "status": 400,
+        "error": "Bad Request",
+        "message": message,
+        "path": "/api/v1/resource",
+    }
+    parser = SpringParser()
+    assert parser.can_parse(body=body) is True
+    assert [
+        (o.parameter_path, o.location, o.kind, o.payload)
+        for o in parse_observations(parser, body, make_operation, case_factory, case_kwargs=case_kwargs)
+    ] == expected
+
+
 SPRING_MESSAGES_MULTI = b'{"messages":["email - must not be blank","username - must not be null","age - is required"]}'
 
 
