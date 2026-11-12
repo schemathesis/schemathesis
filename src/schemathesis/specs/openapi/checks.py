@@ -75,6 +75,7 @@ from schemathesis.specs.openapi._auth_retry import (
 from schemathesis.specs.openapi.serialization import COLLECTION_FORMAT_DELIMITERS
 from schemathesis.specs.openapi.utils import (
     coerce_wire_string,
+    declared_methods,
     numeric_wire_value_is_valid,
     parameter_types,
     reads_as_null,
@@ -1265,8 +1266,10 @@ def allow_header_conformance(ctx: CheckContext, response: Response, case: Case) 
         return None
     declared = {method.lower() for method in case.operation.schema[case.operation.path]}
     declared &= HTTP_METHODS_SCHEMA
+    # Templated paths matching the same URL may add methods, but a router that prefers the exact path need not list them.
+    routed = declared | (declared_methods(case.operation, case.formatted_path) & HTTP_METHODS_SCHEMA)
     missing = sorted(declared - advertised - IMPLICIT_METHODS)
-    undocumented = sorted(advertised - declared - IMPLICIT_METHODS)
+    undocumented = sorted(advertised - routed - IMPLICIT_METHODS)
     if not missing and not undocumented:
         return None
     parts = []
