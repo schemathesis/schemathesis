@@ -1787,6 +1787,75 @@ def test_multipart_binary_property_filename_behind_ref(ctx, body_is_ref, propert
     assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == expected
 
 
+BINARY = {"type": "string", "format": "binary"}
+NULL = {"type": "null"}
+
+
+@pytest.mark.parametrize(
+    "property_schema, value, expected",
+    [
+        ({"anyOf": [BINARY, NULL]}, b"abc", [("file", ("file", b"abc"))]),
+        (
+            {"anyOf": [{"type": "array", "items": BINARY}, NULL]},
+            [b"a", b"b"],
+            [("file", ("file", b"a")), ("file", ("file", b"b"))],
+        ),
+        (
+            {"oneOf": [{"type": "array", "items": BINARY}, NULL]},
+            [b"a", b"b"],
+            [("file", ("file", b"a")), ("file", ("file", b"b"))],
+        ),
+        ({"anyOf": [{"$ref": "#/components/schemas/File"}, NULL]}, b"abc", [("file", ("file", b"abc"))]),
+        (
+            {"anyOf": [{"$ref": "#/components/schemas/Files"}, NULL]},
+            [b"a", b"b"],
+            [("file", ("file", b"a")), ("file", ("file", b"b"))],
+        ),
+        (
+            {"anyOf": [{"type": "array", "items": {"contentMediaType": "application/octet-stream"}}, NULL]},
+            [b"a"],
+            [("file", ("file", b"a"))],
+        ),
+        (
+            {"allOf": [{"$ref": "#/components/schemas/File"}], "description": "Avatar"},
+            b"abc",
+            [("file", ("file", b"abc"))],
+        ),
+        ({"anyOf": [{"type": "string"}, NULL]}, "text", [("file", (None, "text"))]),
+    ],
+    ids=[
+        "optional",
+        "optional-list",
+        "one-of-list",
+        "ref-branch",
+        "ref-array-branch",
+        "content-media-type",
+        "all-of",
+        "text",
+    ],
+)
+def test_multipart_optional_binary_property_keeps_filename(ctx, property_schema, value, expected):
+    # Optional upload fields declare their file schema inside `anyOf` with `null`.
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {"schema": {"type": "object", "properties": {"file": property_schema}}}
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.1.0",
+        components={
+            "schemas": {"File": BINARY, "Files": {"type": "array", "items": {"$ref": "#/components/schemas/File"}}}
+        },
+    )
+    case = operation.Case(body={"file": value}, media_type="multipart/form-data")
+    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == expected
+
+
 @pytest.mark.parametrize("transport", ["wsgi", "http"])
 @pytest.mark.parametrize(
     ("version", "operation", "body", "expected"),

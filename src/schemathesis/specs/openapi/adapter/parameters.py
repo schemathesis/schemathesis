@@ -1603,6 +1603,16 @@ class RequestBodySchemaCache:
         return schema
 
 
+def _resolve_form_part(schema: dict[str, Any], root_schema: dict[str, Any]) -> dict[str, Any]:
+    """A form property schema and its `items` with `$ref` resolved."""
+    schema = resolve_with_root_bundle(schema, root_schema)
+    items = schema.get("items")
+    # Empty `items` stay empty, so an unconstrained array does not look like one with an item schema.
+    if isinstance(items, dict) and items:
+        schema = {**schema, "items": resolve_with_root_bundle(items, root_schema)}
+    return schema
+
+
 @dataclass
 class OpenApiBody(OpenApiComponent):
     """OpenAPI request body."""
@@ -1758,11 +1768,18 @@ class OpenApiBody(OpenApiComponent):
         resolved = {}
         for name, property_schema in collect_object_properties(schema)[0].items():
             if isinstance(property_schema, dict):
-                property_schema = resolve_with_root_bundle(property_schema, schema)
-                items = property_schema.get("items")
-                # Empty `items` stay empty, so an unconstrained array does not look like one with an item schema.
-                if isinstance(items, dict) and items:
-                    property_schema = {**property_schema, "items": resolve_with_root_bundle(items, schema)}
+                property_schema = _resolve_form_part(property_schema, schema)
+                # Optional uploads declare the file inside `anyOf` with `null`, so their branches are resolved too.
+                for keyword in ("anyOf", "oneOf", "allOf"):
+                    branches = property_schema.get(keyword)
+                    if isinstance(branches, list):
+                        property_schema = {
+                            **property_schema,
+                            keyword: [
+                                _resolve_form_part(branch, schema) if isinstance(branch, dict) else branch
+                                for branch in branches
+                            ],
+                        }
             resolved[name] = property_schema
         return resolved
 

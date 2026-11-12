@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.33.3...HEAD) - TBD
 
+### :bug: Fixed
+
+- Multipart file parts without a filename for optional uploads declared as `anyOf` with `null`.
+
 ## [4.33.3](https://github.com/schemathesis/schemathesis/compare/v4.33.2...v4.33.3) - 2026-11-12
 
 ### :racing_car: Performance
