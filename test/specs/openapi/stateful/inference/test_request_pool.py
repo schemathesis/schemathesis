@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import pytest
 from flask import abort, jsonify, request
 
 from test.apps.fragments.handlers import null_name_lookup
 from test.apps.fragments.schemas import null_name_responses
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_request_pool_captures_path_parameters(cli, snapshot_cli, ctx):
     paths = {
         "/products/{productName}": {
@@ -61,7 +59,6 @@ def test_request_pool_captures_path_parameters(cli, snapshot_cli, ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_phase_capture_feeds_fuzzing_pool(cli, snapshot_cli, ctx):
     # Fuzzing GET can hit an existing productId only if coverage's POST captures
     # the schema `examples` ids into the pool — the path schema has none of its own.
@@ -150,7 +147,6 @@ def test_coverage_phase_capture_feeds_fuzzing_pool(cli, snapshot_cli, ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_request_pool_serializes_array_path_parameters(cli, snapshot_cli, ctx):
     paths = {
         "/items": {
@@ -205,7 +201,6 @@ def test_request_pool_serializes_array_path_parameters(cli, snapshot_cli, ctx):
     assert result == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_request_pool_captures_body_fields(cli, snapshot_cli, ctx):
     paths = {
         "/sessions": {
@@ -270,7 +265,6 @@ def test_request_pool_captures_body_fields(cli, snapshot_cli, ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_pool_works_when_no_response_descriptors_exist(cli, snapshot_cli, ctx):
     # POST UUIDs and GET's fresh 36-char strings cannot overlap; only pool can bridge them.
     paths = {

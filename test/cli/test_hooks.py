@@ -23,7 +23,7 @@ def before_call(context, case, kwargs):
 
 
 @pytest.mark.parametrize("phase", ["fuzzing", "stateful"])
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
+@pytest.mark.snapshot(replace_phase_statistic=True)
 def test_before_call_system_exit(ctx, cli, snapshot_cli, phase):
     api = ctx.openapi.apps.users_crud()
     module = ctx.write_pymodule(
@@ -36,7 +36,7 @@ def before_call(context, case, kwargs):
     assert cli.main("run", api.schema_url, f"--phases={phase}", "--max-examples=1", hooks=module) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
+@pytest.mark.snapshot(replace_phase_statistic=True)
 def test_before_call_error_in_stateful_phase(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.users_crud()
     module = ctx.write_pymodule(
@@ -135,7 +135,7 @@ def before_init_operation(context, operation):
 
 
 @pytest.mark.parametrize("invalid_schema", [{"pattern": "["}, {"minLength": "x"}], ids=["regex", "non-regex"])
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_traceback=True)
+@pytest.mark.snapshot(replace_traceback=True)
 def test_before_generate_case_validation_error(ctx, cli, snapshot_cli, invalid_schema):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(
@@ -262,7 +262,6 @@ def test_hooks_file_path_unloadable(ctx, cli, tmp_path):
     assert "Cannot load hooks from:" in result.stdout
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_filter_case_rejects_all(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     # When the `filter_case` hook rejects all generated test cases
@@ -277,7 +276,6 @@ def filter_case(context, case):
     assert cli.main("run", api.schema_url, "--max-examples=10", hooks=module) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_filter_failure_drops_a_failure(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.failure()
     module = ctx.write_pymodule(
@@ -382,6 +380,7 @@ def filter_failure(context, failure, case, response):
     ['apply_to(name="GET /api/success")', 'skip_for(name="GET /api/failure")'],
     ids=["apply_to", "skip_for"],
 )
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_named_hook_respects_filters(ctx, cli, snapshot_cli, filter_call):
     api = ctx.openapi.apps.success_and_failure()
     module = ctx.write_pymodule(
@@ -400,7 +399,6 @@ def reject_call(context, case, kwargs):
     ["before_load_schema(context, raw_schema)", "after_load_schema(context, schema)"],
     ids=["before_load_schema", "after_load_schema"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_load_schema_hook_error(ctx, cli, snapshot_cli, command, hook):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(

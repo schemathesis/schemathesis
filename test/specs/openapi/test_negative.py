@@ -1446,7 +1446,6 @@ def test_negative_path_parameters_reject_encoded_slash_for_explicit_slash_exampl
             assert "/" not in unquote(str(value))
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_integer_path_parameter_no_false_positive(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -1556,7 +1555,7 @@ def test_negative_data_rejection_enum_path_params_no_false_positive(ctx, cli, ap
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
+@pytest.mark.snapshot(replace_invalid_component=True)
 def test_negative_data_rejection_enum_path_params_non_validating_server(ctx, cli, snapshot_cli):
     # A server that accepts everything. Mutations must fire and the check
     # must report failures for enum + integer path parameters in fuzzing mode.

@@ -522,6 +522,7 @@ def test_fallback_to_cli_auth(cli, auth_schema_url, snapshot_cli):
 
 
 @pytest.mark.parametrize("invalid_scheme", ["NonExistentAuth", "ApiKeyHeadr"])
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_unused_openapi_auth_warnings(cli, auth_schema_url, snapshot_cli, invalid_scheme):
     assert (
         cli.run(
@@ -601,6 +602,7 @@ def test_openapi_v2_swagger(ctx, cli, app_runner, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_cli_auth_precedence_over_openapi(cli, auth_schema_url, snapshot_cli):
     assert (
         cli.run(
@@ -683,6 +685,7 @@ def test_operation_security_uses_configured_scheme(
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_partial_scheme_configuration(cli, auth_schema_url, snapshot_cli):
     assert (
         cli.run(
@@ -751,6 +754,7 @@ def test_no_security_requirements(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_auth_with_invalid_scheme_in_schema(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -795,7 +799,6 @@ def test_auth_with_invalid_scheme_in_schema(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_auth_hook_header_keeps_positive_cases_positive(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {

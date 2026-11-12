@@ -935,6 +935,7 @@ def test_multiple_hops_references_swagger(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.filterwarnings("error")
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_responses_in_another_file(ctx, cli, app_runner, snapshot_cli):
     paths = {
         "/api/v1/items": {

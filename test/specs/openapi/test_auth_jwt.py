@@ -32,7 +32,6 @@ def _new_repository(resource_names: list[str]) -> ResourceRepository:
     [f"--header=Authorization: Bearer {_make_jwt({'sub': 'alice'})}", "--auth=alice:wonderland"],
     ids=["jwt-sub", "basic-auth-username"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_auth_username_seeds_pool_for_username_path_param(cli, snapshot_cli, ctx, auth):
     # Without seeding, schemathesis can't generate the authenticated username, so the bug stays hidden.
     user_schema = {

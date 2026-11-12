@@ -22,7 +22,6 @@ def _seed(directory: Path, entries: list[Entry]) -> None:
     write(directory, manifest, entries)
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_no_cache_row_when_cache_empty(ctx, cli, snapshot_cli, tmp_path):
     api = ctx.openapi.apps.success()
     assert (
@@ -36,7 +35,6 @@ def test_no_cache_row_when_cache_empty(ctx, cli, snapshot_cli, tmp_path):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_cache_row_shows_replayed_count(ctx, cli, snapshot_cli, tmp_path):
     api = ctx.openapi.apps.unimplemented_method()
     cache_dir = tmp_path / "cache"
@@ -82,7 +80,6 @@ def test_cache_row_shows_replayed_count(ctx, cli, snapshot_cli, tmp_path):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_cache_row_shows_unavailable_when_corrupt(ctx, cli, snapshot_cli, tmp_path):
     api = ctx.openapi.apps.success()
     cache_dir = tmp_path / "cache"
@@ -101,7 +98,6 @@ def test_cache_row_shows_unavailable_when_corrupt(ctx, cli, snapshot_cli, tmp_pa
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.skipif(platform.system() == "Windows", reason="chmod does not make a directory read-only on Windows")
 def test_run_succeeds_when_cache_directory_is_read_only(ctx, cli, snapshot_cli, tmp_path):
     api = ctx.openapi.apps.success()

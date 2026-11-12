@@ -115,6 +115,7 @@ def test_cli(ctx, unique_hook, raw_schema, cli, hypothesis_max_examples, snapsho
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_cli_failure(ctx, unique_hook, cli, hypothesis_max_examples, snapshot_cli):
     api = ctx.openapi.apps.failure()
     assert (
@@ -134,7 +135,7 @@ def test_cli_failure(ctx, unique_hook, cli, hypothesis_max_examples, snapshot_cl
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
+@pytest.mark.snapshot(replace_phase_statistic=True)
 def test_unique_inputs_replays_cached_failure_in_later_phase(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.failure()
     assert (
@@ -210,7 +211,6 @@ def test_explicit_headers(
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_positive_multipart_not_reported_as_negative(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.upload_file()
     assert (

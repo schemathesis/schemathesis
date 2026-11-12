@@ -69,7 +69,7 @@ def _collapse_tracebacks(data: str) -> str:
 @dataclass
 class CliSnapshotConfig:
     request: FixtureRequest
-    replace_reproduce_with: bool = False
+    replace_reproduce_with: bool = True
     replace_test_cases: bool = True
     replace_generated: bool = False
     replace_phase_statistic: bool = False

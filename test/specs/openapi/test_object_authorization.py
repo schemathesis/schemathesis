@@ -106,13 +106,13 @@ def _verdict(api, context, case):
     return reported, bool(peer_requests)
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("phases", ["fuzzing", "stateful"])
 def test_peer_read_is_reported(cli, ctx, tmp_path, snapshot_cli, phases):
     api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
     assert _run(cli, api, tmp_path, phases=phases) == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_reproduction_names_the_sender(cli, ctx, tmp_path, snapshot_cli):
     api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
     assert _run(cli, api, tmp_path) == snapshot_cli
@@ -162,7 +162,6 @@ def test_without_peers_no_probe_is_sent(cli, ctx, tmp_path):
     assert _peer_requests(api.requests) == []
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     "checks", ["--checks=object_level_authorization", "--exclude-checks=ignored_auth"], ids=["selected", "default"]
 )
@@ -233,7 +232,6 @@ ALICE = "ApiKey alice"
 BOB = "ApiKey bob"
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     ("phases", "replayed"),
     [
@@ -269,7 +267,6 @@ def test_replay_without_recorded_identities_uses_the_current_one(cli, ctx, tmp_p
     assert _senders(api) == replayed
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_with_recorded_identity_not_configured(cli, ctx, tmp_path, snapshot_cli):
     api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
     _run(cli, api, tmp_path, phases="stateful")

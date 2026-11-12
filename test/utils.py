@@ -30,6 +30,7 @@ from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalErro
 from schemathesis.engine.recorder import Interaction
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, APIStateMachine
+from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -326,6 +327,16 @@ def check_context(config=None, *, recorder=None, override=None, headers=None, tr
         recorder=recorder,
         response_checks=None,
     )
+
+
+def oas3_response(schema, *, description="text", media_type="application/json"):
+    return {"description": description, "content": {media_type: {"schema": schema}}}
+
+
+def make_case(ctx, schema: BaseSchema, definition: dict[str, Any]) -> Case:
+    return ctx.openapi.from_full_schema({**schema.raw_schema, "paths": {"/path": {"get": definition}}})["/path"][
+        "GET"
+    ].Case()
 
 
 @contextmanager

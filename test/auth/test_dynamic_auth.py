@@ -521,6 +521,7 @@ def test_reauth_state_not_shared_across_calls(ctx):
     assert schema.reauth_state.disabled is False
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_unused_dynamic_auth_warning(ctx, cli, app_runner, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -552,7 +553,6 @@ def test_unused_dynamic_auth_warning(ctx, cli, app_runner, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_dynamic_auth_unsupported_scheme_type_reported(ctx, cli, app_runner, snapshot_cli):
     app = _protected_app(ctx, "MutualTLS", {"type": "mutualTLS"})
     assert (

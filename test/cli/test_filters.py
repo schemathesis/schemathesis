@@ -200,7 +200,6 @@ def _run_with_filters(cli, ctx, api, *filters):
         "dead-regex-shown-verbatim",
     ],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unmatched_filters(ctx, cli, snapshot_cli, filters):
     api = ctx.openapi.apps.success()
     assert _run_with_filters(cli, ctx, api, *filters) == snapshot_cli
@@ -211,13 +210,11 @@ def test_unmatched_filters(ctx, cli, snapshot_cli, filters):
     ["--include-name=Query.getNope", "--include-name=Query.getBooks", "--exclude-name=Query.getBooks"],
     ids=["dead-filter", "live-filter", "exclude"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unmatched_filters_for_graphql(ctx, cli, snapshot_cli, arg):
     api = ctx.graphql.apps.books()
     assert cli.run(api.schema_url, "--max-examples=1", "--mode=positive", arg) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_operation_id_filter_on_graphql(ctx, cli, snapshot_cli):
     # GraphQL has no `operationId`, so such a filter matches nothing instead of erroring.
     api = ctx.graphql.apps.books()
@@ -233,7 +230,6 @@ def test_operation_id_filter_on_graphql(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unmatched_operations_config_block(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     assert (
@@ -249,7 +245,6 @@ def test_unmatched_operations_config_block(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unmatched_filter_suggests_the_operation_it_nearly_names(ctx, cli, snapshot_cli):
     api = ctx.graphql.apps.books()
     assert (
@@ -257,7 +252,6 @@ def test_unmatched_filter_suggests_the_operation_it_nearly_names(ctx, cli, snaps
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_combined_regex_filters_are_reported_as_one(ctx, cli, snapshot_cli):
     # Every `*-regex` option builds a single filter whose criteria must all hold.
     api = ctx.openapi.apps.success()
@@ -266,7 +260,6 @@ def test_combined_regex_filters_are_reported_as_one(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_no_report_when_an_operation_is_skipped_while_walking(ctx, cli, snapshot_cli):
     # An empty definition cannot be parsed, so the walk is incomplete and a filter cannot be called dead here.
     api = ctx.openapi.apps.success()

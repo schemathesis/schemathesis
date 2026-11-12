@@ -645,7 +645,6 @@ def test_explicit_auth_cli(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("header_name", ["Cookie", "cookie"], ids=["canonical", "lowercase"])
 def test_explicit_cookie_header_cli(ctx, cli, snapshot_cli, header_name):
     app, _ = ctx.openapi.make_flask_app(
@@ -897,7 +896,6 @@ API_KEY_SCHEME = {"securitySchemes": {"apiKey": {"type": "apiKey", "in": "header
 
 
 @pytest.mark.parametrize("enforces_auth", [True, False], ids=["login-redirect", "ignores-auth"])
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_redirect_to_login_page_without_auth(ctx, cli, snapshot_cli, enforces_auth):
     app, _ = ctx.openapi.make_flask_app(ITEM_WITH_API_KEY, components=API_KEY_SCHEME)
 
@@ -917,7 +915,6 @@ def test_redirect_to_login_page_without_auth(ctx, cli, snapshot_cli, enforces_au
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_invalid_path_parameter_missing_the_route(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(ITEM_WITH_API_KEY, components=API_KEY_SCHEME)
 
@@ -937,7 +934,6 @@ def test_invalid_path_parameter_missing_the_route(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_explicit_api_key_header_in_other_case_cli(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(ITEM_WITH_API_KEY, components=API_KEY_SCHEME)
 

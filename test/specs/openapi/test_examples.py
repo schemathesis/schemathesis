@@ -2836,6 +2836,7 @@ def test_find_matching_in_responses_empty():
     assert list(find_matching_in_responses({}, "id")) == []
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_config_override_with_examples(ctx, cli, app_runner, snapshot_cli):
     # See GH-3000
     paths = {
@@ -2883,6 +2884,7 @@ def test_config_override_with_examples(ctx, cli, app_runner, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_path_parameters_example_escaping(ctx, cli, app_runner, snapshot_cli):
     # See GH-3003
     paths = {

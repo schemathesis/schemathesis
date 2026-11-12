@@ -29,7 +29,6 @@ def map_body(context, body):
 
 
 @pytest.mark.parametrize("source", ["reflection", "descriptor-set"])
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_grpc_run_finds_server_error(ctx, cli, tmp_path, snapshot_cli, source):
     if source == "reflection":
         server = ctx.grpc.apps.users()
@@ -42,7 +41,6 @@ def test_grpc_run_finds_server_error(ctx, cli, tmp_path, snapshot_cli, source):
 
 
 @pytest.mark.parametrize("user_id", [1, 503], ids=["ok", "unavailable"])
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_expected_status_name(ctx, cli, snapshot_cli, user_id):
     server = ctx.grpc.apps.users()
     module = pinned_user(ctx, user_id)
@@ -67,14 +65,12 @@ def test_expected_status_name(ctx, cli, snapshot_cli, user_id):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_descriptor_set_requires_url(cli, tmp_path, snapshot_cli):
     write_descriptor_set(tmp_path, users_descriptor_set())
     assert cli.run("api.binpb") == snapshot_cli
 
 
 @pytest.mark.parametrize("filename", ["api.desc", "api.proto.bin"])
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_descriptor_set_detected_by_content(cli, tmp_path, snapshot_cli, filename):
     (tmp_path / filename).write_bytes(users_descriptor_set())
     assert cli.run(filename) == snapshot_cli
@@ -88,13 +84,11 @@ def test_descriptor_set_detected_by_content(cli, tmp_path, snapshot_cli, filenam
     ],
     ids=["invalid-utf8", "control-byte"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_binary_schema_file_error(cli, tmp_path, snapshot_cli, filename, data):
     (tmp_path / filename).write_bytes(data)
     assert cli.run(filename, "--url=grpc://127.0.0.1:1") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_finds_empty_nested_message(ctx, cli, snapshot_cli):
     server = ctx.grpc.apps.envelope()
     assert (
@@ -108,7 +102,6 @@ def test_coverage_finds_empty_nested_message(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_proto_file_refused(cli, tmp_path, snapshot_cli):
     (tmp_path / "users.proto").write_text('syntax = "proto3";\npackage pkg;\nservice Users {}\n')
     assert cli.run("users.proto", "--url=grpc://127.0.0.1:1") == snapshot_cli
@@ -125,7 +118,6 @@ def test_proto_file_refused(cli, tmp_path, snapshot_cli):
     ],
     ids=["ignored", "enforced", "coverage"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_ignored_auth(ctx, cli, snapshot_cli, phase, user_id, sent):
     server = ctx.grpc.apps.users()
     module = pinned_user(ctx, user_id)
@@ -146,7 +138,6 @@ def test_ignored_auth(ctx, cli, snapshot_cli, phase, user_id, sent):
 
 
 # Credentials stay unmasked in the crash file; the edited first step makes its replayed status differ.
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_ignored_auth_replay(ctx, cli, tmp_path, snapshot_cli):
     server = ctx.grpc.apps.users()
     module = pinned_user(ctx, 1)
@@ -176,7 +167,6 @@ def test_ignored_auth_replay(ctx, cli, tmp_path, snapshot_cli):
     ["--report=har", "--report=vcr", "--report=pytest", "--report=wfc", "--auth-wfc=auth.json"],
     ids=["har", "vcr", "pytest", "wfc", "auth-wfc"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_http_only_options_refused(cli, tmp_path, snapshot_cli, option):
     (tmp_path / "auth.json").write_text(
         json.dumps({"auth": [{"name": "user", "fixedHeaders": [{"name": "authorization", "value": "Bearer token"}]}]})
@@ -186,7 +176,6 @@ def test_http_only_options_refused(cli, tmp_path, snapshot_cli, option):
     assert not (tmp_path / "schemathesis-report").exists()
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_remote_descriptor_set_extension_is_not_grpc(cli, snapshot_cli):
     assert cli.run("http://127.0.0.1:1/api.pb") == snapshot_cli
 
@@ -211,7 +200,6 @@ schemathesis.auth.set_from_requests(HTTPBasicAuth("user", "pass"))
     ],
     ids=["tls-verify", "proxy", "descriptor-set-http-url", "requests-auth"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unusable_options_refused(ctx, cli, snapshot_cli, tls, location, options, hooks):
     server = ctx.grpc.apps.users(tls=tls)
     # Writing a hooks module moves the working directory away from the descriptor set file.
@@ -255,7 +243,6 @@ class TokenAuth:
 
 
 @pytest.mark.parametrize("source", ["flag", "config"])
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_tls_verify_file(ctx, cli, tmp_path, snapshot_cli, source):
     server = ctx.grpc.apps.users(tls=True)
     args = [server.target]
@@ -276,7 +263,6 @@ schemathesis(sys.argv[2:])
 """
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_streaming_method_selected(ctx, cli, snapshot_cli):
     server = ctx.grpc.apps.users()
     assert cli.run(server.target, "--include-name=pkg.Users/WatchUsers", "--max-examples=1") == snapshot_cli
@@ -362,7 +348,6 @@ def test_grpc_library_logs_kept_out_of_output(ctx, tmp_path):
         "reflection-plaintext-to-tls-server-waiting",
     ],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_tls_failure_reported(ctx, cli, snapshot_cli, tls, scheme, source, extra):
     server = ctx.grpc.apps.users(tls=tls)
     target = f"{scheme}://{server.target.partition('://')[2]}"
@@ -373,7 +358,6 @@ def test_tls_failure_reported(ctx, cli, snapshot_cli, tls, scheme, source, extra
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_any_fields_warning(ctx, cli, tmp_path, snapshot_cli):
     server = ctx.grpc.apps.envelope()
     write_descriptor_set(tmp_path, all_types_descriptor_set())
@@ -389,7 +373,6 @@ def test_any_fields_warning(ctx, cli, tmp_path, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_rejected_fields_are_replayed_from_cache(ctx, cli, tmp_path, snapshot_cli):
     server = ctx.grpc.apps.users()
     write_descriptor_set(tmp_path, accounts_descriptor_set())
@@ -398,7 +381,6 @@ def test_rejected_fields_are_replayed_from_cache(ctx, cli, tmp_path, snapshot_cl
     assert cli.run(*args) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unserved_operation_warning(ctx, cli, tmp_path, snapshot_cli):
     server = ctx.grpc.apps.users()
     write_descriptor_set(tmp_path, all_types_descriptor_set())
@@ -408,7 +390,6 @@ def test_unserved_operation_warning(ctx, cli, tmp_path, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_partly_served_operation(ctx, cli, snapshot_cli):
     server = ctx.grpc.apps.users()
     # Odd ids are served, even ones are not.
@@ -433,7 +414,6 @@ def map_body(context, body):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unreachable_descriptor_set_target(cli, tmp_path, snapshot_cli):
     write_descriptor_set(tmp_path, users_descriptor_set())
     # A stopped server frees its port, and a server started by another test may take it over.
@@ -458,7 +438,6 @@ def test_unreachable_descriptor_set_target(cli, tmp_path, snapshot_cli):
     ],
     ids=["library-decode-error", "unauthenticated", "deadline-exceeded", "not-found", "cancelled", "unimplemented"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_get_user_status(ctx, cli, snapshot_cli, user_id, extra):
     server = ctx.grpc.apps.users()
     module = pinned_user(ctx, user_id)
@@ -513,7 +492,6 @@ def test_methods_with_side_effects_run_last(ctx, cli, tmp_path):
 
 
 @pytest.mark.parametrize("extra", [[], ["--generation-unique-inputs"]], ids=["default", "unique-inputs"])
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_reaches_created_names_and_page_tokens(ctx, cli, snapshot_cli, extra):
     server = ctx.grpc.apps.library()
     assert (
@@ -530,7 +508,6 @@ def test_stateful_reaches_created_names_and_page_tokens(ctx, cli, snapshot_cli, 
     ],
     ids=["created-name", "page-token"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_follows_links(ctx, cli, snapshot_cli, include):
     server = ctx.grpc.apps.library()
     # The run ends at the first failure; the time limit only stops a regression from hanging the test.
@@ -584,7 +561,6 @@ def before_call(context, case, kwargs):
     assert [call.method for call in server.calls] == ["GetUser"]
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unique_inputs_report_unencodable_messages(ctx, cli, snapshot_cli):
     server = ctx.grpc.apps.users()
     module = ctx.write_pymodule(

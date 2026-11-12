@@ -1793,7 +1793,6 @@ def test_html_report_fuzz_operation_errored(ctx, cli, app_runner, report_dir, sn
     assert read_report(report_dir) == snapshot_html
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_html_report_unwritable_path(ctx, cli, tmp_path, snapshot_cli):
     api = ctx.openapi.apps.success()
     parent = tmp_path / "file"

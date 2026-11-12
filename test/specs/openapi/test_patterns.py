@@ -86,7 +86,6 @@ def test_update_pattern_in_schema_keeps_unenforced_bounds(bounds, expected):
     assert schema == expected
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -227,7 +226,7 @@ def test_response_schema_is_not_mutated(cli, ctx, snapshot_cli):
     assert cli.run_openapi_app(app, "-call", "--phases=fuzzing", "-n 1") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
+@pytest.mark.snapshot(replace_invalid_component=True)
 def test_unicode_surrogate_patterns_are_dropped_with_warning(cli, ctx, snapshot_cli):
     # Surrogate code points are invalid in regex engines.
     query_pattern = "([\\u0020-\\uD7FF\\uE000-\\uFFFD\\uD800\\uDBFF-\\uDC00\\uDFFF\\t\\r\\n]){0,255}"

@@ -313,7 +313,6 @@ class BrokenAuth:
     assert cli.main("run", api.schema_url, "--max-examples=1", hooks=module) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     "extra_kwargs",
     [

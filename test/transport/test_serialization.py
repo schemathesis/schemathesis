@@ -92,6 +92,7 @@ def test_no_serialization_possible(tsv_setup):
         test()
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_in_cli(ctx, cli, tsv_setup, snapshot_cli):
     api, tsv_schema = tsv_setup
     schema_path = ctx.openapi.write_schema(tsv_schema.raw_schema["paths"])

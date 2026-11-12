@@ -15,7 +15,7 @@ from test.apps.catalog.openapi import nested
 from test.utils import run_given
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
+@pytest.mark.snapshot(replace_invalid_component=True)
 def test_deep_leaf_bug_detected_via_negative_fuzzing(ctx, cli, snapshot_cli):
     # Depth-3 `required` violation must reach the bug; at 50 examples a quarter of seeds never draw one.
     api = ctx.openapi.apps.deep_leaf_bug()
@@ -143,7 +143,7 @@ def test_additional_properties_negation_stays_invalid(ctx):
     [nested.header_constraint_bug, nested.one_of_branch_bug, nested.additional_properties_bug],
     ids=["header_constraint_bug", "one_of_branch_bug", "additional_properties_bug"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
+@pytest.mark.snapshot(replace_invalid_component=True)
 def test_secondary_planted_bug_detected(cli, ctx, snapshot_cli, factory):
     api = ctx.openapi.serve(factory())
     result = cli.run(

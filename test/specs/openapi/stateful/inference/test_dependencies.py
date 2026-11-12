@@ -9422,7 +9422,6 @@ def test_resource_name_from_path_with_param(path, param_name, expected):
     assert naming.from_path(path, param_name) == expected
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_schema_inference_discovers_state_corruption(cli, snapshot_cli, ctx):
     product_schema = {
         "type": "object",
@@ -9583,7 +9582,6 @@ def test_schema_inference_discovers_state_corruption(cli, snapshot_cli, ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_discovers_bug_with_no_body_producer_with_explicit_links_mixed_with_others(cli, snapshot_cli, ctx):
     app, schema = ctx.openapi.make_flask_app(
         {
@@ -9764,7 +9762,6 @@ def _customer_order_app(ctx, create_customer_body, create_order):
     return app
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
     def create_order(customer_id, customers):
         if not isinstance(customer_id, (str, int)):
@@ -9786,7 +9783,6 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_discovers_invalid_resource_id_bug(cli, snapshot_cli, ctx):
     def create_order(customer_id, customers):
         if customer_id not in customers:
@@ -9806,7 +9802,6 @@ def test_stateful_discovers_invalid_resource_id_bug(cli, snapshot_cli, ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, snapshot_cli, ctx):
     product_schema = {
         "type": "object",
@@ -9910,7 +9905,6 @@ def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, 
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cli, snapshot_cli, ctx):
     def create_order(customer_id, customers):
         if not isinstance(customer_id, str):
@@ -9931,7 +9925,6 @@ def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cl
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_schemathesis_stateful_finds_checksum_match_bug(ctx, cli, snapshot_cli):
     openapi = {
         "openapi": "3.0.0",
@@ -10565,7 +10558,6 @@ def test_echoed_update_field_in_dependency_graph(ctx, snapshot_json):
 
 
 # Only the item GET returns the version, under a different model than creation returns.
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_echoes_version_returned_only_by_item_get(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -10662,7 +10654,6 @@ def test_stateful_echoes_version_returned_only_by_item_get(ctx, cli, snapshot_cl
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_bug_when_link_always_used(cli, snapshot_cli, ctx):
     item_schema = {
         "type": "object",
@@ -11348,7 +11339,6 @@ def test_iter_links_with_circular_refs(ctx):
                     assert "$ref" in link
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_discovers_bug_with_custom_deserializer(cli, snapshot_cli, ctx):
     @schemathesis.deserializer("application/vnd.custom")
     def deserialize_custom(ctx, response):
