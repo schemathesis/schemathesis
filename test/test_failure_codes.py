@@ -3,6 +3,7 @@ import sys
 
 import pytest
 
+import schemathesis.checks
 from schemathesis.core.failures import Failure, ServerError
 from schemathesis.failure_codes import FAILURE_CLASSES, get_failure_class
 
@@ -44,3 +45,10 @@ def test_user_subclass_inherits_code():
         pass
 
     assert (Direct.code, Crash.code) == ("ST901", "ST101")
+
+
+def test_no_failure_class_keys_on_its_message():
+    # A message-derived key changes whenever wording improves, which a stored key cannot survive.
+    schemathesis.checks.load_all_checks()
+
+    assert [cls.__name__ for cls in FAILURE_CLASSES if cls._unique_key is Failure._unique_key] == []

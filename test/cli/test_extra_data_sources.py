@@ -112,7 +112,6 @@ def _store_item(data, items):
     return jsonify(item), 201
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, snapshot_cli, ctx):
     post_count = [0]
 
@@ -203,7 +202,6 @@ def test_pool_captures_response_only_under_its_documented_status(cli, ctx):
     assert set(order_lookups) & set(orders)
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_disabled_misses_bug(cli, snapshot_cli, ctx):
     assert (
         cli.run_openapi_app(
@@ -217,7 +215,6 @@ def test_extra_data_sources_disabled_misses_bug(cli, snapshot_cli, ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_with_body_parameters(cli, snapshot_cli, ctx):
     project_schema = _object_schema({"id": {"type": "string"}, "name": {"type": "string"}}, required=["id", "name"])
     task_request_schema = _object_schema(
@@ -298,7 +295,6 @@ def test_extra_data_sources_with_body_parameters(cli, snapshot_cli, ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("extra_data_enabled", [True, False])
 def test_extra_data_sources_with_response_examples_prepopulation(cli, snapshot_cli, ctx, extra_data_enabled):
     known_user_id = "seeded-user-abc-123"
@@ -424,7 +420,6 @@ def _make_items_app(ctx, get_params):
     return app
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_examples_phase_merges_pool_with_schema_examples(cli, snapshot_cli, ctx):
     # `filter` has a schema example (keeps the phase active), `id` has none.
     # Pool supplies the real `id` from POST, exposing the bug.
@@ -444,7 +439,6 @@ def test_examples_phase_merges_pool_with_schema_examples(cli, snapshot_cli, ctx)
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_examples_phase_uses_pool_as_fill_missing_source(cli, snapshot_cli, ctx):
     # No schema examples - GET would be skipped without fill-missing.
     # With fill-missing=true, pool supplies the real `id` and exposes the bug.
@@ -462,7 +456,6 @@ def test_examples_phase_uses_pool_as_fill_missing_source(cli, snapshot_cli, ctx)
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, snapshot_cli, ctx):
     user_schema = _object_schema({"id": {"type": "string"}, "email": {"type": "string"}}, required=["id", "email"])
     app, _ = ctx.openapi.make_flask_app(
@@ -530,7 +523,6 @@ def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, snapshot_cli, 
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_examples_phase_uses_pool_for_body_fields(cli, snapshot_cli, ctx):
     # Without body-side pool consumption, fill-missing has nothing to fill the body-only consumer with.
     session_schema = _object_schema({"sessionId": {"type": "string", "format": "uuid"}}, required=["sessionId"])
@@ -590,7 +582,6 @@ def test_examples_phase_uses_pool_for_body_fields(cli, snapshot_cli, ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_no_false_positive_when_pool_body_missing_required_fields(cli, snapshot_cli, ctx):
     # Pool-seeded body with only a subset of required fields must not trigger positive_data_acceptance.
     api = ctx.openapi.serve(basic.sessions_and_log_event())
@@ -607,7 +598,7 @@ def test_no_false_positive_when_pool_body_missing_required_fields(cli, snapshot_
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_traceback=True)
+@pytest.mark.snapshot(replace_traceback=True)
 @pytest.mark.parametrize(
     "deserializer_body",
     ['return {"id": {1: "packed"}}', 'raise ZeroDivisionError("Deserializer crashed")'],
@@ -669,7 +660,6 @@ def deserialize_custom(ctx, response):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_pool_records_responses_with_unbundlable_schema(cli, snapshot_cli, ctx):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -699,7 +689,6 @@ def test_pool_records_responses_with_unbundlable_schema(cli, snapshot_cli, ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, snapshot_cli, ctx):
     # Docker Engine /volumes shape: `{Volumes: [...], Warnings: [...]}`. Server-seeded names;
     # no POST creator. UUIDs make blind generation practically incapable of guessing.
@@ -768,7 +757,6 @@ def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, snapshot
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_parent_aware_pool_correlates_path_params(cli, snapshot_cli, ctx):
     # Deep path planted bug fires only when (productName, itemName) co-refer.
     # Without parent-aware draws, pool feeds independent values and the bug stays unreached.
@@ -971,7 +959,6 @@ def test_pool_chains_picks_when_no_instance_covers_every_slot(cli, ctx):
     assert "g-dead" not in {tag_id for *_, tag_id in tag_lookups} | {body["tag_id"] for body in task_bodies}
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_pool_skips_ids_that_cannot_fill_a_path_segment(cli, snapshot_cli, ctx):
     client_schema = _object_schema({"clientId": {"type": "string"}}, required=["clientId"])
     app, _ = ctx.openapi.make_flask_app(
@@ -1072,7 +1059,6 @@ def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, ctx):
     assert stale_get_calls <= 5, f"pool kept feeding deleted ids: {stale_get_calls} stale GETs"
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     ("producer_shape", "wrap_response"),
     [
@@ -1151,7 +1137,6 @@ def test_stateful_reaches_every_list_producer_element(cli, snapshot_cli, ctx, pr
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     ("sub_cardinality", "sub_resource", "consumer_path", "consumer_op", "ids", "make_post"),
     [
@@ -1344,7 +1329,6 @@ def test_pool_reuses_created_identifiers(cli, ctx, booking_properties, parameter
     assert requested & misplaced == set(), f"Envelope identifier sent as `{parameter}`"
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_overlays_nested_body_foreign_key(cli, snapshot_cli, ctx):
     # Server returns 500 only when shipping.location_id matches a real Location id;
     # without the nested overlay random ints never hit a real id and the bug stays hidden.
@@ -1409,7 +1393,6 @@ def test_extra_data_sources_overlays_nested_body_foreign_key(cli, snapshot_cli, 
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_handles_boolean_body_schema(cli, snapshot_cli, ctx):
     # A `schema: true` body alongside pool-using operations must not derail generation.
     app, _ = ctx.openapi.make_flask_app(
@@ -1507,7 +1490,6 @@ def test_extra_data_sources_fills_boolean_schema_property(cli, ctx):
     assert task_project_ids & project_ids
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_examples_phase_disabled(cli, snapshot_cli, ctx):
     app, _ = ctx.openapi.make_flask_app(
         {

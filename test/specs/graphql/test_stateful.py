@@ -14,7 +14,6 @@ pytestmark = pytest.mark.usefixtures("book_id_scalar")
     [bookstore.bare_slug, bookstore.relay_connection, bookstore.use_after_delete, bookstore.double_delete],
     ids=["bare-slug-arg", "relay-connection-producer", "use-after-delete", "double-delete"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_finds_captured_value_bug(ctx, cli, snapshot_cli, factory):
     # Bare `slug` resolves via the enclosing return type; tombstones expose reads and deletes of a deleted resource.
     api = ctx.graphql.serve(factory())

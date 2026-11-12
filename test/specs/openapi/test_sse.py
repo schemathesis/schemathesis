@@ -124,19 +124,16 @@ def _call_sse(raw_schema, body):
     return case, case.call(app=app)
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_sse_valid_events(ctx, cli, snapshot_cli):
     body = 'event: update\ndata: {"value": 42}\n\nevent: update\ndata: {"value": 100}\n\n'
     assert _run_sse_cli(ctx, cli, body) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_sse_schema_violation(ctx, cli, snapshot_cli):
     body = 'event: update\ndata: {"value": 42}\n\nevent: update\ndata: {"value": "not_an_integer"}\n\n'
     assert _run_sse_cli(ctx, cli, body, SSE_VALUE_ITEM_SCHEMA) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_sse_multiple_failing_events(ctx, cli, snapshot_cli):
     body = (
         'event: update\ndata: {"value": "bad"}\n\n'
@@ -146,12 +143,10 @@ def test_sse_multiple_failing_events(ctx, cli, snapshot_cli):
     assert _run_sse_cli(ctx, cli, body, SSE_VALUE_ITEM_SCHEMA) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_sse_empty_stream(ctx, cli, snapshot_cli):
     assert _run_sse_cli(ctx, cli, "") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_sse_itemschema_ignored_for_json(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -187,12 +182,10 @@ def test_sse_itemschema_ignored_for_json(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_sse_with_openapi_32(ctx, cli, snapshot_cli):
     assert _run_sse_cli(ctx, cli, 'data: {"value": 42}\n\n', version="3.2.0") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_sse_oneof_content_schema_violation(ctx, cli, snapshot_cli):
     item_schema = {
         "type": "object",

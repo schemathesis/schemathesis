@@ -9,7 +9,6 @@ def _response(media_type, schema):
     return {"get": {"responses": {"200": {"description": "OK", "content": {media_type: {"schema": schema}}}}}}
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_custom_deserializers(ctx, cli, snapshot_cli):
     raw_schema = ctx.openapi.build_schema(
         {
@@ -98,7 +97,6 @@ def deserialize_second(ctx, response):
     assert cli.run_openapi_app(app, "--checks=response_schema_conformance", hooks=hooks_module) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_deserializer_with_wildcard_media_type(ctx, cli, snapshot_cli):
     raw_schema = ctx.openapi.build_schema(
         {
@@ -178,7 +176,6 @@ def test_wildcard_deserializer_matches_concrete_media_type(ctx, response_factory
         schema["/data"]["GET"].validate_response(response)
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_deserializer_error_in_stateful_phase(ctx, cli, snapshot_cli):
     # Without `response_schema_conformance` the deserializer first runs between stateful suites.
     custom = {"application/vnd.custom": {"schema": {"type": "object"}}}

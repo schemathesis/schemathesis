@@ -144,7 +144,6 @@ def test_unsupported_scalar_is_not_reported_as_impossible_negative(ctx, modes):
     [st.nothing(), st.lists(st.just("x"), min_size=10**5).map("".join).map(nodes.String)],
     ids=["unsatisfiable", "large-base-example"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_custom_scalar_generation_uses_generic_diagnostics(ctx, cli, snapshot_cli, strategy):
     schemathesis.graphql.scalar("FooBar", strategy)
     schema_file = ctx.graphql.write_sdl(UNSUPPORTED_SCALAR_SDL, filename="schema.gql")

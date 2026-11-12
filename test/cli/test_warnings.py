@@ -20,7 +20,6 @@ def _serve_schema(ctx, cli, app_runner, schema: dict, routes):
     return app_runner.openapi_url(app)
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_warnings_failing_the_run_are_named_in_the_final_line(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.basic()
 
@@ -67,7 +66,6 @@ def test_timeout_units_warning_with_fail_on(ctx, cli, fail_on):
     assert (result.exit_code, final_line) == (ExitCode.TESTS_FAILED, "Warnings fail the run")
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_deserializer_warning_grouped_by_media_type(cli, ctx, snapshot_cli):
     html = {"text/html": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}}
     msgpack = {"application/msgpack": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}}
@@ -96,7 +94,6 @@ def test_missing_deserializer_warning_grouped_by_media_type(cli, ctx, snapshot_c
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_deserializer_warning_names_unvalidated_media_type(cli, ctx, snapshot_cli):
     # JSON responses are validated; only the CSV variant is skipped
     body = {"type": "object", "properties": {"id": {"type": "integer"}}}
@@ -189,7 +186,6 @@ def test_warnings_off_via_cli(cli, ctx):
     assert "Schema validation skipped" not in result.stdout
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_final_line_counts_all_warning_kinds_in_run(cli, ctx, app_runner, snapshot_cli):
     # Regression test: the footer "N warnings in Xs" should count warning *kinds*, not just missing_auth operations
     schema = ctx.openapi.build_schema(
@@ -327,7 +323,6 @@ def test_warning_on_many_operations(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_test_data_advice_for_linked_operations(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.users_crud()
     assert (
@@ -342,7 +337,6 @@ def test_missing_test_data_advice_for_linked_operations(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_test_data_advice_for_unusable_linked_data(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -580,7 +574,6 @@ def test_missing_test_data_warning_withdrawn_by_documented_redirect(ctx, cli, ap
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_test_data_advice_from_dependency_graph(ctx, cli, snapshot_cli):
     # No links are declared, so the advice comes from the inferred dependency graph:
     # `POST /orders` supplies what `GET /orders/{orderId}/receipt` needs, nothing in the schema
@@ -646,7 +639,6 @@ def test_missing_test_data_advice_from_dependency_graph(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_test_data_advice_grouped_by_cause(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.users_crud()
     assert (
@@ -687,7 +679,6 @@ def _base_path_app(ctx, app_runner, schema):
 USERS = {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     "schema_kwargs",
     [{"version": "2.0"}, {"servers": [{"url": "/api"}]}],
@@ -700,7 +691,6 @@ def test_warns_when_base_url_omits_the_declared_path(ctx, cli, app_runner, snaps
     assert cli.run(schema_url, f"--url={base}", "--max-examples=2", "--phases=fuzzing") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_silent_when_the_url_already_has_the_path(ctx, cli, app_runner, snapshot_cli):
     schema_url = _base_path_app(ctx, app_runner, ctx.openapi.build_schema(USERS, version="2.0"))
     base = schema_url.rsplit("/", 1)[0]
@@ -708,7 +698,6 @@ def test_silent_when_the_url_already_has_the_path(ctx, cli, app_runner, snapshot
     assert cli.run(schema_url, f"--url={base}/api", "--max-examples=2", "--phases=fuzzing") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_silent_when_the_schema_declares_no_base_path(ctx, cli, app_runner, snapshot_cli):
     schema_url = _base_path_app(ctx, app_runner, ctx.openapi.build_schema(USERS))
     base = schema_url.rsplit("/", 1)[0]
@@ -872,7 +861,6 @@ def _erratic_books_schema():
     return strawberry.Schema(query=Query)
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_low_valid_rate_for_graphql(ctx, cli, snapshot_cli):
     # GraphQL answers 200 whether it served the query or only returned errors.
     api = ctx.graphql.apps.from_schema(_erratic_books_schema())
@@ -892,7 +880,6 @@ type Query {
 """
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_test_data_for_graphql(ctx, cli, snapshot_cli):
     # A 200 with neither `data` nor `errors` fails no check, so nothing else in the run says the query was never served.
     sdl = ctx.graphql.write_sdl(GRAPHQL_SDL)
@@ -919,7 +906,6 @@ type Mutation {{
 
 
 # The canned responses ignore the selection set.
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_test_data_for_graphql_survives_stateful(ctx, cli, app_runner, snapshot_cli):
     # The mutation is served, so the stateful phase reaches the query - but it still returns no data.
     sdl = ctx.graphql.write_sdl(GRAPHQL_SDL_WITH_MUTATION)
@@ -945,7 +931,6 @@ def test_missing_test_data_for_graphql_survives_stateful(ctx, cli, app_runner, s
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_validation_mismatch_ignores_undeclared_method_probes(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -980,7 +965,6 @@ def test_validation_mismatch_ignores_undeclared_method_probes(ctx, cli, snapshot
     assert cli.run_openapi_app(app, "--phases=coverage", "-c not_a_server_error") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_validation_mismatch_ignores_negative_rejections(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -1043,7 +1027,6 @@ def test_validation_mismatch_ignores_conflicts(ctx, cli, status, expected):
     assert ("Schema validation mismatch" in result.stdout) is expected
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_test_data_ignores_negative_not_found(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -1068,7 +1051,6 @@ def test_missing_test_data_ignores_negative_not_found(ctx, cli, snapshot_cli):
 
 
 # The auth-rejected operation keeps its own warning; only the throttled one is reported as rate-limited.
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_rate_limited_operation_warning(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -1109,7 +1091,6 @@ def test_rate_limited_operation_warning(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.parametrize("extra", [[], ["--checks=not_a_server_error"]], ids=["all-checks", "passing-checks"])
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_method_not_allowed_warning_in_cli_output(cli, ctx, snapshot_cli, extra):
     api = ctx.openapi.apps.unimplemented_method()
     assert (
@@ -1125,7 +1106,6 @@ def test_method_not_allowed_warning_in_cli_output(cli, ctx, snapshot_cli, extra)
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_method_not_allowed_warning_hidden_when_not_displayed(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.unimplemented_method()
 
@@ -1143,7 +1123,6 @@ def test_method_not_allowed_warning_hidden_when_not_displayed(cli, ctx, snapshot
 
 
 # Only phases whose accepted share falls below the threshold are listed.
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_low_valid_rate_lists_only_phases_below_threshold(ctx, cli, snapshot_cli):
     app = _orders_app(ctx, accept_every=10)
 
@@ -1207,7 +1186,6 @@ SIGN_UP_THEN_LOG_IN = {
 }
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_auth_warning_suggests_login_config(ctx, cli, app_runner, snapshot_cli):
     schema = ctx.openapi.build_schema(
         SIGN_UP_THEN_LOG_IN,

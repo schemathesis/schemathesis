@@ -1,4 +1,3 @@
-import pytest
 from flask import jsonify
 
 from test.apps.catalog.openapi import nested
@@ -42,7 +41,6 @@ def _items_app(ctx):
     return app
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_dictionary_mismatch_warning_for_false_schema(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -75,7 +73,6 @@ def test_dictionary_mismatch_warning_for_false_schema(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_dictionary_mismatch_warning_with_invalid_parameter_schema_in_another_operation(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -178,7 +175,6 @@ SHORT_CODES = {"type": "string", "maxLength": 2}
 
 
 # Two operations share both parameters, so each pair is reported once, not once per operation.
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_type_wide_dictionary_mismatch_reported_once_per_parameter(ctx, cli, snapshot_cli):
     parameters = [
         {"name": "lang", "in": "query", "required": True, "schema": SHORT_CODES},

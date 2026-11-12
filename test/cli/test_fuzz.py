@@ -73,7 +73,6 @@ def _make_multi_operation_failure_app(ctx, app_runner):
     return app_runner.openapi_url(app)
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_when_no_checks_ran(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     result = cli.main("fuzz", api.schema_url, "--max-time=30", config={"checks": {"enabled": False}})
@@ -127,7 +126,6 @@ def test_fuzz_operations_summary_unanswered_step_is_skipped_by_failure_limit(ctx
     assert (operations.tested, operations.skipped, operations.skip_reasons) == (1, 1, ["Failure limit reached"])
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_filter_case_rejects_all(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(
@@ -140,7 +138,6 @@ def filter_case(context, case):
     assert cli.main("fuzz", api.schema_url, "--max-time=30", hooks=module) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_filter_case_rejects_after_first_accepted(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(
@@ -157,7 +154,6 @@ def filter_case(context, case):
     assert cli.main("fuzz", api.schema_url, "--max-time=30", hooks=module) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_after_run_check_failure(cli, app_runner, ctx, snapshot_cli):
     url = _make_fuzz_app(ctx, app_runner)
     module = ctx.write_pymodule(
@@ -171,7 +167,6 @@ class NoServerErrors:
     assert cli.main("fuzz", url, "-c", "NoServerErrors", "--max-time=30", hooks=module) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_with_failure(cli, app_runner, ctx, tmp_path, snapshot_cli):
     url = _make_fuzz_failure_app(ctx, app_runner)
     xml_path = tmp_path / "junit.xml"
@@ -189,13 +184,11 @@ def test_fuzz_final_line_with_failure(cli, app_runner, ctx, tmp_path, snapshot_c
     assert any("Server error" in step["statusDetails"]["message"] for step in failure.get("steps", []))
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_with_error(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.slow()
     assert cli.main("fuzz", api.schema_url, "--max-time=30", "--request-timeout=0.001") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_interrupted(cli, app_runner, ctx, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -259,6 +252,7 @@ def test_fuzz_live_progress_on_terminal(cli, app_runner, ctx, make_app, args, ex
     assert re.search(expected, result.stdout)
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_fuzz_unreachable_server_has_no_passed_scenarios(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.success()
 
@@ -305,7 +299,7 @@ def test_fuzz_budget_too_small_for_startup_still_runs_a_scenario(cli, app_runner
 
 
 @pytest.mark.parametrize("max_time", ["0", "30"], ids=["time-limit-reached", "time-left"])
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_traceback=True)
+@pytest.mark.snapshot(replace_traceback=True)
 def test_fuzz_reports_error_that_does_not_repeat(cli, app_runner, ctx, snapshot_cli, max_time):
     url = _make_fuzz_app(ctx, app_runner)
     module = ctx.write_pymodule(
@@ -355,7 +349,6 @@ def test_fuzz_checks_steps_after_a_failure(cli, app_runner, ctx):
 
 
 # Confirming that auth is enforced sends probe requests that join the scenario while its steps are checked.
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_with_enforced_auth(cli, app_runner, ctx, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -379,13 +372,11 @@ def test_fuzz_with_enforced_auth(cli, app_runner, ctx, snapshot_cli):
     assert result == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_empty_test_suite(cli, app_runner, ctx, snapshot_cli):
     url = _make_fuzz_app(ctx, app_runner)
     assert cli.main("fuzz", url, "--include-path=/nonexistent") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_unmatched_filter_suggests_the_operation_it_nearly_names(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.success()
     assert cli.main("fuzz", api.schema_url, "--include-path=/api/succes") == snapshot_cli
@@ -411,7 +402,6 @@ def test_fuzz_unmatched_filter_with_fail_on(cli, ctx, config, expected, final_li
     ), result.stdout
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_fatal_error_loader(cli, tmp_path, snapshot_cli):
     assert (
         cli.main("fuzz", "http://127.0.0.1:1/openapi.json", f"--report-junit-path={tmp_path / 'junit.xml'}")
@@ -426,19 +416,16 @@ def test_fuzz_fatal_error_loader_omits_wait_for_schema_tip_when_set(cli):
     assert "Tip:" not in result.stdout, result.stdout
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_rejects_conflicting_color_flags(cli, snapshot_cli):
     assert cli.main("fuzz", "http://127.0.0.1:1/openapi.json", "--no-color", "--force-color") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_schema_file_with_malformed_server_asks_for_url(cli, ctx, snapshot_cli):
     # A server URL that cannot be read gives no target to suggest.
     schema_path = ctx.openapi.write_schema(USERS_OK_PATHS, servers=[{"url": 5}])
     assert cli.main("fuzz", str(schema_path)) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_fatal_error_internal(cli, app_runner, ctx, snapshot_cli, monkeypatch):
     url = _make_fuzz_app(ctx, app_runner)
     monkeypatch.setattr(fuzz_executor, "from_schema", lambda schema: _RaisingEngine())
@@ -599,7 +586,6 @@ BAD_PARAMETERS_PATHS = {
 }
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_reports_operations_with_schema_errors(cli, app_runner, ctx, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app({**USERS_OK_PATHS, **BAD_PARAMETERS_PATHS})
 
@@ -611,7 +597,6 @@ def test_fuzz_reports_operations_with_schema_errors(cli, app_runner, ctx, snapsh
     assert cli.main("fuzz", url, "--max-time=30") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_all_operations_have_schema_errors(cli, app_runner, ctx, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(BAD_PARAMETERS_PATHS)
     url = app_runner.openapi_url(app)
@@ -648,7 +633,6 @@ def test_fuzz_section_max_time_overrides_root(cli, ctx, app_runner, tmp_path):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_custom_handler_error(cli, app_runner, ctx, snapshot_cli):
     @schemathesis.cli.handler()
     class BrokenHandler(EventHandler):
@@ -659,7 +643,6 @@ def test_fuzz_custom_handler_error(cli, app_runner, ctx, snapshot_cli):
     assert cli.main("fuzz", url, "--max-time=30") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_custom_handler_and_reports(cli, app_runner, ctx, tmp_path, snapshot_cli):
     group = schemathesis.cli.add_group("Fuzz custom group")
     group.add_option("--fuzz-counter", type=int, default=0)
@@ -697,7 +680,6 @@ def test_fuzz_custom_handler_and_reports(cli, app_runner, ctx, tmp_path, snapsho
     assert any((tmp_path / "allure-results").glob("*-result.json"))
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_chains_post_with_get_via_link(cli, app_runner, ctx, snapshot_cli):
     # Server-generated productId means GET path can only match if it comes from POST's response.
     paths = {
@@ -762,7 +744,6 @@ def test_fuzz_chains_post_with_get_via_link(cli, app_runner, ctx, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_chains_via_request_body_link(cli, app_runner, ctx, snapshot_cli):
     # POST /products returns a fixed high-entropy (productId, secret) pair; only when /audit
     # body carries that exact pair does the planted schema violation surface. Random fuzz
@@ -1047,7 +1028,6 @@ def test_fuzz_negative_mode_from_config_skips_operations_without_negatable_parts
     ), result.stdout
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_negative_without_negatable_operations(cli, app_runner, ctx, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(PING_PATHS)
     assert cli.main("fuzz", app_runner.openapi_url(app), "--mode=negative") == snapshot_cli

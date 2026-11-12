@@ -61,7 +61,6 @@ def _json_string_field(name):
     return value if isinstance(value, str) else None
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_consumes_path_keyed_pool(cli, snapshot_cli, ctx):
     paths = {
         "/widgets/{widgetId}": {
@@ -93,7 +92,6 @@ def test_coverage_consumes_path_keyed_pool(cli, snapshot_cli, ctx):
     assert cli.run_openapi_app(app, "--phases=coverage", "-c response_schema_conformance") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_param_mutation_preserves_nested_overlay_siblings(cli, ctx, snapshot_cli):
     # Nested overlay must keep generator-produced siblings (`note`) when the pool seeds a foreign-key leaf (`location_id`).
     paths = {
@@ -163,7 +161,6 @@ def test_coverage_param_mutation_preserves_nested_overlay_siblings(cli, ctx, sna
     assert cli.run_openapi_app(app, "--phases=coverage", "--continue-on-failure") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_consumes_body_field_keyed_pool(cli, snapshot_cli, ctx):
     paths = {
         "/sessions": {
@@ -210,7 +207,6 @@ def test_coverage_consumes_body_field_keyed_pool(cli, snapshot_cli, ctx):
     assert cli.run_openapi_app(app, "--phases=coverage", "-c response_schema_conformance") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_consumes_pool_for_ref_body_property(cli, snapshot_cli, ctx):
     paths = {
         "/sessions": {
@@ -257,7 +253,6 @@ def test_coverage_consumes_pool_for_ref_body_property(cli, snapshot_cli, ctx):
     assert cli.run_openapi_app(app, "--phases=coverage", "-c response_schema_conformance") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_correlates_nested_resource_pool_picks(cli, snapshot_cli, ctx):
     # Independent picks return (U2, R1) but R1's parent is U1; only correlation matches the planted pair.
     paths = {
@@ -316,7 +311,6 @@ def test_coverage_correlates_nested_resource_pool_picks(cli, snapshot_cli, ctx):
     assert cli.run_openapi_app(app, "--phases=coverage", "-c response_schema_conformance") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_negative_does_not_pollute_pool_with_invalid_values(cli, snapshot_cli, ctx):
     # A permissive endpoint's negative mutations must not seed the pool with values a strict endpoint would later reject.
     paths = {
@@ -361,7 +355,6 @@ def test_coverage_negative_does_not_pollute_pool_with_invalid_values(cli, snapsh
     assert cli.run_openapi_app(app, "--phases=coverage", "-c positive_data_acceptance") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_pool_overlay_respects_stricter_destination_constraints(cli, snapshot_cli, ctx):
     # A loose endpoint contributes a value valid only for itself; a stricter consumer must not adopt it.
     paths = {
@@ -406,7 +399,6 @@ def test_coverage_pool_overlay_respects_stricter_destination_constraints(cli, sn
     assert cli.run_openapi_app(app, "--phases=coverage", "-c positive_data_acceptance") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_pool_overlay_respects_destination_format(cli, snapshot_cli, ctx):
     # A producer with no `format` constraint must not contribute values that violate a consumer's `format: uuid`.
     # The producer caps `txnId` length at 5 — no value can satisfy uuid (36 chars), so any pool injection fails.

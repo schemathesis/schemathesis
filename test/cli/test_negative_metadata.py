@@ -12,7 +12,6 @@ from schemathesis.engine import Status, events
 UUID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_format_password_false_positive(ctx, cli, snapshot_cli):
     # GH-3480: Schemathesis incorrectly reports data as invalid for format: password
     # In OpenAPI 3.0, `format` is an annotation and does NOT impose validation constraints by itself.
@@ -67,7 +66,6 @@ def test_format_password_false_positive(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_text_plain_negative_becomes_valid_after_serialization(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -100,7 +98,7 @@ def test_text_plain_negative_becomes_valid_after_serialization(ctx, cli, snapsho
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
+@pytest.mark.snapshot(replace_invalid_component=True)
 def test_text_plain_with_query_negative_still_fails(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {

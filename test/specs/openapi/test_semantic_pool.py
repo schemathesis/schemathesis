@@ -996,7 +996,6 @@ def _attach_planted_bug(app, producer_path, producer_property, value, consumer_p
         return Response(status=200)
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_planted_bugs_surface_via_semantic_pools(ctx, cli, snapshot_cli):
     paths = {}
     for producer_path, producer_property, _, consumer_path, consumer_property, property_schema in _PLANTED_BUGS:

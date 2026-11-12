@@ -116,7 +116,6 @@ def _get_crash(ctx, app_runner, crash_factory, directory: Path, view, *, path: s
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_fixed(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     schema_url, base = _users_app(ctx, app_runner)
     crash_file = _write_crash(
@@ -133,7 +132,6 @@ def test_replay_fixed(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cl
     assert not crash_file.exists()
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_fixed_case_with_multiple_checks_shows_single_block(
     cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli
 ):
@@ -156,7 +154,6 @@ def test_replay_fixed_case_with_multiple_checks_shows_single_block(
     assert cli.main("replay", "Fx1Cd2") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_still_failing(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     def broken():
         return jsonify({"error": "still broken"}), 500
@@ -169,7 +166,6 @@ def test_replay_still_failing(cli, app_runner, ctx, crash_factory, tmp_path, sna
     assert crash_file.exists()
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_flaky(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # A crash that reproduces only on some replays must be kept, not reported as fixed.
     statuses = itertools.cycle([200, 500])
@@ -200,7 +196,6 @@ def test_replay_attempt_count(cli, app_runner, ctx, crash_factory, tmp_path, sta
     assert len(calls) == expected_attempts
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_response_schema_conformance_fixed(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # An unconstrained 200 response schema always passes on replay, so the crash is reported fixed.
     app, _ = ctx.openapi.make_flask_app({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
@@ -226,7 +221,6 @@ def test_replay_response_schema_conformance_fixed(cli, app_runner, ctx, crash_fa
     assert not crash_file.exists()
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_base_url_override(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     schema_url, base = _users_app(ctx, app_runner)
     # Recorded against a dead host; the live schema still loads and --url redirects traffic to it.
@@ -243,7 +237,6 @@ def test_replay_base_url_override(cli, app_runner, ctx, crash_factory, tmp_path,
     assert cli.main("replay", str(tmp_path), "--url", base) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_uses_recorded_base_url_without_override(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # Without --url, a crash from a file-based schema (no servers) must replay against the manifest's base URL.
     received = []
@@ -276,7 +269,6 @@ def test_replay_uses_recorded_base_url_without_override(cli, app_runner, ctx, cr
     assert received, result.output
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_keep_flag(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     schema_url, base = _users_app(ctx, app_runner)
     crash_file = _write_crash(
@@ -293,7 +285,6 @@ def test_replay_keep_flag(cli, app_runner, ctx, crash_factory, tmp_path, snapsho
     assert crash_file.exists()
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_missing_path_is_errored_not_crash(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # An endpoint removed since recording is reported as errored, not aborted with a traceback.
     schema_url, base = _users_app(ctx, app_runner)
@@ -310,7 +301,6 @@ def test_replay_missing_path_is_errored_not_crash(cli, app_runner, ctx, crash_fa
     assert cli.main("replay", str(crash_file)) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_corrupt_meta_is_errored_not_crash(cli, app_runner, ctx, tmp_path, snapshot_cli):
     # A crash file on disk that loads fine but carries metadata the current format can't decode is reported
     # errored and kept, rather than aborting the whole run with a traceback.
@@ -347,7 +337,6 @@ def test_replay_corrupt_meta_is_errored_not_crash(cli, app_runner, ctx, tmp_path
     assert cli.main("replay", "--keep") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_default_finds_named_project_crashes(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # Replay with no path discovers crashes stored under any project directory, not only the unnamed default.
     schema_url, base = _users_app(ctx, app_runner)
@@ -396,7 +385,6 @@ def test_replay_unsupported_method_crash(cli, ctx, tmp_path):
     assert "GET /api/thing/{id}" not in result.output, result.output
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_by_case_id_removes_fixed_crash(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # Replaying by bare case ID removes the fixed crash from its real directory, not the current one.
     schema_url, base = _users_app(ctx, app_runner)
@@ -564,7 +552,6 @@ def test_replay_applies_terminal_step_link(cli, app_runner, ctx, tmp_path, crash
     assert received == ["fresh-123"]
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_applies_non_path_link_parameter(cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli):
     # A link feeding a query parameter (not a path one) is re-extracted from the previous response.
     received = []
@@ -643,7 +630,6 @@ def test_replay_applies_non_path_link_parameter(cli, app_runner, ctx, tmp_path, 
         "top-level-array",
     ],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_request_body_link(
     cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli, source_body, request_body, case_body, expected
 ):
@@ -692,7 +678,6 @@ def test_replay_request_body_link(
     assert received == [expected]
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_reproduces_recorded_unit_failures(cli, ctx, tmp_path, snapshot_cli):
     api = ctx.openapi.apps.failure_multiple_failures_unsatisfiable()
 
@@ -1107,7 +1092,7 @@ def _items_chain(crash_factory, *, parent: int | None, request_headers: dict[str
     return crash
 
 
-@pytest.mark.snapshot
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_replay_chain_reproduces_with_fresh_ids(cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli):
     # The reproduce commands and step diffs must use the ids this replay minted, not the recorded ones.
     schema_url, base = _items_app(ctx, app_runner)
@@ -1119,7 +1104,7 @@ def test_replay_chain_reproduces_with_fresh_ids(cli, app_runner, ctx, tmp_path, 
     assert cli.main("replay", "--keep") == snapshot_cli
 
 
-@pytest.mark.snapshot
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_replay_sibling_link_values_do_not_mask_body_changes(
     cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli
 ):
@@ -1163,7 +1148,7 @@ def test_replay_sibling_link_values_do_not_mask_body_changes(
     assert cli.main("replay", "--keep") == snapshot_cli
 
 
-@pytest.mark.snapshot
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_replay_old_crash_file_without_parent_index_or_case_headers(
     cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli
 ):
@@ -1180,7 +1165,7 @@ def test_replay_old_crash_file_without_parent_index_or_case_headers(
     assert cli.main("replay", "--keep") == snapshot_cli
 
 
-@pytest.mark.snapshot
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_replay_resends_custom_wire_headers_but_not_generated_ones(
     cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli
 ):
@@ -1309,7 +1294,6 @@ def after_call(context, case, response):
 """
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_keyboard_interrupt(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {path: {"get": {"responses": {"500": {"description": "Error"}}}} for path in ("/a", "/b")}
@@ -1350,7 +1334,6 @@ def after_call(context, case, response):
     assert cli.main("replay", str(tmp_path), "--keep", hooks=module) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_interrupt_before_first_outcome(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # Ctrl-C before the first crash finishes exits without rendering a partial report.
     schema_url, base = _users_app(ctx, app_runner)
@@ -1517,7 +1500,6 @@ def test_render_step_chain(ctx, snapshot, crash_factory, response_factory):
     assert _capture_render(schema=ctx.openapi.load_schema({}), crashes=crashes, outcomes=outcomes) == snapshot
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_unrunnable_check_is_not_deleted(cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli):
     schema_url, base = _users_app(ctx, app_runner)
 
@@ -1540,7 +1522,6 @@ def test_replay_unrunnable_check_is_not_deleted(cli, app_runner, ctx, tmp_path, 
     assert crash_path.exists(), "A check we cannot re-run must never be auto-deleted"
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_without_schema_bails(cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli):
     # An unloadable schema with a live 200 server would falsely mark the crash fixed and delete it without a bail.
     _, base = _users_app(ctx, app_runner)
@@ -1563,7 +1544,6 @@ def test_replay_without_schema_bails(cli, app_runner, ctx, tmp_path, crash_facto
     assert crash_path.exists()
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_applies_per_operation_check_config(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # Per-operation expected statuses are honored on replay: a 500 the config allows is reported fixed.
     def boom():
@@ -1606,7 +1586,6 @@ def _write_empty_sequence(path):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     "plant",
     # A directory matches the `*.json` scan but raises OSError on read, like a permission error or a vanished file.
@@ -1625,7 +1604,6 @@ def test_replay_incompatible_crash_file_is_skipped_and_kept(cli, app_runner, ctx
     assert (crash_dir / "broken_x.json").exists()
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_query_link_param_falls_back_to_recorded_when_unresolvable(
     cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli
 ):
@@ -1709,7 +1687,6 @@ def test_replay_inferred_list_link_uses_live_wildcard_match(cli, ctx, tmp_path, 
     ) == (["+ FIXED"], [expected_id] * 3, 0), result.output
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_reruns_recorded_check_disabled_in_config(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # A recorded check is re-run on replay even when the current config disables it.
     def boom():
@@ -1723,7 +1700,6 @@ def test_replay_reruns_recorded_check_disabled_in_config(cli, app_runner, ctx, c
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_check_raising_unexpected_error_is_errored_not_crash(
     cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli
 ):
@@ -1746,7 +1722,6 @@ def test_replay_check_raising_unexpected_error_is_errored_not_crash(
     assert cli.main("replay", str(crash_file), "--keep") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_intermediate_step_operation_removed_is_errored(
     cli, app_runner, ctx, tmp_path, snapshot_cli, crash_factory
 ):
@@ -1792,7 +1767,6 @@ def test_replay_connection_failure_is_errored(cli, app_runner, ctx, crash_factor
     assert crash_file.exists()
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_non_utf8_response_body_does_not_abort(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # A replayed response with non-UTF-8 bytes must decode lossily, not abort the command.
     def boom():
@@ -1803,7 +1777,6 @@ def test_replay_non_utf8_response_body_does_not_abort(cli, app_runner, ctx, cras
     assert cli.main("replay", str(crash_file), "--keep") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_invalid_link_location_is_errored(cli, app_runner, ctx, tmp_path, snapshot_cli):
     # Foreign file the writer never emits: a link parameter with an unrecognized location.
     app, _ = ctx.openapi.make_flask_app(
@@ -1874,7 +1847,6 @@ def test_replay_invalid_link_location_is_errored(cli, app_runner, ctx, tmp_path,
     assert cli.main("replay", "--keep") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_multi_step_terminal_without_link(cli, app_runner, ctx, tmp_path, snapshot_cli, crash_factory):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -1910,7 +1882,6 @@ def test_replay_multi_step_terminal_without_link(cli, app_runner, ctx, tmp_path,
     assert cli.main("replay", "--keep") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_honors_configured_cache_directory(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     schema_url, base = _users_app(ctx, app_runner)
     cache_dir = tmp_path / "custom_cache"
@@ -1936,7 +1907,6 @@ def _empty_directory(tmp_path):
     return [str(empty)]
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     ("make_args", "config"),
     [
@@ -1950,12 +1920,10 @@ def test_replay_without_crashes_reports_none_found(cli, tmp_path, snapshot_cli, 
     assert cli.main("replay", *make_args(tmp_path), config=config(tmp_path)) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_nonexistent_path_errors(cli, tmp_path, snapshot_cli):
     assert cli.main("replay", str(tmp_path / "missing.json")) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_without_manifest_needs_schema_location(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     schema_url, base = _users_app(ctx, app_runner)
     crash_dir = crash_cache_dir(tmp_path)
@@ -1976,7 +1944,6 @@ def test_replay_without_manifest_needs_schema_location(cli, app_runner, ctx, cra
     assert cli.main("replay", f"--schema-location={schema_url}") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_case_id_scan_skips_unreadable_files(cli, tmp_path, snapshot_cli):
     # Foreign file the writer never emits: garbage JSON the case-ID scan must skip without aborting.
     crash_dir = crash_cache_dir(tmp_path)
@@ -1995,7 +1962,6 @@ def test_replay_case_id_scan_skips_non_object_json(cli, tmp_path, snapshot_cli):
     assert cli.main("replay", "Nb7Yt3") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_no_recorded_checks_is_errored(cli, app_runner, ctx, tmp_path, snapshot_cli):
     # Foreign file the writer never emits: a crash with no recorded checks, reported as an error.
     schema_url, base = _users_app(ctx, app_runner)
@@ -2080,7 +2046,6 @@ def _write_partially_fixed_crash(app_runner, ctx, crash_factory, tmp_path, **ste
     return crash_dir
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_partial_fix_shows_per_check_breakdown(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # With only some checks now passing, the case stays failed, the breakdown marks fixed ones, only those removed.
     crash_dir = _write_partially_fixed_crash(app_runner, ctx, crash_factory, tmp_path)
@@ -2089,7 +2054,6 @@ def test_replay_partial_fix_shows_per_check_breakdown(cli, app_runner, ctx, cras
     assert len(_list_crash_files(crash_dir)) == 1
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_partial_fix_without_masked_credentials_keeps_every_file(
     cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli
 ):
@@ -2216,7 +2180,6 @@ def test_replay_credentials_from_cli(cli, ctx, tmp_path, modifiers, args, config
     assert _replayed_authorization(api) == [expected]
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     "args",
     [("-H", "Invalid"), ("--auth", "no-colon"), ("--auth", "user:pass", "-H", "Authorization: Bearer x")],
@@ -2226,7 +2189,6 @@ def test_replay_invalid_credentials_options(cli, tmp_path, args, snapshot_cli):
     assert cli.main("replay", *args) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_names_every_masked_value_not_supplied(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     schema_url, base = _users_app(ctx, app_runner)
     crash_file = _write_crash(
@@ -2265,7 +2227,6 @@ def test_replay_removes_fixed_crash_once_masked_credentials_are_supplied(cli, ap
     assert not crash_file.exists()
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_masked_body_is_errored(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # The masked body value is sent as-is, so a passing replay proves nothing about the recorded request.
     app, _ = ctx.openapi.make_flask_app({"/users": {"post": {"responses": {"201": {"description": "Created"}}}}})
@@ -2300,7 +2261,6 @@ def test_replay_masked_body_is_errored(cli, app_runner, ctx, crash_factory, tmp_
     ],
     ids=["masked-path-parameter", "partially-masked-header"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_unrestorable_masked_value_is_errored(
     cli, app_runner, ctx, crash_factory, tmp_path, url_path, step_fields, snapshot_cli
 ):
@@ -2500,7 +2460,6 @@ class TokenAuth:
     assert set(_replayed_authorization(api)) == {"[Filtered]"}
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_masked_credentials(cli, ctx, tmp_path, snapshot_cli):
     # The API answers 500 only to the valid token; a missing or wrong one gets 401, which must not read as a fix.
     api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500))
@@ -2540,7 +2499,6 @@ def test_replay_masked_credentials(cli, ctx, tmp_path, snapshot_cli):
     assert _replayed_authorization(api) == [f"Bearer {VALID_TOKEN}"]
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_rejected_credentials_with_failing_check_keeps_every_file(
     cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli
 ):
@@ -2606,7 +2564,6 @@ def test_replay_recorded_auth_failure_is_verified(
     assert crash_file.exists() is kept
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_chain_with_rejected_credentials_at_earlier_step_is_errored(
     cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli
 ):

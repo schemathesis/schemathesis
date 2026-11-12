@@ -29,7 +29,6 @@ class FailEveryResponse:
     assert message in result.stdout
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_after_run_failure_rendering(ctx, cli, snapshot_cli, ensure_reachability_module, tmp_path):
     api = ctx.openapi.apps.success_and_failure()
     allure_dir = tmp_path / "allure-results"

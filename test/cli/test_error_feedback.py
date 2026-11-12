@@ -18,7 +18,6 @@ def _run_feedback(cli, api, max_examples=10, **kwargs):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     "extra_kwargs",
     [
@@ -32,7 +31,6 @@ def test_feedback_toggles_planted_bug_visibility(ctx, cli, snapshot_cli, extra_k
 
 
 # A malformed `Content-Type` on a rejection is the server's fault, not the schema's.
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_feedback_ignores_rejection_with_malformed_content_type(ctx, cli, snapshot_cli):
     api = ctx.openapi.serve(error_feedback_apps.malformed_content_type_rejection())
     assert (
@@ -48,7 +46,6 @@ def test_feedback_ignores_rejection_with_malformed_content_type(ctx, cli, snapsh
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_feedback_unmasks_planted_bug_via_missing_request_body(ctx, cli, snapshot_cli):
     api = ctx.openapi.serve(error_feedback_apps.missing_request_body_planted_bug())
     assert (
@@ -67,7 +64,6 @@ def test_feedback_unmasks_planted_bug_via_missing_request_body(ctx, cli, snapsho
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     ("factory", "max_examples"),
     [
@@ -109,7 +105,6 @@ def test_feedback_unmasks_planted_bug(ctx, cli, snapshot_cli, factory, max_examp
     assert _run_feedback(cli, ctx.openapi.serve(factory()), max_examples) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     ("envelope", "max_examples"),
     [(envelopes.LARAVEL, 30), (envelopes.AJV, 10)],
@@ -119,7 +114,6 @@ def test_feedback_unmasks_planted_bug_via_envelope(ctx, cli, snapshot_cli, envel
     assert _run_feedback(cli, ctx.openapi.serve(envelopes.planted_bug(envelope)), max_examples) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("envelope", ["legacy", "modern", "wrapped"])
 def test_feedback_unmasks_planted_bug_via_rails_envelope(ctx, cli, envelope, snapshot_cli):
     assert _run_feedback(cli, ctx.openapi.apps.rails_planted_bug(envelope=envelope), max_examples=30) == snapshot_cli

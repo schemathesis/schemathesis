@@ -758,7 +758,6 @@ def user_api_app(ctx, user_api_schema):
     return app
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_link_inference_discovers_corruption_bug(cli, snapshot_cli, user_api_app):
     assert (
         cli.run_openapi_app(
@@ -772,7 +771,6 @@ def test_link_inference_discovers_corruption_bug(cli, snapshot_cli, user_api_app
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_link_inference_accounts_for_filters(cli, snapshot_cli, user_api_app):
     assert (
         cli.run_openapi_app(
@@ -840,7 +838,6 @@ def test_location_points_to_nonexistent_endpoint(cli, snapshot_cli, ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_location_link_inferred_when_every_response_has_location(cli, snapshot_cli, ctx):
     app, _ = ctx.openapi.make_flask_app(
         {

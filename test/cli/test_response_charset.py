@@ -5,7 +5,6 @@ import pytest
 from flask import Response
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("charset", ["bogus-xyz", "undefined"], ids=["unknown-charset", "undefined-codec"])
 def test_bad_charset_on_successful_response_does_not_crash(ctx, cli, snapshot_cli, charset):
     # A 2xx JSON response with a bad charset is recorded for reuse in later tests; it must not abort the run.

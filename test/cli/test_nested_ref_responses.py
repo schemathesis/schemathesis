@@ -16,7 +16,6 @@ from flask import jsonify, request
     ],
     ids=["whole-document", "non-component-fragment"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_external_ref_in_failure_schema_resolves(ctx, cli, snapshot_cli, reference, component):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -58,7 +57,6 @@ def test_external_ref_in_failure_schema_resolves(ctx, cli, snapshot_cli, referen
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_bundled_ref_schema_path_display(ctx, cli, snapshot_cli):
     # When response validation fails inside a $ref-ed component, the "Schema at" path
     # should show the original component path (e.g. /components/schemas/Host/properties/host)
@@ -110,7 +108,6 @@ def test_bundled_ref_schema_path_display(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_bundled_ref_in_error_message(ctx, cli, snapshot_cli):
     # When a response schema has array items with $ref, the bundled ref path like `#/x-bundled/schema1`
     # should not appear in error messages - it should show the original reference path instead
@@ -165,7 +162,6 @@ def test_bundled_ref_in_error_message(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_nested_ref_in_response_definition(ctx, cli, snapshot_cli):
     # Response 200 -> #/definitions/UserResponse -> actual response with schema
     # Without fix: nested $ref won't be resolved, schema validation won't work
@@ -201,7 +197,7 @@ def test_nested_ref_in_response_definition(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
+@pytest.mark.snapshot(replace_invalid_component=True)
 def test_bundled_ref_in_negative_testing_description(ctx, cli, snapshot_cli):
     # When a request body schema has $ref with multiple definitions, the negative testing (fuzzing)
     # phase may negate the $ref constraint. The error description should show the original reference
@@ -272,7 +268,6 @@ def test_bundled_ref_in_negative_testing_description(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_whole_external_file_reference_in_schema_location(ctx, cli, app_runner, snapshot_cli):
     # A `$ref` without a fragment points at the whole referenced file, so the "Schema at"
     # location must name that file instead of coming out empty.

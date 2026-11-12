@@ -4,7 +4,6 @@ from xml.etree import ElementTree
 import pytest
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize(
     ("behavior", "args"),
     [
@@ -22,7 +21,6 @@ def test_auth_bootstrap_output(ctx, cli, snapshot_cli, behavior, args):
     assert cli.run(api.schema_url, "--phases=examples", *args) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_auth_bootstrap_output_on_narrow_terminal(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.sign_up_and_login("ok")
     # Dropping PYTEST_VERSION lifts the fixed console width; drop FORCE_COLOR too, or CI renders live progress
@@ -41,7 +39,6 @@ def test_signed_up_token_reaches_protected_operations(ctx, cli, behavior):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_auth_auto_signup_disabled(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.sign_up_and_login()
     assert cli.run(api.schema_url, "--phases=examples", config={"auth": {"auto-signup": False}}) == snapshot_cli

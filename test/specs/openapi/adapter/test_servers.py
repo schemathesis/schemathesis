@@ -217,7 +217,6 @@ def test_find_operation_by_reference_returns_per_op_base_url(ctx):
     assert operation.base_url == "https://op.example.com/o"
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_engine_routes_per_path(ctx, cli, snapshot_cli):
     api = ctx.openapi.serve(basic.per_path_servers())
     assert cli.run(api.schema_url, "--max-examples=2") == snapshot_cli

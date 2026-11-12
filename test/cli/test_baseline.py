@@ -129,7 +129,6 @@ def test_known_failure_does_not_fail_a_flaky_stateful_suite(ctx, cli, tmp_path):
     assert "Known failures: 1\n" in result.stdout
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_known_failure_output(ctx, cli, tmp_path, snapshot_cli):
     write_baseline(tmp_path, SERVER_ERROR, {**SERVER_ERROR, "operation": "GET /api/never-tested"})
 
@@ -280,14 +279,12 @@ def test_missing_baseline_directory_is_created(ctx, cli, tmp_path, flags, config
         "invalid-expires",
     ],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unusable_baseline_is_a_usage_error(ctx, cli, tmp_path, snapshot_cli, content):
     (tmp_path / BASELINE).write_bytes(content)
 
     assert run(cli, ctx.openapi.apps.failure(), config=WITH_BASELINE) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_baseline_pointing_at_a_directory_is_a_usage_error(ctx, cli, tmp_path, snapshot_cli):
     (tmp_path / BASELINE).mkdir()
 
@@ -295,7 +292,6 @@ def test_baseline_pointing_at_a_directory_is_a_usage_error(ctx, cli, tmp_path, s
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="chmod doesn't work the same way on Windows")
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unreadable_baseline_is_a_usage_error(ctx, cli, tmp_path, snapshot_cli):
     write_baseline(tmp_path, SERVER_ERROR)
     (tmp_path / BASELINE).chmod(0)
@@ -303,7 +299,6 @@ def test_unreadable_baseline_is_a_usage_error(ctx, cli, tmp_path, snapshot_cli):
     assert run(cli, ctx.openapi.apps.failure(), config=WITH_BASELINE) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_baseline_under_a_file_is_reported(ctx, cli, tmp_path, snapshot_cli):
     (tmp_path / "file").touch()
 
@@ -311,7 +306,6 @@ def test_baseline_under_a_file_is_reported(ctx, cli, tmp_path, snapshot_cli):
 
 
 # Every test passes, yet the run exits non-zero because the baseline could not be written.
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unsaved_baseline_is_named_in_the_final_line(ctx, cli, tmp_path, snapshot_cli):
     (tmp_path / "file").touch()
 
@@ -319,7 +313,6 @@ def test_unsaved_baseline_is_named_in_the_final_line(ctx, cli, tmp_path, snapsho
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="chmod doesn't work the same way on Windows")
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_baseline_in_read_only_directory_is_reported(ctx, cli, tmp_path, snapshot_cli):
     (tmp_path / "read-only").mkdir(mode=0o555)
 
@@ -328,7 +321,6 @@ def test_baseline_in_read_only_directory_is_reported(ctx, cli, tmp_path, snapsho
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unusable_baseline_is_a_usage_error_in_fuzz(ctx, cli, tmp_path, snapshot_cli):
     (tmp_path / BASELINE).write_text("{", encoding="utf-8")
 
@@ -393,14 +385,12 @@ def test_interrupted_prune_run_leaves_the_baseline_unchanged(ctx, cli, tmp_path)
     assert (tmp_path / BASELINE).read_text() == before
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_expired_entry_output(ctx, cli, tmp_path, snapshot_cli):
     write_baseline(tmp_path, {**SERVER_ERROR, "expires": "2020-01-01"})
 
     assert run(cli, ctx.openapi.apps.failure(), "--phases=fuzzing", config=WITH_BASELINE) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_update_run_output(ctx, cli, tmp_path, snapshot_cli):
     assert (
         run(cli, ctx.openapi.apps.failure(), "--phases=fuzzing", "--baseline-update", config=WITH_BASELINE)
@@ -408,7 +398,6 @@ def test_update_run_output(ctx, cli, tmp_path, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_prune_run_output(ctx, cli, tmp_path, snapshot_cli):
     write_baseline(tmp_path, {**SERVER_ERROR, "operation": "GET /api/success"})
 

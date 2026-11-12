@@ -295,7 +295,6 @@ def test_permission_denied(ctx, cli, tmp_path, path):
     assert "Permission denied" in result.stdout or "Permission denied" in result.stderr
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.skipif(platform.system() != "Linux", reason="Requires /dev/full")
 def test_report_write_error(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()

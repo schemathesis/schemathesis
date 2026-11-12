@@ -277,7 +277,6 @@ def test_continue_on_failure_from_config(cli, ctx):
     [((), {True}), (("--mode=all",), {True, False})],
     ids=["mode-from-config", "mode-flag-overrides-config"],
 )
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_generation_mode_from_config(cli, ctx, snapshot_cli, args, sent_integers):
     api = ctx.openapi.apps.identical_query_parameters()
 
@@ -296,6 +295,7 @@ def test_generation_mode_from_config(cli, ctx, snapshot_cli, args, sent_integers
     assert result == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_disable_all_and_enable_one(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success_and_failure()
     assert (
@@ -351,6 +351,7 @@ def test_phase_level_generation_mode(ctx, cli, app_runner):
     assert [value for value in received if value is None or not value.lstrip("-").isdigit()] == []
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_disable_phases(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success_and_failure()
     assert (
@@ -385,6 +386,7 @@ def test_disable_phases(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_disable_operations(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success_and_failure()
     assert (

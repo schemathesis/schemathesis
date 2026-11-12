@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from queue import Queue
 
-import pytest
 from flask import jsonify, request
 
 from schemathesis.cli.commands.run.handlers.crashes import (
@@ -159,7 +158,6 @@ def test_crash_file_written_for_failures_in_errored_scenario(cli, ctx, tmp_path)
     assert checks == {"status_code_conformance"}
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_no_crash_file_when_cache_disabled(cli, ctx, tmp_path, snapshot_cli):
     # With recording off, no crash file is written and the failure must not hint `st replay`.
     app, _ = ctx.openapi.make_flask_app({"/boom": {"get": {"responses": {"500": {"description": "Error"}}}}})

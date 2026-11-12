@@ -1331,7 +1331,6 @@ def test_assignment_is_restored_from_cache(cli, ctx, tmp_path):
     assert {(r.headers.get("Authorization") or "").removeprefix("ApiKey ") for r in second} == {"admin"}
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_failure_names_the_identity(cli, ctx, tmp_path, snapshot_cli):
     # With several identities in play, a report that does not say which one ran is ambiguous.
     # The name alone is not actionable; the flag that reproduces it is.
@@ -1543,7 +1542,6 @@ def test_unknown_peer_is_rejected(ctx, tmp_path):
         _peer_schema(ctx, tmp_path, peers=("alice", "carol"))
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("peers", [["alice"], ["alice", "alice"]], ids=["single", "duplicate"])
 def test_peers_need_two_distinct_users(cli, ctx, tmp_path, snapshot_cli, peers):
     api = ctx.openapi.apps.wfc_login()

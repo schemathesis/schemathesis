@@ -1892,6 +1892,7 @@ def test_required_header_as_string(ctx):
         {"const": 42},
     ],
 )
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_underspecified_path_parameters(ctx, cli, app_runner, snapshot_cli, schema):
     # There should be no "Path parameter 'organization_id' is not defined"
     paths = {
@@ -3121,6 +3122,7 @@ def test_json_content_parameter_keeps_nested_types(ctx, location, media_type):
     ]
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_negative_data_rejection(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     raw_schema = build_schema(
@@ -3226,6 +3228,7 @@ def test_request_body_without_validation_keywords(ctx):
     run_positive_test(operation, test)
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_unspecified_http_methods(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     raw_schema = {
@@ -3494,7 +3497,6 @@ def test_malformed_multipart_probe_does_not_serialize_a_boundary(ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_content_type_probe_reports_server_error(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
@@ -3572,7 +3574,6 @@ def test_content_type_probe_server_error_via_wsgi(ctx, scenario, message):
     ] == [(ContentTypeServerError, "POST /items", 500, message)]
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_content_type_probe_ignores_non_server_errors(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
@@ -3864,6 +3865,7 @@ def test_body_examples_do_not_leak_into_property_schemas(ctx, mode):
     }
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_missing_authorization(ctx, cli, snapshot_cli):
     # The reproduction code should not contain auth if it is explicitly specified
     api = ctx.openapi.apps.failure()
@@ -3932,6 +3934,7 @@ def filter_case(ctx, case):
     assert result.exit_code == 0, result.output
 
 
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_unnecessary_auth_warning(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.basic()
     # If a test for missing Authorization is the only thing that happen, there should be no warning for missing Authorization header
@@ -7977,7 +7980,6 @@ def test_coverage_array_above_max_items_with_draft_mismatch_sibling(ctx):
         )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_array_items_enum_entries_violating_item_schema(cli, snapshot_cli, ctx):
     # No `enum` entry is a string, so nothing may be sent as valid data for a server that enforces the schema.
     paths = {
@@ -8635,7 +8637,6 @@ def test_ref_parameter_schema_keeps_combination_coverage(ctx):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_allow_header_conformance(ctx, cli, snapshot_cli):
     # The server leaves the documented POST out of `Allow`; a fixed value keeps the reported header stable.
     app, _ = ctx.openapi.make_flask_app(

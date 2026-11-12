@@ -2922,6 +2922,7 @@ def test_date_format(data):
 # Inside the generation buffer the floor is reached by repeating one element; past the buffer no example
 # exists at all, which is a schema error.
 @pytest.mark.parametrize("min_items", [20000, 100000], ids=["drawable", "schema-error"])
+@pytest.mark.snapshot(replace_reproduce_with=False)
 def test_large_minimum_array_size(ctx, cli, snapshot_cli, min_items):
     api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
