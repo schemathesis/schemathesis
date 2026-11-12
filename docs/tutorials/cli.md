@@ -123,7 +123,7 @@ uvx schemathesis replay
 ```
 
 ```
-Replaying 1 case from .schemathesis/default/cache/crashes
+Replaying 1 case from .schemathesis/default/cache/crashes/3f2a9c1b07de
 
   + FIXED  POST /bookings
 

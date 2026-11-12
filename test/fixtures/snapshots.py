@@ -109,6 +109,7 @@ class CliSnapshotConfig:
             (True, _mask_environment),
             (True, self._mask_tmp_dir),
             (True, _mask_config_path),
+            (True, _mask_crash_directories),
             (True, _mask_fuzz_counters),
             (self.replace_phase_statistic, _mask_phase_errors),
             (self.replace_cycle_metrics, _mask_cycle_metrics),
@@ -171,6 +172,11 @@ def _mask_generated(data: str) -> str:
 def _mask_local_ports(data: str) -> str:
     # gRPC errors also name the bare address, without a scheme.
     return re.sub(r"127\.0\.0\.1:[0-9]{3,}", "127.0.0.1", data)
+
+
+def _mask_crash_directories(data: str) -> str:
+    # Crash subdirectories are named after a hash of the schema location, which includes a random port.
+    return re.sub(r"(crashes[/\\])[0-9a-f]{12}\b", r"\1<SCHEMA>", data)
 
 
 def _mask_config_path(data: str) -> str:
@@ -276,6 +282,8 @@ def _mask_test_case_ids(data: str) -> str:
             lines[idx] = f"{sequential_id}. Test Case ID: <PLACEHOLDER>"
         elif re.match(r"\s+st replay \S+", line):
             lines[idx] = "    st replay <PLACEHOLDER>"
+        elif match := re.match(r"(Replaying \d+ cases? from )[A-Za-z0-9]{6}$", line):
+            lines[idx] = f"{match.group(1)}<PLACEHOLDER>"
     return "\n".join(lines) + "\n"
 
 

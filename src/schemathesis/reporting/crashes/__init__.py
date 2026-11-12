@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import time
 from dataclasses import asdict, dataclass, field, replace
@@ -12,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.core.failures import Failure, is_reproducible_failure
+from schemathesis.core.fs import file_exists
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION
 from schemathesis.core.storage import atomic_write_text, retry_while_locked
@@ -246,7 +248,7 @@ class CrashWriter:
         manifest = CrashManifest(
             format_version=CRASH_FORMAT_VERSION,
             schemathesis_version=schemathesis.__version__,
-            schema_location=schema_location,
+            schema_location=_recorded_location(schema_location, self._directory),
             base_url=base_url,
             created_at=format_timestamp(time.time()),
             tls_verify=tls_verify,
@@ -290,6 +292,43 @@ class CrashWriter:
                 (self._directory / filename).unlink()
             except FileNotFoundError:
                 pass
+
+
+def schema_crash_directory(crashes_directory: Path, schema_location: str) -> Path:
+    """Crash files of each schema location live in their own subdirectory, so runs against other APIs keep them."""
+    return crashes_directory / hashlib.sha256(_schema_key(schema_location).encode()).hexdigest()[:12]
+
+
+def adopt_flat_crashes(crashes_directory: Path, schema_directory: Path, schema_location: str) -> None:
+    """Move crash files that older versions kept directly in the crashes directory into their schema's subdirectory."""
+    manifest = load_manifest(crashes_directory)
+    if manifest is None or _schema_key(manifest.schema_location) != _schema_key(schema_location):
+        return
+    schema_directory.mkdir(parents=True, exist_ok=True)
+    for path in crashes_directory.glob("*.json"):
+        path.replace(schema_directory / path.name)
+
+
+def recorded_schema_location(directory: Path, manifest: CrashManifest) -> str:
+    # URLs, and schema files that older versions recorded relative to the working directory, load as recorded.
+    candidate = directory / manifest.schema_location
+    return str(candidate.resolve()) if file_exists(str(candidate)) else manifest.schema_location
+
+
+def _schema_key(schema_location: str) -> str:
+    # An absolute path keeps one schema file apart from same-named files elsewhere.
+    return str(Path(schema_location).resolve()) if file_exists(schema_location) else schema_location
+
+
+def _recorded_location(schema_location: str, directory: Path) -> str:
+    # Schema files are recorded relative to the crash directory, so replay finds them from anywhere in any checkout.
+    if not file_exists(schema_location):
+        return schema_location
+    try:
+        return Path(os.path.relpath(Path(schema_location).resolve(), directory.resolve())).as_posix()
+    except ValueError:
+        # Paths on different Windows drives have no relative form.
+        return _schema_key(schema_location)
 
 
 def load_manifest(directory: Path) -> CrashManifest | None:

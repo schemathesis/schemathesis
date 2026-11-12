@@ -153,13 +153,13 @@ def test_ignored_auth_replay(ctx, cli, tmp_path, snapshot_cli):
         "Authorization: Bearer secret",
         hooks=module,
     )
-    crash_files = sorted(crash_cache_dir(tmp_path).glob("*.json"))
+    crash_files = sorted(crash_cache_dir(tmp_path).rglob("*.json"))
     crash_file = next(path for path in crash_files if path.name != "manifest.json")
     crash = json.loads(crash_file.read_text())
     crash["sequence"][0]["case_body"]["value"]["userId"] = 404
     crash_file.write_text(json.dumps(crash))
     assert cli.main("replay") == snapshot_cli
-    assert sorted(crash_cache_dir(tmp_path).glob("*.json")) == crash_files
+    assert sorted(crash_cache_dir(tmp_path).rglob("*.json")) == crash_files
 
 
 @pytest.mark.parametrize(
@@ -525,7 +525,7 @@ def test_replay_reextracts_created_names_on_fresh_server(ctx, cli, tmp_path, fix
         "--max-examples=10",
         "--seed=1",
     )
-    crash_files = sorted(crash_cache_dir(tmp_path).glob("library*.json"))
+    crash_files = sorted(crash_cache_dir(tmp_path).rglob("library*.json"))
     # A fresh server knows none of the recorded names, so only a name taken from its own response reaches the bug.
     fresh = ctx.grpc.apps.library(fixed=fixed)
 

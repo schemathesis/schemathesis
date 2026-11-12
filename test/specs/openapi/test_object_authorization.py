@@ -121,7 +121,7 @@ def test_reproduction_names_the_sender(cli, ctx, tmp_path, snapshot_cli):
 def test_stateful_reproduction_names_each_sender(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
     _run(cli, api, tmp_path, phases="stateful")
-    (crash_file,) = crash_cache_dir(tmp_path).glob("*_object_level_authorization_*.json")
+    (crash_file,) = crash_cache_dir(tmp_path).rglob("*_object_level_authorization_*.json")
     code_sample = json.loads(crash_file.read_text())["code_sample"]
     assert [line for line in code_sample.splitlines() if line.startswith("#")] == [
         "# as alice (owner)",
@@ -221,7 +221,7 @@ def _senders(api):
 
 
 def _strip_identities(tmp_path):
-    for path in crash_cache_dir(tmp_path).glob("*.json"):
+    for path in crash_cache_dir(tmp_path).rglob("*.json"):
         data = json.loads(path.read_text())
         for step in data.get("sequence", ()):
             step.pop("auth_identity", None)
