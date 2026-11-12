@@ -20,6 +20,7 @@ from schemathesis.core.transforms import get_template_fields
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 from schemathesis.specs.openapi.stateful import dependencies
+from test.apps.runtime import OpenAPIApp
 from test.utils import integer, run_given
 
 USER_REFERENCE = {"$ref": "#/components/schemas/User"}
@@ -165,6 +166,160 @@ def test_request_body_reference_into_own_definitions_of_declared_id(ctx, version
     @run_given(case=operation.as_strategy(), max_examples=3)
     def test(case):
         assert case.body == expected
+
+
+SELF_URI = "https://example.invalid/api/openapi.json"
+
+
+def test_references_to_self_uri_resolve_in_document(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {"$ref": f"{SELF_URI}#/components/pathItems/Items"},
+            "/items/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        version="3.2.0",
+        components={
+            "pathItems": {
+                "Items": {
+                    "post": {
+                        "parameters": [{"$ref": f"{SELF_URI}#/components/parameters/Limit"}],
+                        "requestBody": {"$ref": f"{SELF_URI}#/components/requestBodies/Item"},
+                        "responses": {"201": {"$ref": f"{SELF_URI}#/components/responses/Created"}},
+                    }
+                }
+            },
+            "parameters": {"Limit": {"name": "limit", "in": "query", "required": True, "schema": {"enum": [5]}}},
+            "requestBodies": {
+                "Item": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": f"{SELF_URI}#/components/schemas/Item"}}},
+                }
+            },
+            "responses": {
+                "Created": {
+                    "description": "Created",
+                    "content": {"application/json": {"schema": {"$ref": f"{SELF_URI}#/components/schemas/Item"}}},
+                    "links": {"GetItem": {"$ref": f"{SELF_URI}#/components/links/GetItem"}},
+                }
+            },
+            "links": {
+                "GetItem": {
+                    "operationRef": f"{SELF_URI}#/paths/~1items~1{{id}}/get",
+                    "parameters": {"id": "$response.body#/id"},
+                }
+            },
+            "schemas": {
+                "Item": {
+                    "type": "object",
+                    "properties": {"id": {"enum": [1]}},
+                    "required": ["id"],
+                    "additionalProperties": False,
+                }
+            },
+        },
+        **{"$self": SELF_URI},
+    )
+    operation = schema["/items"]["POST"]
+
+    assert [
+        operation.is_valid_response(response_factory.requests(status_code=201, content=content))
+        for content in (b'{"id": 1}', b'{"id": 2}')
+    ] == [True, False]
+    assert (schema.statistic.transitions.total, schema.statistic.transitions.selected) == (1, 1)
+
+    @run_given(case=operation.as_strategy(), max_examples=3)
+    def test(case):
+        assert (case.query, case.body) == ({"limit": 5}, {"id": 1})
+
+
+def _post_items(body_reference):
+    return {
+        "/items": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": body_reference}}},
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+
+def test_relative_references_resolve_against_relative_self_uri_of_file(ctx, tmp_path):
+    (tmp_path / "published" / "schemas").mkdir(parents=True)
+    (tmp_path / "published" / "schemas" / "item.json").write_text(json.dumps({"enum": ["alpha"]}))
+    (tmp_path / "specs").mkdir()
+    path = tmp_path / "specs" / "openapi.json"
+    path.write_text(
+        json.dumps(
+            ctx.openapi.build_schema(
+                _post_items("schemas/item.json"), version="3.2.0", **{"$self": "../published/openapi.json"}
+            )
+        )
+    )
+    operation = schemathesis.openapi.from_path(path)["/items"]["POST"]
+
+    @run_given(case=operation.as_strategy(), max_examples=3)
+    def test(case):
+        assert case.body == "alpha"
+
+
+def test_relative_references_resolve_against_self_uri_of_in_memory_document(ctx, tmp_path):
+    (tmp_path / "schemas").mkdir()
+    (tmp_path / "schemas" / "item.json").write_text(json.dumps({"enum": ["alpha"]}))
+    operation = ctx.openapi.load_schema(
+        _post_items("schemas/item.json"), version="3.2.0", **{"$self": (tmp_path / "openapi.json").as_uri()}
+    )["/items"]["POST"]
+
+    @run_given(case=operation.as_strategy(), max_examples=3)
+    def test(case):
+        assert case.body == "alpha"
+
+
+def test_served_schema_references_resolve_against_relative_self_uri(ctx):
+    paths = _post_items("schemas/item.json")
+    paths["/items"]["post"]["parameters"] = [{"$ref": "/api/v1/openapi.json#/components/parameters/Limit"}]
+    app, spec = ctx.openapi.make_flask_app(
+        paths,
+        version="3.2.0",
+        components={
+            "parameters": {"Limit": {"name": "limit", "in": "query", "required": True, "schema": {"enum": [5]}}}
+        },
+        **{"$self": "/api/v1/openapi.json"},
+    )
+
+    @app.route("/api/v1/schemas/item.json")
+    def item():
+        return jsonify({"enum": ["alpha"]})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+    operation = schemathesis.openapi.from_url(api.schema_url)["/items"]["POST"]
+
+    @run_given(case=operation.as_strategy(), max_examples=3)
+    def test(case):
+        assert (case.query, case.body) == ({"limit": 5}, "alpha")
+
+    assert [request.path for request in api.requests] == ["/api/v1/schemas/item.json"]
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2", "3.1.0"])
+def test_self_uri_names_no_document_before_open_api_3_2(ctx, version):
+    schema = ctx.openapi.load_schema(
+        {"/items": {"$ref": "urn:example:api#/x-paths/Items"}},
+        version=version,
+        **{"$self": "urn:example:api", "x-paths": {"Items": {"get": {"responses": {"200": {"description": "OK"}}}}}},
+    )
+
+    assert [str(result.err()) for result in schema.get_all_operations()] == [
+        "Unresolvable reference in the schema\n\nError details:\n    Reference: urn:example:api#/x-paths/Items\n"
+        "    File reference could not be resolved. Check that the file exists."
+    ]
 
 
 def build_schema_with_recursion(schema, definition):

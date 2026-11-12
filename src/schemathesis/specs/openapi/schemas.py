@@ -27,7 +27,12 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.jsonschema import Bundler
 from schemathesis.core.jsonschema.bundler import BundleCache
-from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver
+from schemathesis.core.jsonschema.resolver import (
+    IN_MEMORY_BASE_URI,
+    Resolver,
+    make_root_resolver,
+    resolve_reference_uri,
+)
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
@@ -649,7 +654,12 @@ class OpenApiSchema(BaseSchema):
 
     @cached_property
     def root_resolver(self) -> Resolver:
-        return make_root_resolver(self.raw_schema, location=self.location)
+        location = self.location
+        document_uri = self.raw_schema.get("$self")
+        # Open API 3.2 `$self` is the document's own URI: references to it stay here, relative ones resolve against it
+        if isinstance(document_uri, str) and parse_spec_version(self._spec_version) >= _V3_2:
+            location = resolve_reference_uri(location or IN_MEMORY_BASE_URI, document_uri)
+        return make_root_resolver(self.raw_schema, location=location)
 
     def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         """Content types available for this API operation."""
