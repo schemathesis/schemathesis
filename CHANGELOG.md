@@ -18,6 +18,7 @@
 - `--auth-wfc` runs with several users keeping an operation on a refused user after a `403` caused by request data.
 - Spring validation errors not learned from when answered as plain text or listing constraint arguments.
 - False positive `positive_data_acceptance` from application constants that break the `type` or `format` of optional values.
+- Slow generation and `filter_too_much` health check on recursive schemas.
 - False `Schema validation mismatch` warning when an API refuses only oversized strings. [#6210](https://github.com/schemathesis/schemathesis/issues/6210)
 
 ## [4.34.2](https://github.com/schemathesis/schemathesis/compare/v4.34.1...v4.34.2) - 2026-11-24
