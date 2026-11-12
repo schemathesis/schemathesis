@@ -287,9 +287,7 @@ def test_enum_serialization_without_sanitization(cli, ctx, ndjson_path):
         phase = data["phase"]
         assert isinstance(phase["name"], str)
         assert phase["name"] in (
-            "probing",
-            "schema_analysis",
-            "auth_bootstrap",
+            "setup",
             "examples",
             "coverage",
             "fuzzing",

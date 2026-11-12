@@ -13,14 +13,14 @@ def _run(schema, **kwargs):
 
 
 def _bootstrap(stream):
-    return stream.find(events.PhaseFinished, phase=lambda phase: phase.name is PhaseName.AUTH_BOOTSTRAP)
+    return stream.find(events.PhaseFinished, phase=lambda phase: phase.name is PhaseName.SETUP).payload.auth
 
 
 def _statuses(stream, label):
     return [
         interaction.response.status_code
         for event in stream.find_all(events.ScenarioFinished, label=label)
-        if event.phase is not PhaseName.AUTH_BOOTSTRAP
+        if event.phase is not PhaseName.SETUP
         for interaction in event.recorder.interactions.values()
     ]
 
@@ -35,14 +35,14 @@ def test_sign_up_and_login_authenticate_protected_operations(ctx, transport):
     stream = _run(schema)
     sign_up = next(request.json() for request in api.requests if request.path == "/auth/register")
     assert {
-        "bootstrap": (_bootstrap(stream).status, _bootstrap(stream).payload.failure_stage),
+        "bootstrap": (_bootstrap(stream).status, _bootstrap(stream).failure_stage),
         "scenarios": [
             (
                 event.label,
                 event.status,
                 [interaction.response.status_code for interaction in event.recorder.interactions.values()],
             )
-            for event in stream.find_all(events.ScenarioFinished, phase=PhaseName.AUTH_BOOTSTRAP)
+            for event in stream.find_all(events.ScenarioFinished, phase=PhaseName.SETUP)
         ],
         "sign_up": (sorted(sign_up), bool(sign_up["firstName"].strip())),
         "orders_authenticated": 200 in _statuses(stream, "GET /orders"),
@@ -104,7 +104,7 @@ def test_bootstrap_skipped_when_auth_is_supplied(ctx, supply):
     api = ctx.openapi.apps.sign_up_and_login()
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = _run(schema, **supply(schema))
-    assert (_bootstrap(stream).status, stream.find_all(events.ScenarioStarted, phase=PhaseName.AUTH_BOOTSTRAP)) == (
+    assert (_bootstrap(stream).status, stream.find_all(events.ScenarioStarted, phase=PhaseName.SETUP)) == (
         Status.SKIP,
         [],
     )
@@ -112,7 +112,7 @@ def test_bootstrap_skipped_when_auth_is_supplied(ctx, supply):
 
 def test_no_flow_is_a_silent_success(ctx):
     api = ctx.openapi.apps.success()
-    payload = _bootstrap(_run(schemathesis.openapi.from_url(api.schema_url))).payload
+    payload = _bootstrap(_run(schemathesis.openapi.from_url(api.schema_url)))
     assert (payload.status, payload.spec) == (Status.SUCCESS, None)
 
 
@@ -120,5 +120,5 @@ def test_unreachable_sign_up_is_a_register_failure(ctx, app_runner):
     api = ctx.openapi.apps.sign_up_and_login()
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.update(base_url=f"http://127.0.0.1:{app_runner.run_resetting_server()}")
-    payload = _bootstrap(_run(schema)).payload
+    payload = _bootstrap(_run(schema))
     assert (payload.status, payload.failure_stage, payload.status_code) == (Status.ERROR, "register", None)

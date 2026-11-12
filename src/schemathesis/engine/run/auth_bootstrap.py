@@ -18,8 +18,7 @@ if TYPE_CHECKING:
     from schemathesis.core.spec import AuthFlow, AuthFlowSteps
     from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
-    from schemathesis.engine.events import EngineEvent, EventGenerator
-    from schemathesis.engine.run import Phase
+    from schemathesis.engine.events import EngineEvent
     from schemathesis.schemas import APIOperation
 
 
@@ -32,30 +31,25 @@ class AuthBootstrapPayload:
     message: str | None = None
 
 
-def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
+def bootstrap(ctx: EngineContext) -> Generator[EngineEvent, None, AuthBootstrapPayload]:
+    """Sign up and log in when the schema declares such a flow and the run supplies no credentials."""
     try:
         flow = ctx.schema.auth_flow()
     except HookExecutionError:
-        # The schema analysis phase reports failing hooks.
+        # Schema analysis reports failing hooks.
         flow = None
     if flow is None:
-        yield events.PhaseFinished(
-            phase=phase, status=Status.SUCCESS, payload=AuthBootstrapPayload(spec=None, status=Status.SUCCESS)
-        )
-        return
+        return AuthBootstrapPayload(spec=None, status=Status.SUCCESS)
     if not ctx.schema.config.auth.auto_signup or flow.is_supplied():
-        yield events.PhaseFinished(
-            phase=phase, status=Status.SKIP, payload=AuthBootstrapPayload(spec=flow.spec, status=Status.SKIP)
-        )
-        return
-    suite = events.SuiteStarted(phase=PhaseName.AUTH_BOOTSTRAP)
+        return AuthBootstrapPayload(spec=flow.spec, status=Status.SKIP)
+    suite = events.SuiteStarted(phase=PhaseName.SETUP)
     yield suite
-    payload = yield from _bootstrap(ctx, flow, suite.id)
-    yield events.SuiteFinished(id=suite.id, phase=PhaseName.AUTH_BOOTSTRAP, status=payload.status)
-    yield events.PhaseFinished(phase=phase, status=payload.status, payload=payload)
+    payload = yield from _sign_up_and_log_in(ctx, flow, suite.id)
+    yield events.SuiteFinished(id=suite.id, phase=PhaseName.SETUP, status=payload.status)
+    return payload
 
 
-def _bootstrap(
+def _sign_up_and_log_in(
     ctx: EngineContext, flow: AuthFlow, suite_id: uuid.UUID
 ) -> Generator[EngineEvent, None, AuthBootstrapPayload]:
     spec = flow.spec
@@ -90,7 +84,7 @@ def _call(
 ) -> Generator[EngineEvent, None, Response | Exception]:
     import requests
 
-    started = events.ScenarioStarted(phase=PhaseName.AUTH_BOOTSTRAP, suite_id=suite_id, label=operation.label)
+    started = events.ScenarioStarted(phase=PhaseName.SETUP, suite_id=suite_id, label=operation.label)
     yield started
     case = operation.Case(body=body, media_type=media_type)
     recorder = ScenarioRecorder(label=operation.label)
@@ -108,7 +102,7 @@ def _call(
     yield events.ScenarioFinished(
         id=started.id,
         suite_id=suite_id,
-        phase=PhaseName.AUTH_BOOTSTRAP,
+        phase=PhaseName.SETUP,
         label=operation.label,
         status=status,
         recorder=recorder,

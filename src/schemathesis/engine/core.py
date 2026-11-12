@@ -62,17 +62,7 @@ class Engine:
     def _create_execution_plan(self) -> ExecutionPlan:
         """Create execution plan based on configuration."""
         phases = [
-            self.get_phase_config(PhaseName.PROBING, is_supported=True, requires_transitions=False),
-            self.get_phase_config(
-                PhaseName.SCHEMA_ANALYSIS,
-                is_supported=self.schema.specification.supports_feature(SpecificationFeature.SCHEMA_ANALYSIS),
-                requires_transitions=False,
-            ),
-            self.get_phase_config(
-                PhaseName.AUTH_BOOTSTRAP,
-                is_supported=self.schema.specification.supports_feature(SpecificationFeature.AUTH_BOOTSTRAP),
-                requires_transitions=False,
-            ),
+            self.get_phase_config(PhaseName.SETUP, is_supported=True, requires_transitions=False),
             self.get_phase_config(
                 PhaseName.EXAMPLES,
                 is_supported=self.schema.specification.supports_feature(SpecificationFeature.EXAMPLES),
@@ -138,9 +128,9 @@ def preflight_error(engine: EngineContext) -> events.NonFatalError | None:
         # Same for the base URL - a malformed `servers` entry is a schema error, not a phase crash.
         engine.schema.get_base_url()
     except ConfigError as exc:
-        return events.NonFatalError(error=exc, phase=PhaseName.PROBING, label="checks", related_to_operation=False)
+        return events.NonFatalError(error=exc, phase=PhaseName.SETUP, label="checks", related_to_operation=False)
     except InvalidSchema as exc:
-        return events.NonFatalError(error=exc, phase=PhaseName.PROBING, label="schema", related_to_operation=False)
+        return events.NonFatalError(error=exc, phase=PhaseName.SETUP, label="schema", related_to_operation=False)
     return None
 
 

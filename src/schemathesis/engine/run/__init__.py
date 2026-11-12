@@ -20,9 +20,7 @@ T = TypeVar("T")
 class PhaseName(enum.StrEnum):
     """Available execution phases."""
 
-    PROBING = "probing"
-    SCHEMA_ANALYSIS = "schema_analysis"
-    AUTH_BOOTSTRAP = "auth_bootstrap"
+    SETUP = "setup"
     EXAMPLES = "examples"
     COVERAGE = "coverage"
     FUZZING = "fuzzing"
@@ -31,8 +29,6 @@ class PhaseName(enum.StrEnum):
     @property
     def display(self) -> str:
         """Title-cased label for terminal output."""
-        if self is PhaseName.PROBING:
-            return "API probing"
         return self.value.replace("_", " ").capitalize()
 
     @classmethod
@@ -41,7 +37,7 @@ class PhaseName(enum.StrEnum):
 
 
 # Internal phases are not part of the reported test phases, matching the terminal.
-INTERNAL_PHASES = (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS, PhaseName.AUTH_BOOTSTRAP)
+INTERNAL_PHASES = (PhaseName.SETUP,)
 
 
 # Phases that test each operation on its own.
@@ -148,17 +144,13 @@ def relay_events(event_queue: queue.Queue[T], threads: Sequence[threading.Thread
 def execute(ctx: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> EventGenerator:
     from urllib3.exceptions import InsecureRequestWarning
 
-    from . import analysis, auth_bootstrap, probes, stateful, unit
+    from . import setup, stateful, unit
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", InsecureRequestWarning)
 
-        if phase.name == PhaseName.PROBING:
-            yield from probes.execute(ctx, phase)
-        elif phase.name == PhaseName.SCHEMA_ANALYSIS:
-            yield from analysis.execute(ctx, phase)
-        elif phase.name == PhaseName.AUTH_BOOTSTRAP:
-            yield from auth_bootstrap.execute(ctx, phase)
+        if phase.name == PhaseName.SETUP:
+            yield from setup.execute(ctx, phase)
         elif phase.name in UNIT_PHASES:
             yield from unit.execute(ctx, phase, only=only)
         elif phase.name == PhaseName.STATEFUL_TESTING:

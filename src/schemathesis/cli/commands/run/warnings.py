@@ -338,7 +338,7 @@ class WarningCollector:
         ):
             self._check_stateful_warnings(ctx, event)
 
-    def on_schema_warnings(self, event: events.SchemaAnalysisWarnings) -> None:
+    def on_setup_warnings(self, event: events.SetupWarnings) -> None:
         """Process schema-level warnings emitted outside of scenarios."""
         for warning in event.warnings:
             self._handle_warning(warning.kind, _schema_warning_recorder(self.data, warning))
