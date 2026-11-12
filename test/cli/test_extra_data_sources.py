@@ -604,8 +604,8 @@ def test_no_false_positive_when_pool_body_missing_required_fields(cli, snapshot_
     ['return {"id": {1: "packed"}}', 'raise ZeroDivisionError("Deserializer crashed")'],
     ids=["uncomparable-values", "crashing"],
 )
-def test_pool_survives_unusual_deserializer_output(cli, snapshot_cli, ctx, deserializer_body):
-    # A custom deserializer may produce maps with non-string keys, which the pool cannot deduplicate, or crash.
+def test_pool_survives_unusual_response_bodies(cli, snapshot_cli, ctx, deserializer_body):
+    # A custom deserializer may produce maps with non-string keys or crash; a server may send YAML the parser rejects.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -627,7 +627,12 @@ def test_pool_survives_unusual_deserializer_output(cli, snapshot_cli, ctx, deser
                 "get": {
                     "operationId": "getItem",
                     "parameters": [_path_param("id")],
-                    "responses": {"200": {"description": "OK"}},
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/yaml": {"schema": _object_schema({"id": {"type": "string"}})}},
+                        }
+                    },
                 }
             },
         }
@@ -639,7 +644,7 @@ def test_pool_survives_unusual_deserializer_output(cli, snapshot_cli, ctx, deser
 
     @app.route("/items/<item_id>", methods=["GET"])
     def get_item(item_id):
-        return jsonify({}), 200
+        return "id: \x91\n", 200, {"Content-Type": "application/yaml"}
 
     hooks_module = ctx.write_pymodule(f"""
 @schemathesis.deserializer("application/vnd.custom")
