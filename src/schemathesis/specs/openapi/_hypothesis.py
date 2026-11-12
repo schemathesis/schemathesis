@@ -604,7 +604,7 @@ def _build_form_strategy_with_encoding(
     if not properties:
         return None
 
-    # Maps property_name to strategy returning (content_type, data) tuple
+    # Maps property_name to strategy returning (content_type, data strategy) tuple
     property_with_content_type_strategies: dict[str, st.SearchStrategy] = {}
     # Maps property_name to list of content types (for comma-separated without custom strategy)
     property_content_type_selections: dict[str, list[str]] = {}
@@ -618,11 +618,11 @@ def _build_form_strategy_with_encoding(
             for ct in content_types:
                 for media_type, strategy in iter_matching_media_type_strategies(ct):
                     # Pair strategy with its content type so we know which was selected
-                    strategies_for_types.append(st.tuples(st.just(media_type), strategy))
+                    strategies_for_types.append((media_type, strategy))
 
             if strategies_for_types:
-                # Store strategy that returns (content_type, data) tuple
-                property_with_content_type_strategies[property_name] = st.one_of(*strategies_for_types)
+                # Store strategy that returns (content_type, data strategy) tuple
+                property_with_content_type_strategies[property_name] = st.sampled_from(strategies_for_types)
             elif len(content_types) > 1:
                 # No custom strategy found, but multiple content types specified
                 # Store them for random selection
@@ -667,6 +667,8 @@ def _build_form_strategy_with_encoding(
             container_schema=base_schema,
         )
 
+    array_item_counts = parameter.form_array_item_counts
+
     @st.composite
     def build_body(draw: st.DrawFn) -> object:
         generated = draw(body_strategy)
@@ -678,8 +680,14 @@ def _build_form_strategy_with_encoding(
         selected_content_types: dict[str, str] = {}
         for property_name, content_type_strategy in property_with_content_type_strategies.items():
             if property_name in body:
-                content_type, data = draw(content_type_strategy)
-                body[property_name] = data
+                content_type, strategy = draw(content_type_strategy)
+                if property_name in array_item_counts:
+                    # An array's media type describes its items, so each one is a separate draw.
+                    current = body[property_name]
+                    count = len(current) if isinstance(current, list) else array_item_counts[property_name]
+                    body[property_name] = [draw(strategy) for _ in range(count)]
+                else:
+                    body[property_name] = draw(strategy)
                 selected_content_types[property_name] = content_type
         # Properties with several content types but no registered strategy get one of those content types
         for property_name, content_type_list in property_content_type_selections.items():

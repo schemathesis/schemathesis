@@ -1767,6 +1767,17 @@ class OpenApiBody(OpenApiComponent):
         return resolved
 
     @property
+    def form_array_item_counts(self) -> dict[str, int]:
+        """Array form properties mapped to the fewest items sent for them: `minItems`, but at least one."""
+        counts: dict[str, int] = {}
+        for name, property_schema in self.form_properties.items():
+            # An untyped property admits arrays too, but nothing marks its values as items.
+            if isinstance(property_schema, dict) and "type" in property_schema and "array" in get_type(property_schema):
+                min_items = property_schema.get("minItems")
+                counts[name] = min_items if isinstance(min_items, int) and min_items > 1 else 1
+        return counts
+
+    @property
     def required_form_properties(self) -> list[str]:
         """Names of the body properties the schema or its `allOf` branches require."""
         schema = self.resolved_schema
