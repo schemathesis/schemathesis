@@ -6,6 +6,7 @@ from collections.abc import Generator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core.errors import InvalidSchema, RejectedSchemaDefinition
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Result
 from schemathesis.core.schema_analysis import SchemaWarning
@@ -360,12 +361,20 @@ class NonFatalError(EngineEvent):
         self.label = label
         self.related_to_operation = related_to_operation
 
+    @property
+    def error_type(self) -> type[Exception]:
+        """The kind of error reports show once per operation."""
+        # A definition its own draft rejects is one schema error, whichever generation path found it
+        if isinstance(self.value, RejectedSchemaDefinition):
+            return InvalidSchema
+        return type(self.value)
+
     def __eq__(self, other: object) -> bool:
         assert isinstance(other, NonFatalError)
-        return self.label == other.label and type(self.value) is type(other.value)
+        return self.label == other.label and self.error_type is other.error_type
 
     def __hash__(self) -> int:
-        return hash((self.label, type(self.value)))
+        return hash((self.label, self.error_type))
 
 
 def fail_phase(phase: Phase, error: Exception, *, label: str) -> EventGenerator:

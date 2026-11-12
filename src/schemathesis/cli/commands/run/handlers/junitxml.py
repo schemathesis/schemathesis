@@ -16,10 +16,13 @@ if TYPE_CHECKING:
 class JunitXMLHandler(EventHandler):
     output: TextOutput
     writer: JunitXmlWriter
+    # Errors already written: one per label and error type, however many phases raise it, as in the CLI output
+    errors: set[events.NonFatalError]
 
     def __init__(self, output: TextOutput) -> None:
         self.output = output
         self.writer = JunitXmlWriter(output)
+        self.errors = set()
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         for record in scenario_records(ctx.statistic, event):
@@ -30,7 +33,8 @@ class JunitXMLHandler(EventHandler):
                 skip_reason=record.skip_reason,
                 config=ctx.config.output,
             )
-        if isinstance(event, events.NonFatalError):
+        if isinstance(event, events.NonFatalError) and event not in self.errors:
+            self.errors.add(event)
             self.writer.record_error(label=event.label, message=event.info.format(base_url_is_set=ctx.base_url_is_set))
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:

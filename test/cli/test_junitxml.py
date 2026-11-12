@@ -4,7 +4,7 @@ from xml.etree import ElementTree
 
 import pytest
 from _pytest.main import ExitCode
-from flask import Response
+from flask import Response, jsonify
 
 from test.apps.catalog.openapi import basic
 from test.utils import allure_results
@@ -91,6 +91,84 @@ def test_junitxml_file(ctx, cli, hypothesis_max_examples, tmp_path, path, in_con
         .text.replace("\n", " ")
         .startswith("Schema Error  Cannot generate test data for request body (application/json) Schema:")
     )
+
+
+INVALID_ITEMS = {"type": "array", "items": {"type": "string", "required": True}}
+NO_INTEGER = {"type": "integer", "minimum": 5, "maximum": 1}
+CREATED = {
+    "201": {
+        "description": "Created",
+        "content": {"application/json": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}},
+    }
+}
+
+
+def _create(schema):
+    return {
+        "post": {
+            "requestBody": {"required": True, "content": {"application/json": {"schema": schema}}},
+            "responses": CREATED,
+        }
+    }
+
+
+def _read(name):
+    return {
+        "get": {
+            "parameters": [{"name": name, "in": "path", "required": True, "schema": {"type": "integer"}}],
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize(
+    ("mode", "version", "body", "expected"),
+    [
+        ("positive", "3.0.2", INVALID_ITEMS, "Invalid `items` definition"),
+        ("all", "3.1.0", INVALID_ITEMS, "Invalid `required` definition"),
+        ("positive", "3.0.2", NO_INTEGER, "Cannot generate test data for request body (application/json)"),
+    ],
+    ids=["invalid-schema", "invalid-schema-openapi-3.1", "unsatisfiable"],
+)
+def test_operation_error_reported_once_across_phases(ctx, cli, tmp_path, snapshot_cli, mode, version, body, expected):
+    xml_path = tmp_path / "junit.xml"
+    html_dir = tmp_path / "report"
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": _create({"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}),
+            "/users/{userId}": _read("userId"),
+            "/items": _create(body),
+            "/items/{itemId}": _read("itemId"),
+        },
+        version=version,
+    )
+
+    @app.route("/users", methods=["POST"])
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>")
+    @app.route("/items/<int:item_id>")
+    def read(**_):
+        return jsonify({"id": 1})
+
+    result = cli.run_openapi_app(
+        app,
+        "--phases=coverage,fuzzing,stateful",
+        f"--mode={mode}",
+        "--checks=not_a_server_error",
+        "--max-examples=10",
+        "--seed=1",
+        f"--report-junit-path={xml_path}",
+        f"--report-html-path={html_dir}",
+    )
+    testcases = {testcase.attrib["name"]: testcase for testcase in ElementTree.parse(xml_path).getroot()[0]}
+    errors = [child.text.splitlines()[2] for child in testcases["POST /items"] if child.tag == "error"]
+    assert errors == [expected]
+    assert (html_dir / "index.html").read_text(encoding="utf-8").count('<article class="case case-error">') == 1
+    assert result == snapshot_cli
 
 
 @pytest.mark.skipif(
