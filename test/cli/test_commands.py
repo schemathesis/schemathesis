@@ -5259,7 +5259,7 @@ def test_ctrl_c_in_custom_handler_after_probing(ctx, cli, snapshot_cli):
     @schemathesis.cli.handler()
     class Interrupter(schemathesis.cli.EventHandler):
         def handle_event(self, run_ctx, event) -> None:
-            if isinstance(event, events.PhaseFinished) and event.phase.name == PhaseName.PROBING:
+            if isinstance(event, events.PhaseFinished) and event.phase.name == PhaseName.SETUP:
                 raise KeyboardInterrupt
 
     api = ctx.openapi.apps.success()

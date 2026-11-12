@@ -71,7 +71,7 @@ def test_cache_row_shows_replayed_count(ctx, cli, snapshot_cli, tmp_path):
     (probing,) = [
         event["PhaseFinished"]["payload"]["cache"]
         for event in events
-        if event.get("PhaseFinished", {}).get("phase", {}).get("name") == "probing"
+        if event.get("PhaseFinished", {}).get("phase", {}).get("name") == "setup"
     ]
     (summary,) = [event["EngineFinished"]["payload"]["cache"] for event in events if "EngineFinished" in event]
     assert (probing, summary) == (

@@ -1392,9 +1392,10 @@ def test_stop_event_stream_has_stop_reason_interrupted(event_stream):
     assert finished.stop_reason == StopReason.INTERRUPTED
 
 
-def test_stop_event_stream_after_second_event(event_stream):
-    for _ in range(8):
-        next(event_stream)
+def test_stop_event_stream_after_setup(event_stream):
+    for event in event_stream:
+        if isinstance(event, events.PhaseFinished) and event.phase.name is PhaseName.SETUP:
+            break
     event_stream.stop()
     remaining = list(event_stream)
 
@@ -1670,7 +1671,7 @@ def test_missing_deserializer_warnings_collected(ctx):
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1).execute()
 
-    warning_event = stream.find(events.SchemaAnalysisWarnings)
+    warning_event = stream.find(events.SetupWarnings)
     assert warning_event is not None
     assert len(warning_event.warnings) == 1
     warning = warning_event.warnings[0]
@@ -1703,7 +1704,7 @@ def test_no_warnings_for_json(ctx):
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1).execute()
 
-    warning_event = stream.find(events.SchemaAnalysisWarnings)
+    warning_event = stream.find(events.SetupWarnings)
     assert warning_event is None
 
 
@@ -1766,7 +1767,7 @@ def test_stateful_phase_missing_deserializer_warnings(ctx):
     stream = EventStream(schema, phases=[PhaseName.STATEFUL_TESTING], **STATEFUL_KWARGS).execute()
 
     # Verify warnings were detected once for the run
-    warning_event = stream.find(events.SchemaAnalysisWarnings)
+    warning_event = stream.find(events.SetupWarnings)
     assert warning_event is not None
 
     warning_messages = {(w.operation_label, w.status_code, w.content_type) for w in warning_event.warnings}
