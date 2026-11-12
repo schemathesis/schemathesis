@@ -6,7 +6,7 @@ from unittest.mock import ANY
 
 import jsonschema_rs
 import pytest
-from flask import Flask, Response
+from flask import Flask, Response, jsonify
 from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 
@@ -36,6 +36,7 @@ from schemathesis.specs.openapi.examples import (
 )
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource, ParameterRequirement
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
+from test.apps.runtime import OpenAPIApp
 from test.utils import EventStream, assert_requests_call
 
 if TYPE_CHECKING:
@@ -1461,18 +1462,85 @@ def test_data_value_example(ctx, value):
     assert examples.generate_one(operation.get_strategies_from_examples()[0]).body == value
 
 
-def test_serialized_value_example_skipped(ctx):
-    operation = ctx.openapi.load_operation(
-        "POST /items",
+SERIALIZED_ITEM = {
+    "type": "object",
+    "properties": {"id": {"type": "integer"}},
+    "required": ["id"],
+    "additionalProperties": False,
+}
+
+
+def body_example_operation(media_type, schema, example):
+    return {
+        "requestBody": {"required": True, "content": {media_type: {"schema": schema, "examples": {"a": example}}}},
+        "responses": {"200": {"description": "OK"}},
+    }
+
+
+@pytest.mark.parametrize(
+    ("media_type", "schema", "example", "expected"),
+    [
+        ("application/json", SERIALIZED_ITEM, {"serializedValue": '{\n  "id": 2\n}'}, b'{"id": 2}'),
+        (
+            "application/xml",
+            {"type": "object", "properties": {"name": {"type": "string"}}},
+            {"serializedValue": "<item><name>Grüße</name></item>"},
+            "<item><name>Grüße</name></item>".encode(),
+        ),
+        (
+            "application/x-www-form-urlencoded",
+            {"type": "object", "properties": {"foo": {"type": "string"}, "bar": {"type": "boolean"}}},
+            {"serializedValue": "foo=a+%2B+b&bar=true"},
+            b"foo=a+%2B+b&bar=true",
+        ),
+        ("application/json", SERIALIZED_ITEM, {"dataValue": {"id": 1}, "serializedValue": '{"id":1}'}, b'{"id": 1}'),
+    ],
+    ids=["json", "xml-non-ascii", "form", "data-value-wins"],
+)
+def test_serialized_value_example(ctx, media_type, schema, example, expected):
+    app, spec = ctx.openapi.make_flask_app(
+        {"/api/items": {"post": body_example_operation(media_type, schema, example)}}, version="3.2.0"
+    )
+
+    @app.route("/api/items", methods=["POST"])
+    def items():
+        return jsonify({})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+    operation = schemathesis.openapi.from_url(api.schema_url)["/api/items"]["POST"]
+    for strategy in operation.get_strategies_from_examples():
+        examples.generate_one(strategy).call()
+    assert [(request.headers["Content-Type"], request.body) for request in api.requests] == [(media_type, expected)]
+
+
+@pytest.mark.parametrize(
+    "definition",
+    [
+        body_example_operation("application/json", {}, {"serializedValue": {"id": 2}}),
+        body_example_operation("application/json", SERIALIZED_ITEM, {"serializedValue": '{"id": "2"}'}),
+        body_example_operation("application/json", SERIALIZED_ITEM, {"serializedValue": '{"id": '}),
+        body_example_operation(
+            "multipart/form-data",
+            {"type": "object", "properties": {"name": {"type": "string"}}},
+            {"serializedValue": '--abc\r\nContent-Disposition: form-data; name="name"\r\n\r\nJohn\r\n--abc--\r\n'},
+        ),
         {
-            "requestBody": {
-                "required": True,
-                "content": {"application/json": {"schema": {}, "examples": {"a": {"serializedValue": '{"id": 2}'}}}},
-            },
+            "parameters": [
+                {
+                    "name": "flag",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "boolean"},
+                    "examples": {"a": {"serializedValue": "flag=true"}},
+                }
+            ],
             "responses": {"200": {"description": "OK"}},
         },
-        version="3.2.0",
-    )
+    ],
+    ids=["non-string-body", "json-schema-invalid", "json-malformed", "multipart", "query-parameter"],
+)
+def test_serialized_value_example_skipped(ctx, definition):
+    operation = ctx.openapi.load_operation("POST /items", definition, version="3.2.0")
     assert operation.get_strategies_from_examples() == []
 
 

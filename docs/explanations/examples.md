@@ -41,6 +41,18 @@ content:
         externalValue: 'http://example.com/examples/user.json'
 ```
 
+In OpenAPI 3.2, `serializedValue` gives a request body example in its serialized form. Schemathesis reads a JSON one as data, like `dataValue`, and sends other media types as written, without checking them against the schema. Multipart and parameter examples given only as `serializedValue` are skipped; use `dataValue` for them.
+
+```yaml
+content:
+  application/xml:
+    schema:
+      $ref: '#/components/schemas/User'
+    examples:
+      user:
+        serializedValue: '<user><name>John Doe</name></user>'
+```
+
 !!! tip "OpenAPI 2.0 Support"
 
     In OpenAPI 2.0, use the `example` keyword or `x-examples` extension for multiple examples.

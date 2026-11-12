@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections import Counter
 from collections.abc import Generator
 from dataclasses import dataclass, replace
@@ -12,7 +13,7 @@ import requests
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 
 from schemathesis.config import GenerationConfig
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import (
     InvalidSchema,
     RefResolutionError,
@@ -437,7 +438,9 @@ def extract_top_level(
                             yield BodyExample(value=completed, media_type=body.media_type)
         if body.adapter.examples_container_keyword in body.definition:
             for value in extract_inner_examples(
-                body.definition[body.adapter.examples_container_keyword], operation.schema.root_resolver
+                body.definition[body.adapter.examples_container_keyword],
+                operation.schema.root_resolver,
+                media_type=body.media_type,
             ):
                 if example_is_valid(value, body_validator):
                     yield BodyExample(value=value, media_type=body.media_type)
@@ -674,7 +677,9 @@ def _merge_all_of(
     return merged, expanded_path, expanded_resolver
 
 
-def _unpack_example_object(example: dict[str, Any], resolver: Resolver) -> Generator[Any, None, None]:
+def _unpack_example_object(
+    example: dict[str, Any], resolver: Resolver, *, media_type: str | None
+) -> Generator[Any, None, None]:
     """Extract the value from a single OAS3 Example Object."""
     target = resolve_example(example, resolver)
     if isinstance(target, dict):
@@ -691,14 +696,31 @@ def _unpack_example_object(example: dict[str, Any], resolver: Resolver) -> Gener
             yield load_external_example(example["externalValue"])
         except requests.RequestException:
             pass
-    # A `serializedValue` is already on the wire form, which bodies here are not; a looping reference holds no data
-    elif example and "serializedValue" not in example and "$ref" not in example:
+    elif "serializedValue" in example:
+        serialized = example["serializedValue"]
+        # Only a body's serialized form is the whole payload: a parameter's also carries its name and delimiters,
+        # and a multipart one needs its boundary declared in a header
+        if media_type is None or not isinstance(serialized, str) or media_types.is_multipart(media_type):
+            return
+        if not media_types.is_json_lenient(media_type):
+            yield serialized.encode("utf-8")
+            return
+        # JSON text is read back into data, so it is checked against the schema like `dataValue`
+        try:
+            data = json.loads(serialized)
+        except json.JSONDecodeError:
+            return
+        yield data
+    # A looping reference holds no data
+    elif example and "$ref" not in example:
         yield example
 
 
-def extract_inner_examples(examples: dict[str, Any] | list, resolver: Resolver) -> Generator[Any, None, None]:
+def extract_inner_examples(
+    examples: dict[str, Any] | list, resolver: Resolver, *, media_type: str | None = None
+) -> Generator[Any, None, None]:
     """Extract exact examples values from the `examples` dictionary."""
-    for _, value in extract_named_inner_examples(examples, resolver):
+    for _, value in extract_named_inner_examples(examples, resolver, media_type=media_type):
         yield value
 
 
@@ -713,18 +735,18 @@ def _iter_schema_examples(container: object, resolver: Resolver) -> Generator[An
 
 
 def extract_named_inner_examples(
-    examples: dict[str, Any] | list, resolver: Resolver
+    examples: dict[str, Any] | list, resolver: Resolver, *, media_type: str | None = None
 ) -> Generator[tuple[str | None, Any], None, None]:
     """Extract exact example values together with their names."""
     if isinstance(examples, dict):
         for name, example in examples.items():
             if isinstance(example, dict):
-                for value in _unpack_example_object(example, resolver):
+                for value in _unpack_example_object(example, resolver, media_type=media_type):
                     yield name, value
     elif isinstance(examples, list):
         for example in examples:
             if isinstance(example, dict):
-                for value in _unpack_example_object(example, resolver):
+                for value in _unpack_example_object(example, resolver, media_type=media_type):
                     yield None, value
             else:
                 yield None, example
