@@ -92,6 +92,110 @@ def test_multipart_with_custom_encoding(ctx, declared):
         assert ("file", ("file", xml, "text/xml")) in case.as_transport_kwargs(base_url="http://127.0.0.1")["files"]
 
 
+JPEG = b"\xff\xd8\xff\xe0JFIF"
+FILE = {"type": "string", "format": "binary"}
+FILES = {"type": "array", "items": FILE}
+
+
+def load_upload(ctx, files, *, version="3.0.2", media_type="multipart/form-data", encoding=None, **properties):
+    schemathesis.openapi.media_type("image/jpeg", st.just(JPEG))
+    return ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    media_type: {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"files": files, **properties},
+                            "required": ["files", *properties],
+                        },
+                        "encoding": {"files": {"contentType": "image/jpeg", **(encoding or {})}},
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        version=version,
+        components={"schemas": {"Files": FILES, "File": FILE}},
+    )
+
+
+def generate_cases(operation, phase, mode=GenerationMode.POSITIVE):
+    if phase == "fuzzing":
+        # Enough draws for an untyped property to yield a list and a nullable array to yield `null`.
+        return generate_many(operation.as_strategy(generation_mode=mode), 30)
+    return list(
+        operation.schema.iter_coverage_cases(
+            operation, generation_modes=[mode], generation_config=operation.schema.config.generation
+        )
+    )
+
+
+def sent_file_parts(cases):
+    return {
+        part
+        for case in cases
+        if isinstance(case.body, dict)
+        for part in case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] or []
+        if part[0] == "files"
+    }
+
+
+@pytest.mark.parametrize("phase", ["fuzzing", "coverage"])
+@pytest.mark.parametrize(
+    ("version", "files", "encoding", "filename"),
+    [
+        ("3.0.2", FILES, None, "files.jpg"),
+        ("3.0.2", {"$ref": "#/components/schemas/Files"}, None, "files.jpg"),
+        ("3.0.2", {"type": "array", "items": {"$ref": "#/components/schemas/File"}}, None, "files.jpg"),
+        ("3.0.2", {**FILES, "nullable": True}, None, "files.jpg"),
+        ("3.1.0", {**FILES, "type": ["array", "null"]}, None, "files.jpg"),
+        ("3.1.0", {"type": "array", "items": {"contentMediaType": "application/octet-stream"}}, None, "files.jpg"),
+        (
+            "3.0.2",
+            FILES,
+            {"headers": {"Content-Disposition": {"schema": {"example": 'form-data; name="files"; filename="a.jpg"'}}}},
+            "a.jpg",
+        ),
+        # An untyped file property also yields lists, yet it is still a single file.
+        ("3.0.2", {"format": "binary"}, None, "files.jpg"),
+    ],
+    ids=["inline", "ref", "ref-items", "nullable", "type-list", "content-media-type", "declared-filename", "untyped"],
+)
+def test_registered_media_type_sends_array_items_as_file_parts(ctx, phase, version, files, encoding, filename):
+    operation = load_upload(ctx, files, version=version, encoding=encoding)
+
+    assert sent_file_parts(generate_cases(operation, phase)) == {("files", (filename, JPEG, "image/jpeg"))}
+
+
+@pytest.mark.parametrize(
+    ("phase", "expected"),
+    [("fuzzing", {(JPEG, JPEG), (JPEG, JPEG, JPEG)}), ("coverage", {(JPEG, JPEG)})],
+    ids=["fuzzing", "coverage"],
+)
+@pytest.mark.parametrize("media_type", ["multipart/form-data", "application/x-www-form-urlencoded"])
+def test_registered_media_type_draws_array_items_within_bounds(ctx, phase, expected, media_type):
+    operation = load_upload(ctx, {**FILES, "minItems": 2, "maxItems": 3}, media_type=media_type)
+
+    assert {tuple(case.body["files"]) for case in generate_cases(operation, phase)} == expected
+
+
+# The media type data replaces `files`, so each negative body violates another property.
+def test_negative_bodies_send_array_items_as_file_parts(ctx):
+    operation = load_upload(ctx, FILES, age={"type": "integer"})
+
+    cases = generate_cases(operation, "fuzzing", GenerationMode.NEGATIVE)
+
+    assert sent_file_parts(cases) == {("files", ("files.jpg", JPEG, "image/jpeg"))}
+    assert [
+        case.body
+        for case in cases
+        if isinstance(case.body, dict) and set(case.body) == {"files", "age"} and type(case.body["age"]) is int
+    ] == []
+
+
 def test_multipart_without_custom_encoding_uses_default(ctx):
     # Given an OpenAPI schema with multipart but NO custom encoding
     operation = make_operation(

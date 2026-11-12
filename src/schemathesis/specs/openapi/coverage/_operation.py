@@ -651,6 +651,7 @@ def _generate_multipart_body_from_custom_strategies(
 
     properties = body.form_properties
     required = body.required_form_properties
+    array_item_counts = body.form_array_item_counts
 
     result: dict[str, Any] = {}
     content_types: dict[str, str] = {}
@@ -660,7 +661,9 @@ def _generate_multipart_body_from_custom_strategies(
             match = next(iter_matching_media_type_strategies(ct), None)
             if match is not None:
                 content_types[prop_name], strategy = match
-                result[prop_name] = examples.generate_one(strategy)
+                value = examples.generate_one(strategy)
+                # An array's media type describes its items, so the value fills each item the array needs.
+                result[prop_name] = [value] * array_item_counts[prop_name] if prop_name in array_item_counts else value
                 break
 
     if not content_types:
