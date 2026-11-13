@@ -15,5 +15,8 @@ updates:
       python-dependencies:
         patterns:
           - "*"
+    ignore:
+      # coverage 7.13.3+ can drop modules other threads are importing: coveragepy#2247
+      - dependency-name: "coverage"
     cooldown:
       default-days: 7
