@@ -26,6 +26,10 @@
 - `ModuleNotFoundError` for `allure_commons` in pytest reports when `allure-pytest` is not installed.
 - `<BINARY>` shown for text responses cut mid-character by `max-recorded-payload-size`.
 
+#### Coverage phase
+
+- Missing positive values when `minLength` exceeds what an unanchored `pattern` matches. [#6085](https://github.com/schemathesis/schemathesis/issues/6085)
+
 #### `st replay`
 
 - Crash files deleted or replayed against the wrong schema after a run against another API.

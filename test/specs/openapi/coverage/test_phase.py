@@ -2207,8 +2207,14 @@ def test_path_parameter_string_non_empty(ctx):
     assert_positive_coverage(schema, [{"path_parameters": {"name": "0"}}])
 
 
-@pytest.mark.parametrize("extra", [{}, {"pattern": "[0-9]{1}", "minLength": 1}])
-def test_path_parameter_invalid_example(ctx, extra):
+@pytest.mark.parametrize(
+    ("extra", "expected"),
+    [
+        ({}, ["0"]),
+        ({"pattern": "[0-9]{1}", "minLength": 1}, ["00", "0"]),
+    ],
+)
+def test_path_parameter_invalid_example(ctx, extra, expected):
     schema = build_schema(
         ctx,
         [
@@ -2221,7 +2227,7 @@ def test_path_parameter_invalid_example(ctx, extra):
             }
         ],
     )
-    assert_positive_coverage(schema, [{"path_parameters": {"name": "0"}}])
+    assert_positive_coverage(schema, [{"path_parameters": {"name": value}} for value in expected])
 
 
 def test_path_parameter_as_string(ctx):

@@ -1992,6 +1992,22 @@ def pin_pattern_length(pattern: str, min_length: int | None, max_length: int | N
         return pattern
 
 
+_ANY_TEXT: _Node = (sre.MAX_REPEAT, (0, MAXREPEAT, [(sre.ANY, None)]))
+
+
+def extend_unanchored_ends(pattern: str) -> str:
+    """Spell out the text a string may carry around a match of `pattern`; anchored ends stay closed."""
+    parsed = sre_parse.parse(pattern)
+    nodes = list(parsed)
+    if not nodes or nodes[0] not in (_AT_BEGINNING, (sre.AT, sre.AT_BEGINNING_STRING)):
+        nodes.insert(0, _ANY_TEXT)
+    if nodes[-1] not in (_AT_END, (sre.AT, sre.AT_END_STRING)):
+        nodes.append(_ANY_TEXT)
+    if len(nodes) == len(parsed):
+        return pattern
+    return _serialize(nodes, global_flags=parsed.state.flags & ~_DEFAULT_FLAGS)
+
+
 _CATEGORY_TEXT = {
     sre.CATEGORY_DIGIT: r"\d",
     sre.CATEGORY_NOT_DIGIT: r"\D",
