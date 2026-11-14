@@ -8,7 +8,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       1 selected / 1 total
+     Operations:       2 selected / 2 total
      Configuration:    /tmp/config.toml
 
  ✅  API capabilities:
@@ -18,9 +18,17 @@ Schemathesis dev
 
  🚫  Fuzzing (in 0.00s)
 
-     🚫 1 error
+     🚫 2 errors
 
 ==================================== ERRORS ====================================
+________________________________ GET /relative _________________________________
+Schema Error
+
+Unresolvable reference in the schema
+
+Error details:
+    Reference: external/schemas/user.yaml#/User
+    Remote document at http://127.0.0.1/external/schemas/user.yaml is parsed as int, but an object/array is expected (HTTP 200, Content-Type=application/json, size=3)
 __________________________________ GET /test ___________________________________
 Schema Error
 
@@ -28,7 +36,7 @@ Unresolvable reference in the schema
 
 Error details:
     Reference: http://127.0.0.1/external/schemas/user.yaml#/User
-    Remote document is parsed as int, but an object/array is expected (HTTP 200, Content-Type=application/json, size=3)
+    Remote document at http://127.0.0.1/external/schemas/user.yaml is parsed as int, but an object/array is expected (HTTP 200, Content-Type=application/json, size=3)
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -36,9 +44,9 @@ Need more help?
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/1
+  Selected: 2/2
   Tested: 0
-  Errored: 1
+  Errored: 2
 
 Test Phases:
   ⏭  Examples (disabled)
@@ -47,11 +55,11 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Errors:
-  🚫 Schema Error: 1
+  🚫 Schema Error: 2
 
 Test cases:
   No test cases were generated
 
 Seed: 42
 
-=============================== 1 error in 1.00s ===============================
+============================== 2 errors in 1.00s ===============================

@@ -308,6 +308,17 @@ def test_served_schema_references_resolve_against_relative_self_uri(ctx):
     assert [request.path for request in api.requests] == ["/api/v1/schemas/item.json"]
 
 
+def test_unreachable_document_behind_relative_reference_against_self_uri(ctx):
+    schema = ctx.openapi.load_schema(
+        _post_items("schemas/item.json"), version="3.2.0", **{"$self": "http://127.0.0.1:1/api/openapi.json"}
+    )
+
+    assert [str(result.err()) for result in schema.get_all_operations()] == [
+        "Unresolvable reference in the schema\n\nError details:\n    Reference: schemas/item.json\n"
+        "    Failed to fetch http://127.0.0.1:1/api/schemas/item.json (Connection failed)"
+    ]
+
+
 @pytest.mark.parametrize("version", ["2.0", "3.0.2", "3.1.0"])
 def test_self_uri_names_no_document_before_open_api_3_2(ctx, version):
     schema = ctx.openapi.load_schema(
@@ -1187,26 +1198,16 @@ def test_remote_ref_fails(ctx, kind, cli, app_runner, snapshot_cli):
     path = "/external/schemas/user.yaml"
     base_url = ""
 
+    def operation(reference):
+        return {
+            "get": {"requestBody": {"content": {"application/json": {"schema": {"$ref": reference}}}, "required": True}}
+        }
+
     @app.route("/openapi.json")
     def openapi():
         return jsonify(
             ctx.openapi.build_schema(
-                {
-                    "/test": {
-                        "get": {
-                            "requestBody": {
-                                "content": {
-                                    "application/json": {
-                                        "schema": {
-                                            "$ref": f"{base_url}{path}#/User",
-                                        }
-                                    }
-                                },
-                                "required": True,
-                            },
-                        }
-                    }
-                }
+                {"/test": operation(f"{base_url}{path}#/User"), "/relative": operation(f"{path[1:]}#/User")}
             )
         )
 
