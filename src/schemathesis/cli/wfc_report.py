@@ -49,7 +49,6 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 SCHEMA_VERSION = "0.10.0"
-HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 VALIDATION_FAILURES = (
     JsonSchemaError,
     MalformedJson,
@@ -249,9 +248,13 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingFinished):
+            from schemathesis.specs.openapi.operations import iter_path_item_operations
+
             for path, item in event.schema.get("paths", {}).items():
                 if isinstance(item, dict):
-                    self.endpoint_ids.update(operation_id(method, path) for method in item if method in HTTP_METHODS)
+                    self.endpoint_ids.update(
+                        operation_id(method, path) for method, _ in iter_path_item_operations(item)
+                    )
         elif isinstance(event, EngineStarted):
             self.started_at = event.timestamp
         elif isinstance(event, EngineFinished):
