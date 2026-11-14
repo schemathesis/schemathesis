@@ -12,6 +12,7 @@
 - XML request bodies place children of `nodeType: none` objects directly in the parent element.
 - Error feedback learns integer, hex and ObjectId formats from Java and MongoDB parse errors.
 - `from-operation` dictionaries fill from API responses, including nested listings per parent. [#5751](https://github.com/schemathesis/schemathesis/issues/5751)
+- `setup` and `teardown` hooks run once around testing in `st run` and `st fuzz`.
 
 ### :wrench: Changed
 

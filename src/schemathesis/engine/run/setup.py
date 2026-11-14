@@ -6,7 +6,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from schemathesis.core import SpecificationFeature
+from schemathesis.core.errors import HookExecutionError
 from schemathesis.engine import Status, events
+from schemathesis.hooks import dispatch_setup
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
@@ -42,6 +44,12 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     if not ctx.has_to_stop:
         payload.dictionaries = dictionary_loading.load_dictionaries(ctx)
         yield from dictionary_loading.load_errors(payload.dictionaries)
+    if not ctx.has_to_stop:
+        try:
+            dispatch_setup(ctx.schema)
+        except HookExecutionError as exc:
+            hook_failed = True
+            yield events.hook_error(phase.name, exc)
     failed = (
         hook_failed
         or (payload.auth is not None and payload.auth.status == Status.ERROR)

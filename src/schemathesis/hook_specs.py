@@ -194,6 +194,24 @@ def after_load_schema(context: HookContext, schema: BaseSchema) -> None:
     """Called after schema instance is created."""
 
 
+@HookDispatcher.register_spec([HookScope.GLOBAL, HookScope.SCHEMA])
+def setup(context: HookContext, schema: BaseSchema) -> None:
+    """Called once before testing starts in `st run` and `st fuzz`, after Schemathesis's own setup.
+
+    Use cases:
+     - Seeding test data or starting services the API depends on.
+    """
+
+
+@HookDispatcher.register_spec([HookScope.GLOBAL, HookScope.SCHEMA])
+def teardown(context: HookContext, schema: BaseSchema) -> None:
+    """Called once after testing ends in `st run` and `st fuzz`, even when the run failed or was interrupted.
+
+    Use cases:
+     - Removing test data or stopping services started in `setup`.
+    """
+
+
 @all_scopes
 def before_add_examples(context: HookContext, examples: list[Case]) -> None:
     """Called before explicit examples are added to a test via `@example` decorator.

@@ -6,7 +6,7 @@ from collections.abc import Generator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.core.errors import InvalidSchema, RejectedSchemaDefinition
+from schemathesis.core.errors import HookExecutionError, InvalidSchema, RejectedSchemaDefinition
 from schemathesis.core.failures import Failure
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.core.warnings import SchemathesisWarning
@@ -371,6 +371,11 @@ class NonFatalError(EngineEvent):
 
     def __hash__(self) -> int:
         return hash((self.label, self.error_type))
+
+
+def hook_error(phase: PhaseName, error: HookExecutionError) -> NonFatalError:
+    """A run-level error raised by a user hook."""
+    return NonFatalError(error=error, phase=phase, label=f"`{error.hook_name}` hook", related_to_operation=False)
 
 
 def fail_phase(phase: Phase, error: Exception, *, label: str) -> EventGenerator:

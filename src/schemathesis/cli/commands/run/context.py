@@ -30,7 +30,9 @@ class ExecutionContext(BaseExecutionContext):
     """Execution state for `st run`."""
 
     phases: PhaseStatuses = field(
-        default_factory=lambda: dict.fromkeys((PhaseName.SETUP, *TESTING_PHASES), (Status.SKIP, None))
+        default_factory=lambda: dict.fromkeys(
+            (PhaseName.SETUP, *TESTING_PHASES, PhaseName.TEARDOWN), (Status.SKIP, None)
+        )
     )
     baseline_update: bool = False
     baseline_prune: bool = False

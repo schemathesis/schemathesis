@@ -330,7 +330,7 @@ def validate_filterable_hook(hook: str | Callable) -> None:
         name = hook.__name__
     else:
         name = hook
-    if name in ("before_process_path", "before_load_schema", "after_load_schema"):
+    if name in ("before_process_path", "before_load_schema", "after_load_schema", "setup", "teardown"):
         raise ValueError(f"Filters are not applicable to this hook: `{name}`")
 
 
@@ -392,6 +392,28 @@ def load_with_hooks(
     instance.filter_set = project_config.operations.filter_set_with(include=instance.filter_set)
     dispatch_after_load_schema(GLOBAL_HOOK_DISPATCHER, context=context, schema=instance)
     return instance
+
+
+def dispatch_setup(schema: SchemaMetadata) -> None:
+    _dispatch_schema_cascade(schema, "setup", HookContext(), schema)
+
+
+def defines_teardown(schema: SchemaMetadata) -> bool:
+    return any(dispatcher.defines("teardown") for dispatcher in schema_hook_dispatchers(schema))
+
+
+def dispatch_teardown(schema: SchemaMetadata) -> list[HookExecutionError]:
+    """Run every `teardown` hook, even after one fails, and return the errors they raised."""
+    context = HookContext()
+    errors = []
+    # A later hook may build on what an earlier one set up, so it is torn down first.
+    for dispatcher in reversed(schema_hook_dispatchers(schema)):
+        for hook in reversed(dispatcher.get_all_by_name("teardown")):
+            try:
+                hook(context, schema)
+            except (Exception, SystemExit) as exc:
+                errors.append(HookExecutionError("teardown", exc))
+    return errors
 
 
 def dispatch_before_add_examples(*dispatchers: HookDispatcher, context: HookContext, examples: list[Case]) -> None:

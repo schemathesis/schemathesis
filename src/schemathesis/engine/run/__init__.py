@@ -26,6 +26,7 @@ class PhaseName(enum.StrEnum):
     FUZZING = "fuzzing"
     STATEFUL_TESTING = "stateful"
     CONTINUOUS_FUZZING = "continuous_fuzzing"
+    TEARDOWN = "teardown"
 
     @property
     def display(self) -> str:
@@ -38,7 +39,7 @@ class PhaseName(enum.StrEnum):
 
 
 # Internal phases are not part of the reported test phases, matching the terminal.
-INTERNAL_PHASES = (PhaseName.SETUP,)
+INTERNAL_PHASES = (PhaseName.SETUP, PhaseName.TEARDOWN)
 
 
 # Phases that test each operation on its own.
@@ -155,7 +156,7 @@ def execute(ctx: EngineContext, phase: Phase, *, only: frozenset[str] | None = N
 
     from schemathesis.engine import fuzz
 
-    from . import setup, stateful, unit
+    from . import setup, stateful, teardown, unit
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", InsecureRequestWarning)
@@ -168,3 +169,7 @@ def execute(ctx: EngineContext, phase: Phase, *, only: frozenset[str] | None = N
             yield from stateful.execute(ctx, phase)
         elif phase.name == PhaseName.CONTINUOUS_FUZZING:
             yield from fuzz.execute(ctx, phase)
+        elif phase.name == PhaseName.TEARDOWN:
+            yield from teardown.execute(ctx, phase)
+        else:
+            raise NotImplementedError(phase.name)

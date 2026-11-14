@@ -1,0 +1,77 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  1 skipped
+
+ ✅  Coverage (in 0.00s)
+
+     ✅ 1 passed
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 1 passed
+
+==================================== ERRORS ====================================
+_________________________________ `setup` hook _________________________________
+Hook Error
+
+Error in `setup` hook: ValueError: setup failed
+
+    Traceback (most recent call last):
+      File "/package-root/hooks.py", line XXX, in _dispatch_to_all
+        hook(context, *args)
+      File "/tmp/module.py", line XXX, in setup
+        raise ValueError("setup failed")
+    ValueError: setup failed
+_______________________________ `teardown` hook ________________________________
+Hook Error
+
+Error in `teardown` hook: ValueError: teardown failed
+
+    Traceback (most recent call last):
+      File "/package-root/hooks.py", line XXX, in dispatch_teardown
+        hook(context, schema)
+      File "/tmp/module.py", line XXX, in teardown
+        raise ValueError("teardown failed")
+    ValueError: teardown failed
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples
+  ✅ Coverage
+  ✅ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Errors:
+  🚫 Hook Error: 2
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+============================== 2 errors in 1.00s ===============================
