@@ -62,6 +62,7 @@ if TYPE_CHECKING:
     from schemathesis.cli.commands.run.context import ExecutionContext
     from schemathesis.core.spec import AuthFlowSteps
     from schemathesis.engine.run.cache import CacheReport
+    from schemathesis.engine.run.setup import SetupPayload
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
 DICTIONARY_MISMATCH_REASON = "with entries that mostly fail the bound parameter's schema"
@@ -576,6 +577,60 @@ def extraction_failure_steps(failure: ExtractionFailure) -> list[tuple[int, str]
         )
         for case, response in reversed(failure.history)
     ]
+
+
+def display_setup(console: Console, payload: SetupPayload) -> None:
+    """Print what setup learned about the API: probed capabilities, the cache, and sign-up."""
+    from rich.style import Style
+    from rich.table import Table
+    from rich.text import Text
+
+    cache_row = _format_cache_row(payload.cache)
+    # Specifications without HTTP probes have nothing to report unless the cache does.
+    if payload.probes or cache_row is not None:
+        unreachable = _server_unreachable(payload.probes)
+        if unreachable:
+            header = Text.assemble(
+                ("⚠️  ", Style(color="yellow")),
+                ("API capabilities: unknown, server unreachable", Style(color="bright_white")),
+            )
+        else:
+            header = Text.assemble(
+                ("✅  ", Style(color="green")),
+                ("API capabilities:", Style(color="bright_white")),
+            )
+        console.print(Indent(header))
+        console.print()
+
+        table = Table(
+            show_header=False,
+            box=None,
+            padding=(0, 4),
+            collapse_padding=True,
+        )
+        table.add_column("Capability", style=Style(color="bright_white", bold=True), no_wrap=True)
+        table.add_column("Status", style="cyan")
+        # Without a response, a probe measured nothing about the API.
+        for probe_run in [] if unreachable else payload.probes:
+            icon, style = {
+                ProbeOutcome.SUCCESS: ("✓", Style(color="green")),
+                ProbeOutcome.FAILURE: ("✘", Style(color="red")),
+                ProbeOutcome.SKIP: ("⊘", Style(color="yellow")),
+            }[probe_run.outcome]
+
+            table.add_row(f"{probe_run.probe.name}:", Text(icon, style=style))
+
+        if cache_row is not None:
+            table.add_row("Cache:", cache_row)
+
+        if table.row_count:
+            console.print(Indent(table))
+            console.print()
+    auth = payload.auth
+    # Users who supply credentials gain nothing from hearing that sign-up was skipped.
+    if auth is not None and auth.spec is not None and auth.status != Status.SKIP:
+        console.print(Indent(_auth_bootstrap_line(auth, auth.spec)))
+        console.print()
 
 
 @dataclass(slots=True)
@@ -1279,65 +1334,14 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         self.stateful_tests_manager.start(show_live=not in_cycle and self.cycle_live is None)
 
     def _on_phase_finished(self, ctx: ExecutionContext, event: events.PhaseFinished) -> None:
-        from rich.style import Style
-        from rich.table import Table
-        from rich.text import Text
-
         phase = event.phase
 
         if phase.name == PhaseName.SETUP:
             assert self.setup_manager is not None
             self.setup_manager.stop()
             self.setup_manager = None
-
-            payload = event.payload
-            if payload is not None:
-                cache_row = _format_cache_row(payload.cache)
-                # Specifications without HTTP probes have nothing to report unless the cache does.
-                if payload.probes or cache_row is not None:
-                    unreachable = _server_unreachable(payload.probes)
-                    if unreachable:
-                        header = Text.assemble(
-                            ("⚠️  ", Style(color="yellow")),
-                            ("API capabilities: unknown, server unreachable", Style(color="bright_white")),
-                        )
-                    else:
-                        header = Text.assemble(
-                            ("✅  ", Style(color="green")),
-                            ("API capabilities:", Style(color="bright_white")),
-                        )
-                    self.console.print(Indent(header))
-                    self.console.print()
-
-                    table = Table(
-                        show_header=False,
-                        box=None,
-                        padding=(0, 4),
-                        collapse_padding=True,
-                    )
-                    table.add_column("Capability", style=Style(color="bright_white", bold=True), no_wrap=True)
-                    table.add_column("Status", style="cyan")
-                    # Without a response, a probe measured nothing about the API.
-                    for probe_run in [] if unreachable else payload.probes:
-                        icon, style = {
-                            ProbeOutcome.SUCCESS: ("✓", Style(color="green")),
-                            ProbeOutcome.FAILURE: ("✘", Style(color="red")),
-                            ProbeOutcome.SKIP: ("⊘", Style(color="yellow")),
-                        }[probe_run.outcome]
-
-                        table.add_row(f"{probe_run.probe.name}:", Text(icon, style=style))
-
-                    if cache_row is not None:
-                        table.add_row("Cache:", cache_row)
-
-                    if table.row_count:
-                        self.console.print(Indent(table))
-                        self.console.print()
-                auth = payload.auth
-                # Users who supply credentials gain nothing from hearing that sign-up was skipped.
-                if auth is not None and auth.spec is not None and auth.status != Status.SKIP:
-                    self.console.print(Indent(_auth_bootstrap_line(auth, auth.spec)))
-                    self.console.print()
+            if event.payload is not None:
+                display_setup(self.console, event.payload)
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and self.stateful_tests_manager is not None:
             manager = self.stateful_tests_manager
             self.stateful_tests_manager = None
@@ -1526,11 +1530,10 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
     def display_phases(self, ctx: ExecutionContext) -> None:
         click.echo(style("Test Phases:", bold=True))
 
-        for phase in PhaseName:
+        for phase, (status, skip_reason) in ctx.phases.items():
             if phase in INTERNAL_PHASES:
                 # Internal phases are not part of the test phase summary
                 continue
-            status, skip_reason = ctx.phases[phase]
 
             if status == Status.SKIP:
                 click.echo(style(f"  ⏭  {phase.display}", fg="yellow"), nl=False)

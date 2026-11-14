@@ -22,7 +22,7 @@ from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, StopReason, events, from_schema
 from schemathesis.engine.control import ExecutionControl
-from schemathesis.engine.run import relay_events
+from schemathesis.engine.run import PhaseName, relay_events
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.stateful._link_chooser import collect_link_candidates
 from test.apps.catalog.openapi import basic
@@ -133,6 +133,23 @@ def test_fuzz_entry_point_emits_engine_started_and_finished(ctx):
     _assert_engine_started_and_finished(_fuzz_events(schema))
 
 
+def test_fuzz_signs_up_in_setup_before_fuzzing(ctx):
+    api = ctx.openapi.apps.sign_up_and_login()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    collected = _collect_until_finished(schema)
+    assert {
+        "phases": [event.phase.name for event in collected if isinstance(event, events.PhaseStarted)],
+        "sign_up": [
+            event.payload.auth.status
+            for event in collected
+            if isinstance(event, events.PhaseFinished) and event.phase.name is PhaseName.SETUP
+        ],
+    } == {
+        "phases": [PhaseName.SETUP, PhaseName.CONTINUOUS_FUZZING],
+        "sign_up": [Status.SUCCESS],
+    }
+
+
 # Only waits at or above the reporting threshold are announced, so the test sleeps that long once.
 def test_fuzz_emits_rate_limit_retry(ctx, app_runner):
     calls = []
@@ -177,7 +194,15 @@ def test_fuzz_skips_operation_with_unresolvable_required_body(ctx):
         }
     )
     collected = _fuzz_events(schema)
-    assert [type(event) for event in collected] == [events.EngineStarted, events.EngineFinished]
+    assert [type(event) for event in collected] == [
+        events.EngineStarted,
+        events.PhaseStarted,
+        events.SetupWarnings,
+        events.PhaseFinished,
+        events.PhaseStarted,
+        events.PhaseFinished,
+        events.EngineFinished,
+    ]
 
 
 def test_fuzz_wsgi_app_without_error_feedback_and_response_data(ctx):

@@ -12,7 +12,7 @@ from schemathesis.cli.ext.fs import describe_path_error
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core.failures import is_reproducible_failure
 from schemathesis.engine import Status, StopReason, events
-from schemathesis.engine.run import UNIT_PHASES, PhaseName, PhaseSkipReason
+from schemathesis.engine.run import TESTING_PHASES, UNIT_PHASES, PhaseName, PhaseSkipReason
 from schemathesis.engine.summary import PhaseStatuses, SummaryData
 
 # How telling each outcome is about a phase that ran several times: the summary keeps the highest.
@@ -29,7 +29,9 @@ PHASE_STATUS_PRIORITY = {
 class ExecutionContext(BaseExecutionContext):
     """Execution state for `st run`."""
 
-    phases: PhaseStatuses = field(default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None)))
+    phases: PhaseStatuses = field(
+        default_factory=lambda: dict.fromkeys((PhaseName.SETUP, *TESTING_PHASES), (Status.SKIP, None))
+    )
     baseline_update: bool = False
     baseline_prune: bool = False
     # Problems with the invocation itself, shown before the schema is loaded.

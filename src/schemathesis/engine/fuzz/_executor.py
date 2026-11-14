@@ -36,7 +36,6 @@ if TYPE_CHECKING:
     import hypothesis
     from hypothesis.strategies import DrawFn
 
-    from schemathesis.config import FuzzConfig
     from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.events import EventGenerator
@@ -188,7 +187,7 @@ class Cell:
     value: ActiveScenario | None
 
 
-def run_forever(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
+def run_forever(ctx: EngineContext) -> EventGenerator:
     """Yield fuzz scenario events produced by background Hypothesis threads until all stop."""
     from hypothesis.errors import HypothesisWarning
 
@@ -211,7 +210,7 @@ def run_forever(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
 
     with catch_warnings():
         warnings.filterwarnings("ignore", category=HypothesisWarning)
-        yield from _run_forever(ctx, config, operations=operations, event_queue=event_queue)
+        yield from _run_forever(ctx, operations=operations, event_queue=event_queue)
 
 
 def _relay_events(
@@ -226,7 +225,6 @@ def _relay_events(
 
 def _run_forever(
     ctx: EngineContext,
-    config: FuzzConfig,
     *,
     operations: list[APIOperation],
     event_queue: queue.Queue[events.EngineEvent],
@@ -251,7 +249,6 @@ def _run_forever(
             name=f"schemathesis_fuzz_{worker_id}",
             kwargs={
                 "ctx": ctx,
-                "config": config,
                 "event_queue": event_queue,
                 "worker_id": worker_id,
                 "plan": plan,
@@ -553,7 +550,6 @@ def _handle_session_end(
 
 def _run_forever_thread(
     ctx: EngineContext,
-    config: FuzzConfig,
     event_queue: queue.Queue[events.EngineEvent],
     worker_id: int,
     plan: FuzzPlan,

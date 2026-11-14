@@ -11,6 +11,10 @@
 - XML request bodies place children of `nodeType: none` objects directly in the parent element.
 - Error feedback learns integer, hex and ObjectId formats from Java and MongoDB parse errors.
 
+### :wrench: Changed
+
+- `st fuzz` probes API capabilities and runs sign-up before fuzzing, like `st run`.
+
 ### :bug: Fixed
 
 #### Schema loading

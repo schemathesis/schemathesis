@@ -145,11 +145,8 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             self.skip_reasons.setdefault(event.label, set()).add(event.skip_reason)
 
     def _on_fuzz_scenario_finished(self, ctx: BaseExecutionContext, event: events.FuzzScenarioFinished) -> None:
-        # `st fuzz` has no phases; the timeline shows its whole run as one fuzzing span.
-        if self.started_at is not None:
-            self.phase_started.setdefault(PhaseName.FUZZING, self.started_at)
         self._record(event.recorder)
-        self._record_found(ctx, event.recorder, PhaseName.FUZZING.display, event.timestamp)
+        self._record_found(ctx, event.recorder, PhaseName.CONTINUOUS_FUZZING.display, event.timestamp)
 
     def _on_error(self, event: events.NonFatalError, *, base_url_is_set: bool) -> None:
         entries = self.errors.setdefault(event.label, {})

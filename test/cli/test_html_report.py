@@ -608,7 +608,7 @@ def test_html_report_fuzz_failures(ctx, cli, report_dir, snapshot_html):
     assert '<tr class="op-row row-failed has-details" id="op-get-api-failure">' in html
     assert '<span class="method get">GET</span><span class="path">/api<wbr>/failure</span>' in html
     assert '<tr class="detail-row detail-failed" id="op-get-api-failure-details">' in html
-    assert re.findall(r'tl-lane-name">(\w+)</span><span class="tl-sub">', html) == ["Fuzzing"]
+    assert re.findall(r'tl-lane-name">([\w ]+)</span><span class="tl-sub">', html) == ["Continuous fuzzing"]
 
 
 # `/api/items-0` and `/api/items/0` share an anchor slug; `/api/failure/details` collides with a detail-row id.

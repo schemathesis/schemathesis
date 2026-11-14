@@ -2,29 +2,32 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from schemathesis.engine import events
+from schemathesis.engine import Status, events
+from schemathesis.engine.run import PhaseProgress
 
 if TYPE_CHECKING:
-    from schemathesis.config._fuzz import FuzzConfig
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.events import EventGenerator
+    from schemathesis.engine.run import Phase
 
 
-def execute(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
-    from schemathesis.engine._check_context import run_after_run_checks
-    from schemathesis.engine.core import preflight_error
+def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     from schemathesis.engine.fuzz._executor import run_forever
 
-    yield events.EngineStarted()
-    error = preflight_error(ctx)
-    if error is not None:
-        yield error
-        yield events.EngineFinished(running_time=ctx.running_time, stop_reason=ctx.stop_reason)
-        return
-    yield from run_forever(ctx, config)
-    yield events.EngineFinished(
-        running_time=ctx.running_time,
-        stop_reason=ctx.stop_reason,
-        payload=events.RunSummary(reauth_count=ctx.reauth.reauth_count, reauth_broke=ctx.reauth.broke),
-        failures=run_after_run_checks(ctx),
-    )
+    progress = PhaseProgress()
+    for event in run_forever(ctx):
+        _fold_event(event, progress)
+        yield event
+    yield events.PhaseFinished(phase=phase, status=progress.final_status(phase), payload=None)
+
+
+def _fold_event(event: events.EngineEvent, progress: PhaseProgress) -> None:
+    if isinstance(event, events.FuzzScenarioFinished):
+        progress.is_executed = True
+        progress.checks_ran = progress.checks_ran or any(event.recorder.checks.values())
+        if event.status != Status.SKIP and (progress.status is None or progress.status < event.status):
+            progress.status = event.status
+    elif isinstance(event, events.NonFatalError):
+        progress.record_error()
+    elif isinstance(event, events.Interrupted):
+        progress.status = Status.INTERRUPTED

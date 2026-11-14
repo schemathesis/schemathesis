@@ -8,7 +8,7 @@ from schemathesis import auths
 from schemathesis.config import ConfigError, FuzzConfig, InferenceAlgorithm
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import HookExecutionError, InvalidSchema
-from schemathesis.engine import Status, StopReason, events, fuzz, run
+from schemathesis.engine import Status, StopReason, events, run
 from schemathesis.engine._check_context import run_after_run_checks
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.events import EventGenerator, StatefulPhasePayload
@@ -56,8 +56,9 @@ class Engine:
             auths.unregister()
 
         resolved_config = config or self.schema.config.fuzz
+        plan = ExecutionPlan([Phase(PhaseName.SETUP), Phase(PhaseName.CONTINUOUS_FUZZING)])
         ctx = EngineContext(schema=self.schema, stop_event=threading.Event(), max_time=resolved_config.max_time)
-        return EventStream(fuzz.execute(ctx, resolved_config), ctx.control.stop_event)
+        return EventStream(plan.execute(ctx), ctx.control.stop_event)
 
     def _create_execution_plan(self) -> ExecutionPlan:
         """Create execution plan based on configuration."""
@@ -313,9 +314,11 @@ class ExecutionPlan:
             reauth_count=ctx.reauth.reauth_count,
             reauth_broke=ctx.reauth.broke,
         )
-        # Skip after_run on a partial run (interrupt/abort); the fuzz path runs them on stop.
-        # Spending the whole time budget is a planned finish, so it keeps them.
-        completed = ctx.stop_reason in (StopReason.COMPLETED, StopReason.MAX_TIME)
+        # Skip after_run on a partial run (interrupt/abort). Spending the whole time budget is a planned finish,
+        # and continuous fuzzing has no natural end, so stopping it is how every such run finishes.
+        completed = ctx.stop_reason in (StopReason.COMPLETED, StopReason.MAX_TIME) or any(
+            phase.name is PhaseName.CONTINUOUS_FUZZING for phase in self.phases
+        )
         failures = run_after_run_checks(ctx) if completed else []
         yield events.EngineFinished(
             running_time=ctx.running_time,

@@ -25,6 +25,7 @@ class PhaseName(enum.StrEnum):
     COVERAGE = "coverage"
     FUZZING = "fuzzing"
     STATEFUL_TESTING = "stateful"
+    CONTINUOUS_FUZZING = "continuous_fuzzing"
 
     @property
     def display(self) -> str:
@@ -88,7 +89,15 @@ class Phase:
 
     def should_execute(self, ctx: EngineContext) -> bool:
         """Determine if phase should run based on context & configuration."""
-        return self.is_enabled and not ctx.has_to_stop
+        if not self.is_enabled:
+            return False
+        control = ctx.control
+        # A budget spent before continuous fuzzing starts still buys it one scenario rather than an empty run.
+        if self.name is PhaseName.CONTINUOUS_FUZZING:
+            return not (
+                control.is_interrupted or control.is_server_unavailable or control.has_reached_the_failure_limit
+            )
+        return not ctx.has_to_stop
 
     def enable(self) -> None:
         """Enable this test phase."""
@@ -144,6 +153,8 @@ def relay_events(event_queue: queue.Queue[T], threads: Sequence[threading.Thread
 def execute(ctx: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> EventGenerator:
     from urllib3.exceptions import InsecureRequestWarning
 
+    from schemathesis.engine import fuzz
+
     from . import setup, stateful, unit
 
     with warnings.catch_warnings():
@@ -155,3 +166,5 @@ def execute(ctx: EngineContext, phase: Phase, *, only: frozenset[str] | None = N
             yield from unit.execute(ctx, phase, only=only)
         elif phase.name == PhaseName.STATEFUL_TESTING:
             yield from stateful.execute(ctx, phase)
+        elif phase.name == PhaseName.CONTINUOUS_FUZZING:
+            yield from fuzz.execute(ctx, phase)
