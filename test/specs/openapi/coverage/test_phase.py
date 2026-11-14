@@ -2226,7 +2226,7 @@ def test_path_parameter_string_non_empty(ctx):
     ("extra", "expected"),
     [
         ({}, ["0"]),
-        ({"pattern": "[0-9]{1}", "minLength": 1}, ["00", "0"]),
+        ({"pattern": "[0-9]{1}", "minLength": 1}, ["0", "00"]),
     ],
 )
 def test_path_parameter_invalid_example(ctx, extra, expected):
