@@ -463,13 +463,20 @@ def _format_request_retries_oneof(error: ValidationError) -> str | None:
 def _format_dictionary_definition_oneof(error: ValidationError) -> str:
     section = path_to_section_name(error.instance_path)
     instance = error.instance if isinstance(error.instance, dict) else {}
-    if "values" in instance and "from-file" in instance:
-        return f"Error in {section} section:\n  `values` and `from-file` are mutually exclusive - pick one."
-    return (
-        f"Error in {section} section:\n"
-        "  Must define either `values` (inline entries) "
-        "or `from-file` (path to a libFuzzer/AFL-format file)."
-    )
+    if sum(key in instance for key in ("values", "from-file", "from-operation")) > 1:
+        detail = "`values`, `from-file` and `from-operation` are mutually exclusive - pick one."
+    elif "from-operation" in instance:
+        detail = (
+            "`from-operation` needs `pointer` - a JSON Pointer to the values in the response body, e.g. `/data/*/id`."
+        )
+    elif "pointer" in instance or "parameters" in instance:
+        detail = "`pointer` and `parameters` apply only to `from-operation` dictionaries."
+    else:
+        detail = (
+            "Must define one of `values` (inline entries), `from-file` (path to a libFuzzer/AFL-format file) "
+            "or `from-operation` (an operation whose response fills the dictionary)."
+        )
+    return f"Error in {section} section:\n  {detail}"
 
 
 def _resolve_reference(schema: dict[str, object]) -> dict[str, object]:

@@ -44,6 +44,8 @@ class SpecificationFeature(enum.StrEnum):
     STATUS_CODE_ANALYSIS = "status_code_analysis"
     # Probing how the server handles HTTP edge cases (null bytes in headers, encoded path separators).
     HTTP_PROBES = "http_probes"
+    # Filling dictionaries from API responses before testing starts.
+    OPERATION_DICTIONARIES = "operation_dictionaries"
 
 
 @dataclass(slots=True)
@@ -96,6 +98,7 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
             SpecificationFeature.AUTH_BOOTSTRAP,
             SpecificationFeature.STATUS_CODE_ANALYSIS,
             SpecificationFeature.HTTP_PROBES,
+            SpecificationFeature.OPERATION_DICTIONARIES,
         }
     ),
     SpecificationKind.GRAPHQL: frozenset(

@@ -50,6 +50,7 @@ from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.errors import never_reached_server
 from schemathesis.engine.run import ELASTIC_PHASES, INTERNAL_PHASES, UNIT_PHASES, PhaseName
 from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
+from schemathesis.engine.run.dictionary_loading import DictionaryLoad
 from schemathesis.engine.run.probes import ProbeOutcome, ProbeRun
 from schemathesis.engine.summary import WarningBlock, WarningGroup, WarningItem
 
@@ -89,6 +90,17 @@ def _auth_bootstrap_line(payload: AuthBootstrapPayload, spec: AuthFlowSteps) -> 
         text += "; continuing without authentication"
     return Text.assemble(
         (icon, Style(color=color)), ("Auth: ", Style(color="bright_white", bold=True)), (text, Style(color=color))
+    )
+
+
+def _dictionary_load_line(load: DictionaryLoad) -> Text:
+    from rich.style import Style
+    from rich.text import Text
+
+    return Text.assemble(
+        ("✅  ", Style(color="green")),
+        (f"Dictionary `{load.dictionary}`: ", Style(color="bright_white", bold=True)),
+        (f"{pluralize(load.entries, 'value')} from {load.operation}", Style(color="green")),
     )
 
 
@@ -630,6 +642,12 @@ def display_setup(console: Console, payload: SetupPayload) -> None:
     # Users who supply credentials gain nothing from hearing that sign-up was skipped.
     if auth is not None and auth.spec is not None and auth.status != Status.SKIP:
         console.print(Indent(_auth_bootstrap_line(auth, auth.spec)))
+        console.print()
+    # Failed loads reach the Errors section instead.
+    loaded = [load for load in payload.dictionaries if load.error is None]
+    for load in loaded:
+        console.print(Indent(_dictionary_load_line(load)))
+    if loaded:
         console.print()
 
 

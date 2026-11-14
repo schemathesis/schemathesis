@@ -401,6 +401,28 @@ def register_additional_properties_bug(app: Flask) -> None:
         return jsonify({"ok": True}), 200
 
 
+_CHILDREN_BY_PARENT = {"1": ["c11", "c12"], "2": ["c21", "c22"], "3": []}
+
+
+def register_parents_with_children(app: Flask) -> None:
+    # Parent IDs are JSON integers, while the path parameters declare strings.
+    @app.route("/api/parents", methods=["GET"])
+    def list_parents() -> Any:
+        return jsonify({"data": [{"id": int(parent)} for parent in _CHILDREN_BY_PARENT]}), 200
+
+    @app.route("/api/parents/<parent_id>/children", methods=["GET"])
+    def list_children(parent_id: str) -> Any:
+        if parent_id not in _CHILDREN_BY_PARENT:
+            return jsonify({"detail": "Unknown parent"}), 404
+        return jsonify({"data": [{"id": child} for child in _CHILDREN_BY_PARENT[parent_id]]}), 200
+
+    @app.route("/api/parents/<parent_id>/children/<child_id>", methods=["GET"])
+    def get_child(parent_id: str, child_id: str) -> Any:
+        if child_id not in _CHILDREN_BY_PARENT.get(parent_id, []):
+            return jsonify({"detail": "Unknown child"}), 404
+        return jsonify({"id": child_id}), 200
+
+
 def register_languages_with_codes(app: Flask) -> None:
     @app.route("/languages/", methods=["GET"])
     def list_languages() -> Any:

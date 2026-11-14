@@ -1,9 +1,10 @@
 import os
+import re
 
 import pytest
 
 from schemathesis.config import ConfigError, GenerationConfig, SchemathesisConfig
-from schemathesis.config._dictionaries import coerce_entries_for_type, parse_body_path
+from schemathesis.config._dictionaries import OperationSource, coerce_entries_for_type, parse_body_path
 
 
 def test_from_file_loaded_with_relative_path_and_escapes(tmp_path):
@@ -231,4 +232,60 @@ def test_type_wide_binding_accepts_dictionary_with_some_eligible_entries(values,
     )
     assert repr(config.projects.default.generation.dictionaries) == (
         f"{{'{ty}': DictionaryBinding(dictionary='x', probability=0.5)}}"
+    )
+
+
+PARENTS = {"from-operation": "GET /api/parents", "pointer": "/data/*/id", "parameters": {"query.limit": 100}}
+
+
+def test_from_operation_dictionary_is_parsed():
+    definition = SchemathesisConfig.from_dict({"dictionaries": {"parents": PARENTS}}).dictionaries["parents"]
+    assert (definition.entries, definition.source_kind, definition.source) == (
+        (),
+        "from-operation",
+        OperationSource(operation="GET /api/parents", pointer="/data/*/id", parameters={"query.limit": 100}),
+    )
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (
+            {"from-operation": "GET /api/parents"},
+            "`from-operation` needs `pointer` - a JSON Pointer to the values in the response body, e.g. `/data/*/id`.",
+        ),
+        (
+            {"values": ["a"], "pointer": "/id"},
+            "`pointer` and `parameters` apply only to `from-operation` dictionaries.",
+        ),
+        (
+            {"values": ["a"], "from-operation": "GET /x", "pointer": "/id"},
+            "`values`, `from-file` and `from-operation` are mutually exclusive - pick one.",
+        ),
+        (
+            {"from-operation": "GET /x", "pointer": "/id", "parameters": {"limit": 1}},
+            "Dictionary `bad` parameter `limit` must start with `path.`, `query.`, `header.` or `cookie.`",
+        ),
+        (
+            {"from-operation": "GET /x", "pointer": "/id", "parameters": {"body.id": 1}},
+            "Dictionary `bad` parameter `body.id` must start with `path.`, `query.`, `header.` or `cookie.`",
+        ),
+    ],
+    ids=["no-pointer", "pointer-without-source", "two-sources", "no-location", "body-location"],
+)
+def test_invalid_from_operation_dictionary(payload, message):
+    with pytest.raises(ConfigError, match=re.escape(message)):
+        SchemathesisConfig.from_dict({"dictionaries": {"bad": payload}})
+
+
+# The dictionary has no entries until setup fetches them.
+def test_type_wide_binding_accepts_from_operation_dictionary():
+    config = SchemathesisConfig.from_dict(
+        {
+            "dictionaries": {"parents": PARENTS},
+            "generation": {"dictionaries": {"string": {"dictionary": "parents", "probability": 0.1}}},
+        }
+    )
+    assert repr(config.projects.default.generation.dictionaries) == (
+        "{'string': DictionaryBinding(dictionary='parents', probability=0.1)}"
     )

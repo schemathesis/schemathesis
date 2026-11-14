@@ -134,7 +134,13 @@ def resolve_parameter_bindings(
         dictionary = dictionaries[binding.dictionary]
         is_parameter_specific = isinstance(binding, ParameterDictionaryBinding)
         if is_parameter_specific:
-            entries = tuple((entry.index, entry.value) for entry in dictionary.entries)
+            # Values fetched from the API take the parameter's type, so an integer ID fills a string path parameter.
+            if dictionary.source is not None:
+                ty = _infer_ty(parameter_schema)
+            if ty is not None:
+                entries = coerce_entries_for_type(dictionary.entries, ty)
+            else:
+                entries = tuple((entry.index, entry.value) for entry in dictionary.entries)
         else:
             assert ty is not None
             entries = coerce_entries_for_type(dictionary.entries, ty)

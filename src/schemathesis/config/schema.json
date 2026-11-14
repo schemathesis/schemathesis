@@ -828,18 +828,84 @@
         "from-file": {
           "type": "string",
           "minLength": 1
+        },
+        "from-operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pointer": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "integer",
+              "number",
+              "boolean"
+            ]
+          }
         }
       },
       "oneOf": [
         {
           "required": [
             "values"
-          ]
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "pointer"
+                ]
+              },
+              {
+                "required": [
+                  "parameters"
+                ]
+              }
+            ]
+          }
         },
         {
           "required": [
             "from-file"
-          ]
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "pointer"
+                ]
+              },
+              {
+                "required": [
+                  "parameters"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "from-operation",
+            "pointer"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "values"
+                ]
+              },
+              {
+                "required": [
+                  "from-file"
+                ]
+              }
+            ]
+          }
         }
       ]
     },

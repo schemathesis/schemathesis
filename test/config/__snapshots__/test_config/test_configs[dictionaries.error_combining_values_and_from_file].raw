@@ -1,2 +1,2 @@
 Error in [dictionaries.x] section:
-  `values` and `from-file` are mutually exclusive - pick one.
+  `values`, `from-file` and `from-operation` are mutually exclusive - pick one.

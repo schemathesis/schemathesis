@@ -25,5 +25,9 @@ def additional_properties_bug() -> OpenAPIApp:
     return flask_app(schemas.additional_properties_bug(), handlers.register_additional_properties_bug)
 
 
+def parents_with_children() -> OpenAPIApp:
+    return flask_app(schemas.parents_with_children(), handlers.register_parents_with_children)
+
+
 def languages_with_codes() -> OpenAPIApp:
     return flask_app(schemas.languages_with_codes(), handlers.register_languages_with_codes)
