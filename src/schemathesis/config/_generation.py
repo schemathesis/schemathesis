@@ -220,7 +220,9 @@ def _parse_type_wide_bindings(
     for ty, value in raw.items():
         name: str = value["dictionary"]
         require_known_dictionary(f"`generation.dictionaries.{ty}`", name, dictionaries)
-        if not coerce_entries_for_type(dictionaries[name].entries, ty):
+        dictionary = dictionaries[name]
+        # Dictionaries filled from an API response have no entries to check until the run starts.
+        if dictionary.source is None and not coerce_entries_for_type(dictionary.entries, ty):
             raise ConfigError(f"Dictionary `{name}` has no entries eligible for `{ty}` under `generation.dictionaries`")
         result[ty] = DictionaryBinding(dictionary=name, probability=float(value["probability"]))
     return result

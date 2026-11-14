@@ -921,6 +921,24 @@ def additional_properties_bug() -> dict[str, Any]:
     }
 
 
+def parents_with_children() -> dict[str, Any]:
+    parent_id = {"in": "path", "name": "parentId", "required": True, "schema": {"type": "string"}}
+    child_id = {"in": "path", "name": "childId", "required": True, "schema": {"type": "string"}}
+    responses = {"200": {"description": "OK"}, "404": {"description": "Not Found"}}
+    return {
+        "/api/parents": {
+            "get": {
+                "parameters": [{"in": "query", "name": "limit", "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+        "/api/parents/{parentId}/children": {"get": {"parameters": [parent_id], "responses": responses}},
+        "/api/parents/{parentId}/children/{childId}": {
+            "get": {"parameters": [parent_id, child_id], "responses": responses}
+        },
+    }
+
+
 def languages_with_codes() -> dict[str, Any]:
     return {
         "/languages/": {

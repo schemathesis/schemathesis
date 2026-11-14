@@ -442,6 +442,10 @@ class AuthenticationError(SchemathesisError):
         super().__init__(text)
 
 
+class DictionaryLoadingError(SchemathesisError):
+    """A `from-operation` dictionary could not be filled from its source operation."""
+
+
 class NoLinksFound(IncorrectUsage):
     """Raised when no valid links are available for stateful testing."""
 

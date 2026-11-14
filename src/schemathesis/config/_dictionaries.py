@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal, get_args
 
+from schemathesis.config._env import resolve
 from schemathesis.config._error import ConfigError
 from schemathesis.core.transforms import format_body_path
 
@@ -99,12 +100,26 @@ class DictionaryEntry:
     index: int
 
 
+@dataclass(slots=True, frozen=True)
+class OperationSource:
+    """An API operation whose response fills a dictionary before testing starts."""
+
+    # Operation label, e.g. `GET /api/parents`.
+    operation: str
+    # JSON Pointer to the values in the response body; `*` matches every array item.
+    pointer: str
+    # Request parameters keyed by location-prefixed names, e.g. `query.limit`.
+    parameters: dict[str, object]
+
+
 @dataclass(slots=True)
 class DictionaryDefinition:
     name: str
+    # Empty for `from-operation` dictionaries until the setup phase fetches them.
     entries: tuple[DictionaryEntry, ...]
     source_kind: str
     source_path: str | None
+    source: OperationSource | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -141,12 +156,35 @@ def _parse_one_dictionary(name: str, payload: dict, *, base_dir: str | None) -> 
     if "values" in payload:
         entries = tuple(DictionaryEntry(value=item, index=index) for index, item in enumerate(payload["values"]))
         return DictionaryDefinition(name=name, entries=entries, source_kind="values", source_path=None)
+    if "from-operation" in payload:
+        return DictionaryDefinition(
+            name=name,
+            entries=(),
+            source_kind="from-operation",
+            source_path=None,
+            source=_parse_operation_source(name, payload),
+        )
     path_str: str = payload["from-file"]
     resolved = _resolve_dictionary_path(path_str, base_dir=base_dir)
     file_entries = _parse_libfuzzer_file(resolved, name=name)
     if not file_entries:
         raise ConfigError(f"Dictionary `{name}` file `{path_str}` contains no entries")
     return DictionaryDefinition(name=name, entries=tuple(file_entries), source_kind="from-file", source_path=resolved)
+
+
+_SOURCE_PARAMETER_LOCATIONS = ("path", "query", "header", "cookie")
+
+
+def _parse_operation_source(name: str, payload: dict) -> OperationSource:
+    parameters: dict[str, object] = {}
+    for key, value in payload.get("parameters", {}).items():
+        location, _, parameter = key.partition(".")
+        if location not in _SOURCE_PARAMETER_LOCATIONS or not parameter:
+            raise ConfigError(
+                f"Dictionary `{name}` parameter `{key}` must start with `path.`, `query.`, `header.` or `cookie.`"
+            )
+        parameters[key] = resolve(value)
+    return OperationSource(operation=payload["from-operation"], pointer=payload["pointer"], parameters=parameters)
 
 
 def _resolve_dictionary_path(path: str, *, base_dir: str | None) -> str:

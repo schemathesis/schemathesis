@@ -18,6 +18,7 @@ from schemathesis import errors
 from schemathesis.config import ConfigError
 from schemathesis.core.errors import (
     AuthenticationError,
+    DictionaryLoadingError,
     HookExecutionError,
     InvalidTransition,
     SerializationNotPossible,
@@ -92,6 +93,9 @@ class EngineErrorInfo:
         if isinstance(self._error, UnresponsiveOperationError):
             return "Unresponsive Operation"
 
+        if isinstance(self._error, DictionaryLoadingError):
+            return "Dictionary Loading Error"
+
         if isinstance(self._error, requests.RequestException):
             return "Network Error"
 
@@ -165,6 +169,8 @@ class EngineErrorInfo:
     def has_useful_traceback(self) -> bool:
         if isinstance(self._error, AuthenticationError):
             return self._error.show_traceback
+        if isinstance(self._error, DictionaryLoadingError):
+            return False
         return self._kind not in (
             RuntimeErrorKind.CONFIG_ERROR,
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,

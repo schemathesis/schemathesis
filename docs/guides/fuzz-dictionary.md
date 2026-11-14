@@ -56,6 +56,26 @@ values = [42, 100, 9999]
 "path.user_id" = { dictionary = "users", probability = 0.5 }
 ```
 
+## Fill a Dictionary From the API
+
+When real IDs change between environments, let the API list them instead of hard-coding `values`:
+
+```toml
+[dictionaries.users]
+from-operation = "GET /users"
+pointer = "/data/*/id"
+parameters = { "query.limit" = 100 }
+
+[parameters]
+"path.user_id" = { dictionary = "users" }
+```
+
+Before testing starts, `st run` and `st fuzz` send one `GET /users?limit=100` request and collects every value at `pointer`, a JSON Pointer into the response body where `*` matches each item of an array. The request carries your headers and configured auth, and Schemathesis calls the operation even when filters exclude it from testing. Keys in `parameters` start with `path.`, `query.`, `header.` or `cookie.`; every path parameter of the source operation needs a value.
+
+Fetched values take the type of the parameter they fill, so an integer ID `42` reaches a `type: string` path parameter as `"42"`. Strings and numbers count as values; objects, arrays, booleans and `null` do not.
+
+If the request fails, returns a non-2xx status, or yields no values, the dictionary stays empty and its parameters fall back to generated values. Schemathesis reports the error and exits with code 1, but the run continues. The pytest plugin does not load these dictionaries.
+
 ## Target Body Fields
 
 For request bodies, address fields with a JSONPath subset rooted at `body.`:

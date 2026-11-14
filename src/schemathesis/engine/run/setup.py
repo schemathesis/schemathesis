@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from schemathesis.core import SpecificationFeature
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.run import Phase
     from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
     from schemathesis.engine.run.cache import CacheReport
+    from schemathesis.engine.run.dictionary_loading import DictionaryLoad
     from schemathesis.engine.run.probes import ProbeRun
 
 
@@ -23,10 +24,11 @@ class SetupPayload:
     cache: CacheReport | None = None
     # `None` when the specification does not support signing up.
     auth: AuthBootstrapPayload | None = None
+    dictionaries: list[DictionaryLoad] = field(default_factory=list)
 
 
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
-    from schemathesis.engine.run import analysis, auth_bootstrap, probes
+    from schemathesis.engine.run import analysis, auth_bootstrap, dictionary_loading, probes
 
     specification = ctx.schema.specification
     payload = SetupPayload(probes=probes.probe(ctx), cache=ctx.cache.run())
@@ -36,5 +38,13 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
         hook_failed = yield from analysis.analyze(ctx, phase)
     if specification.supports_feature(SpecificationFeature.AUTH_BOOTSTRAP) and not ctx.has_to_stop:
         payload.auth = yield from auth_bootstrap.bootstrap(ctx)
-    failed = hook_failed or (payload.auth is not None and payload.auth.status == Status.ERROR)
+    # Source requests run after sign-up, so they carry its credentials.
+    if not ctx.has_to_stop:
+        payload.dictionaries = dictionary_loading.load_dictionaries(ctx)
+        yield from dictionary_loading.load_errors(payload.dictionaries)
+    failed = (
+        hook_failed
+        or (payload.auth is not None and payload.auth.status == Status.ERROR)
+        or any(load.error is not None for load in payload.dictionaries)
+    )
     yield events.PhaseFinished(phase=phase, status=Status.ERROR if failed else Status.SUCCESS, payload=payload)
