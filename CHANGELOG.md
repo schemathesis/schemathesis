@@ -27,6 +27,7 @@
 
 - Crash in HAR reports when the base URL contains credentials.
 - Lost or misattributed pytest report entries for stateful tests and calls to other operations.
+- Missing Open API 3.2 `query` operations in the WFC report.
 - `HookExecutionError` in pytest reports when tests validate responses from their own HTTP client.
 - `ModuleNotFoundError` for `allure_commons` in pytest reports when `allure-pytest` is not installed.
 - `<BINARY>` shown for text responses cut mid-character by `max-recorded-payload-size`.

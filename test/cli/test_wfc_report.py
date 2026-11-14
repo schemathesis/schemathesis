@@ -244,6 +244,31 @@ def test_endpoint_ids_list_declared_operations(ctx, cli, tmp_path):
     assert [entry["endpointId"] for entry in rest["coveredHttpStatus"]] == ["GET:/api/success"]
 
 
+@pytest.mark.parametrize(
+    ("operation", "method"),
+    [
+        ({"query": {"responses": {"200": {"description": "OK"}}}}, "QUERY"),
+        ({"additionalOperations": {"COPY": {"responses": {"200": {"description": "OK"}}}}}, "COPY"),
+    ],
+    ids=["query", "additional-operations"],
+)
+def test_endpoint_ids_list_open_api_3_2_methods(ctx, cli, tmp_path, operation, method):
+    app, _ = ctx.openapi.make_flask_app({"/items": operation}, version="3.2.0")
+
+    @app.route("/items", methods=[method])
+    def items():
+        return jsonify({}), 200
+
+    path = tmp_path / "report.json"
+    cli.run_openapi_app(app, f"--report-wfc-path={path}", "--max-examples=1", "--phases=fuzzing")
+
+    rest = load_report(path)["problemDetails"]["rest"]
+    assert (rest["endpointIds"], rest["coveredHttpStatus"]) == (
+        [f"{method}:/items"],
+        [{"endpointId": f"{method}:/items", "testCaseId": f"{method}:/items", "httpStatus": [200]}],
+    )
+
+
 def test_one_case_can_carry_several_faults(ctx, cli, tmp_path):
     app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
