@@ -31,6 +31,10 @@
 - `ModuleNotFoundError` for `allure_commons` in pytest reports when `allure-pytest` is not installed.
 - `<BINARY>` shown for text responses cut mid-character by `max-recorded-payload-size`.
 
+#### Request serialization
+
+- Unwrapped XML arrays naming their items after the array's own `xml.name`.
+
 #### Coverage phase
 
 - Missing positive values when `minLength` exceeds what an unanchored `pattern` matches. [#6085](https://github.com/schemathesis/schemathesis/issues/6085)

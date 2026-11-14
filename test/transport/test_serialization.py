@@ -3216,6 +3216,49 @@ def _with_child(child):
             ["a"],
             b"<x_1_tag><x_1_tag>a</x_1_tag></x_1_tag>",
         ),
+        (
+            _with_child({"type": "array", "items": {"type": "string"}, "xml": {"name": "aliens"}}),
+            {},
+            "3.0.3",
+            {"child": ["a", "b"]},
+            b"<root><child>a</child><child>b</child></root>",
+        ),
+        (
+            _with_child(
+                {"type": "array", "items": {"type": "string", "xml": {"name": "animal"}}, "xml": {"name": "aliens"}}
+            ),
+            {},
+            "3.0.3",
+            {"child": ["a", "b"]},
+            b"<root><animal>a</animal><animal>b</animal></root>",
+        ),
+        (
+            _with_child({"type": "array", "items": {"type": "string"}, "xml": {"name": "aliens", "wrapped": True}}),
+            {},
+            "3.0.3",
+            {"child": ["a", "b"]},
+            b"<root><aliens><aliens>a</aliens><aliens>b</aliens></aliens></root>",
+        ),
+        (
+            _with_child(
+                {
+                    "type": "array",
+                    "xml": {"wrapped": True},
+                    "items": {"type": "array", "items": {"type": "string"}, "xml": {"name": "aliens"}},
+                }
+            ),
+            {},
+            "3.0.3",
+            {"child": [["a", "b"]]},
+            b"<root><child><child>a</child><child>b</child></child></root>",
+        ),
+        (
+            {"$ref": "#/components/schemas/Animals"},
+            {"Animals": {"type": "array", "items": {"type": "string"}, "xml": {"name": "aliens"}}},
+            "3.0.3",
+            ["a", "b"],
+            b"<Animals>a</Animals><Animals>b</Animals>",
+        ),
     ],
     ids=[
         "reference-alias-chain-root",
@@ -3263,6 +3306,11 @@ def _with_child(child):
         "invalid-primitive-item-names-sanitized",
         "invalid-root-primitive-name-sanitized",
         "invalid-wrapped-root-array-name-sanitized",
+        "unwrapped-array-name-ignored",
+        "unwrapped-array-name-ignored-items-name-kept",
+        "wrapped-array-name-names-wrapper-and-items",
+        "nested-unwrapped-array-name-ignored",
+        "root-unwrapped-array-name-ignored",
     ],
 )
 def test_serialize_xml_body(ctx, schema, components, version, body, expected):
