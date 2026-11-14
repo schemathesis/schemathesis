@@ -69,6 +69,7 @@ from schemathesis.core.jsonschema.patterns import (
     CharacterRules,
     character_rules,
     compile_ecma_pattern,
+    extend_unanchored_ends,
     matches_every_string,
     pattern_length_bounds,
     pattern_length_is_unreachable,
@@ -1127,13 +1128,18 @@ class CoverageContext:
             pattern_min, pattern_max = pattern_length_bounds(pattern)
             if max_length is not None and max_length < pattern_min:
                 raise Unsatisfiable
-            if min_length is not None and pattern_max is not None and min_length > pattern_max:
-                raise Unsatisfiable
             # A floor above the sizes the pattern emits on its own is where drawing and
             # discarding never lands, so the length gets worked out rather than searched for.
             doomed = min_length is not None and min_length > pattern_min
-            if doomed and pattern_length_is_unreachable(pattern, min_length, max_length):
-                raise Unsatisfiable
+            if min_length is not None and (
+                (pattern_max is not None and min_length > pattern_max)
+                or (doomed and pattern_length_is_unreachable(pattern, min_length, max_length))
+            ):
+                # `pattern` is a search, so text around a match can make up the missing length.
+                extended = extend_unanchored_ends(pattern)
+                if extended == pattern:
+                    raise Unsatisfiable
+                pattern = extended
             # A length-aware format generator can supply a boundary value without the rejection
             # search that broad character classes need. Check one candidate against the original
             # schema; a restrictive pattern still gets its own generator below.

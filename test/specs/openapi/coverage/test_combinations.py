@@ -1812,6 +1812,30 @@ def test_positive_string_absent_where_a_length_bound_meets_a_shape_neither_path_
     assert cover_schema(pctx, {"type": "string", "pattern": pattern, "minLength": 8, "maxLength": 8}) == []
 
 
+@pytest.mark.parametrize(
+    ("pattern", "min_length", "max_length"),
+    [
+        ("", 1, None),
+        ("a", 2, None),
+        ("^a", 2, None),
+        ("a$", 2, None),
+        ("a", 3, 5),
+        ("a|^bc$", 4, None),
+        ("^(?! )", 1, None),
+        ("^(?=a)", 1, None),
+        (r"^(?=.*\S)", 1, None),
+    ],
+)
+def test_positive_string_extends_past_an_unanchored_pattern_match(pctx, pattern, min_length, max_length):
+    # `pattern` is a search, so a match shorter than `minLength` still fits inside a longer string.
+    schema = {"type": "string", "pattern": pattern, "minLength": min_length}
+    if max_length is not None:
+        schema["maxLength"] = max_length
+    values = cover_schema(pctx, schema)
+    assert values
+    assert_conform(values, schema)
+
+
 def test_positive_string_skips_a_window_no_length_can_satisfy(pctx):
     # `minLength` above `maxLength` leaves nothing to aim at, and searching for it never ends.
     assert cover_schema(pctx, {"type": "string", "pattern": r"^[a-z]+$", "minLength": 40, "maxLength": 8}) == []
