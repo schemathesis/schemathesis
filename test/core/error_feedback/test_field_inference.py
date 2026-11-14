@@ -32,7 +32,7 @@ def test_blocklisted_values_skip(case_factory, value):
     ("case_kwargs", "rejected_value"),
     [
         ({"body": {}}, "DISTINCT-VALUE-2026"),
-        # str(False) == "False" but the wire form is "false" — must use json.dumps to compare.
+        # `str(False)` is "False" but the wire form is "false", so the comparison goes through `json.dumps`.
         ({"body": {"flag": False, "name": "ALPHA-BRAVO-2026"}}, "False"),
         ({"body": {"name": "alice", "score": 42}}, "2024-01-15"),
         ({"body": _nested("DEEPLY-NESTED-VALUE", 33)}, "DEEPLY-NESTED-VALUE"),
@@ -146,7 +146,7 @@ def test_query_attribution_depends_on_remaining_walk_budget(case_factory, body, 
             ParameterLocation.QUERY,
             ("from",),
         ),
-        # Rejected value isn't in the request — likely a server-side default.
+        # Rejected value isn't in the request, likely a server-side default.
         (
             "/api/users",
             {"body": {"name": "alice", "score": 42}, "method": "POST"},
@@ -167,7 +167,7 @@ def test_query_attribution_depends_on_remaining_walk_budget(case_factory, body, 
             ParameterLocation.BODY,
             None,
         ),
-        # Distinct nested match — only one candidate.
+        # Distinct nested match: only one candidate.
         (
             "/api/orders",
             {

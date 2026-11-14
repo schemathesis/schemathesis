@@ -1169,8 +1169,7 @@ EXPIRING_AUTH = {
 
 
 def test_escalating_provider_exposes_its_caching_providers(ctx, tmp_path):
-    # Reactive reauth is driven off the caching providers reachable from the schema; an escalating
-    # provider must not hide the ones it wraps, or a stale token can never be refreshed.
+    # Reactive reauth finds caching providers through the schema; an escalating provider must not hide them.
     auth = _write(tmp_path, EXPIRING_AUTH)
     schema = ctx.openapi.load_schema(
         {"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}},
@@ -1181,8 +1180,7 @@ def test_escalating_provider_exposes_its_caching_providers(ctx, tmp_path):
 
 
 def test_expired_token_is_refreshed_for_a_multi_user_document(cli, ctx, tmp_path):
-    # The identity stays valid; only its token dies. Without reactive reauth the run replays the dead
-    # token for the rest of the budget instead of logging in again.
+    # Only the token dies; without reactive reauth the run replays it for the rest of the budget instead of logging in.
     api = ctx.openapi.serve(wfc_apps.wfc_expiring_token())
     auth = _write(tmp_path, EXPIRING_AUTH)
 
@@ -1332,8 +1330,7 @@ def test_assignment_is_restored_from_cache(cli, ctx, tmp_path):
 
 
 def test_failure_names_the_identity(cli, ctx, tmp_path, snapshot_cli):
-    # With several identities in play, a report that does not say which one ran is ambiguous.
-    # The name alone is not actionable; the flag that reproduces it is.
+    # With several identities, the report needs the flag reproducing the one that ran; its name alone is not actionable.
     api = ctx.openapi.apps.wfc_role_gated()
     auth = _write(tmp_path, ROLE_AUTH)
     junit = tmp_path / "junit.xml"

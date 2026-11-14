@@ -73,9 +73,7 @@ from test.utils import EventStream, check_context, make_case, oas3_response, run
 @pytest.mark.parametrize(
     ("lhs", "lhs_vars", "rhs", "rhs_vars", "expected"),
     [
-        # Exact match, no variables
         ("/users/123", {}, "/users/123", {}, True),
-        # Different paths, no variables
         ("/users/123", {}, "/users/456", {}, False),
         # Different variable names
         ("/users/{id}", {"id": "123"}, "/users/{user_id}", {"user_id": "123"}, True),
@@ -85,24 +83,19 @@ from test.utils import EventStream, check_context, make_case, oas3_response, run
         ("/user/{id}", {"id": "123"}, "/users/{id}", {"id": "456"}, False),
         ("/users/{id}", {"id": "123"}, "/user/{id}", {"id": "123"}, True),
         ("/users/{id}", {"id": "123"}, "/user/{id}", {"id": "456"}, False),
-        # Trailing slashes
         ("/users/{id}/", {"id": "123"}, "/users/{id}", {"id": "123"}, True),
         ("/users/{id}/", {"id": "123"}, "/users/{id}", {"id": "456"}, False),
         ("/users/{id}", {"id": "123"}, "/users/{id}/", {"id": "123"}, True),
         ("/users/{id}", {"id": "123"}, "/users/{id}/", {"id": "456"}, False),
         ("/users/", {}, "/users", {}, True),
         ("/users", {}, "/users/", {}, True),
-        # Empty paths
         ("", {}, "", {}, True),
         ("", {}, "/", {}, True),
         ("/", {}, "", {}, True),
-        # Mismatched paths
         ("/users/{id}", {"id": "123"}, "/products/{id}", {"id": "456"}, False),
         ("/users/{id}", {"id": "123"}, "/users/{name}", {"name": "John"}, False),
-        # LHS is a prefix of RHS
         ("/users/{id}", {"id": "123"}, "/users/{id}/details", {"id": "123"}, True),
         ("/users/{id}", {"id": "123"}, "/users/{id}/details", {"id": "456"}, False),
-        # LHS is a prefix of RHS, with different number of variables
         ("/users/{id}", {"id": "123"}, "/users/{id}/{name}", {"id": "123", "name": "John"}, True),
         (
             "/users/{id}",
@@ -111,15 +104,12 @@ from test.utils import EventStream, check_context, make_case, oas3_response, run
             {"id": "123", "name": "John", "email": "john@example.com"},
             True,
         ),
-        # LHS is a prefix of RHS, with different variable types
         ("/users/{id}", {"id": "123"}, "/users/{id}/details", {"id": 123}, True),
         ("/users/{id}", {"id": 123}, "/users/{id}/details", {"id": "123"}, True),
-        # LHS is a prefix of RHS, with extra path segments
         ("/users/{id}", {"id": "123"}, "/users/{id}/details/view", {"id": "123"}, True),
         ("/users/{id}", {"id": "123"}, "/users/{id}/details/view", {"id": "456"}, False),
         ("/users/{id}", {"id": "123"}, "/users/{id}/details/view/edit", {"id": "123"}, True),
         ("/users/{id}", {"id": "123"}, "/users/{id}/details/view/edit", {"id": "456"}, False),
-        # Longer than a prefix
         ("/one/two/three/four/{id}", {"id": "123"}, "/users/{id}/details", {"id": "456"}, False),
     ],
 )
@@ -141,8 +131,7 @@ def build_metadata(
     mutations=None,
     phase=TestPhase.FUZZING,
 ):
-    # When the test pins a type-mutation description, also populate the structured
-    # Mutation record so the case carries what the engine produces for the same case.
+    # Pair a type-mutation description with the mutation record the engine attaches to such a case.
     if mutations is None:
         mutations = ()
         if description.startswith("Invalid type") and parameter is not None:
@@ -160,7 +149,7 @@ def build_metadata(
                 ),
             )
     elif not description:
-        # The engine derives the description from the mutations; mirror that instead of restating it.
+        # Derive the description from the mutations, as the engine does.
         description = MutationMetadata(mutations=mutations).description
     return CaseMetadata(
         generation=GenerationInfo(
@@ -508,7 +497,7 @@ def test_has_only_additional_properties_reads_parameters_as_sent(ctx, parameters
 
 
 def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
-    # Patterns with large quantifiers require pattern_options with sufficient size_limit
+    # Large quantifiers need a raised regex size limit.
     operation = ctx.openapi.load_operation(
         "POST /test",
         {
@@ -528,7 +517,6 @@ def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
         _meta=build_metadata(query=GenerationMode.NEGATIVE),
         query={"key": "valid", "unknown": "extra"},
     )
-    # Should not raise - the validator should handle patterns with large quantifiers
     assert has_only_additional_properties_in_non_body_parameters(case) is True
 
 
@@ -649,7 +637,7 @@ def test_negative_data_rejection_reports_scalar_parameter_behind_reference(ctx, 
 
 
 def test_negative_data_rejection_ignores_extras_next_to_allow_empty_value_string(ctx, response_factory):
-    # `allowEmptyValue` admits types other than string, but "0" is still a valid string, not `false`.
+    # "0" is a valid string even under `allowEmptyValue`, which also admits non-string types.
     operation = ctx.openapi.load_operation(
         "GET /test",
         {
@@ -858,8 +846,7 @@ def test_additional_properties_hint_resolves_bundled_ref(ctx, response_factory, 
     ],
 )
 def test_additional_properties_hint_with_composed_properties(ctx, response_factory, combinator, body, expected_hint):
-    # Properties declared inside combinator branches are not extras, and telling the user to add
-    # `additionalProperties: false` there would reject valid requests.
+    # Branch-declared properties are not extras, and `additionalProperties: false` there would reject valid requests.
     schema = ctx.openapi.from_full_schema(
         {
             "openapi": "3.0.2",
@@ -1027,8 +1014,7 @@ def test_additional_properties_hint_follows_response_attribution(ctx, response_f
     ("status_code", "reported"),
     [
         pytest.param(405, False, id="405-method-not-allowed-passes"),
-        # 409 short-circuits validation on uniqueness-gated endpoints (duplicate email etc.)
-        # before the server reaches the mutated field — treating it as "accepted" is a false positive.
+        # Uniqueness checks (duplicate email etc.) can answer 409 before the server reads the mutated field.
         pytest.param(409, False, id="409-conflict-passes"),
         # A throttle refuses the request without judging its data.
         pytest.param(429, False, id="429-too-many-requests-passes"),
@@ -3082,7 +3068,7 @@ def test_response_schema_conformance_with_unspecified_method(response_factory, s
         (300, ["2XX", "3XX", "4XX"], True, False),
         (400, ["2XX", "3XX", "4XX"], True, False),
         (500, ["2XX", "3XX", "4XX"], True, True),
-        # Negative data, should not raise
+        # Negative data
         (200, ["200", "400"], False, False),
         (400, ["200", "400"], False, False),
     ],
@@ -3132,10 +3118,10 @@ def test_grpc_status_name_is_invalid_for_openapi(ctx):
 @pytest.mark.parametrize(
     ["path", "header_name", "expected_status"],
     [
-        ("/success", "X-API-Key-1", "200"),  # Does not fail
-        ("/success", "X-API-Key-1", "406"),  # Fails because the response is HTTP 200
-        ("/basic", "Authorization", "406"),  # Does not fail because Authorization has its own check
-        ("/success", "Authorization", "200"),  # Fails because response is not 401
+        ("/success", "X-API-Key-1", "200"),  # Passes
+        ("/success", "X-API-Key-1", "406"),  # Fails: the response is 200
+        ("/basic", "Authorization", "406"),  # Passes: `Authorization` has its own check
+        ("/success", "Authorization", "200"),  # Fails: the response is not 401
     ],
 )
 @pytest.mark.snapshot(replace_reproduce_with=False)
@@ -3404,9 +3390,7 @@ def test_negative_data_rejection_single_element_array_beside_other_parameters(
 
 
 def test_negative_data_rejection_single_element_array_serialization(ctx, response_factory):
-    # When a single-element array is generated for negative testing (e.g., [67] for an integer parameter),
-    # it serializes to the same query string as a single integer (page=67).
-    # The API correctly accepts this as valid, so negative_data_rejection should not fail.
+    # `[67]` serializes as `page=67`, a valid integer, so a 200 is not a failure.
 
     operation = ctx.openapi.load_operation(
         "GET /job_info/scroll",
@@ -3426,30 +3410,22 @@ def test_negative_data_rejection_single_element_array_serialization(ctx, respons
         },
     )
 
-    # Simulate negative testing where a single-element array [67] is generated
-    # for an integer parameter
     case = operation.Case(
         _meta=build_metadata(
             query=GenerationMode.NEGATIVE,
             generation_modes=[GenerationMode.NEGATIVE],
         ),
-        query={"page": [67]},  # Single-element array
+        query={"page": [67]},
     )
 
-    # Create a successful response (200 OK)
     response = response_factory.requests(status_code=200)
 
-    # The check should NOT raise an error because:
-    # 1. The single-element array [67] serializes to "67"
-    # 2. This is valid for an integer parameter
-    # 3. The API correctly returns 200
     result = negative_data_rejection(
         check_context(),
         response,
         case,
     )
 
-    # Should return None (no error) because the serialized value is valid
     assert result is None
 
 
@@ -3865,9 +3841,7 @@ def test_negative_data_rejection_path_string_numeric_serialization_with_other_ne
 
 
 def test_response_schema_conformance_with_surrogate_chars_in_response(response_factory, ctx):
-    # The JSON escape \uDCF3 is a lone low surrogate; Python's json.loads accepts it and
-    # produces a Python str containing the lone surrogate '\udcf3'. jsonschema_rs then
-    # raises ValueError  when it tries to UTF-8-encode that string.
+    # `json.loads` accepts the lone surrogate `\uDCF3`, which the validator then fails to encode as UTF-8.
     operation = ctx.openapi.load_operation(
         "GET /test",
         {
@@ -3890,9 +3864,7 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
             case,
         )
     failure = exc_info.value
-    # document should be the raw JSON text
     assert failure.document == '"\\udcf3"'
-    # \udcf3 starts at index 1 in the document
     assert failure.position == 1
     assert failure.lineno == 1
     assert failure.colno == 2
@@ -4563,7 +4535,7 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
             },
             False,
         ),
-        # Implicit schema names remain valid even when explicit mapping is present
+        # Implicit schema names stay valid next to an explicit mapping
         (
             {"petType": "Cat"},
             {
@@ -4572,7 +4544,7 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
             },
             False,
         ),
-        # Unknown value fails even when explicit mapping exists
+        # Unknown value fails
         (
             {"petType": "Fish"},
             {
@@ -4581,9 +4553,9 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
             },
             True,
         ),
-        # Missing discriminator property: skip check (let JSON schema handle required fields)
+        # Missing property: the check defers to JSON Schema `required`
         ({}, {"propertyName": "petType"}, False),
-        # No propertyName in discriminator: skip check
+        # No `propertyName`: the check skips
         ({"petType": "Fish"}, {}, False),
         # Open API 3.2 routes unknown values to the `defaultMapping` schema
         ({"petType": "Fish"}, {"propertyName": "petType", "defaultMapping": "#/components/schemas/Dog"}, False),
@@ -4981,8 +4953,7 @@ def test_response_schema_conformance_json_sequence_discriminator(ctx, response_f
 
 
 def test_response_schema_conformance_discriminator_boolean_schema(ctx, response_factory):
-    # Boolean schemas (true/false) in anyOf/oneOf are valid in OpenAPI 3.1.
-    # The boolean item is skipped during implicit mapping extraction; only $ref items contribute.
+    # Open API 3.1 allows boolean schemas in `anyOf`/`oneOf`; only `$ref` branches contribute implicit names.
     operation = ctx.openapi.load_operation(
         "GET /pets",
         {
@@ -6522,8 +6493,7 @@ def case(ctx, request, spec) -> Case:
             "responses": {
                 "200": {
                     "content": {
-                        # There should be a content type in OAS3. But in test below it is omitted
-                        # For simplicity a default value is implemented here
+                        # Open API 3 requires a media type, so an empty param falls back to `application/json`.
                         key: {"schema": {"type": "string"}}
                         for key in request.param or ["application/json"]
                     }
@@ -6620,7 +6590,6 @@ def test_content_type_conformance_default_response(ctx, response_factory, conten
     [("application:json", "application/json"), ("application/json", "application:json")],
 )
 def test_malformed_content_type(ctx, schema_media_type, response_media_type, response_factory):
-    # When the verified content type is malformed
     raw_schema = {
         "openapi": "3.0.2",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -6632,7 +6601,6 @@ def test_malformed_content_type(ctx, schema_media_type, response_media_type, res
             }
         },
     }
-    # Then it should raise an assertion error, rather than an internal one
     schema = ctx.openapi.from_full_schema(raw_schema)
     location = "Schema" if schema_media_type == "application:json" else "Response"
     response = Response.from_requests(response_factory.requests(content_type=response_media_type), True)
@@ -6648,7 +6616,6 @@ def test_malformed_content_type(ctx, schema_media_type, response_media_type, res
 
 
 def test_content_type_conformance_another_status_code(ctx, response_factory):
-    # When the schema only defines a response for status code 400
     raw_schema = {
         "openapi": "3.0.2",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -6660,8 +6627,7 @@ def test_content_type_conformance_another_status_code(ctx, response_factory):
             }
         },
     }
-    # And the response has another status code
-    # Then the content type should be ignored, since the schema does not contain relevant definitions
+    # Only a 400 response is documented, so other statuses have no content type to check.
     schema = ctx.openapi.from_full_schema(raw_schema)
     assert_content_type_conformance(response_factory, schema, "application/xml", False)
 
@@ -6729,19 +6695,16 @@ def test_content_type_conformance_invalid(spec, response, case):
 
 
 def test_invalid_schema_on_content_type_check(ctx, response_factory):
-    # When schema validation is disabled, and it doesn't contain "responses" key
+    # The operation lacks the required `responses` key.
     schema = ctx.openapi.load_schema({"/users": {"get": {}}})
     operation = schema["/users"]["get"]
     case = operation.Case()
     response = response_factory.requests(content_type="application/json")
-    # Then there should be no error
     content_type_conformance(check_context(), response, case)
 
 
 def test_missing_content_type_header(case, response_factory):
-    # When the response has no `Content-Type` header
     response = response_factory.requests(content_type=None)
-    # Then an error should be risen
     with pytest.raises(Failure, match="Missing Content-Type header"):
         content_type_conformance(check_context(), response, case)
 
@@ -6777,7 +6740,6 @@ def test_response_schema_conformance_swagger(ctx, swagger_20, content, definitio
 
 
 def test_response_schema_conformance_type_after_large_required(ctx, openapi_30, response_factory):
-    # Schema with a large 'required' array followed by 'type' keyword
     many_fields = [f"field_{i}" for i in range(100)]
     schema = {
         "required": many_fields,
@@ -6785,7 +6747,6 @@ def test_response_schema_conformance_type_after_large_required(ctx, openapi_30, 
         "properties": {field: {"type": "string"} for field in many_fields},
     }
 
-    # Response is a string, not an object - will fail on 'type' validation
     response = Response.from_requests(response_factory.requests(content=b'"not an object"'), True)
     case = make_case(ctx, openapi_30, _oas3_definition(schema, status="200"))
 
@@ -6866,7 +6827,7 @@ Value:
             b'{"success": true}',
             {
                 "responses": {
-                    # Specific status code should be used instead of a more general one
+                    # The specific status code takes precedence over `2XX`.
                     "200": {
                         "description": "text",
                         "content": {"application/json": {"schema": SUCCESS_SCHEMA}},
@@ -6983,29 +6944,23 @@ def test_response_schema_conformance_invalid_properties(ctx, openapi_30, respons
 @pytest.mark.parametrize(
     "extra",
     [
-        # "content" is not required
         {},
-        # "content" can be empty
         {"content": {}},
     ],
 )
 def test_response_conformance_openapi_no_media_types(ctx, openapi_30, extra, response_factory):
-    # When there is no media type defined in the schema
     definition = {"responses": {"default": {"description": "text", **extra}}}
     assert_no_media_types(ctx, response_factory, openapi_30, definition)
 
 
 def test_response_conformance_swagger_no_media_types(ctx, swagger_20, response_factory):
-    # When there is no media type defined in the schema
     definition = {"responses": {"default": {"description": "text"}}}
     assert_no_media_types(ctx, response_factory, swagger_20, definition)
 
 
 def assert_no_media_types(ctx, response_factory, schema, definition):
     case = make_case(ctx, schema, definition)
-    # And no "Content-Type" header in the received response
     response = Response.from_requests(response_factory.requests(content_type=None, status_code=204), True)
-    # Then there should be no errors
     assert response_schema_conformance(check_context(), response, case) is None
 
 
@@ -7041,7 +6996,6 @@ def test_response_conformance_unresolvable_file(ctx, cli, snapshot_cli):
 
 @pytest.mark.parametrize("spec", ["swagger_20", "openapi_30"])
 def test_response_conformance_no_content_type(ctx, request, spec, response_factory):
-    # When there is a media type defined in the schema
     schema = request.getfixturevalue(spec)
     if spec == "swagger_20":
         definition = _swagger_definition(SUCCESS_SCHEMA)
@@ -7049,9 +7003,7 @@ def test_response_conformance_no_content_type(ctx, request, spec, response_facto
     else:
         definition = _oas3_definition(SUCCESS_SCHEMA)
     case = make_case(ctx, schema, definition)
-    # And no "Content-Type" header in the received response
     response = Response.from_requests(response_factory.requests(content_type=None, status_code=200), True)
-    # Then the check should fail
     with pytest.raises(FailureGroup) as exc:
         response_schema_conformance(check_context(), response, case)
     assert (
@@ -7153,7 +7105,6 @@ def test_response_schema_conformance_invalid_openapi(
 
 def test_no_schema(ctx, openapi_30, response_factory):
     # See GH-1220
-    # When the response definition has no "schema" key
     response = Response.from_requests(response_factory.requests(), True)
     definition = {
         "responses": {
@@ -7164,7 +7115,6 @@ def test_no_schema(ctx, openapi_30, response_factory):
         }
     }
     case = make_case(ctx, openapi_30, definition)
-    # Then the check should be ignored
     response_schema_conformance(check_context(), response, case)
     assert case.operation.is_valid_response(response)
 
@@ -7256,11 +7206,9 @@ def test_response_schema_conformance_custom_deserializer(ctx, openapi_30, respon
         result = {}
         for pair in text.split("&"):
             key, value = pair.split("=", 1)
-            # Convert count to integer for schema validation
             result[key] = int(value) if key == "count" else value
         return result
 
-    # With deserializer, should fail validation
     with pytest.raises(AssertionError):
         case.operation.validate_response(response)
 
@@ -7315,13 +7263,10 @@ def schema_with_optional_headers(ctx, request):
 
 
 def test_optional_headers_missing(schema_with_optional_headers, response_factory):
-    # When a response header is declared as optional
-    # NOTE: Open API 2.0 headers are much simpler and do not contain any notion of declaring them as optional
-    # For this reason we support `x-required` instead
+    # Open API 2.0 headers have no notion of optionality, so Schemathesis supports `x-required` there.
     schema = schema_with_optional_headers
     case = schema["/data"]["GET"].Case()
     response = Response.from_requests(response_factory.requests(), True)
-    # Then it should not be reported as missing
     assert response_headers_conformance(check_context(), response, case) is None
 
 
@@ -7680,30 +7625,25 @@ The following required headers are missing from the response:
 @pytest.mark.parametrize(
     ("value", "schema", "explode", "expected"),
     [
-        # String type
         ("test", {"type": "string"}, False, "test"),
         ("123", {"type": "string"}, False, "123"),
-        # Integer type
         ("123", {"type": "integer"}, False, 123),
         ("-456", {"type": "integer"}, False, -456),
-        ("12.34", {"type": "integer"}, False, "12.34"),  # Non-integer string
-        ("abc", {"type": "integer"}, False, "abc"),  # Non-numeric string
-        # Number type
+        ("12.34", {"type": "integer"}, False, "12.34"),
+        ("abc", {"type": "integer"}, False, "abc"),
         ("123.45", {"type": "number"}, False, 123.45),
         ("-67.89", {"type": "number"}, False, -67.89),
         ("123", {"type": "number"}, False, 123.0),
-        ("abc", {"type": "number"}, False, "abc"),  # Non-numeric string
-        # Null type
+        ("abc", {"type": "number"}, False, "abc"),
         ("null", {"type": "null"}, False, None),
         ("NULL", {"type": "null"}, False, None),
         ("Null", {"type": "null"}, False, None),
         ("not null", {"type": "null"}, False, "not null"),
-        # Boolean type
         ("true", {"type": "boolean"}, False, True),
         ("false", {"type": "boolean"}, False, False),
         ("1", {"type": "boolean"}, False, True),
         ("0", {"type": "boolean"}, False, False),
-        # Array type — Swagger 2.0 collectionFormat splits the wire value into items.
+        # Swagger 2.0 `collectionFormat` splits the wire value into items.
         ("a,b,c", {"type": "array", "items": {"type": "string"}}, False, ["a", "b", "c"]),
         (
             "1,2,3",
@@ -7723,7 +7663,6 @@ The following required headers are missing from the response:
         ),
         # Unsupported type
         ("test", {"type": "object"}, False, "test"),
-        # No type specified
         ("test", {}, False, "test"),
         (
             "a=1,b=x=y",
@@ -7800,7 +7739,7 @@ def test_response_schema_conformance_deduplicates_same_schema_path(ctx, response
         }
     )
     case = schema["/data"]["GET"].Case()
-    # All three items violate the same schema_path (items/type) — dedup collapses to one error
+    # All three items fail at `items/type`, so deduplication leaves one error.
     response = Response.from_requests(
         response_factory.requests(content=b"[1, 2, 3]"),
         True,
@@ -7826,7 +7765,7 @@ def test_header_conformance_reports_multiple_errors_from_one_header(ctx, respons
         }
     )
     case = schema["/data"]["GET"].Case()
-    # 75 is both less than minimum=100 and greater than maximum=50 — two distinct violations
+    # 75 violates both `minimum: 100` and `maximum: 50`.
     response = Response.from_requests(
         response_factory.requests(headers={"X-Rate-Limit": "75"}),
         True,
@@ -7860,7 +7799,7 @@ def test_header_conformance_names_negated_reference(ctx, response_factory):
 
 
 def test_use_after_free_no_false_positive_on_idempotent_delete(ctx, response_factory):
-    # RFC 7231 §4.3.5: a repeated DELETE may legitimately return 200/204 instead of 404.
+    # RFC 7231 section 4.3.5: a repeated DELETE may return 200/204 instead of 404.
     schema = ctx.openapi.load_schema(
         {
             "/users": {
@@ -7957,8 +7896,7 @@ def test_use_after_free_failure_references_prior_delete(ctx, response_factory):
 
 
 def test_use_after_free_no_false_positive_on_collection_delete(ctx, response_factory):
-    # DELETE on a bare collection (no path parameters) does not free a specific resource;
-    # a follow-up GET on the same collection returning 200 is a list read, not a use-after-free.
+    # DELETE on a bare collection frees no specific resource, so a later 200 GET is a list read.
     schema = ctx.openapi.load_schema(
         {
             "/locations": {

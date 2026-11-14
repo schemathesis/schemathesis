@@ -16,9 +16,7 @@ from schemathesis.core.transforms import decode_pointer, encode_pointer
 
 BUNDLE_STORAGE_KEY = "x-bundled"
 REFERENCE_TO_BUNDLE_PREFIX = f"#/{BUNDLE_STORAGE_KEY}"
-# Cache for bundled parameters: parameter object id -> (parameter, bundled definition, name_to_uri mapping).
-# The parameter is stored so that its address stays reserved - otherwise a freed parameter's address can be
-# handed to an unrelated one, which would then hit the wrong entry.
+# Parameter id -> (parameter, bundled definition, name_to_uri); holding the parameter keeps its id from being reused.
 BundleCache = dict[int, tuple[Mapping[str, Any], dict[str, Any], dict[str, str]]]
 
 
@@ -26,10 +24,9 @@ IDENTITY_KEYWORDS = ("$id", "id")
 
 
 def _without_identity(schema: JsonSchema | list[JsonSchema]) -> JsonSchema | list[JsonSchema]:
-    """The schema without the name it gave itself.
+    """The schema without its `$id` / `id`.
 
-    A bundled definition is reachable only as `#/x-bundled/<name>`, and a name it kept would set a
-    base URI that every later pointer resolves against - a bare fragment breaks them outright.
+    A bundled definition lives at `#/x-bundled/<name>`; a kept `$id` would rebase every pointer inside it.
     """
     if not isinstance(schema, dict) or ("$id" not in schema and "id" not in schema):
         return schema
@@ -53,8 +50,6 @@ class Bundle:
 
 
 class Bundler:
-    """Bundler tracks schema ids stored in a bundle."""
-
     counter: int
     # Whether keywords next to `$ref` apply (Draft 2019-09+) or are ignored (Draft 4).
     ref_siblings: bool
@@ -66,11 +61,9 @@ class Bundler:
         self.ref_siblings = ref_siblings
 
     def bundle(self, schema: JsonSchema, resolver: Resolver) -> Bundle:
-        """Bundle a JSON Schema by embedding all references."""
         if not isinstance(schema, dict):
             return Bundle(schema=schema, name_to_uri={})
 
-        # Track visited URIs and their local definition names
         visited: set[str] = set()
         uri_to_name: dict[str, str] = {}
         defs = {}
@@ -81,7 +74,6 @@ class Bundler:
         visit = visited.add
 
         def get_def_name(uri: str) -> str:
-            """Generate or retrieve the local definition name for a URI."""
             nonlocal reference_count
             reference_count += 1
             name = uri_to_name.get(uri)
@@ -97,9 +89,7 @@ class Bundler:
             current_resolver: Resolver,
             identity_handled: bool = False,
         ) -> JsonSchema | list[JsonSchema]:
-            """Recursively process and bundle references in the current schema."""
-            # Local lookup is cheaper and it matters for large schemas.
-            # It works because this recursive call goes to every nested value
+            # A local alias is cheaper than a closure lookup on every nested value of large schemas.
             nonlocal has_recursive_references
             _bundle_recursive = bundle_recursive
             if isinstance(current, dict):
@@ -121,8 +111,7 @@ class Bundler:
                             for key, value in current.items()
                             if key != "$ref"
                         }
-                    # Fast path for duplicate refs: skip the schema retrieval if we've
-                    # already bundled this URI (and we're not currently inlining it).
+                    # Skip retrieval for a URI already bundled and not currently being inlined.
                     if visited:
                         candidate_uri = resolve_reference_uri(current_resolver.base_uri, reference)
                         if candidate_uri in visited and candidate_uri not in scope_stack:
@@ -148,10 +137,8 @@ class Bundler:
                     is_recursive_reference = resolved_uri in scope_stack
                     has_recursive_references |= is_recursive_reference
                     if resolved_uri not in visited:
-                        # Bundle only new schemas
                         visit(resolved_uri)
 
-                        # Recursively bundle the embedded schema too!
                         scope_stack.append(resolved_uri)
                         try:
                             bundled_resolved = _bundle_recursive(resolved_schema, next_resolver)
@@ -169,7 +156,6 @@ class Bundler:
                             for key, value in current.items()
                         }
                     else:
-                        # Already visited - just update $ref
                         return {
                             key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
                             if key == "$ref"
@@ -190,17 +176,15 @@ class Bundler:
                     for item in current
                 ]
                 return result_list
-            # `isinstance` guards won't let it happen
-            # Otherwise is present to make type checker happy
+            # Unreachable, satisfies the type checker
             return current  # pragma: no cover
 
         bundled = bundle_recursive(schema, resolver)
 
         assert isinstance(bundled, dict)
 
-        # A root reference to a single non-recursive target reads the same spelled out in place, unless
-        # a sibling points at that target or shares a keyword with it (the merge would overwrite one).
-        # Where siblings are ignored, spelling the target out next to them would enforce them instead.
+        # Inline a root reference's lone non-recursive target unless a sibling also references it or shares a keyword.
+        # Where siblings are ignored, inlining the target next to them would enforce them.
         if (
             not has_recursive_references
             and "$ref" in bundled
@@ -274,8 +258,7 @@ def _unbundled_schema_name(bundled_name: str, original_uri: str | None) -> str:
 
 def _unbundled_components(bundled: dict[str, Any], name_to_uri: dict[str, str]) -> dict[str, dict[str, Any]]:
     """Every definition in the document under its original name, for display."""
-    # The same storage dict is unbundled again for every reported failure, and it holds the whole
-    # document; callers only read the result, so one expansion is shared between them.
+    # Every reported failure unbundles the same whole-document storage; callers only read, so they share one result.
     cache_key = (id(bundled), id(name_to_uri))
     cached = _UNBUNDLED_COMPONENTS_CACHE.get(cache_key)
     if cached is not MISSING:

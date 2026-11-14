@@ -49,11 +49,7 @@ def _collect_semantic_eligible_operations(schema: OpenApiSchema) -> frozenset[st
 
 
 class OpenAPIAnalysis:
-    """Aggregated derived data for an OpenAPI schema.
-
-    Provides a central access point for expensive computations so that
-    downstream features share cached results instead of recomputing them.
-    """
+    """Derived data for an OpenAPI schema, computed once and shared across features."""
 
     __slots__ = (
         "schema",
@@ -91,17 +87,7 @@ class OpenAPIAnalysis:
 
     @property
     def dependency_layers(self) -> list[list[str]] | None:
-        """Operations grouped into layers based on dependencies.
-
-        Each layer can execute in parallel, but layers must execute sequentially.
-        Returns None if no useful ordering exists.
-
-        Example:
-            Layer 0: [POST /users, POST /products]  # No dependencies
-            Layer 1: [GET /users/{id}, POST /orders]  # Depend on layer 0
-            Layer 2: [GET /orders/{id}]  # Depends on layer 1
-
-        """
+        """Operation labels in layers that run in sequence, each layer in parallel; `None` without a useful ordering."""
         if self._dependency_layers is NOT_SET:
             self._dependency_layers = compute_dependency_layers(self.dependency_graph)
         assert not isinstance(self._dependency_layers, NotSet)
@@ -116,11 +102,7 @@ class OpenAPIAnalysis:
 
     @property
     def extra_data_source(self) -> ExtraDataSource | None:
-        """Extra data source for augmenting test generation with captured API data.
-
-        Returns None when the spec has neither response-extractable descriptors, request-side
-        input slots, nor any operation with a declared successful response.
-        """
+        """Captured API data for generation; `None` when no operation has anything to capture or feed."""
         if self._extra_data_source is NOT_SET:
             descriptors = self.resource_descriptors
             requirements = build_parameter_requirements(self.dependency_graph)
@@ -158,7 +140,7 @@ class OpenAPIAnalysis:
             if not repository.descriptors_for_operation(operation.label):
                 continue
             for response in operation.responses.iter_successful_responses():
-                # Skip wildcard patterns like "2XX" - they rarely have useful examples
+                # Wildcard statuses like "2XX" rarely have useful examples
                 if not response.status_code.isdigit():
                     continue
                 status_code = int(response.status_code)
@@ -188,13 +170,6 @@ class OpenAPIAnalysis:
         return self._inferencer
 
     def should_inject_links(self) -> bool:
-        """Check if dependency-based link injection should be applied.
-
-        Returns True if:
-        - Stateful testing is enabled
-        - Dependency analysis algorithm is enabled
-        - Links have not been injected yet
-        """
         return (
             self.schema.config.phases.stateful.enabled
             and self.schema.config.phases.stateful.inference.is_algorithm_enabled(
@@ -204,10 +179,7 @@ class OpenAPIAnalysis:
         )
 
     def inject_links(self) -> int:
-        """Inject inferred links into the schema based on dependency analysis.
-
-        Returns the number of links injected. Returns 0 if links were already injected.
-        """
+        """Inject inferred links and return their count; 0 when links were already injected."""
         if self._links_injected:
             return 0
         injected = dependencies.inject_links(self.schema)
@@ -221,12 +193,9 @@ class OpenAPIAnalysis:
             self._responses_unshared = True
 
     def iter_warnings(self) -> Iterator[SchemaWarning]:
-        """Iterate over all cached schema warnings."""
-        # Operation-level warnings
         warnings_map = self._get_warnings_map()
         for warnings in warnings_map.values():
             yield from warnings
-        # Schema-level warnings
         yield from self._get_schema_warnings()
 
     def _get_warnings_map(self) -> Mapping[str, Sequence[SchemaWarning]]:

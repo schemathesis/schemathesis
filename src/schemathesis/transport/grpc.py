@@ -189,8 +189,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                 unreachable = not _is_reachable(address, tls, verify, cert)
                 if unreachable:
                     raise
-                # The server is up, but a channel that failed to connect waits before trying again and fails calls in
-                # the meantime without sending them.
+                # The server is up; a channel that failed to connect fails calls unsent until it retries
                 started_at = Instant()
                 content, outcome = call.with_call(**call_kwargs, timeout=timeout, wait_for_ready=True)
         except grpc.RpcError as error:

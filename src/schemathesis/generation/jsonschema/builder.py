@@ -31,8 +31,7 @@ if TYPE_CHECKING:
     from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 
 
-# What this module returns for a schema that admits no value. Callers recognize it by identity, which
-# says "this engine ruled the schema out" without forcing an unrelated strategy to build itself first.
+# Returned for a schema that admits no value; callers check its identity, so no unrelated strategy has to build first.
 EMPTY_STRATEGY: SearchStrategy = st.nothing()
 
 
@@ -51,8 +50,7 @@ def build(
         schema_key = schema_cache_key(schema)
     except (TypeError, ValueError):
         schema_key = None
-    # Negative generation reaches this from a `flatmap`, so the same mutated schema comes back on
-    # every draw; rebuilding its strategy each time is what the cache is for.
+    # Negative generation reaches this from a `flatmap`, so the same mutated schema comes back on every draw.
     key = (schema_key, draft, id(formats), alphabet, whole_floats) if schema_key is not None else None
     result: SearchStrategy[JsonValue] | InvalidSchema | None = None
     if key is not None:
@@ -71,12 +69,10 @@ def build(
                 whole_floats=whole_floats,
             )
         except InvalidSchema as exc:
-            # A rejected schema is rejected again on every call, and finding out can cost as much as a successful
-            # build, e.g. compiling a pattern with a huge repetition count.
+            # Rejections are cached too: finding one can cost a full build, e.g. a pattern with a huge repetition count.
             result = copy.copy(exc)
         if key is not None:
-            # Keeping `formats` alive next to the strategy stops its `id` from being recycled
-            # into a stale hit once the caller drops it.
+            # Holding `formats` keeps its `id` from being recycled into a stale hit after the caller drops it.
             canonical_strategy_cache[key] = (formats, result)
     if isinstance(result, InvalidSchema):
         # One raise site for fresh and cached rejections, so Hypothesis sees the same failure when it replays a case.
@@ -138,10 +134,8 @@ def _build(
         strategy = from_schema(canonical_schema, context)
         if not context.cyclic:
             return strategy
-        # What a cycle leads back to is spelled lazily, so this is where the rest of it gets built -
-        # and where a node this module cannot take still gets to route the whole schema elsewhere.
-        # A cycle can also leave a schema whose every value would have to be infinitely deep. The
-        # strategies form the same cycle, so Hypothesis works that out here.
+        # Cycle targets build lazily, so the rest builds here, where an unsupported node can still reroute the schema.
+        # Hypothesis also spots here a cycle whose every value would have to be infinitely deep.
         empty = strategy.is_empty
     # Spelling it out keeps the caller reporting an unsatisfiable schema, where a strategy that
     # only fails on a draw would surface as whatever Hypothesis raises first.

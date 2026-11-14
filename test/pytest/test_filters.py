@@ -29,7 +29,6 @@ def test_(request, case):
 
 
 def test_error_on_no_matches(testdir):
-    # When test filters don't match any operation
     testdir.make_test(
         """
 @schema.include(operation_id=["does-not-exist"]).parametrize()
@@ -39,7 +38,6 @@ def test_(request, case):
 """,
     )
     result = testdir.runpytest("-v")
-    # Then it should be an error
     result.assert_outcomes(errors=1)
     result.stdout.re_match_lines(
         [

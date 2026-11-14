@@ -16,8 +16,7 @@ from schemathesis.cli.output import DEFAULT_INTERNAL_ERROR_MESSAGE
     ids=["check-failure", "engine-error"],
 )
 def test_lone_surrogate_in_check_message(cli, ctx, exception, prefix):
-    # `response.json()` decodes the server's ASCII `\uXXXX` escape into a real lone surrogate; the FAILURES and
-    # ERRORS renderers show it escaped instead of crashing or replacing it when writing to a UTF-8 terminal.
+    # `response.json()` decodes the `\uXXXX` escape into a lone surrogate; the output must show it escaped, not crash.
     app, _ = ctx.openapi.make_flask_app({"/echo": {"post": {"responses": {"200": {"description": "OK"}}}}})
 
     @app.route("/echo", methods=["POST"])

@@ -45,10 +45,8 @@ from schemathesis.specs.openapi.error_feedback import (
 from test.core.error_feedback.helpers import meta_for, record_400
 from test.core.error_feedback.parsers.helpers import DRF_DETAIL_WRAPPED_BODY, drf_obs
 
-# Schema Object meta-validators for each supported spec version. Adjustments must
-# produce schemas that satisfy these so downstream Hypothesis draws against the
-# spec meta-schema do not blow up — e.g. `required: []` violates the `minItems: 1`
-# constraint on `required` in Swagger 2.0 and OpenAPI 3.0.
+# Schema Object meta-validators per spec version. Adjusted schemas must pass them, or meta-schema draws fail,
+# e.g. `required: []` violates `minItems: 1` in Swagger 2.0 and Open API 3.0.
 _SCHEMA_OBJECT_VALIDATORS: dict[str, jsonschema_rs.Validator] = {
     "2.0": make_validator(
         {"$ref": "#/definitions/schema", "definitions": SWAGGER_20["definitions"]},
@@ -77,13 +75,9 @@ def _has_type_union(value: object) -> bool:
 
 
 def _assert_valid_schema_object(input_schema: object, out: object, *, draft: str = "3.0") -> None:
-    """An adjustment must not turn a valid Schema Object into an invalid one.
+    """An adjustment must not make a valid Schema Object invalid; invalid inputs are skipped.
 
-    The validator is auto-selected: schemas using `type: [..., null]` syntax are
-    OpenAPI 3.1; anything else is checked against `draft` (default 3.0, stricter —
-    catches `required: []` that 3.1 silently allows). Skipped when the input is not
-    itself a valid Schema Object: a few cases deliberately feed malformed input to
-    verify the adjustment is resilient, and the adjustment only owns its own changes.
+    `type: [..., null]` selects the 3.1 validator; others use `draft` (3.0 by default, which rejects `required: []`).
     """
     if not isinstance(out, dict) or not isinstance(input_schema, dict):
         return
@@ -110,8 +104,7 @@ def _apply_body_adjustment(adjustment, schema, observations, case_factory, *, dr
 
 
 def test_spring_parser_locates_declared_query_parameters(ctx, case_factory):
-    # Spring names the field without saying where it came from, so a declared query parameter
-    # must not be mistaken for a body field.
+    # Spring omits the field's location, so a declared query parameter must not pass for a body field.
     operation = ctx.openapi.load_operation(
         "GET /api/stats",
         {
@@ -914,8 +907,7 @@ def test_required_field_adjustment_applies_correctly(input_schema, paths, expect
 
 
 def test_required_field_adjustment_idempotent(case_factory):
-    # `apply` mutates in place, so feed it the same dict twice and check
-    # the second pass doesn't drift from the first.
+    # `apply` mutates in place, so a second pass over the same dict must not drift.
     schema = {"type": "object", "properties": {}}
     obs = _build_observations(("email",))
     operation = case_factory().operation
@@ -1615,8 +1607,7 @@ def test_numeric_bound_is_written_as_integer_only_for_integer_properties(case_fa
 
 
 def test_numeric_bound_adjustment_tightens_a_format_derived_bound(case_factory):
-    # `format: int32` is widened into real keywords before generation; a server-reported bound is
-    # sharper information than the width of the integer type and must win over it.
+    # A server-reported bound is sharper than the `int32` width and must win over it.
     schema = {
         "type": "object",
         "properties": {"month": {"type": "integer", "format": "int32", "minimum": -(2**31), "maximum": 2**31 - 1}},
@@ -1635,8 +1626,7 @@ def test_numeric_bound_adjustment_tightens_a_format_derived_bound(case_factory):
 
 
 def test_numeric_bound_adjustment_reaches_array_items(case_factory):
-    # A repeated query parameter reports its bound under the field name while the constraint
-    # belongs to each element.
+    # A repeated query parameter reports its bound under the field name; the bound applies to each element.
     schema = {"type": "object", "properties": {"month": {"type": "array", "items": {"type": "integer"}}}}
     out = NumericBoundAdjustment().apply(
         operation=case_factory().operation,
@@ -2012,8 +2002,7 @@ def _build_type_mismatch_observations(
             {"type": "object", "properties": {"x": {"type": "boolean"}}},
         ),
         (
-            # Schema declares a sub-object; rewriting `type` to a scalar would
-            # leave `properties` orphaned. Conservative: skip.
+            # Rewriting `type` to a scalar would orphan `properties`, so skip.
             {
                 "type": "object",
                 "properties": {"profile": {"type": "object", "properties": {"name": {"type": "string"}}}},
@@ -2025,8 +2014,7 @@ def _build_type_mismatch_observations(
             },
         ),
         (
-            # Schema declares an array; rewriting `type` to a scalar would
-            # leave `items` orphaned. Conservative: skip.
+            # Rewriting `type` to a scalar would orphan `items`, so skip.
             {
                 "type": "object",
                 "properties": {"tags": {"type": "array", "items": {"type": "string"}}},
@@ -2196,8 +2184,7 @@ def test_enum_adjustment_applies_correctly(input_schema, items, expected, case_f
 
 
 def test_apply_adjustments_does_not_mutate_caller_schema(case_factory):
-    # Callers cache the input schema; the dispatcher must clone before mutating
-    # so adjustment-internal mutation never leaks back to the caller.
+    # Callers cache the input schema, so the dispatcher must clone before mutating.
     original = {
         "type": "object",
         "properties": {"username": {"type": "string"}},

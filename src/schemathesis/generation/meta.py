@@ -28,8 +28,6 @@ class TestPhase(StrEnum):
 
 
 class CoverageScenario(StrEnum):
-    """Coverage test scenario types."""
-
     # Positive scenarios - Valid values
     EXAMPLE_VALUE = "example_value"
     DEFAULT_VALUE = "default_value"
@@ -118,8 +116,6 @@ REQUEST_SHAPE_PROBES = frozenset({CoverageScenario.UNSPECIFIED_HTTP_METHOD, *CON
 
 @dataclass
 class ComponentInfo:
-    """Information about how a specific component was generated."""
-
     mode: GenerationMode
 
     __slots__ = ("mode",)
@@ -127,8 +123,6 @@ class ComponentInfo:
 
 @dataclass(slots=True)
 class FuzzingPhaseData:
-    """Metadata specific to fuzzing phase."""
-
     description: str | None
     parameter: str | None
     parameter_location: ParameterLocation | None
@@ -138,8 +132,6 @@ class FuzzingPhaseData:
 
 @dataclass(slots=True)
 class StatefulPhaseData:
-    """Metadata specific to stateful phase."""
-
     description: str | None
     parameter: str | None
     parameter_location: ParameterLocation | None
@@ -149,8 +141,6 @@ class StatefulPhaseData:
 
 @dataclass(slots=True)
 class ExamplesPhaseData:
-    """Metadata specific to examples phase."""
-
     description: str | None
     parameter: str | None
     parameter_location: ParameterLocation | None
@@ -187,8 +177,6 @@ def build_phase_data(
 
 @dataclass(slots=True)
 class CoveragePhaseData:
-    """Metadata specific to coverage phase."""
-
     scenario: CoverageScenario
     description: str
     location: str | None
@@ -199,8 +187,6 @@ class CoveragePhaseData:
 
 @dataclass
 class PhaseInfo:
-    """Phase-specific information."""
-
     name: TestPhase
     data: CoveragePhaseData | ExamplesPhaseData | FuzzingPhaseData | StatefulPhaseData
 
@@ -229,8 +215,6 @@ class PhaseInfo:
 
 @dataclass
 class GenerationInfo:
-    """Information about test case generation."""
-
     time: float
     mode: GenerationMode
 
@@ -239,14 +223,11 @@ class GenerationInfo:
 
 @dataclass(slots=True)
 class CaseMetadata:
-    """Complete metadata for generated cases."""
-
     generation: GenerationInfo
     components: dict[ParameterLocation, ComponentInfo]
     phase: PhaseInfo
     pool_draws: tuple[PoolDraw, ...] = ()
-    # Resource-bound (location, parameter_name) slots the engine wanted to fill from the pool
-    # but couldn't (no captured instance). Lets the analyzer compute chain rate.
+    # Resource-bound `(location, parameter_name)` slots the pool had no captured instance for; feeds the chain rate.
     pool_misses: tuple[tuple[str, str], ...] = ()
     # Semantic value index substitutions applied by the overlay (one entry per leaf substituted).
     semantic_draws: tuple[SemanticDraw, ...] = ()
@@ -254,21 +235,16 @@ class CaseMetadata:
     dictionary_draws: tuple[DictionaryDraw, ...] = ()
     # Constant-pool substitutions applied by the overlay (one entry per property substituted).
     constants_draws: tuple[ConstantDraw, ...] = ()
-    # Typed (pre-serialization) container snapshots captured at generation time.
-    # Coverage stringifies query/path values for the wire; this preserves the
-    # original typed form so revalidation matches the schema's abstraction level.
+    # Pre-serialization containers: coverage stringifies query/path values, but revalidation checks the typed form.
     raw_containers: dict[ParameterLocation, Any] = field(default_factory=dict)
 
     # Dirty tracking for revalidation
     _dirty: set[ParameterLocation] = field(default_factory=set, init=False)
     _last_validated_hashes: dict[ParameterLocation, int] = field(default_factory=dict, init=False)
-    # Initial container hashes captured once after generation; never updated.
-    # Lets revalidation detect whether a container still matches its wire-form
-    # snapshot (so the typed `raw_containers` value remains authoritative).
+    # Hashes taken once after generation; while a container matches, its typed `raw_containers` value is authoritative.
     _initial_hashes: dict[ParameterLocation, int] = field(default_factory=dict, init=False)
-    # Initial wire-form container snapshots captured once after generation; never updated.
-    # Lets revalidation tell, per key, whether a value still equals its generated wire
-    # form (use the typed snapshot) or was overwritten by a hook (validate the live value).
+    # Wire-form containers taken once after generation; per key, a value still equal to it validates in typed form,
+    # while one a hook overwrote validates as is.
     _initial_containers: dict[ParameterLocation, Any] = field(default_factory=dict, init=False)
 
     def copy(self) -> CaseMetadata:
@@ -283,24 +259,19 @@ class CaseMetadata:
         return copied
 
     def is_negative_at(self, location: ParameterLocation) -> bool:
-        """Whether the component at `location` was generated in negative mode."""
         component = self.components.get(location)
         return component is not None and component.mode.is_negative
 
     def mark_dirty(self, location: ParameterLocation) -> None:
-        """Mark a component as modified and needing revalidation."""
         self._dirty.add(location)
 
     def clear_dirty(self, location: ParameterLocation) -> None:
-        """Clear dirty flag for a component after revalidation."""
         self._dirty.discard(location)
 
     def is_dirty(self) -> bool:
-        """Check if any component needs revalidation."""
         return len(self._dirty) > 0
 
     def update_validated_hash(self, location: ParameterLocation, value: int) -> None:
-        """Store hash after validation to detect future changes."""
         self._last_validated_hashes[location] = value
 
     def to_dict(self) -> dict[str, Any]:
@@ -533,8 +504,7 @@ def _load_mutations(raw: dict[str, Any]) -> tuple[Mutation, ...]:
     return tuple(Mutation.from_dict(m) for m in raw.get("mutations", ()))
 
 
-# Constant values can be raw bytes (harvested `b"..."` literals substituted into `format: binary`
-# fields); tag them so `to_dict` output stays JSON-serializable for crash reports and transport.
+# Tags raw-bytes constants, e.g. `b"..."` literals in `format: binary` fields, so `to_dict` output stays JSON.
 _BYTES_TAG = "__schemathesis_bytes__"
 
 

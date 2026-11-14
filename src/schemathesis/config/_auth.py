@@ -13,8 +13,6 @@ DEFAULT_RETRY_ON = (401,)
 
 @dataclass(repr=False, slots=True)
 class ApiKeyAuthConfig(DiffBase):
-    """API Key authentication configuration."""
-
     api_key: str
 
     def __init__(self, *, api_key: str = "") -> None:
@@ -23,8 +21,6 @@ class ApiKeyAuthConfig(DiffBase):
 
 @dataclass(repr=False, slots=True)
 class HttpBasicAuthConfig(DiffBase):
-    """HTTP Basic authentication configuration."""
-
     username: str
     password: str
 
@@ -39,8 +35,6 @@ class HttpBasicAuthConfig(DiffBase):
 
 @dataclass(repr=False, slots=True)
 class HttpBearerAuthConfig(DiffBase):
-    """HTTP Bearer token authentication configuration."""
-
     bearer: str
 
     def __init__(self, *, bearer: str = "") -> None:
@@ -89,8 +83,6 @@ class DynamicTokenAuthConfig(DiffBase):
 
 @dataclass(repr=False, slots=True)
 class OpenAPIAuthConfig(DiffBase):
-    """OpenAPI-aware authentication configuration."""
-
     schemes: dict[str, ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig]
 
     def __init__(self, *, schemes: dict[str, dict[str, Any]] | None = None) -> None:
@@ -114,8 +106,6 @@ class OpenAPIAuthConfig(DiffBase):
 
 @dataclass(repr=False, slots=True)
 class OpenAPIDynamicAuthConfig(DiffBase):
-    """OpenAPI-aware dynamic authentication configuration."""
-
     schemes: dict[str, DynamicTokenAuthConfig]
 
     def __init__(self, *, schemes: dict[str, dict[str, Any]] | None = None) -> None:
@@ -224,11 +214,7 @@ class AuthConfig(DiffBase):
         wfc_path: str | None = None,
         wfc_user: str | None = None,
     ) -> None:
-        """Update auth config with explicit override (from CLI or user code).
-
-        This method is for explicit overrides, so it does not validate mutual exclusivity.
-        CLI and programmatic overrides take precedence over config file settings.
-        """
+        """Apply explicit CLI or user-code overrides; they win over the config file and skip the exclusivity check."""
         if basic is not None:
             _validate_basic(*basic)
             self.basic = basic

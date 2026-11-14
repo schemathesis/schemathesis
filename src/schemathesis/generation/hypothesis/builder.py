@@ -82,7 +82,6 @@ def create_test(
     test_func: Callable,
     config: HypothesisTestConfig,
 ) -> Callable:
-    """Create a Hypothesis test."""
     hook_dispatcher = HookDispatcherMark.get(test_func)
     auth_storage = AuthStorageMark.get(test_func)
 
@@ -104,7 +103,6 @@ def create_test(
 
     specification = operation.schema.specification
 
-    # Add examples if explicit phase is enabled
     if (
         HypothesisTestMode.EXAMPLES in config.modes
         and Phase.explicit in settings.phases
@@ -159,18 +157,13 @@ def _resolve_settings(
     test_func: Callable, hypothesis_test: Callable, config: HypothesisTestConfig
 ) -> hypothesis.settings:
     """Combine the user's Hypothesis settings with the ones from the Schemathesis config."""
-    # Get user's explicit settings from their @settings decorator (if present).
-    # config.explicit_settings carries settings applied outside the lazy schema wrapper
-    # (e.g. @settings applied after @lazy_schema.parametrize()).
+    # `config.explicit_settings` holds `@settings` applied outside the lazy schema wrapper, e.g. after `parametrize()`.
     user_explicit_settings = getattr(test_func, SETTINGS_ATTRIBUTE_NAME, None) or config.explicit_settings
 
-    # Get settings from the @given wrapper (inherits from loaded profile or default)
+    # `@given` settings inherit from the loaded profile or the default
     given_settings = getattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, None)
     assert given_settings is not None
 
-    # Determine the source of user's settings:
-    # - User's @settings decorator takes priority
-    # - Otherwise use @given settings (which inherit from loaded profile or default)
     if user_explicit_settings is not None:
         user_settings = user_explicit_settings
     else:
@@ -185,7 +178,7 @@ def _resolve_settings(
     if config.settings is None:
         return user_settings
 
-    # Get hypothesis' built-in defaults (not affected by loaded profiles)
+    # Built-in defaults, unaffected by loaded profiles
     hypothesis_defaults = hypothesis.settings.get_profile("default")
 
     # Values are whatever each Hypothesis setting accepts.
@@ -227,7 +220,7 @@ def _drop_unused_phases(settings: hypothesis.settings, modes: list[HypothesisTes
         phases: tuple[Phase, ...] = tuple(phase for phase in settings.phases if phase != Phase.explain)
         settings = hypothesis.settings(settings, phases=phases)
 
-    # Remove `reuse` & `generate` phases to avoid yielding any test cases if we don't do fuzzing
+    # Without fuzzing, the `reuse` and `generate` phases must yield no cases
     if HypothesisTestMode.FUZZING not in modes and (
         Phase.generate in settings.phases or Phase.reuse in settings.phases
     ):
@@ -239,21 +232,17 @@ def _drop_unused_phases(settings: hypothesis.settings, modes: list[HypothesisTes
 def _reject_given_with_schema_examples(
     operation: APIOperation, config: HypothesisTestConfig, strategy_kwargs: dict[str, Any]
 ) -> None:
-    # Check if user provided custom strategies via @schema.given()
-    # AND the operation actually has examples
-    # These are incompatible because examples only provide 'case' while custom strategies require additional parameters
+    # Schema examples provide only `case`, while `@schema.given()` strategies need more parameters
     if config.given_kwargs:
-        # Check if there are actually examples to add
         try:
             example_strategies = list(
                 operation.get_strategies_from_examples(feedback=config.feedback, **strategy_kwargs)
             )
         except Exception:
-            # If we can't get examples (invalid schema, etc), let add_examples handle it
+            # Errors like an invalid schema surface later, when examples are added
             example_strategies = []
 
         if example_strategies:
-            # Get the parameter names from given_kwargs to show in error message
             param_names = ", ".join(sorted(config.given_kwargs.keys()))
             raise IncorrectUsage(format_given_and_schema_examples_error(param_names))
 
@@ -268,8 +257,6 @@ def create_base_test(
     args: tuple[GivenInput, ...],
     kwargs: dict[str, GivenInput],
 ) -> Callable:
-    """Create the basic Hypothesis test with the given strategy."""
-
     @wraps(test_function)
     def test_wrapper(*args: Any, **kwargs: Any) -> Any:
         __tracebackhide__ = True

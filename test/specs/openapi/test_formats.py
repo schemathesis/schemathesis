@@ -48,8 +48,7 @@ def _asserted():
 
 @pytest.mark.parametrize(("name", "validator"), list(_asserted()))
 def test_registered_format_satisfies_its_own_validator(name, validator):
-    # A generator whose values its own validator rejects turns every use of that format into a
-    # false positive.
+    # A generator whose values its own validator rejects makes every use of that format a false positive.
     @run_given(_resolve(name), max_examples=50)
     def test(value):
         assert validator.is_valid(value), value
@@ -64,8 +63,7 @@ def test_registered_format_generates_strings(name):
 
 @pytest.mark.parametrize(("name", "bounds"), sorted(FORMAT_LENGTHS.items()))
 def test_declared_format_lengths_hold(name, bounds):
-    # A length window outside these is answered without drawing, so a generator reaching past them
-    # silently drops cases.
+    # A length window outside these is answered without drawing, so a generator reaching past them drops cases.
     low, high = bounds
 
     @run_given(_resolve(name), max_examples=50)

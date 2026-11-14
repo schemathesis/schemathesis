@@ -162,10 +162,9 @@ def write_to_writers(
 
 
 class PytestReportDispatcher:
-    """Records the calls each parametrized test makes into one ScenarioRecorder per test.
+    """Records the calls each parametrized test makes into one `ScenarioRecorder` per test.
 
-    Registers after_call, after_validate and after_network_error on the hooks of the schemas it records (not
-    globally). Does not own writers - the plugin owns writers and calls pop_recorder() at teardown.
+    Hooks into the recorded schemas only; the plugin owns the writers and calls `pop_recorder` at teardown.
     """
 
     def __init__(self, schema: SchemaMetadata) -> None:
@@ -177,9 +176,7 @@ class PytestReportDispatcher:
         self._label: str | None = None
         self._recorder: ScenarioRecorder | None = None
         self._started_at = 0.0
-        # Store bound methods so unregister() removes the same objects.
-        # Python bound methods are not cached - accessing self._on_after_call twice
-        # gives two different objects, breaking identity comparison in hooks.unregister().
+        # Each access creates a new bound method, so keep these for `unregister` to remove the same objects.
         self._after_call_hook = self._on_after_call
         self._after_validate_hook = self._on_after_validate
         self._after_network_error_hook = self._on_after_network_error
@@ -229,8 +226,7 @@ class PytestReportDispatcher:
     def pop_recorder(self) -> tuple[ScenarioRecorder, float] | None:
         """Stop recording and return what the test recorded with the elapsed seconds, or None if it made no calls.
 
-        Dropping the recorder lets the GC reclaim the Case objects it holds.
-        Called by the plugin at test teardown, before writing to the report writers.
+        Dropping the recorder lets the GC reclaim its cases; the plugin calls this at teardown, before writing reports.
         """
         recorder = self._recorder
         self._label = None
@@ -240,7 +236,7 @@ class PytestReportDispatcher:
         return recorder, time.monotonic() - self._started_at
 
     def unregister(self) -> None:
-        """Remove all hooks from the recorded schemas' hooks. Called at pytest_sessionfinish."""
+        """Remove this dispatcher's hooks from the recorded schemas; called at `pytest_sessionfinish`."""
         for hooks in self._hooks:
             hooks.unregister(self._after_call_hook)
             hooks.unregister(self._after_validate_hook)

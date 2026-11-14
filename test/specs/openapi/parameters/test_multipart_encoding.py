@@ -57,7 +57,6 @@ def test_multipart_with_custom_encoding(ctx, declared):
     xml = b"<?xml version='1.0'?><root>test</root>"
     schemathesis.openapi.media_type("text/xml", st.just(xml))
 
-    # Given an OpenAPI schema with multipart/form-data and custom encoding
     named = {
         "type": "object",
         "required": ["name"],
@@ -86,7 +85,6 @@ def test_multipart_with_custom_encoding(ctx, declared):
 
     @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
-        # Then the file property should use the XML strategy and be sent as a file
         assert case.body["file"] == xml
         assert isinstance(case.body["name"], str)
         assert ("file", ("file", xml, "text/xml")) in case.as_transport_kwargs(base_url="http://127.0.0.1")["files"]
@@ -197,7 +195,6 @@ def test_negative_bodies_send_array_items_as_file_parts(ctx):
 
 
 def test_multipart_without_custom_encoding_uses_default(ctx):
-    # Given an OpenAPI schema with multipart but NO custom encoding
     operation = make_operation(
         ctx,
         {
@@ -219,7 +216,6 @@ def test_multipart_without_custom_encoding_uses_default(ctx):
 
 
 def test_multipart_encoding_without_registered_strategy_falls_back(ctx):
-    # Given custom encoding but NO registered strategy for that content type
     operation = make_operation(
         ctx,
         {
@@ -236,12 +232,10 @@ def test_multipart_encoding_without_registered_strategy_falls_back(ctx):
 
     @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
-        # Should fall back to default strategy
         assert isinstance(case.body["file"], ((bytes, Binary)))
 
 
 def test_multipart_multiple_properties_with_different_encodings(ctx):
-    # Register strategies for different media types
     xml_strategy = st.just(b"<xml>data</xml>")
     csv_strategy = st.just(b"col1,col2\nval1,val2")
     schemathesis.openapi.media_type("text/xml", xml_strategy)
@@ -274,7 +268,6 @@ def test_multipart_multiple_properties_with_different_encodings(ctx):
 
 
 def test_multipart_encoding_with_multiple_content_types(ctx):
-    # Register strategies for both image types
     png_strategy = st.just(b"\x89PNG\r\n\x1a\n")
     jpeg_strategy = st.just(b"\xff\xd8\xff\xe0")
     schemathesis.openapi.media_type("image/png", png_strategy)
@@ -296,7 +289,6 @@ def test_multipart_encoding_with_multiple_content_types(ctx):
 
     @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
-        # Should use one of the registered strategies
         assert case.body["image"] in (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff\xe0")
 
 
@@ -365,12 +357,7 @@ def test_multipart_wildcard_matching_specific_to_wildcard(ctx):
                     "avatar": {"type": "string", "format": "binary"},
                 },
             },
-            "encoding": {
-                "avatar": {
-                    # Specific type should match wildcard
-                    "contentType": "image/png"
-                }
-            },
+            "encoding": {"avatar": {"contentType": "image/png"}},
         },
     )
 
@@ -394,12 +381,7 @@ def test_multipart_wildcard_matching_wildcard_to_specific(ctx):
                     "photo": {"type": "string", "format": "binary"},
                 },
             },
-            "encoding": {
-                "photo": {
-                    # Wildcard should match registered specific types
-                    "contentType": "image/*"
-                }
-            },
+            "encoding": {"photo": {"contentType": "image/*"}},
         },
     )
 
@@ -450,7 +432,6 @@ def test_multipart_defensive_non_string_content_type(ctx):
                     "data": {"type": "string", "format": "binary"},
                 },
             },
-            # Malformed encoding (contentType is not a string)
             "encoding": {"data": {"contentType": 123}},
         },
     )
@@ -458,7 +439,6 @@ def test_multipart_defensive_non_string_content_type(ctx):
     @given(case=operation.as_strategy())
     @settings(suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
-        # Should fall back to default strategy
         assert isinstance(case.body["data"], ((bytes, Binary)))
 
     test()
@@ -493,7 +473,6 @@ def test_nested_object_with_encoding(ctx):
     @given(case=operation.as_strategy())
     @settings(suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
-        # Should ignore the encoding since "file" is nested, not top-level
         assert "metadata" in case.body
         assert isinstance(case.body["metadata"], dict)
 
@@ -635,7 +614,6 @@ def test_encoding_with_invalid_content_type_format(ctx):
 
     @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
-        # Should handle empty string gracefully
         assert "file" in case.body
 
 
@@ -659,7 +637,6 @@ def test_encoding_with_invalid_content_type_format(ctx):
     ids=["properties", "all-of"],
 )
 def test_multipart_comma_separated_without_custom_strategy(ctx, schema):
-    # Comma-separated content types should work even without custom strategies
     operation = make_operation(
         ctx,
         {
@@ -846,8 +823,7 @@ def test_multipart_encoding_with_unknown_content_type_fails(ctx):
 
 
 def test_multipart_empty_body_sends_valid_terminator(ctx, case_factory):
-    # An empty multipart body (e.g. a required property omitted by negative generation) must
-    # still serialize to a well-formed multipart payload instead of an empty `data`/`files` pair.
+    # An empty multipart body must still serialize to a well-formed payload, not an empty `data`/`files` pair.
     operation = make_operation(
         ctx,
         {

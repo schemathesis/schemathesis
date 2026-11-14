@@ -33,8 +33,7 @@ from test.apps.catalog.openapi import supervisor
             SchedulingDirective.RUN,
             None,
         ),
-        # A single non-405 response permanently cancels the streak; mixed-traffic
-        # operations whose handlers return 400 on some inputs stay in the queue.
+        # One non-405 response cancels the streak for good, so operations answering 400 on some inputs stay queued.
         (
             ((200, False), *((405, False) for _ in range(METHOD_NOT_ALLOWED_THRESHOLD * 5))),
             SchedulingDirective.RUN,
@@ -115,7 +114,6 @@ def test_controller_without_supervisor_allows_everything():
 
 
 def test_controller_supervisor_does_not_block_run_verdicts():
-    # A supervisor that has a record but verdict still RUN must not block transitions.
     controller = TransitionController(ApiTransitions(), roots=frozenset())
     supervisor = Supervisor()
     for _ in range(METHOD_NOT_ALLOWED_THRESHOLD - 1):
@@ -191,8 +189,7 @@ def test_unserved_operation_skipped_in_later_phases(ctx, load_schema, missing, s
 
 
 def test_baked_cases_short_circuit_after_supervisor_fires(ctx):
-    # Eager-baked Coverage cases past the supervisor's fire point must skip
-    # the server call instead of running the full mutation set.
+    # Pre-built coverage cases past the supervisor's fire point must skip the server call.
     api = ctx.openapi.apps.unimplemented_method()
     store = api.wsgi_app.config["store"]
     schema = schemathesis.openapi.from_url(api.schema_url)
@@ -213,8 +210,7 @@ def test_baked_cases_short_circuit_after_supervisor_fires(ctx):
 
 
 def test_stateful_skips_supervisor_blocked_operations(ctx):
-    # Stateful's `TransitionController` must reject rules whose target operation
-    # has a SKIP verdict so the dead op is never selected as a transition.
+    # Stateful testing must never pick an operation with a SKIP verdict as a transition target.
     api = ctx.openapi.serve(supervisor.linked_with_unimplemented_method())
     store = api.wsgi_app.config["store"]
     schema = schemathesis.openapi.from_url(api.schema_url)

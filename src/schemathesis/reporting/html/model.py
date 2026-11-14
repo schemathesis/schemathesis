@@ -204,8 +204,7 @@ class ReportData:
     # Oldest first; empty when nothing ran or the run has no phases (pytest).
     phase_spans: list[PhaseSpan]
     stop_reason: StopReason
-    # `started` is False when the engine never ran (schema failed to load); `complete` is False
-    # when `EngineFinished` never arrived (crash, load-time Ctrl-C). Both feed the verdict.
+    # `started`: False if the schema failed to load; `complete`: False if `EngineFinished` never came (crash, Ctrl-C).
     started: bool
     complete: bool
     exit_code: int

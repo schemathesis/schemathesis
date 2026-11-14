@@ -19,8 +19,7 @@ def _required_parameters(cls: type) -> set[str]:
 
 # Not a dataclass: subclasses are, and a base field would land before their own required ones.
 class DiffBase:
-    # Options that came from a config file key or an `update()` argument. Empty for configs built
-    # directly in Python, where an explicit value cannot be told apart from a default one.
+    # Options a config file key or `update()` set; empty for Python-built configs, where explicit and default match.
     _source_keys: frozenset[str] = frozenset()
 
     # Config-file keys whose name differs from the option they set.
@@ -40,8 +39,7 @@ class DiffBase:
 
     def __repr__(self) -> str:
         """Show only the fields that differ from the default."""
-        # A section with required arguments has no argument-free default, so it is built from those values
-        # and they are always shown.
+        # A section with required arguments builds its default from them, so they always show.
         required = _required_parameters(self.__class__)
         default = self.__class__(**{name: getattr(self, name) for name in required})
         diffs = []
@@ -78,7 +76,6 @@ class DiffBase:
 
     def _diff_repr(self, value: object, default: object) -> str:
         if is_dataclass(value):
-            # If the nested object is a dataclass, recursively show its diff.
             return repr(value)
         if isinstance(value, list) and isinstance(default, list):
             return f"[{', '.join(_repr(item) for item in value)}]"
@@ -93,7 +90,6 @@ class DiffBase:
 
     @classmethod
     def from_hierarchy(cls, configs: list[T]) -> T:
-        # This config will accumulate "merged" config options
         if len(configs) == 1:
             return configs[0]
         output = cls()
@@ -102,13 +98,10 @@ class DiffBase:
                 continue
             default = getattr(output, option)
             if hasattr(default, "__dataclass_fields__"):
-                # Sub-configs require merging of nested config options
                 sub_configs = [getattr(config, option) for config in configs]
                 merged = type(default).from_hierarchy(sub_configs)
                 setattr(output, option, merged)
             else:
-                # Primitive config options can be compared directly and do not
-                # require merging of nested options
                 for config in configs:
                     current = getattr(config, option)
                     source_keys = config._source_keys
@@ -119,8 +112,7 @@ class DiffBase:
                         setattr(output, option, current)
                         # Keep the decision visible to later merges and to readers of explicit options
                         output._mark_source_keys((option,))
-                        # As we go from the highest priority to the lowest one,
-                        # we can stop at the first config that sets the option
+                        # Configs go from the highest priority to the lowest, so the first decision wins
                         break
         return output  # type: ignore[return-value]
 

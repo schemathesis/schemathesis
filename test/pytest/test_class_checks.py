@@ -113,7 +113,7 @@ def test_after_run_failure_reported_without_terminal(testdir):
     testdir.make_test(_ALWAYS_FAIL_CHECK + _SCHEMA_PARAMETRIZE_BODY)
     result = testdir.runpytest("-p", "no:terminal")
     assert result.ret != 0
-    # Failure text must still surface without the terminal reporter, not be silently dropped.
+    # Failure text must surface without the terminal reporter.
     assert "always fails in after_run" in (result.stderr.str() + result.stdout.str())
 
 

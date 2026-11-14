@@ -13,7 +13,6 @@ class GrpcStatus(NamedTuple):
     outcome: CallOutcome
 
 
-# gRPC status code -> its meaning.
 # FAILED_PRECONDITION and OUT_OF_RANGE depend on system state, not on the data sent, so they are conflicts.
 # UNIMPLEMENTED answers calls to methods the server lacks or has disabled.
 GRPC_STATUSES: dict[int, GrpcStatus] = {

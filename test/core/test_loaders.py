@@ -29,8 +29,6 @@ from test.utils import graphql_url, openapi_url, refusing_url
     ids=["openapi-asgi", "openapi-wsgi", "graphql-asgi", "graphql-wsgi"],
 )
 def test_absolute_urls_for_apps(loader):
-    # When an absolute URL passed to a ASGI / WSGI loader
-    # Then it should be rejected
     with pytest.raises(ValueError, match="Schema path should be relative for WSGI/ASGI loaders"):
         loader("http://127.0.0.1:1/schema.json", app=None)  # actual app doesn't matter here
 
@@ -45,11 +43,10 @@ def test_absolute_urls_for_apps(loader):
 @pytest.mark.parametrize("base_url", ["http://example.com/", "http://example.com"])
 def test_base_url_override(ctx, loader, make_url, base_url):
     url = make_url(ctx)
-    # When the user overrides base_url
     schema = loader(url)
     schema.config.update(base_url=base_url)
     operation = next(schema.get_all_operations()).ok()
-    # Then the overridden value should not have a trailing slash
+    # A trailing slash in the override is dropped.
     assert operation.base_url == "http://example.com"
 
 
@@ -156,8 +153,7 @@ def test_redirect_loop_reported_as_loader_error(app_runner):
 
 
 def test_wait_for_schema_retries_on_read_timeout(ctx, app_runner):
-    # A slow-to-respond server (read timeout) must be retried within the wait budget,
-    # the same way connection refused or HTTP 503 is.
+    # A read timeout is retried within the wait budget, like connection refused or HTTP 503.
     schema = ctx.openapi.build_schema({"/x": {"get": {"responses": {"200": {"description": "OK"}}}}})
     call_count = [0]
     retried = threading.Event()

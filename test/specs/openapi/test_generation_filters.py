@@ -78,8 +78,7 @@ def test_invalid_query_fails_with_requests(invalid_params):
         "abc%00def",
         "abc\x00def",
         "prefix%00suffix",
-        # Dot path-segments collapse during URL normalization (RFC 3986),
-        # routing the request to a different operation than declared.
+        # Dot segments collapse in URL normalization (RFC 3986), routing to another operation.
         ".",
         "..",
         "%2E",
@@ -115,14 +114,13 @@ def test_filter_path_parameters_with_explicit(params, allow_encoded_slash_for, e
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        # Valid cases - can be sent via requests
         ({"key": "value"}, True),
         ({"a": 1, "b": "2"}, True),
         ({}, True),
         ([("key", "value")], True),
         ([("a", "1"), ("b", "2")], True),
         (NOT_SET, True),
-        # Invalid cases - cannot be URL-encoded by requests
+        # `requests` cannot URL-encode these
         ([1, 2, 3], False),
         ([("a",)], False),
         ([("a", "b", "c")], False),
@@ -183,10 +181,10 @@ def test_invalid_urlencoded_fails_with_requests(invalid_data):
     [
         ({"X-Token": "valid"}, True),
         # RFC 9110 Section 5.5: 0x00-0x08, 0x0A-0x1F, 0x7F are invalid field value chars
-        ({"Authorization": "Bearer \x16hW"}, False),  # 0x16 SYN — from issue #3696
-        ({"Authorization": "Bearer \x00null"}, False),  # 0x00 NUL
-        ({"Authorization": "Bearer \x7fDEL"}, False),  # 0x7F DEL
-        ({"Authorization": "Bearer \x01start"}, False),  # 0x01 SOH
+        ({"Authorization": "Bearer \x16hW"}, False),  # GH-3696
+        ({"Authorization": "Bearer \x00null"}, False),
+        ({"Authorization": "Bearer \x7fDEL"}, False),
+        ({"Authorization": "Bearer \x01start"}, False),
     ],
     ids=["valid", "syn-0x16", "nul-0x00", "del-0x7f", "soh-0x01"],
 )

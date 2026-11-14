@@ -197,7 +197,6 @@ def test_security_definitions_api_key_cookie(ctx, cookie_schema):
 
 
 def _assert_parameter(schema, schema_spec, location, expected=None):
-    # When security definition is defined as "apiKey"
     schema = schemathesis.openapi.from_dict(schema)
     if schema_spec == "swagger":
         operation = schema["/users"]["get"]
@@ -230,7 +229,6 @@ def _assert_parameter(schema, schema_spec, location, expected=None):
             ]
         )
     parameters = [param.definition for param in operation.security.iter_parameters() if param.location == location]
-    # Then it should be presented as a "string" parameter
     assert parameters == expected
 
 
@@ -297,9 +295,6 @@ def test_security_definitions_bearer_auth(ctx, simple_openapi):
 
 
 def test_bearer_auth_valid_header():
-    # When an HTTP Bearer Auth headers is generated
-    # Then it should be a valid header
-    # And no invalid headers should be generated
     strategy = get_default_format_strategies()["_bearer_auth"]
     with pytest.raises(NoSuchExample):
         find_first(strategy, lambda x: not is_valid_header({"x": x}), max_examples=2000)
@@ -334,7 +329,7 @@ def test_unknown_data(ctx):
 
 @pytest.mark.hypothesis_nested
 def test_date_deserializing(ctx):
-    # When dates in schema are written without quotes (achieved by dumping the schema with date instances)
+    # Dumping `date` instances writes unquoted dates into the YAML.
     schema_path = ctx.openapi.write_schema(
         {
             "/teapot": {
@@ -347,7 +342,7 @@ def test_date_deserializing(ctx):
                             "required": True,
                             "schema": {
                                 "allOf": [
-                                    # For sake of example to check allOf logic
+                                    # Exercises `allOf` handling
                                     {"type": "string", "example": datetime.date(2020, 1, 1)},
                                     {"type": "string", "example": datetime.date(2020, 1, 1)},
                                 ]
@@ -360,8 +355,6 @@ def test_date_deserializing(ctx):
         },
         format="yaml",
     )
-    # Then yaml loader should ignore it
-    # And data generation should work without errors
     schema = schemathesis.openapi.from_path(str(schema_path))
 
     @given(case=schema["/teapot"]["GET"].as_strategy())
@@ -373,7 +366,6 @@ def test_date_deserializing(ctx):
 
 
 def test_nullable_body_behind_a_reference(ctx):
-    # When a body parameter is nullable and is behind a reference
     operation = ctx.openapi.load_operation(
         "POST /payload",
         {
@@ -390,8 +382,7 @@ def test_nullable_body_behind_a_reference(ctx):
             }
         },
     )
-    # Then it should be properly collected
-    # And its definition is not transformed to JSON Schema
+    # The definition stays in its Open API form.
     assert operation.body[0].definition == {
         "in": "body",
         "name": "payload",
@@ -404,7 +395,6 @@ def test_nullable_body_behind_a_reference(ctx):
 @pytest.mark.hypothesis_nested
 def test_null_body(ctx):
     api = ctx.openapi.apps.payload()
-    # When API operation expects `null` as payload
     schema = ctx.openapi.load_schema(
         {
             "/api/payload": {
@@ -423,36 +413,31 @@ def test_null_body(ctx):
     @run_given(case=schema["/api/payload"]["POST"].as_strategy(), max_examples=5)
     def test(case):
         assume(case.body is None)
-        # Then it should be possible to send `null`
         response = case.call_and_validate()
-        # And the application should return what was sent (`/api/payload` behaves this way)
+        # `/api/payload` echoes the request body.
         assert response.content.strip() == b"null"
 
 
 def test_read_only(ctx):
-    # When API operation has `readOnly` properties
     api = ctx.openapi.serve(basic.read_only())
     schema = schemathesis.openapi.from_url(api.schema_url)
 
     @run_given(case=schema["/api/read_only"]["GET"].as_strategy(), max_examples=1)
     def test(case):
-        # Then `writeOnly` should not affect the response schema
+        # `writeOnly` must not affect the response schema.
         response = case.call_and_validate()
         assert "write" not in response.json()
         assert "read" in response.json()
 
 
 def test_write_only(ctx):
-    # When API operation has `writeOnly` properties
     api = ctx.openapi.serve(basic.write_only())
     schema = schemathesis.openapi.from_url(api.schema_url)
 
     @run_given(case=schema["/api/write_only"]["POST"].as_strategy(), max_examples=1)
     def test(case):
-        # Then `writeOnly` should be used only in requests
         assert "write" in case.body
         assert "read" not in case.body
-        # And `readOnly` should only occur in responses
         response = case.call_and_validate()
         assert "write" not in response.json()
         assert "read" in response.json()
@@ -804,7 +789,6 @@ def test_read_only_property_is_sent_where_another_media_type_keeps_it_writable(c
 
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
 def test_missing_content_and_schema(ctx, location):
-    # When an Open API 3 parameter is missing `schema` & `content`
     operation = ctx.openapi.load_operation(
         "GET /foo", {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}
     )
@@ -814,7 +798,6 @@ def test_missing_content_and_schema(ctx, location):
     def test(case):
         pass
 
-    # Then the proper error should be shown
     with pytest.raises(
         InvalidSchema,
         match=f"Can not generate data for {location} parameter `X-Foo`! "
@@ -973,7 +956,6 @@ def test_exclude_chars_and_no_x00_for_headers(ctx):
 
 
 def test_parameter_with_boolean_true_schema(ctx, cli, snapshot_cli):
-    # When a parameter has a boolean true schema (accepts anything in OpenAPI 3.1)
     paths = {
         "/success": {
             "get": {
@@ -998,8 +980,7 @@ def test_parameter_with_boolean_true_schema(ctx, cli, snapshot_cli):
     schema = ctx.openapi.load_schema(paths, version="3.1.0")
     operation = schema["/success"]["GET"]
 
-    # Then the optimized schema should handle boolean true correctly
-    # Header parameters should default to string type for practical generation
+    # Header parameters default to `string` so generation stays practical.
     assert operation.headers[0].optimized_schema == {"type": "string"}
     assert operation.query[0].optimized_schema is True
 
@@ -1038,7 +1019,6 @@ def test_path_parameter_with_boolean_true_schema(ctx):
 
 
 def test_parameter_with_boolean_false_schema(ctx):
-    # When a parameter has a boolean false schema (accepts nothing - unusual but valid)
     operation = ctx.openapi.load_operation(
         "GET /test",
         {
@@ -1046,21 +1026,18 @@ def test_parameter_with_boolean_false_schema(ctx):
                 {
                     "name": "impossible",
                     "in": "query",
-                    "schema": False,  # Boolean false - accepts nothing
+                    "schema": False,
                 }
             ],
             "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
-    # Then it should load without crashing
     parameter = operation.query[0]
-    # The optimized schema should be preserved or handled
     assert parameter.optimized_schema is False
 
 
 def test_request_body_with_boolean_true_schema(ctx, cli, snapshot_cli):
-    # When a request body has a boolean true schema
     paths = {
         "/payload": {
             "post": {
@@ -1079,7 +1056,6 @@ def test_request_body_with_boolean_true_schema(ctx, cli, snapshot_cli):
     schema = ctx.openapi.load_schema(paths, version="3.1.0")
     operation = schema["/payload"]["POST"]
 
-    # Then the optimized schema should handle boolean true correctly
     assert operation.body[0].optimized_schema is True
 
     @run_given(case=operation.as_strategy(), max_examples=5)
@@ -1091,7 +1067,7 @@ def test_request_body_with_boolean_true_schema(ctx, cli, snapshot_cli):
     def test_negative(case):
         pass
 
-    # It is not possible to generate data for a schema that accepts everything
+    # A schema that accepts everything has no negative values.
     with pytest.raises((Unsatisfiable, FailedHealthCheck)):
         test_negative()
 

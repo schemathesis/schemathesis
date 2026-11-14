@@ -58,9 +58,7 @@ def test_materialize_dag_yields_targets_in_separate_copies(materialize_targets):
 
 
 def test_materialize_skips_descriptors_when_replay_schema_diverges(materialize_targets):
-    # When error-feedback adjustments transform the schema between strategy build
-    # and case generation, a recorded `properties X` walk may land on a parent that
-    # no longer has `properties`. Skip the descriptor instead of crashing.
+    # Error feedback may reshape the schema after descriptors are recorded; a walk that no longer fits is skipped.
     descriptors_schema = {
         "type": "object",
         "properties": {
@@ -74,23 +72,18 @@ def test_materialize_skips_descriptors_when_replay_schema_diverges(materialize_t
     leaf_walk = (WalkStep("properties", "outer"), WalkStep("properties", "leaf"))
     assert any(d.walk == leaf_walk for d in descriptors)
 
-    # A divergent replay target where `properties.outer` lacks `properties`.
     replay_schema = {
         "type": "object",
         "properties": {"outer": {"type": "object"}},
     }
     targets = materialize_targets(replay_schema, descriptors)
     target_walks = [tuple((step.keyword, step.selector) for step in s.path) for s in targets]
-    # Root and `properties.outer` survive; the deeper `properties.leaf` is dropped.
     assert ("properties", "outer") in [w[-1] for w in target_walks if w]
     assert all(w[-1] != ("properties", "leaf") for w in target_walks if w)
 
 
 def test_materialize_ref_with_siblings_keeps_wrapper_not_target(materialize_targets):
-    # OpenAPI 3.1 sibling-bearing `{$ref, minLength}` must materialize to the
-    # wrapper itself so the sibling can be mutated; an unconditional post-walk
-    # dereference would silently swap in the referenced target and lose the
-    # sibling constraint.
+    # A `$ref` with a sibling `minLength` materializes to the wrapper, so dereferencing must not drop the sibling.
     schema = {
         "$ref": "#/x-bundled/inner",
         "minLength": 3,
@@ -100,12 +93,11 @@ def test_materialize_ref_with_siblings_keeps_wrapper_not_target(materialize_targ
     targets = materialize_targets(schema, descriptors)
     by_walk = {d.walk: target for d, target in zip(descriptors, targets, strict=True)}
     wrapper_target = by_walk[()]
-    assert wrapper_target.schema is schema  # not the dereferenced inner
+    assert wrapper_target.schema is schema
 
 
 def test_materialize_skips_descriptors_with_missing_bundle_target(materialize_targets):
-    # A descriptor referencing a bundled target absent from the replay schema's
-    # bundle map should be dropped, not raise KeyError.
+    # A descriptor whose bundled target is missing from the replay bundle is dropped without a KeyError.
     descriptors_schema = {
         "$ref": "#/x-bundled/inner",
         BUNDLE_STORAGE_KEY: {"inner": {"type": "object", "properties": {"x": {"type": "string"}}}},
@@ -113,5 +105,5 @@ def test_materialize_skips_descriptors_with_missing_bundle_target(materialize_ta
     descriptors = compute_mutation_targets(descriptors_schema)
     assert descriptors
     replay_schema = {"$ref": "#/x-bundled/inner", BUNDLE_STORAGE_KEY: {}}
-    # Every descriptor's first hop is `$ref inner` — none survive, but no crash.
+    # Every descriptor starts at the missing `$ref inner`, so none survive.
     assert materialize_targets(replay_schema, descriptors) == []

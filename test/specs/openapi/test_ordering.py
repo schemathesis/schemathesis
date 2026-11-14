@@ -40,9 +40,7 @@ def test_restful_heuristic_ordering(ctx):
 
     layers = compute_operation_layers(loaded, ops)
 
-    # Layer 0: POST (creates resources)
-    # Layer 1: GET, PATCH (reads/updates)
-    # Layer 2: DELETE (cleanup)
+    # Expected layers: POST creates, GET/PATCH read and update, DELETE cleans up.
     assert len(layers) >= 2
 
     layer_0_methods = {op.method.upper() for op in layers[0]}
@@ -133,8 +131,6 @@ def test_dependency_layers_restful_order_within_layer(ctx):
 
     layers = compute_dependency_layers(loaded.analysis.dependency_graph)
 
-    # Layer 0: Collection operations (produce resources) - POST before GET
-    # Layer 1: Item operations (depend on collection outputs) - GET before DELETE
     assert layers == [
         ["POST /items", "POST /users", "GET /items", "GET /users"],
         ["GET /items/{itemId}", "GET /users/{userId}", "DELETE /users/{userId}"],

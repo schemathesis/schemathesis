@@ -150,20 +150,12 @@ class SchemathesisConfig(DiffBase):
 
     @property
     def config_path(self) -> str | None:
-        """Filesystem path to the loaded configuration file, if any.
-
-        Returns None if using default configuration.
-        """
+        """Filesystem path to the loaded configuration file; `None` for the default configuration."""
         return self._config_path
 
     @classmethod
     def discover(cls) -> SchemathesisConfig:
-        """Discover the Schemathesis configuration file.
-
-        Search for 'schemathesis.toml' in the current directory and then in each parent directory,
-        stopping when a directory containing a '.git' folder is encountered or the filesystem root is reached.
-        If a config file is found, load it; otherwise, return a default configuration.
-        """
+        """Load the nearest `schemathesis.toml` up to a `.git` directory or the root, or return the default config."""
         current_dir = os.getcwd()
         config_file = None
 
@@ -173,12 +165,10 @@ class SchemathesisConfig(DiffBase):
                 config_file = candidate
                 break
 
-            # Stop searching if we've reached a git repository root
             git_dir = os.path.join(current_dir, ".git")
             if os.path.isdir(git_dir):
                 break
 
-            # Stop if we've reached the filesystem root
             parent = os.path.dirname(current_dir)
             if parent == current_dir:
                 break

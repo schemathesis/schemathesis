@@ -50,13 +50,7 @@ def _has_generation_config_option(config, name: str) -> bool:
 
 @pytest.fixture
 def cli(request, tmp_path, app_runner, monkeypatch):
-    """CLI runner helper.
-
-    Provides in-process execution via `click.CliRunner`. CWD is moved to
-    `tmp_path` so any local artifacts the engine writes (e.g.
-    `.schemathesis/<project>/cache/`) land inside the test's own directory
-    and do not bleed across runs.
-    """
+    """Run the CLI in-process from `tmp_path`, so artifacts like `.schemathesis/<project>/cache/` stay per test."""
     monkeypatch.chdir(tmp_path)
     cli_runner = CliRunner()
     invocations = request.node.stash.setdefault(CLI_INVOCATIONS, [])

@@ -84,8 +84,7 @@ def test_jackson_parser_extracts_date_parse_format(rejected_value, body, expecte
 
 
 def test_pipeline_falls_through_to_jackson_for_empty_field_errors_envelope(make_operation, case_factory):
-    # Spring envelope with empty fieldErrors + Jackson-shaped top-level `message`:
-    # Spring returns nothing, pipeline falls through, Jackson picks it up.
+    # Spring yields nothing for an empty `fieldErrors`, so the pipeline falls through to Jackson's top-level `message`.
     body = {
         "message": (
             "JSON parse error: Cannot deserialize instance of `java.lang.String` "
@@ -151,19 +150,14 @@ _JACKSON_LEGACY_UUID = (
 )
 
 
-# Collection-element failure: chain has a bare `[N]` between the field and the
-# leaf. Jackson uses this when deserialization fails inside a list/array element.
-# The index value is irrelevant for JSON Schema (every element shares `items`),
-# but it must appear in the path so the walker takes the `items` branch.
+# A bare `[N]` in the chain marks a list element; the walker needs it to take the `items` branch.
 _JACKSON_ARRAY_ELEMENT = (
     'Cannot deserialize value of type `java.time.LocalDate` from String "x" '
     'through reference chain: User["addresses"]->java.util.ArrayList[0]->Address["created_on"]'
 )
 
 
-# Modern Jackson with non-String source (object / array / boolean) — different
-# verb form ("instance of" rather than "value of type") and the source token
-# replaces the String quoting.
+# Non-String sources use "instance of" and name the source token in place of a quoted String.
 _JACKSON_NON_STRING_SOURCE = (
     "JSON parse error: Cannot deserialize instance of `java.util.Date` out of START_OBJECT token; "
     "nested exception is com.fasterxml.jackson.databind.exc.MismatchedInputException: "
@@ -178,9 +172,7 @@ _JACKSON_NON_STRING_ARRAY_SOURCE = (
 )
 
 
-# Jackson enum-deserialization: the `not one of the values accepted` clause
-# names the valid literals inline. A single message carries both the offending
-# Java type and the accepted value list — parser emits both kinds of observation.
+# An enum failure names the Java type and the accepted values, so the parser emits both observations.
 _JACKSON_ENUM_USERTYPE = (
     "JSON parse error: Cannot deserialize value of type "
     '`com.example.demo.auth.model.enums.UserType` from String "AAA": '
@@ -357,8 +349,7 @@ def test_jackson_parser_parse_returns_empty_for_unparsable_bodies(body, make_ope
     ],
 )
 def test_jackson_parser_walks_into_array_shape_envelopes(array_key, item_key, make_operation, case_factory):
-    # Custom `@ControllerAdvice` handlers sometimes funnel Jackson parse errors
-    # alongside Bean-validation results into a single `errors[]` array.
+    # Custom `@ControllerAdvice` handlers may put Jackson errors and Bean-validation results in one `errors[]`.
     body = {array_key: [{item_key: _JACKSON_LOCAL_DATE}]}
     obs = parse_observations(JacksonParser(), body, make_operation, case_factory)
     assert [o.payload for o in obs] == [TypeMismatchPayload(type_name="java.time.LocalDate")]
@@ -371,8 +362,7 @@ def test_jackson_parser_skips_non_dict_array_items(make_operation, case_factory)
 
 
 def test_jackson_parser_extracts_one_observation_per_carrier_key(make_operation, case_factory):
-    # Different carrier keys can each carry a Jackson error — `_carrier_strings`
-    # walks them in order and emits one observation per match.
+    # Each carrier key may hold its own Jackson error; each match emits one observation, in key order.
     body = {
         "msg": _JACKSON_LOCAL_DATE,
         "detail": _JACKSON_UUID,
@@ -443,8 +433,7 @@ def test_jackson_numeric_overflow_long(make_operation, case_factory):
             {"hireDate": "dd-MM-yyyy"},
             ("hireDate",),
         ),
-        # `instance of X out of <token>` carries no captured value; with no reference chain,
-        # the helper has nothing to walk against and the message is dropped.
+        # `instance of X out of <token>` captures no value and has no reference chain, so the message is dropped.
         (
             "Cannot deserialize instance of `java.util.Map` out of START_ARRAY token",
             {"name": "alice"},

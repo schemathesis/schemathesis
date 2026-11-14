@@ -147,8 +147,7 @@ def _replay_directory(
     effective_schema_location = schema_location or (
         recorded_schema_location(crash_dir, manifest) if manifest is not None else None
     )
-    # File-based schemas carry no base URL on their operations; fall back to the manifest's recorded base URL
-    # for the actual requests when no --url override is given (the header still flags only an explicit override).
+    # Without --url, file-based schemas use the manifest's recorded base URL; the header flags only an explicit --url.
     effective_base_url = base_url or (manifest.base_url if manifest is not None else None)
     if not effective_schema_location:
         click.echo("Error: cannot replay without a schema. Pass --schema-location <url-or-path>.", err=True)

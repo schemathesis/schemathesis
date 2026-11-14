@@ -139,8 +139,7 @@ class CliSnapshotConfig:
         with keep_cwd():
             data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
             data = data.replace(str(Path(self.testdir.tmpdir).parent) + os.path.sep, "/tmp/")
-        # Whatever remains is a sibling per-test directory (e.g. the `tmp_path` fixture). Its numeric
-        # suffix depends on allocation order within the session, so strip it instead of recording it.
+        # What remains is a sibling per-test directory (e.g. `tmp_path`) whose suffix depends on allocation order.
         data = re.sub(r"/tmp/[A-Za-z0-9_.\-]+\d+" + re.escape(os.path.sep), "/tmp/", data)
         if os.path.sep != "/":
             data = re.sub(r"/tmp/\S+", lambda match: match.group(0).replace(os.path.sep, "/"), data)
@@ -151,13 +150,12 @@ def _mask_test_cases(data: str) -> str:
     # All-skipped and all-errored runs: the skipped/errored split varies across environments.
     data = re.sub(r"Test cases:\n  (\d+) generated, \1 (?:skipped|errored)", "Test cases:\n  N generated", data)
     data = re.sub(r"Test cases:\n  \d+ generated, \d+ errored, \d+ skipped", "Test cases:\n  N generated", data)
-    # Cases with failures (skip count optional — non-deterministic, so not snapshot-tested)
+    # The skip count of runs with failures varies, so the mask drops it.
     data = re.sub(
         r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures?(?:, \d+ errored)?(?:, \d+ skipped)?",
         "Test cases:\n  N generated, N found N unique failures",
         data,
     )
-    # Cases with passed (skip count optional)
     return re.sub(
         r"Test cases:\n  (\d+) generated, (\d+) passed(?:, \d+ errored)?(?:, \d+ skipped)?",
         "Test cases:\n  N generated, N passed",
@@ -214,7 +212,7 @@ def _mask_environment(data: str) -> str:
 def _mask_fuzz_counters(data: str) -> str:
     if "Stop reason:" not in data:
         return data
-    # Fuzz-specific output: scenario count and counters vary with time and machine speed
+    # Fuzz counters vary with time and machine speed.
     data = re.sub(r"✅ \d+ scenarios?\b", "✅ N scenarios", data)
     data = re.sub(r"⏭  \d+ without checks", "⏭  N without checks", data)
     data = re.sub(r"❌ \d+ unique failures?\b", "❌ N unique failures", data)
@@ -248,7 +246,6 @@ def _drop_traceback_noise(data: str) -> str:
         return data
     lines = [line for line in data.splitlines() if set(line) not in ({" ", "^"}, {" ", "^", "~"})]
     comprehension_ids = [idx for idx, line in enumerate(lines) if line.strip().endswith("comp>")]
-    # Drop frames that are related to comprehensions
     for idx in comprehension_ids[::-1]:
         lines.pop(idx)
         lines.pop(idx)
@@ -317,20 +314,15 @@ def _mask_random_values(data: str) -> str:
 
 
 def _mask_invalid_component(data: str) -> str:
-    # Same seed picks different mutator outputs across CI Pythons (constraint
-    # violation vs. syntax fuzzing vs. format violation, etc.). Collapse the
-    # whole `Invalid component:` body to a placeholder so version-specific
-    # case selection doesn't break the snapshot.
+    # One seed picks different mutations on different CI Pythons, so the whole `Invalid component:` body is masked.
     data = re.sub(
         r"^([ \t]*Invalid component:)[^\n]*(?:\n[ \t]+- [^\n]*)*",
         r"\1 <PLACEHOLDER>",
         data,
         flags=re.MULTILINE,
     )
-    # Negative-fuzzing variance can produce body content with non-printable bytes, and the
-    # curl advisory for those only appears where shell detection comes up empty — true on
-    # CI, false on a developer machine. Strip the warning and the blank line under it, which
-    # the reproduce block indents, so spacing matches the warning-free runs.
+    # The curl warning for non-printable body bytes appears only where shell detection finds nothing (CI, not dev
+    # machines). Drop it with the indented blank line under it so spacing matches warning-free runs.
     return re.sub(
         r"^[ \t]*⚠️[ \t]+Request body contains non-printable characters\.[^\n]*\n[ \t]*\n",
         "",
@@ -423,8 +415,7 @@ def _is_phase_header(line: str) -> bool:
 def _normalize_line(line: str) -> str:
     line = click.unstyle(line)
     if line.endswith("Schema Loading Error") and line.strip() != "Schema Loading Error":
-        # It is written at the end of the current line and does not properly rewrite the current line
-        # on all terminals
+        # Written at the end of the current line, which some terminals do not rewrite.
         return "Schema Loading Error"
     if IS_WINDOWS and ("Loading specification" in line or "Loaded specification" in line):
         return line.replace("\\", "/")
@@ -464,10 +455,8 @@ def _clean_lines(data: str) -> str:
         if normalized == "Schema Loading Error" or not _is_transient(normalized):
             lines.append(normalized.rstrip())
     if _has_unstable_blank_lines(data):
-        # Rich Live progress widgets leave extra blank lines on non-TTY consoles;
-        # collapse runs of consecutive blanks to one. Triggers on st fuzz output
-        # (after "Stop reason:") and on the st run path where nothing was generated,
-        # where the setup progress doesn't clean up identically across platforms.
+        # Live progress widgets leave extra blank lines on non-TTY consoles, and setup progress cleans up differently
+        # across platforms; collapse each run of blanks to one.
         lines = _collapse_blank_runs(lines)
     lines = clean_unit_tests(lines)
     lines = clean_stateful_tests(lines)
@@ -481,15 +470,14 @@ def clean_unit_tests(lines):
             capabilities_idx = idx
             break
         if "Setup interrupted" in line:
-            # No capability block follows; setup was interrupted.
+            # No capability block follows.
             probing_idx = idx + 2
             break
     else:
         return lines
 
     if capabilities_idx is not None:
-        # Keep every row of the capability block up to the next phase marker rather than
-        # trimming to a fixed line count; lets future capability rows render without losing them.
+        # Keep every capability row up to the next phase marker, so new capability rows render too.
         probing_idx = capabilities_idx + 1
         while probing_idx < len(lines) and not any(
             f"{phase} (in" in lines[probing_idx] for phase in ("Examples", "Coverage", "Fuzzing")

@@ -1,5 +1,3 @@
-"""WFC-specific errors."""
-
 from __future__ import annotations
 
 from schemathesis.core.errors import SchemathesisError

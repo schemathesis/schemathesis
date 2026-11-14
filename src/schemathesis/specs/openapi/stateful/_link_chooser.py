@@ -26,7 +26,6 @@ def collect_link_candidates(
 ) -> list[tuple[APIOperation, dict[str, Any]]]:
     """Return resolvable (target, overrides) candidates for Links from this response."""
     candidates: list[tuple[APIOperation, dict[str, Any]]] = []
-    # Only links of the response definition that describes this status code can follow it
     response_def = operation.responses.find_by_status_code(response.status_code)
     if response_def is None:
         return candidates

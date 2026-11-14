@@ -93,7 +93,7 @@ class GrpcServer:
     def stop(self) -> None:
         self.server.stop(None).wait()
         self.held_port = socket.socket()
-        # Connections the server just closed may still occupy the port.
+        # Connections the server closed a moment ago may still occupy the port.
         self.held_port.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.held_port.bind(("127.0.0.1", urlsplit(self.target).port))
 
@@ -240,21 +240,20 @@ def users(
     """`pkg.Users/GetUser` answers `u<id>`; a negative id fails, 13 is slow, 503 is a server-sent UNAVAILABLE.
 
     `on_get_user` sees each id first. 404 is NOT_FOUND, 499 is CANCELLED, 504 is DEADLINE_EXCEEDED sent at once,
-    17 answers with bytes that do not decode, 413 answers with a name of 5 MiB, and 422 fails in the request
-    deserializer. A call with `x-undeclared-field` metadata gets field 99 in the answer, which `pkg.User` does not
-    declare. `pkg.Admin/Reset` answers with `u<id>` packed into `response`, or with
-    a `google.rpc.ErrorInfo` detail, a type clients do not know, in `error` for a negative id. Reflection refuses calls
-    that carry `x-deny: 1`.
-    Reflection also lists `undescribed_services`, which it answers with a NOT_FOUND error response.
+    17 answers with undecodable bytes, 413 with a 5 MiB name, and 422 fails in the request deserializer.
+    `x-undeclared-field` metadata adds field 99, which `pkg.User` does not declare, to the answer.
+    `pkg.Admin/Reset` answers with `u<id>` packed into `response`, or, for a negative id, with a
+    `google.rpc.ErrorInfo` detail, a type clients do not know, in `error`.
+    Reflection refuses calls carrying `x-deny: 1`, and lists `undescribed_services` but answers them with NOT_FOUND.
     Without `reflection_imports`, a symbol lookup returns only its file, and imports come by file name.
     Reflection cannot describe `unserved_files` and leaves them out of symbol lookups; it describes `emptied_files`
     in symbol lookups as files that define nothing.
     With `annotated`, `GetUser` sets a custom option from `annotations.proto`, imported for that option alone.
     `pkg.Accounts/CreateAccount` (in `accounts_descriptor_set()`, not reflected) rejects an empty `display_name`,
     an empty `profile.contact_email` and the reserved name `admin` with INVALID_ARGUMENT, listing each field in
-    `google.rpc.BadRequest` details next to a detail of a type clients do not know. With `x-details: malformed`
-    metadata, the details do not decode. With `x-details: invalid-retry-info` or `x-details: invalid-duration`, they
-    add a `google.rpc.RetryInfo` or a bare duration with more than a second of nanoseconds, which JSON cannot express.
+    `google.rpc.BadRequest` details next to a detail of a type clients do not know. `x-details: malformed` metadata
+    makes the details undecodable; `invalid-retry-info` or `invalid-duration` adds a `google.rpc.RetryInfo` or a bare
+    duration with more than a second of nanoseconds, which JSON cannot express.
     """
     descriptor_set = users_descriptor_set(annotated=annotated)
     pool = load_pool(descriptor_set)

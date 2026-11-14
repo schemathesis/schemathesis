@@ -280,7 +280,7 @@ def _replay_sequence(
         try:
             case = _build_case(step_operation, step)
         except Exception:
-            # The recorded data (typically `meta`) can't be decoded - a corrupt file or a different version.
+            # Undecodable recorded data, typically `meta`: a corrupt file or a different version.
             return _errored_outcome(
                 f"step {index + 1}: incompatible or corrupted crash data",
                 elapsed=instant.elapsed_ms,
@@ -345,7 +345,7 @@ def _replay_sequence(
         recorder.record_case(parent_id=parent_id, case=case)
         recorder.record_response(case_id=case.id, response=response)
 
-        # Built from the headers this step actually sent, the same way a run reports its failures.
+        # Built from the headers this step sent, as a run reports its failures.
         curl = case.as_reproduction_command(
             headers=recorder.find_request_headers(case_id=case.id), verify=response.verify
         )
@@ -390,8 +390,7 @@ def _checked_index(sequence: list[CrashStep]) -> int:
     """The step the recorded checks ran on."""
     terminal = sequence[-1]
     parent = terminal.parent_index
-    # Sent as another identity than its parent without a link: a peer's request a check sent from the parent,
-    # so the checks run on the parent and send it again.
+    # Another identity and no link: a check sent this peer request from the parent, so checks run on the parent again.
     if (
         terminal.link is None
         and parent is not None

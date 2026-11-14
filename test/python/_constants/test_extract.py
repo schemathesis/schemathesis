@@ -47,11 +47,9 @@ def test_local_imports_of_follows_conditional_imports():
 
 @pytest.mark.parametrize("module_name", ["definitely_not_a_real_module_xyz", "sys"], ids=["unimportable", "no-source"])
 def test_local_imports_of_returns_empty(module_name):
-    # Unimportable modules and built-ins (no readable source) contribute nothing.
     assert extract.local_imports_of(module_name) == set()
 
 
 @pytest.mark.parametrize("module_name", ["definitely_not_a_real_module_xyz", "sys"], ids=["unimportable", "stdlib"])
 def test_extract_from_module_yields_nothing(module_name):
-    # Unimportable and stdlib/built-in modules yield no constants.
     assert list(extract.extract_from_module(module_name, origin=ORIGIN)) == []

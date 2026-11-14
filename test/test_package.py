@@ -8,7 +8,6 @@ SRC = str(Path(__file__).parent.parent / "src")
 
 
 def test_dev_version(monkeypatch):
-    # When Schemathesis is run in dev environment without installation
     monkeypatch.delitem(sys.modules, "schemathesis.core.version")
 
     def not_installed(name):
@@ -17,7 +16,6 @@ def test_dev_version(monkeypatch):
     monkeypatch.setattr(metadata, "version", not_installed)
     from schemathesis.core.version import SCHEMATHESIS_VERSION
 
-    # Then it's version is "dev"
     assert SCHEMATHESIS_VERSION == "dev"
 
 

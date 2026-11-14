@@ -157,7 +157,7 @@ def test_seed_silently_skips_non_jwt_bearer(token):
 
 
 def test_seed_skips_jwt_without_recognized_claims():
-    # JWT with only registered claims (`iat`, `exp`) but no identifier claims -> no seeding.
+    # Registered claims (`iat`, `exp`) without identifier claims seed nothing.
     repo = _new_repository(["User"])
     token = _make_jwt({"iat": 1700000000, "exp": 1800000000, "iss": "https://issuer.example"})
 

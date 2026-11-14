@@ -21,7 +21,7 @@ KNOWN_HEADER_FORMATS: dict[str, str] = {
 # Formats given to plain string headers so generated values are valid on the wire; the schema itself allows any string.
 PLAIN_HEADER_FORMATS = {HEADER_FORMAT, *KNOWN_HEADER_FORMATS.values()}
 
-# Visible ASCII for ETag content: 0x21-0x7E excluding DQUOTE (0x22)
+# ETag content: visible ASCII except DQUOTE
 _ETAG_CHARS = "".join(chr(i) for i in range(0x21, 0x7F) if chr(i) != '"')
 
 STRUCTURED_HEADER_PROBABILITY = 0.75
@@ -69,13 +69,12 @@ def range_slightly_invalid_values() -> st.SearchStrategy[str]:
 
     non_neg = st.integers(min_value=0, max_value=10_000)
 
-    # bytes=LAST-FIRST where LAST > FIRST (inverted bounds)
     inverted = non_neg.flatmap(
         lambda last: st.integers(min_value=last + 1, max_value=last + 10_000).map(lambda first: f"bytes={first}-{last}")
     )
-    # bytes=-1-N (negative first byte position)
+    # Negative first byte position
     neg_first = non_neg.map(lambda n: f"bytes=-1-{n}")
-    # non-bytes unit and empty range-set as sampled constants
+    # Non-bytes unit and empty range-set
     constants = st.sampled_from(["invalid=0-100", "bytes="])
 
     return st.one_of(inverted, neg_first, constants)

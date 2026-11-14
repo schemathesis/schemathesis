@@ -52,7 +52,7 @@ def _to_segment(raw: str) -> str | int:
 
 
 def _split_instance_path(raw: str) -> ParameterPath:
-    """`/user/email` → ('user', 'email'); `/tags/0` → ('tags', 0); '' → ()."""
+    """`/user/email` -> ('user', 'email'); `/tags/0` -> ('tags', 0); '' -> ()."""
     if not raw:
         return ()
     return tuple(_to_segment(s) for s in raw.lstrip("/").split("/"))
@@ -213,7 +213,7 @@ def _extract_array_errors(body: object) -> list[dict] | None:
     return candidate
 
 
-# Fastify form: single-message envelope. Matches `body must <phrase>` (root) or `<location>/<path> must <phrase>`.
+# Fastify single-message form: `body must <phrase>` (root) or `<location>/<path> must <phrase>`.
 _FASTIFY_CLAUSE = re.compile(
     r"(?P<location>body|query|params|headers)(?:/(?P<path>[^ ]+))? must "
     r"(?P<rest>.+?)(?=, (?:body|query|params|headers)(?:/| )|$)"

@@ -33,7 +33,6 @@ def run_test(
     suite_id: uuid.UUID,
     scenario_id: uuid.UUID,
 ) -> events.EventGenerator:
-    """A single test run with all error handling needed."""
     errors: list[Exception] = []
     skip_reason = None
     assert phase in TESTING_PHASES
@@ -56,8 +55,7 @@ def run_test(
             str(exc), str(exc)
         )
     except BudgetExpired:
-        # The operation ran out of its share, not the whole run — keep whatever it already produced,
-        # errors included: running out of time does not undo them.
+        # Only this operation's share ran out; keep what it produced, errors included.
         status, skip_reason, stored = _settle_stopped(
             scenario, errors, skip_reason=StopReason.MAX_TIME.skip_explanation
         )
@@ -108,10 +106,7 @@ def _settle_stopped(
 
 
 def setup_hypothesis_database_key(test: Callable, operation: APIOperation, generation: GenerationConfig) -> None:
-    """Make Hypothesis use separate database entries for every API operation.
-
-    It increases the effectiveness of the Hypothesis database in the CLI.
-    """
+    """Give each API operation its own Hypothesis database entries, or disable the database when set to `none`."""
     if generation.database is not None and generation.database.lower() == "none":
         test._hypothesis_internal_database_key = None  # type: ignore[attr-defined]
         return

@@ -30,7 +30,6 @@ def assert_links_work(response_factory, location, results, schema):
 
 
 def build_links(inferencer, location: str) -> list[dict]:
-    """Build all possible OpenAPI link definitions from Location header."""
     normalized_location = inferencer._normalize_location(location)
     if normalized_location is None:
         return []
@@ -77,7 +76,7 @@ def _link_by(key: str, value: str, **parameters):
             "/users/123",
             [link_by_id("getUserById", userId="/users/([^/?#]+)")],
         ),
-        # Without operationId (should use operationRef)
+        # Without operationId, links use operationRef
         (
             {
                 "/users/{userId}": {
@@ -87,8 +86,7 @@ def _link_by(key: str, value: str, **parameters):
             "/users/123",
             [link_by_ref("#/paths/~1users~1{userId}/get", userId="/users/([^/?#]+)")],
         ),
-        # No path parameters
-        # Links without parameters don't make sense
+        # No path parameters, so nothing to link
         (
             {"/users": {"get": {"operationId": "getUsers"}}},
             "/users",
@@ -243,7 +241,7 @@ def _link_by(key: str, value: str, **parameters):
             "/path~with~tildes/123",
             [link_by_ref("#/paths/~1path~0with~0tildes~1{id}/get", id="/path\\~with\\~tildes/([^/?#]+)")],
         ),
-        # Same path with multiple methods - ALL should be included
+        # Same path with multiple methods: all are included
         (
             {
                 "/users/{userId}": {
@@ -275,7 +273,7 @@ def _link_by(key: str, value: str, **parameters):
                 link_by_id("patchUser", userId="/users/([^/?#]+)"),
             ],
         ),
-        # Prefix matching should find ALL methods on matching paths
+        # Prefix matching finds all methods on matching paths
         (
             {
                 "/users/{userId}": {
@@ -344,14 +342,14 @@ def test_build_links_location_needing_redirect(ctx, path, location, method):
 @pytest.mark.parametrize(
     ["base_url", "paths", "location", "expected"],
     [
-        # Relative Location with base_url - should work normally
+        # Relative Location with base_url
         (
             "http://localhost:8080/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "/users/123",
             [link_by_id("getUserById", userId="(?:/api/v1)?/users/([^/?#]+)")],
         ),
-        # Absolute Location matching base_url - should strip base and work
+        # Absolute Location matching base_url has the base stripped
         (
             "http://localhost:8080/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
@@ -365,14 +363,14 @@ def test_build_links_location_needing_redirect(ctx, path, location, method):
             "http://localhost:8080/users/123",
             [link_by_id("getUserById", userId="/users/([^/?#]+)")],
         ),
-        # Absolute Location with different host - should not match
+        # Absolute Location with a different host does not match
         (
             "http://localhost:8080/api",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://different-host.com/api/users/123",
             [],
         ),
-        # Absolute Location with different base path - should not match
+        # Absolute Location with a different base path does not match
         (
             "http://localhost:8080/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
@@ -399,21 +397,21 @@ def test_build_links_location_needing_redirect(ctx, path, location, method):
             "http://localhost:8080/api/users/123",
             [link_by_id("getUserById", userId="(?:/api)?/users/([^/?#]+)")],
         ),
-        # Location with query parameters (should be ignored in matching)
+        # Matching ignores query parameters
         (
             "http://localhost:8080/api",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/api/users/123?expand=profile",
             [link_by_id("getUserById", userId="(?:/api)?/users/([^/?#]+)")],
         ),
-        # Location with fragment (should be ignored in matching)
+        # Matching ignores the fragment
         (
             "http://localhost:8080/api",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/api/users/123#profile",
             [link_by_id("getUserById", userId="(?:/api)?/users/([^/?#]+)")],
         ),
-        # Relative Location includes base path - should be stripped
+        # A base path inside a relative Location is stripped
         (
             "http://api.example.com/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
@@ -427,7 +425,7 @@ def test_build_links_location_needing_redirect(ctx, path, location, method):
             "/api/v2/internal/users/123",
             [link_by_id("getUserById", userId="(?:/api/v2/internal)?/users/([^/?#]+)")],
         ),
-        # Location has wrong base path - should not match
+        # A wrong base path does not match
         (
             "http://api.example.com/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
@@ -441,7 +439,7 @@ def test_build_links_location_needing_redirect(ctx, path, location, method):
             "http://localhost:8080/apiv2/123",
             [],
         ),
-        # Location has partial base path - should not match
+        # A partial base path does not match
         (
             "http://api.example.com/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
@@ -468,7 +466,7 @@ def test_build_links_location_needing_redirect(ctx, path, location, method):
                 link_by_id("getUserPost", userId="(?:/v1)?/users/([^/?#]+)"),
             ],
         ),
-        # Base path with trailing slash, Location without - should still work
+        # Base path with a trailing slash, Location without one
         (
             "http://api.example.com/api/v1/",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
@@ -572,10 +570,9 @@ def test_build_links_path_item_broken_ref(ctx):
     )
     inferencer = LinkInferencer.from_schema(schema)
 
-    # Broken ref should not cause crashes, should just skip that path
+    # A broken ref skips its path without crashing
     assert build_links(inferencer, "/orders/456") == [link_by_id("getOrder", orderId="/orders/([^/?#]+)")]
 
-    # The broken ref path should not match anything
     assert build_links(inferencer, "/users/123") == []
 
 
@@ -612,19 +609,16 @@ def test_build_links_no_base_url_configured(ctx):
 
     inferencer = LinkInferencer.from_schema(schema)
 
-    # Relative Location should work fine
     assert build_links(inferencer, "/users/123") == [
         link_by_id("getUserById", userId="/users/([^/?#]+)"),
         link_by_id("updateUser", userId="/users/([^/?#]+)"),
     ]
 
-    # Absolute Location should be ignored (can't validate without base_url)
+    # Without base_url, absolute Locations cannot be validated, so they are ignored
     assert build_links(inferencer, "http://api.example.com/users/123") == []
 
-    # Different absolute URLs should also be ignored
     assert build_links(inferencer, "https://localhost:8080/api/v1/users/123") == []
 
-    # Another relative path should work
     assert build_links(inferencer, "/users/456") == [
         link_by_id("getUserById", userId="/users/([^/?#]+)"),
         link_by_id("updateUser", userId="/users/([^/?#]+)"),
@@ -819,13 +813,12 @@ def test_location_points_to_nonexistent_endpoint(cli, snapshot_cli, ctx):
                     "responses": {"201": {"description": "Item created"}},
                 }
             },
-            # Note: No /items/{itemId} endpoint defined
+            # No /items/{itemId} endpoint
         }
     )
 
     @app.route("/items", methods=["POST"])
     def create_item():
-        # Returns Location pointing to endpoint not defined in schema
         return jsonify({"message": "created"}), 201, {"Location": "/items/123"}
 
     assert (
@@ -1025,7 +1018,7 @@ def test_inject_links_location_normalization_returns_none(ctx):
     inferencer = LinkInferencer.from_schema(schema)
     operation = schema["/users"]["post"]
 
-    # Empty location should be normalized to None
+    # An empty Location normalizes to None
     entries = [LocationHeaderEntry(value="", status_code=201)]
 
     assert inferencer.inject_links(operation, entries) == 0
@@ -1073,7 +1066,6 @@ def test_inject_links_creates_response_definition(ctx):
     entries = [LocationHeaderEntry(value="/users/123", status_code=201)]
 
     assert inferencer.inject_links(operation, entries) == 1
-    # Should create the 201 response definition
     assert "201" in operation.responses.status_codes
     response = operation.responses.find_by_status_code("201")
     assert "links" in response.definition

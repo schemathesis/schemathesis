@@ -16,8 +16,7 @@ from schemathesis.core.error_feedback.parsers.marshmallow import MarshmallowPars
 from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
 
-# Wire-form envelopes captured against running plain-Flask, webargs, flask-smorest,
-# and APIFlask apps. Inner shape is identical across stacks; wrappers differ.
+# Envelopes captured from plain-Flask, webargs, flask-smorest and APIFlask apps; only the wrappers differ.
 _PLAIN_REQUIRED = {"username": ["Missing data for required field."]}
 
 

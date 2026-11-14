@@ -25,7 +25,7 @@ def test_failures_per_minute_uses_unique_count(tmp_path):
                 },
                 "checks": {
                     "c1": [_failure_block("Schema mismatch", "x")],
-                    "c2": [_failure_block("Schema mismatch", "y")],  # same fingerprint -> dedupes
+                    "c2": [_failure_block("Schema mismatch", "y")],  # same fingerprint, deduplicated
                     "c3": [_failure_block("Other failure", "z")],
                 },
                 "interactions": {
@@ -108,7 +108,7 @@ def test_timeline_does_not_count_4xx_only_operations(tmp_path):
             {"EngineStarted": {"timestamp": 100.0}},
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             _scenario_at("GET /a", 100.5, 200),
-            _scenario_at("GET /b", 165.0, 422),  # 4xx-only — excluded
+            _scenario_at("GET /b", 165.0, 422),  # 4xx only, excluded
             {"EngineFinished": {"timestamp": 180.0}},
         ],
     )
@@ -116,10 +116,7 @@ def test_timeline_does_not_count_4xx_only_operations(tmp_path):
 
 
 def test_timeline_uses_per_call_interaction_timestamp_when_present(tmp_path):
-    # The scenario `timestamp` is shared by every case in the payload; per-interaction
-    # `timestamp` is finer and must be preferred when available. Discovery for /a lands at
-    # minute 0 (interaction timestamp 100.5), /b at minute 2 (interaction timestamp 220.0)
-    # — even though both share the same scenario timestamp.
+    # Per-interaction timestamps beat the shared scenario one: /a lands at minute 0 (100.5), /b at minute 2 (220.0).
     payload = scenario(
         "Fuzz tests",
         {
@@ -157,7 +154,7 @@ def test_reachability_lists_distinct_operations_with_2xx(tmp_path):
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             _scenario_at("GET /b", 100.5, 200),
             _scenario_at("GET /a", 101.0, 200),
-            _scenario_at("GET /c", 102.0, 422),  # never gets a 2xx — excluded
+            _scenario_at("GET /c", 102.0, 422),  # never gets a 2xx, excluded
             {"EngineFinished": {"timestamp": 130.0}},
         ],
     )

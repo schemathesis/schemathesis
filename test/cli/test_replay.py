@@ -302,8 +302,7 @@ def test_replay_missing_path_is_errored_not_crash(cli, app_runner, ctx, crash_fa
 
 
 def test_replay_corrupt_meta_is_errored_not_crash(cli, app_runner, ctx, tmp_path, snapshot_cli):
-    # A crash file on disk that loads fine but carries metadata the current format can't decode is reported
-    # errored and kept, rather than aborting the whole run with a traceback.
+    # A crash file whose metadata no longer decodes is reported errored and kept, without a traceback.
     schema_url, base = _users_app(ctx, app_runner)
     crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
@@ -934,7 +933,7 @@ def test_timing_only_failure_not_recorded_or_hinted(cli, ctx, tmp_path):
 def test_replay_kitchen_sink_at_scale(cli, ctx, tmp_path):
     api = ctx.openapi.serve(openapi_basic.kitchen_sink())
 
-    # /api/flaky is non-deterministic by design; sanitization would mask the `key` body field, so replay can't restore it.
+    # /api/flaky is non-deterministic; sanitization would mask the `key` body field, which replay cannot restore.
     cli.run(
         api.schema_url,
         "--max-examples=2",
@@ -960,7 +959,7 @@ def test_replay_kitchen_sink_at_scale(cli, ctx, tmp_path):
 def test_replay_stateful_chain(cli, ctx, tmp_path):
     api = ctx.openapi.apps.stateful_users(IndependentInternalError())
 
-    # Enough examples to reliably build a multi-step linked failing scenario.
+    # Enough examples to build a multi-step linked failing scenario.
     cli.run(api.schema_url, "--max-examples=30", "--phases=stateful")
 
     crash_files = _list_crash_files(crash_cache_dir(tmp_path))
@@ -1439,8 +1438,7 @@ def _capture_render(
     duration_ms: int = 142,
     removal_count: int = 0,
 ) -> str:
-    # Capture both the Rich console and the `click.echo` failure output into one buffer, in order,
-    # so the snapshot mirrors what the terminal actually shows.
+    # One buffer captures Rich and `click.echo` output in order, so the snapshot mirrors the terminal.
     buffer = io.StringIO()
     console = make_console(file=buffer)
     with contextlib.redirect_stdout(buffer):
@@ -1561,7 +1559,7 @@ def test_replay_unrunnable_check_is_not_deleted(cli, app_runner, ctx, tmp_path, 
     writer.write(crash)
     crash_path = crash_dir / crash.filename()
 
-    # An unrunnable check is reported as errored, not silently treated as fixed.
+    # An unrunnable check is reported as errored, not as fixed.
     assert cli.main("replay") == snapshot_cli
     assert crash_path.exists(), "A check we cannot re-run must never be auto-deleted"
 
@@ -2091,7 +2089,7 @@ def _write_partially_fixed_crash(app_runner, ctx, crash_factory, tmp_path, **ste
 
 
 def test_replay_partial_fix_shows_per_check_breakdown(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
-    # With only some checks now passing, the case stays failed, the breakdown marks fixed ones, only those removed.
+    # When some checks pass, the case stays failed; the breakdown marks the fixed checks, and only those are removed.
     crash_dir = _write_partially_fixed_crash(app_runner, ctx, crash_factory, tmp_path)
 
     assert cli.main("replay") == snapshot_cli
@@ -2110,8 +2108,7 @@ def test_replay_partial_fix_without_masked_credentials_keeps_every_file(
 
 
 def test_sanitized_crash_is_never_removed(cli, app_runner, ctx, crash_factory, tmp_path):
-    # The stored request carries `[Filtered]` instead of the credential, so a `fixed` verdict from
-    # replaying it is meaningless - the file must survive.
+    # The stored request has `[Filtered]` in place of the credential, so a `fixed` replay proves nothing; keep the file.
     schema_url, base = _users_app(ctx, app_runner)
     crash_file = _write_crash(
         tmp_path,

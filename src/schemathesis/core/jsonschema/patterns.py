@@ -12,8 +12,7 @@ from typing import Any, Literal, TypeAlias, TypeGuard
 from schemathesis.core.errors import InternalError
 from schemathesis.core.jsonschema import pattern_matcher
 
-# Unicode property escape translations (PCRE/Java/JS -> Python approximations)
-# These cover Latin-based scripts which handle the majority of real-world APIs
+# Python approximations of PCRE/Java/JS Unicode property escapes, covering Latin-based scripts
 _LETTER_CLASS = r"a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F"
 _LETTER_UPPER_CLASS = r"A-Z\u00C0-\u00D6\u00D8-\u00DE\u0100-\u0136\u0139-\u0147\u014A-\u0178\u0179-\u017D"
 _LETTER_LOWER_CLASS = r"a-z\u00DF-\u00F6\u00F8-\u00FF\u0101-\u0137\u013A-\u0148\u014B-\u0177\u017A-\u017E"
@@ -153,8 +152,7 @@ _UNICODE_SHORTHAND_RAW_MAP: dict[str, str] = {
     "Z": _SPACE_CLASS,
 }
 
-# POSIX character classes (only valid inside `[...]` in PCRE; Python's `re` misparses them
-# and emits FutureWarning about possible nested sets).
+# POSIX classes, valid only inside `[...]` in PCRE; Python's `re` misparses them with a FutureWarning.
 _POSIX_CLASS_RAW_MAP: dict[str, str] = {
     "alpha": _LETTER_CLASS,
     "alnum": _ALNUM_CLASS,
@@ -322,7 +320,7 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
                     return None
                 raw = _POSIX_CLASS_RAW_MAP.get(inner)
                 if raw is None:
-                    # Unknown POSIX name (or not a POSIX class at all) - bail out.
+                    # Unknown POSIX name, or not a POSIX class at all
                     return None
                 out.append(raw)
                 i = end + 2
@@ -360,8 +358,7 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
 
 def _strip_group_names(pattern: str) -> str:
     """Named groups as plain ones, leaving lookbehind and literal text alone."""
-    # Neither spelling of a name is read by every engine the pattern reaches, and a name carries no
-    # constraint, so dropping it keeps the pattern where one spelling or the other would be refused.
+    # Some engine refuses each spelling of a group name, and names constrain nothing, so dropping them is safe.
     out: list[str] = []
     in_class = False
     i = 0
@@ -397,17 +394,9 @@ def _strip_group_names(pattern: str) -> str:
 
 @lru_cache(maxsize=256)
 def normalize_regex(pattern: object) -> str | None:
-    r"""Translate PCRE-style Unicode property escapes and Python-specific anchors.
+    r"""Translate `\p{L}` / `\pL`, `\x{..}`, POSIX classes, ECMA class literals, `\A` / `\Z` and named groups.
 
-    Handles:
-    - PCRE Unicode property escapes (\p{L}, \pL, etc.) -> Python equivalents
-    - POSIX character classes ([:alnum:], [:digit:], etc.) -> Python equivalents
-    - ECMA character-class literals -> escaped Python equivalents
-    - Python anchors (\A, \Z) -> Rust-compatible equivalents (^, $)
-    - Named groups ((?<name>...), (?P<name>...)) -> plain groups
-
-    Returns the translated pattern if successful, None if translation failed
-    or the result is not a valid Python regex.
+    `None` when nothing needs translating, translation fails, or the result is not a valid Python regex.
     """
     if not isinstance(pattern, str):
         return None
@@ -417,7 +406,6 @@ def normalize_regex(pattern: object) -> str | None:
     if translated is None:
         return None
     has_class_literals = translated != stripped
-    # Check for both braced (\p{L}) and shorthand (\pL) forms
     has_braced = r"\p{" in pattern or r"\P{" in pattern
     has_shorthand = any(
         esc in pattern
@@ -425,26 +413,24 @@ def normalize_regex(pattern: object) -> str | None:
     )
     # PCRE brace hex escapes are not read by Python `re`.
     has_brace_hex = r"\x{" in pattern
-    # Check for Python-specific anchors that need Rust translation
     has_python_anchors = pattern.startswith(r"\A") or pattern.endswith(r"\Z")
 
     if not any((has_braced, has_shorthand, has_class_literals, has_python_anchors, has_brace_hex, has_named_group)):
-        return None  # No translation needed
+        return None
 
     for pcre_escape, python_equiv in _UNICODE_PROPERTY_MAP:
         translated = translated.replace(pcre_escape, python_equiv)
 
-    # Check if there are still untranslated Unicode property escapes
+    # Escapes left untranslated are unsupported
     if r"\p{" in translated or r"\P{" in translated:
-        return None  # Contains unsupported escapes
+        return None
 
-    # Translate Python-specific anchors to Rust equivalents for jsonschema-rs
+    # Rust equivalents of Python-specific anchors
     if translated.startswith(r"\A"):
         translated = "^" + translated[2:]
     if translated.endswith(r"\Z"):
         translated = translated[:-2] + "$"
 
-    # Verify the translated pattern is valid
     if is_valid_python_regex(translated):
         return translated
     return None
@@ -468,12 +454,9 @@ def enforced_pattern(pattern: object) -> str | None:
 
 
 def is_valid_python_regex(pattern: object) -> TypeGuard[str]:
-    """Check if a pattern is valid Python regex."""
     if not isinstance(pattern, str):
         return False
-    # POSIX character classes nested inside `[...]` are misparsed by Python's `re` (it treats
-    # `[:alnum:]` as the literal characters `:`, `a`, `l`, `n`, `u`, `m` and emits a FutureWarning).
-    # Treat such patterns as invalid so callers route them through `normalize_regex`.
+    # Python's `re` reads a nested `[:alnum:]` as literal characters; report it invalid so callers translate it first.
     if _POSIX_CLASS_RE.search(pattern):
         return False
     try:
@@ -506,9 +489,7 @@ NOT_LITERAL = sre.NOT_LITERAL
 IN = sre.IN
 MAXREPEAT = sre_parse.MAXREPEAT
 
-# sre_parse AST node: (opcode, value)
-# Value varies by opcode (int for LITERAL/AT, list for IN, tuple for REPEAT/SUBPATTERN/BRANCH, None for ANY)
-# so `Any` is unavoidable here — this is a tagged union that Python's type system cannot express structurally
+# sre_parse AST node `(opcode, value)`; `value` depends on the opcode, a tagged union Python types cannot express.
 _Node: TypeAlias = tuple[int, Any]
 
 # Specific value shapes for opcodes that carry structured data
@@ -555,10 +536,7 @@ def _parse_regex(pattern: str) -> list[_Node] | None:
 
 
 def _nodes_guarantee(nodes: list[_Node], forces: Callable[[int, Any], bool]) -> bool:
-    """Return True if every match of `nodes` contains a char that `forces` flags.
-
-    Structural nodes (SUBPATTERN/REPEATS/BRANCH) are walked here, so `forces` only sees leaves.
-    """
+    """True if every match of `nodes` contains a char that `forces` flags; `forces` sees only leaf nodes."""
     for op, value in nodes:
         if op == sre.SUBPATTERN:
             _, _, _, inner = value
@@ -579,7 +557,7 @@ def _nodes_guarantee(nodes: list[_Node], forces: Callable[[int, Any], bool]) -> 
 
 @lru_cache
 def pattern_length_bounds(pattern: str) -> tuple[int, int | None]:
-    """Return min and max string length the pattern matches; `max` is `None` when unbounded."""
+    """Min and max length of strings the pattern matches; max is `None` when unbounded."""
     parsed = _parse_regex(pattern)
     if parsed is None:
         return (0, None)
@@ -610,11 +588,7 @@ def _is_position_dependent(nodes: list[_Node]) -> bool:
 
 @lru_cache
 def matches_every_string(pattern: str) -> bool:
-    """Return True if every string contains a match, so no value can violate `pattern`.
-
-    JSON Schema `pattern` is a substring search, so a pattern that accepts the empty string
-    matches at position 0 of anything. Conservative: unknown constructs answer False.
-    """
+    """True if every string contains a match, so no value can violate `pattern`; unknown constructs answer False."""
     parsed = _parse_regex(pattern)
     if parsed is None or _is_position_dependent(parsed):
         return False
@@ -623,7 +597,7 @@ def matches_every_string(pattern: str) -> bool:
 
 @lru_cache
 def pattern_requires_literal(pattern: str, chars: str) -> bool:
-    """Return True if every string matching `pattern` must contain at least one char from `chars`."""
+    """True if every match of `pattern` contains a char from `chars`."""
     parsed = _parse_regex(pattern)
     if parsed is None:
         return False
@@ -633,7 +607,7 @@ def pattern_requires_literal(pattern: str, chars: str) -> bool:
 
 @lru_cache
 def pattern_requires_char_outside(pattern: str, allowed: str) -> bool:
-    """Return True if every string matching `pattern` must contain at least one char outside `allowed`."""
+    """True if every match of `pattern` contains a char outside `allowed`."""
     parsed = _parse_regex(pattern)
     if parsed is None:
         return False
@@ -650,7 +624,7 @@ def pattern_requires_char_outside(pattern: str, allowed: str) -> bool:
 
 
 def _char_class_excludes_all(items: list[_Node], allowed_codes: frozenset[int]) -> bool:
-    """Return True if every char matched by the class `[...]` lies outside `allowed_codes`."""
+    """True if the class `[...]` matches no char in `allowed_codes`."""
     if not items:
         return False
     # Negated classes (`[^...]`) match almost anything, including allowed chars.
@@ -665,14 +639,14 @@ def _char_class_excludes_all(items: list[_Node], allowed_codes: frozenset[int]) 
             if any(lo <= code <= hi for code in allowed_codes):
                 return False
         else:
-            # Categories like `\d` / `\w` overlap with the allowed set — assume they can match it.
+            # Categories like `\d` / `\w` may overlap the allowed set
             return False
     return True
 
 
 @lru_cache
 def update_quantifier(pattern: str, min_length: int | None, max_length: int | None) -> str:
-    """Update the quantifier of a regular expression based on given min and max lengths."""
+    """`pattern` with its quantifiers narrowed to `min_length` / `max_length`, or unchanged when that fails."""
     # Regex repeats cannot express bounds this large, so they mean no limit.
     if max_length is not None and max_length >= MAXREPEAT:
         max_length = None
@@ -692,7 +666,7 @@ def update_quantifier(pattern: str, min_length: int | None, max_length: int | No
             return pattern
         return updated
     except (re.error, InternalError):
-        # Invalid pattern or unsupported opcode — return unchanged
+        # Invalid pattern or unsupported opcode
         return pattern
 
 
@@ -700,13 +674,11 @@ _REGEX_META = set(r"\.^$*+?{[|()")
 
 
 def _serialize(nodes: list[_Node], *, global_flags: int = 0) -> str:
-    """Serialize sre_parse AST back to regex string."""
     parts = []
     multi = len(nodes) > 1
     for op, value in nodes:
         s = _serialize_node((op, value))
-        # BRANCH must be wrapped when concatenated with other nodes,
-        # otherwise | extends to the end of the enclosing group
+        # An unwrapped `|` next to other nodes would extend to the end of the enclosing group
         if op == sre.BRANCH and multi:
             s = f"(?:{s})"
         parts.append(s)
@@ -718,7 +690,6 @@ def _serialize(nodes: list[_Node], *, global_flags: int = 0) -> str:
 
 
 def _serialize_node(node: _Node) -> str:
-    """Serialize a single AST node."""
     op, value = node
     match op, value:
         case sre.LITERAL, int():
@@ -860,14 +831,13 @@ def _serialize_repeat(op: int, value: _RepeatValue) -> str:
 
 def _serialize_repeat_inner(subpattern: list[_Node]) -> str:
     """Serialize the inner part of a repeat, wrapping in parens only when needed."""
-    # sre_parse returns SubPattern objects (not plain lists) which don't
-    # match sequence patterns in match/case — convert to list first.
+    # `match` sequence patterns reject sre_parse's SubPattern objects
     items = list(subpattern)
     match items:
         case [(sre.SUBPATTERN, value)]:
             return _serialize_subpattern(value)
         case [(op, _)] if op in (LITERAL, NOT_LITERAL, IN, sre.ANY, sre.CATEGORY):
-            # Single atomic node — already a valid quantifier target, no group needed
+            # A single atom takes a quantifier without a group
             return _serialize_node(items[0])
         case _:
             return "(?:" + _serialize(items) + ")"
@@ -880,12 +850,10 @@ def _serialize_subpattern(value: _SubpatternValue) -> str:
     if group_id is None or group_id == 0:
         return f"(?{flags}:{inner})" if flags else f"(?:{inner})"
     if flags:
-        # Capturing group with flags — wrap: (?flags:(inner))
         return f"(?{flags}:({inner}))"
     return f"({inner})"
 
 
-# Flag bit -> letter mapping for inline flag serialization
 _FLAG_LETTERS: tuple[tuple[int, str], ...] = (
     (sre.SRE_FLAG_IGNORECASE, "i"),
     (sre.SRE_FLAG_LOCALE, "L"),
@@ -931,7 +899,6 @@ def _matches_empty_at_either_end(nodes: list[_Node]) -> bool:
 
 
 def _transform(parsed: list[_Node], min_length: int | None, max_length: int | None) -> list[_Node] | None:
-    """Top-level transformer. Dispatches by pattern structure."""
     nodes = list(parsed)
     lookarounds = 0
     if nodes and nodes[0] == _AT_BEGINNING:
@@ -948,9 +915,7 @@ def _transform(parsed: list[_Node], min_length: int | None, max_length: int | No
     # shapes that are otherwise left alone, so they keep the narrow rewrite.
     complete = not _matches_empty_at_either_end(nodes)
     match _classify_structure(nodes):
-        # For cases without full anchoring: JSON Schema `pattern` is a substring match,
-        # so `{1,50}` alone doesn't reject strings longer than 50 chars. Add the missing
-        # anchor(s) whenever max_length is being encoded into the quantifier.
+        # `pattern` is a substring match, so a quantifier enforces `max_length` only with both anchors.
         case ("single", content):
             result = _transform_node(content, min_length, max_length, complete=complete)
             if result is None:
@@ -999,7 +964,7 @@ def _transform(parsed: list[_Node], min_length: int | None, max_length: int | No
             return None
 
 
-# Return type for _classify_structure — Literal tags let mypy narrow captures in match/case
+# Literal tags let mypy narrow `match` captures
 _Structure: TypeAlias = (
     tuple[Literal["single"], _Node]
     | tuple[Literal["leading_anchor"], _Node, _Node]
@@ -1013,7 +978,6 @@ _Structure: TypeAlias = (
 
 
 def _classify_structure(nodes: list[_Node]) -> _Structure:
-    """Classify pattern structure for dispatch."""
     _CONTENT_OPS = (LITERAL, NOT_LITERAL, IN, sre.ANY, sre.SUBPATTERN, *REPEATS)
     match nodes:
         case [content]:
@@ -1062,7 +1026,7 @@ def _transform_node(
 def _transform_repeat(
     op: int, value: _RepeatValue, min_l: int | None, max_l: int | None, *, complete: bool = True
 ) -> _Node | None:
-    """Core transform: merge length constraints into repeat bounds."""
+    """Merge length constraints into repeat bounds."""
     min_repeat, max_repeat, subpattern = value
     inner_length = _calculate_min_repetition_length(subpattern)
 
@@ -1074,7 +1038,6 @@ def _transform_repeat(
     if max_l is not None and 0 < max_l < inner_length:
         return None
 
-    # Convert length constraints to repetition counts
     ext_min = None
     ext_max = None
     # The fewest repetitions reaching `min_l` are the longest ones.
@@ -1084,9 +1047,8 @@ def _transform_repeat(
     elif min_l is not None:
         ext_min = -(-min_l // inner_max_length)
     if max_l is not None:
-        ext_max = max_l // inner_length  # floor division
+        ext_max = max_l // inner_length
 
-    # Merge with existing bounds
     final_min = min_repeat
     if ext_min is not None:
         final_min = max(min_repeat, ext_min)
@@ -1122,7 +1084,6 @@ def _transform_anchored_single(
     r"""^content$ with canonicalization of [\w\W] -> . before transform."""
     op, value = content
 
-    # Canonicalize match-anything patterns
     if op == sre.IN and _matches_anything(value):
         content = (sre.ANY, None)
     elif op in REPEATS and len(value[2]) == 1 and value[2][0][0] == sre.IN and _matches_anything(value[2][0][1]):
@@ -1141,7 +1102,7 @@ def _transform_anchored_multi(
     min_l: int | None,
     max_l: int | None,
 ) -> list[_Node] | None:
-    """^part1 part2 ... partN$ — multiple quantified/fixed parts."""
+    """`^part1 ... partN$` with several quantified or fixed parts."""
     new_parts = _distribute_multi(parts, min_l, max_l)
     if new_parts is None:
         return None
@@ -1153,8 +1114,7 @@ def _distribute_multi(
 ) -> list[_Node] | None:
     """Distribute a length budget across the quantified parts; the caller adds any anchors."""
     if any(op in POSSESSIVE_REPEATS for op, _ in parts):
-        # A possessive part keeps everything it took, so what follows it never gets those characters
-        # back - a rewritten count would admit strings the pattern itself rejects.
+        # A possessive part gives no characters back, so a rewritten count would admit strings the pattern rejects.
         return None
     fixed_length = 0
     quantifier_bounds = []
@@ -1202,21 +1162,11 @@ def _distribute_multi(
     if not quantifier_bounds:
         return None
 
-    # Pin slots whose bounds the distributor must not change:
-    #   - Slots whose inner per-tick max is truly unbounded (e.g. `[|]+` inside,
-    #     branches with unbounded alternatives): outer count cannot enforce length.
-    #     Pinning them keeps the rewrite a superset of the original; siblings can
-    #     still tighten for minLength.
-    #   - Variable-inner slots in exact-length cases: the exact-length DP can't
-    #     distribute a per-tick range, so we keep them and accept that the
-    #     resulting pattern won't enforce exact length.
-    #   - Optional finite slots with fixed-length inner (range cases only):
-    #     collapse-to-zero would produce a strict subset (e.g. `\*?` in
-    #     `^geo:\w*\*?$` becoming `\*{0}` rejects "geo:abc*"). For exact-length
-    #     the DP picks one concrete shape and collapses are acceptable.
-    # Variable-inner slots with finite per-tick max (e.g. `(aa|bbb)`) are NOT
-    # pinned — the distributor uses `repetition_max_lengths` to compute outer
-    # bounds that actually enforce maxLength.
+    # Pinned slots keep their bounds:
+    #   - unbounded inner length (e.g. `[|]+` inside): no outer count enforces length, so keep a superset;
+    #   - variable inner length with an exact length: the DP cannot split a per-repetition range;
+    #   - optional fixed-inner slots in range cases: `^geo:\w*\*?$` loses "geo:abc*" when `\*?` collapses to `\*{0}`.
+    # A variable inner length with a finite max (e.g. `(aa|bbb)`) stays unpinned; its max bounds the outer count.
     exact_length = adj_min == adj_max
     pinned: set[int] = set()
     # Slots dropped to zero repetitions; left open-ended, generation hunts forever for the only matches that fit.
@@ -1235,9 +1185,7 @@ def _distribute_multi(
             has_unbounded_pinned = True
         elif inner_variable and exact_length:
             pinned.add(dist_idx)
-            # Bounded inner length, but exact-length DP can't use the range.
-            # Treat contribution as bounded for budget; the resulting rewrite
-            # is a superset that no longer enforces exact length.
+            # The DP cannot use the inner range; the rewrite is a superset that no longer enforces exact length.
             has_unbounded_pinned = True
         elif not exact_length and orig_min == 0 and 0 < orig_max < MAXREPEAT and not inner_variable:
             pinned.add(dist_idx)
@@ -1252,8 +1200,7 @@ def _distribute_multi(
             sum_pinned_max += max_r * rep_len
 
         np_adj_min = None if adj_min is None else max(0, adj_min - sum_pinned_min)
-        # A pinned slot can carry more than its minimum, so the total cannot be pinned to maxLength -
-        # but leaving the rest open-ended aims generation orders of magnitude past it, for nothing.
+        # Pinned slots may exceed their minimum, so the total can't hit maxLength exactly; an open end overshoots far.
         if has_unbounded_pinned:
             np_adj_max = None if adj_max is None else max(0, adj_max - sum_pinned_min)
         else:
@@ -1263,7 +1210,7 @@ def _distribute_multi(
 
         np_indices = [i for i in range(len(quantifier_bounds)) if i not in pinned and i not in collapsed]
         if not np_indices:
-            # All slots pinned — the rewrite would just re-emit the original bounds.
+            # All slots pinned: the rewrite would re-emit the original bounds.
             return None
         np_bounds = [quantifier_bounds[i] for i in np_indices]
         np_rep_lens = [repetition_lengths[i] for i in np_indices]
@@ -1311,13 +1258,10 @@ def _distribute_multi(
         orig_min, orig_max = quantifier_bounds[dist_idx]
         if (new_min, new_max) == (orig_min, orig_max):
             continue
-        # For exact-length cases the rewrite picks one concrete shape. Collapsing
-        # an optional sibling to `{0}` is fine — the chosen shape still satisfies
-        # the original pattern and the requested length.
+        # An exact length picks one concrete shape, so an optional sibling may collapse to `{0}`.
         if not exact_length and orig_max != 0 and new_max == 0:
             return None
 
-    # Apply distribution directly to AST nodes
     new_parts = list(parts)
     for dist_idx, part_idx in enumerate(quantified_indices):
         op, value = parts[part_idx]
@@ -1385,7 +1329,7 @@ def _cover_needed_counts(
 
 
 def _matches_anything(value: list[_Node]) -> bool:
-    """Check if the given pattern is equivalent to '.' (match any character)."""
+    """True for a class pairing a category with its complement, which matches any character."""
     return value in (
         [(sre.CATEGORY, sre.CATEGORY_WORD), (sre.CATEGORY, sre.CATEGORY_NOT_WORD)],
         [(sre.CATEGORY, sre.CATEGORY_SPACE), (sre.CATEGORY, sre.CATEGORY_NOT_SPACE)],
@@ -1404,7 +1348,6 @@ def _distribute_length_constraints(
     *,
     max_repetition_lengths: list[int],
 ) -> list[tuple[int, int]] | None:
-    """Distribute length constraints among quantified pattern parts."""
     if min_length is not None and min_length == max_length:
         return _distribute_exact_length(bounds, repetition_lengths, min_length)
     return _distribute_length_range(
@@ -1432,10 +1375,7 @@ def _distribute_exact_length(
         if max_repeat == MAXREPEAT:
             max_repeat = remaining // repeat_length + 1 if repeat_length > 0 else remaining + 1
 
-        # For optional slots that contribute chars, try non-zero counts first so
-        # the chosen distribution avoids unnecessary `{0}` collapses (e.g. picks
-        # `[a-z]{1}-[0-9]{1}` for `^[a-z]*-[0-9]*$` length 3 instead of leaving
-        # one slot at zero). Falls back to zero if no non-zero combination fits.
+        # Optional slots try non-zero counts first: length 3 of `^[a-z]*-[0-9]*$` gives `[a-z]{1}-[0-9]{1}`.
         if min_repeat == 0 and max_repeat > 0 and repeat_length > 0:
             counts: range | tuple[int, ...] = (*range(1, max_repeat + 1), 0)
         else:
@@ -1468,22 +1408,12 @@ def _distribute_length_range(
     *,
     max_repetition_lengths: list[int],
 ) -> list[tuple[int, int]] | None:
-    """Distribute min/max length budget across quantifiers.
+    """Split a min/max length budget across quantifiers: greedy first, balanced when greedy starves a sibling.
 
-    When `max_repetition_lengths` differs from `repetition_lengths` (variable inner
-    with finite per-tick max), the upper-budget calculation uses the per-tick max
-    so the resulting outer count actually bounds the slot's contribution.
-
-    A first pass is greedy: each slot consumes as much of the budget as it can.
-    If that collapses an optional sibling to `{0}` (the leading slot ate everything),
-    a balanced second pass splits the max budget across slots so each gets headroom.
+    The upper budget uses `max_repetition_lengths`, so each outer count bounds its slot's contribution.
     """
     greedy = _greedy_distribute_range(bounds, repetition_lengths, max_repetition_lengths, min_length, max_length)
-    # Greedy may either succeed with a starved sibling (`{0}`) or fail outright
-    # because it gave the leading slot too much. Both are signals that the budget
-    # is contested across siblings — fall back to a balanced split. Balanced needs
-    # a finite upper budget to redistribute; without one (pinned unbounded inner
-    # dropped `max_length`) there is nothing it can do and greedy's result stands.
+    # A starved sibling (`{0}`) or a greedy failure means a contested budget; balancing needs a finite `max_length`.
     needs_balance = max_length is not None and (
         greedy is None or any(new_max == 0 and bounds[idx][1] > 0 for idx, (_, new_max) in enumerate(greedy))
     )
@@ -1559,18 +1489,12 @@ def _balanced_distribute_range(
     min_length: int | None,
     max_length: int | None,
 ) -> list[tuple[int, int]] | None:
-    """Distribute min/max budgets across slots so every sibling keeps headroom.
+    """Give each slot the budget minus its siblings' minimums; an even split would reject skewed valid strings.
 
-    Each slot's max gets the full budget minus what the other slots are *required*
-    to consume; an even `max_length // n` cap would reject valid skewed distributions
-    the original pattern allowed (e.g. `"A" + "0"*100` for `^[a-zA-Z*]+[a-zA-Z0-9-]*$`
-    with `maxLength=128`). The pattern's combined max may exceed `max_length`, so
-    callers must keep the schema-level `maxLength` to enforce the total.
+    The combined max may exceed `max_length`, so callers keep the schema's `maxLength` to enforce the total.
     """
     n = len(bounds)
-    # Balanced is only invoked when greedy starved a sibling — that requires both
-    # a finite max budget and at least one slot. The caller (`_transform_anchored_multi`)
-    # already guarantees `bounds` is non-empty.
+    # Callers reach this only with a finite budget and at least one slot.
     assert n > 0 and max_length is not None and max_length < MAXREPEAT
     other_min_chars = []
     for idx in range(n):
@@ -1581,9 +1505,7 @@ def _balanced_distribute_range(
         other_min_chars.append(total)
     slot_max_chars = [max(0, max_length - other) for other in other_min_chars]
 
-    # Min budget is distributed only across required slots (orig_min > 0). Optional
-    # slots keep `part_min = 0` so they stay optional in the rewrite — forcing them
-    # to a non-zero count would reject strings the original schema accepts.
+    # Only required slots share the min budget; forcing an optional slot would reject strings the schema accepts.
     required_slots_left = sum(1 for (mn, _), rl in zip(bounds, repetition_lengths, strict=True) if mn > 0 and rl > 0)
 
     result = []
@@ -1596,13 +1518,10 @@ def _balanced_distribute_range(
             result.append((0, 0))
             continue
 
-        # Slots with unbounded `rep_len_max` are pinned upstream, and `slot_max_chars`
-        # are all finite by construction (the caller only invokes balanced when
-        # `max_length` is finite).
+        # Finite: unbounded slots are pinned upstream and `max_length` is finite here.
         part_max = min(max_repeat, max_chars // rep_len_max)
 
         if min_repeat == 0:
-            # Optional slot — keep it optional; min budget is the required slots' job.
             part_min = 0
         elif remaining_min > 0 and rep_len_min > 0 and required_slots_left > 0:
             share_chars = -(-remaining_min // required_slots_left)
@@ -1627,7 +1546,6 @@ def _balanced_distribute_range(
 
 
 def _calculate_min_repetition_length(subpattern: list[_Node]) -> int:
-    """Calculate minimum length contribution per repetition of a quantified group."""
     total = 0
     for op, value in subpattern:
         if op in [LITERAL, NOT_LITERAL, IN, sre.ANY]:
@@ -1647,7 +1565,7 @@ def _calculate_min_repetition_length(subpattern: list[_Node]) -> int:
 
 
 def _calculate_max_repetition_length(subpattern: list[_Node]) -> int:
-    """Calculate maximum length contribution per repetition. Returns MAXREPEAT if unbounded."""
+    """Maximum length one repetition adds, or `MAXREPEAT` when unbounded."""
     total = 0
     for op, value in subpattern:
         if op in [LITERAL, NOT_LITERAL, IN, sre.ANY]:
@@ -1679,7 +1597,7 @@ def _calculate_max_repetition_length(subpattern: list[_Node]) -> int:
 
 
 def _has_variable_length(nodes: list[_Node]) -> bool:
-    """Return True if the nodes can produce strings of variable length (contain *, +, ?, {n,m}, or branches)."""
+    """True if `nodes` contain a non-fixed repeat or a branch."""
     for op, value in nodes:
         if op in REPEATS:
             min_r, max_r, inner = value
@@ -1697,7 +1615,6 @@ def _has_variable_length(nodes: list[_Node]) -> bool:
 
 
 def _build_quantifier(minimum: int | None, maximum: int | None) -> str:
-    """Construct a quantifier string based on min and max values."""
     if maximum == MAXREPEAT or maximum is None:
         return f"{{{minimum or 0},}}"
     if minimum == maximum:
@@ -1731,8 +1648,7 @@ def _concat_lengths(left: int, right: int, limit: int) -> int:
     if left == 0 or right == 0:
         return 0
     full = (1 << (limit + 1)) - 1
-    # An unbroken run of reachable lengths at the top shifts as one block, so only the gapped
-    # part below it costs a step - which is what keeps this affordable on `.*`-style patterns.
+    # The unbroken run of lengths at the top shifts as one block, so only the gapped part below costs steps.
     dense_from = (full & ~left).bit_length()
     lowest_right = (right & -right).bit_length() - 1
     result = (full << (dense_from + lowest_right)) & full
@@ -1746,8 +1662,7 @@ def _concat_lengths(left: int, right: int, limit: int) -> int:
 def _power_lengths(base: int, exponent: int, limit: int) -> int:
     """Lengths reachable by putting `exponent` matches of `base` in a row.
 
-    Callers cap the exponent so the shortest run still fits under `limit`, which is what keeps
-    every intermediate product non-empty.
+    Callers cap `exponent` so the shortest run fits under `limit`, keeping every intermediate product non-empty.
     """
     result = 1
     while exponent:
@@ -1781,8 +1696,7 @@ def _node_lengths(node: _Node, limit: int) -> int | None:
     op, value = node
     if op in (LITERAL, NOT_LITERAL, IN, sre.ANY):
         return 0b10
-    # Anchors and lookaround match no characters of their own; ignoring what they demand of the
-    # surrounding text only ever admits more lengths, never fewer.
+    # Anchors and lookarounds match no characters; ignoring their demands only admits more lengths.
     if op in (sre.AT, sre.ASSERT, sre.ASSERT_NOT):
         return 0b1
     if op == sre.SUBPATTERN:
@@ -1828,10 +1742,9 @@ def _pattern_lengths(pattern: str, limit: int) -> int | None:
 
 @lru_cache(maxsize=256)
 def pattern_length_is_unreachable(pattern: str, min_length: int | None, max_length: int | None) -> bool:
-    """Whether no string of a length inside the window matches the pattern end to end.
+    """Whether no string with a length in the window matches the pattern end to end; unknown constructs give False.
 
-    A min/max pair cannot see that a length falls in a hole between two reachable sizes, which is
-    where generation spends its whole budget before giving up. Unknown constructs answer False.
+    Catches windows inside a gap between reachable lengths, where generation would spend its whole budget.
     """
     limit = _length_analysis_limit(min_length, max_length)
     if limit is None:
@@ -1897,8 +1810,7 @@ def _restrict_node(node: _Node, length: int, limit: int) -> list[_Node] | None:
             if restricted is not None:
                 return [(sre.BRANCH, (None, [restricted]))]
         return None
-    # A possessive part keeps every character it took, so what follows it never gets those back -
-    # a rewritten count would admit strings the pattern itself rejects.
+    # A possessive part gives no characters back, so a rewritten count would admit strings the pattern rejects.
     if op in REPEATS and op not in POSSESSIVE_REPEATS:
         return _restrict_repeat(value, length, limit)
     return None
@@ -1913,14 +1825,12 @@ def _restrict_repeat(value: _RepeatValue, length: int, limit: int) -> list[_Node
         return [] if inner == 0 and min_repeat == 0 else None
     lowest = (inner & -inner).bit_length() - 1
     highest = inner.bit_length() - 1
-    # Repetitions that match no characters add nothing to the text, so dropping them is exact unless
-    # they carry anchors or lookarounds that still have to hold.
+    # Empty repetitions add no text, so dropping them is exact unless they carry anchors or lookarounds.
     if lowest == 0 and min_repeat > 0 and _is_position_dependent(body):
         return None
     if length == 0:
         return [] if min_repeat == 0 or lowest == 0 else None
-    # Only a body whose reachable lengths run without gaps lets a budget be split evenly across
-    # repetitions; anything else needs a search this walk deliberately does not do.
+    # Only gapless body lengths split evenly across repetitions; other shapes would need a search.
     if highest == 0 or inner != ((1 << (highest - lowest + 1)) - 1) << lowest:
         return None
     # `length` came off this repeat's own reachable set, so a count that fits always exists.
@@ -1962,10 +1872,9 @@ def _witness(nodes: list[_Node]) -> str:
 
 @lru_cache(maxsize=256)
 def pin_pattern_length(pattern: str, min_length: int | None, max_length: int | None) -> str:
-    """Rewrite the pattern so every match has one length inside the window.
+    """Rewrite the pattern so every match has one length inside the window; resisting shapes come back unchanged.
 
-    Rejection sampling never lands on a window far from the sizes a pattern emits on its own, so the
-    length has to be spelled into the pattern. Shapes that resist the rewrite come back unchanged.
+    Rejection sampling never reaches a window far from the lengths the pattern produces on its own.
     """
     limit = _length_analysis_limit(min_length, max_length)
     if limit is None:

@@ -1,4 +1,4 @@
-"""Shell detection and escaping for generating reproducible curl commands."""
+"""Shell detection and escaping for reproducible curl commands."""
 
 from __future__ import annotations
 
@@ -9,8 +9,6 @@ from shlex import quote
 
 
 class ShellType(StrEnum):
-    """Supported shell types."""
-
     BASH = "bash"
     ZSH = "zsh"
     FISH = "fish"
@@ -29,8 +27,6 @@ class ShellType(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class EscapeResult:
-    """Result of escaping a value for shell."""
-
     escaped_value: str
     """The escaped string ready for shell."""
 
@@ -45,7 +41,7 @@ class EscapeResult:
 
 
 def detect_shell() -> ShellType:
-    """Detect the current shell type from $SHELL environment variable."""
+    """The shell named by `$SHELL`."""
     shell_path = os.environ.get("SHELL", "")
     if shell_path:
         return _parse_shell_name(os.path.basename(shell_path).lower())
@@ -53,7 +49,6 @@ def detect_shell() -> ShellType:
 
 
 def _parse_shell_name(name: str) -> ShellType:
-    """Parse shell name string to ShellType."""
     name_lower = name.lower()
     for shell_type in (ShellType.BASH, ShellType.ZSH, ShellType.FISH):
         if shell_type.value in name_lower:
@@ -61,8 +56,7 @@ def _parse_shell_name(name: str) -> ShellType:
     return ShellType.UNKNOWN
 
 
-# Above this, the curl is unrunnable anyway; bounding the per-char scans
-# keeps reproduce-build O(1) on multi-MB inputs.
+# Longer values make the curl command unrunnable anyway; the cap bounds per-character scans of multi-MB inputs.
 MAX_SHELL_SCAN_BYTES = 64 * 1024
 
 
@@ -84,12 +78,11 @@ def _truncate_utf8(value: str) -> str:
 
 
 def has_non_printable(value: str | bytes) -> bool:
-    """Check if value contains control, line separator or other non-printable characters."""
+    """True for undecodable bytes, values over the scan cap, or any non-printable character."""
     if isinstance(value, bytes):
         try:
             value = value.decode("utf-8")
         except UnicodeDecodeError:
-            # Binary data that can't be decoded - treat as non-printable
             return True
 
     # Above the cap, skip the scan and force the escape path; truncation marker comes from `escape_for_shell`.
@@ -105,19 +98,16 @@ def _truncated_marker(total_bytes: int) -> str:
 
 
 def escape_for_shell(value: str, shell: ShellType | None = None) -> EscapeResult:
-    """Escape value for shell use in curl commands."""
     if shell is None:
         shell = detect_shell()
 
-    # Truncate before the per-char escape: `_escape_with_ansi_c` builds a
-    # ~10x list-of-chars; an MB input would explode without this guard.
+    # Truncate first: the per-character escape would blow up a multi-MB value.
     truncated = False
     full_size = _utf8_length(value)
     if full_size > MAX_SHELL_SCAN_BYTES:
         value = _truncate_utf8(value)
         truncated = True
 
-    # Fast path: no non-printable characters
     if not has_non_printable(value):
         if truncated:
             # Keep the marker inside the quotes; unquoted it would be parsed as a shell redirect
@@ -138,7 +128,6 @@ def escape_for_shell(value: str, shell: ShellType | None = None) -> EscapeResult
     original_bytes = value.encode("utf-8", "surrogatepass")
     suffix = _truncated_marker(full_size) if truncated else ""
 
-    # Bash/Zsh: Use ANSI-C quoting $'...\xHH'
     if shell.supports_ansi_c_quoting:
         escaped = _escape_with_ansi_c(value)
         return EscapeResult(
@@ -148,7 +137,6 @@ def escape_for_shell(value: str, shell: ShellType | None = None) -> EscapeResult
             shell_used=shell,
         )
 
-    # Fish: Use \xHH in single quotes
     if shell.supports_hex_in_quotes:
         return EscapeResult(
             escaped_value=f"{_escape_with_hex(value)}{suffix}",
@@ -168,10 +156,8 @@ def escape_for_shell(value: str, shell: ShellType | None = None) -> EscapeResult
 
 
 def _escape_with_ansi_c(value: str) -> str:
-    """Escape string for ANSI-C quoting ($'...') used in bash/zsh."""
     result = []
     for char in value:
-        # Readable escapes for common control characters
         if char == "\t":
             result.append("\\t")
         elif char == "\n":

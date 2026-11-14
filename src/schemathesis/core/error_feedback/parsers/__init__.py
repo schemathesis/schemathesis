@@ -16,7 +16,7 @@ class ResponseParser(Protocol):
     priority: int
 
     def can_parse(self, *, body: object) -> bool:
-        """Cheap shape pre-check; the pipeline uses this to skip non-matching parsers."""
+        """Cheap shape check; the pipeline skips parsers that return `False`."""
         ...  # pragma: no cover
 
     def parse(
@@ -26,7 +26,7 @@ class ResponseParser(Protocol):
         body: object,
         case: Case,
     ) -> tuple[Observation, ...]:
-        """Extract observations from the body. Empty tuple means no signal."""
+        """Observations from the body; `()` means no signal."""
         ...  # pragma: no cover
 
 

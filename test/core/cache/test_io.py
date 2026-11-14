@@ -260,7 +260,7 @@ def test_retry_while_locked_completes_once_permission_returns(tmp_path):
 
 @requires_posix_permissions
 def test_retry_while_locked_raises_when_permission_never_returns(tmp_path):
-    # Reporting the refusal is the point: a swallowed one silently drops the data the caller asked to persist.
+    # A swallowed refusal would drop data the caller asked to persist.
     source = tmp_path / "source.tmp"
     source.write_text("payload")
     destination = tmp_path / MANIFEST_FILENAME

@@ -21,12 +21,7 @@ _MAX_NODES = 10_000
 
 
 def _wire_form(value: object) -> str:
-    """Render a value to the string the server saw on the wire.
-
-    Strings pass through unchanged. Bytes have no text wire form and can never
-    appear verbatim in a text error message, so they fold to an empty (never-matching)
-    string. Everything else renders via JSON, matching the body wire format.
-    """
+    """The value as the server saw it: strings as is, other values as JSON, bytes as `""` so they never match."""
     if isinstance(value, str):
         return value
     if isinstance(value, (bytes, bytearray)):
@@ -36,8 +31,6 @@ def _wire_form(value: object) -> str:
 
 @dataclass(slots=True)
 class _WalkState:
-    """Per-call walk budget; tracks remaining node capacity."""
-
     nodes_left: int
 
 
@@ -47,7 +40,7 @@ def _walk_body(
     rejected_value: str,
     state: _WalkState,
 ) -> Iterator[tuple[ParameterPath, object]]:
-    """Yield every (path, value) where the value's wire form equals `rejected_value`."""
+    """Yield `(path, value)` for every leaf whose wire form equals `rejected_value`."""
     stack: list[tuple[ParameterPath, object, int]] = [((), body, 0)]
     while stack and state.nodes_left > 0:
         path, current, depth = stack.pop()
@@ -71,7 +64,6 @@ def _walk_flat(
     rejected_value: str,
     state: _WalkState,
 ) -> Iterator[tuple[ParameterPath, object]]:
-    """Yield (path, value) for query / headers / cookies / path_parameters."""
     for key, value in container.items():
         if state.nodes_left == 0:
             return
@@ -85,10 +77,9 @@ def infer_path_from_request(
     case: Case,
     rejected_value: str,
 ) -> tuple[ParameterLocation, ParameterPath] | None:
-    """Find the parameter slot whose wire-form value equals `rejected_value`.
+    """The one parameter slot whose wire form equals `rejected_value`.
 
-    Returns the single matching slot or `None` when the value is too low-entropy
-    to attribute, no candidate matches, or candidates are ambiguous.
+    `None` when the value is too short or common to attribute, or matches no slot or several.
     """
     if rejected_value in _BLOCKLIST:
         return None
@@ -103,9 +94,7 @@ def infer_path_from_request(
         for path, _ in _walk_body(body, rejected_value=rejected_value, state=state):
             candidates.append((ParameterLocation.BODY, path))
 
-    # Body is walked recursively above. Non-body containers match by top-level
-    # value only, so nested parameter styles (deepObject, pipeDelimited, exploded
-    # form-object, etc.) attribute to the top-level parameter or not at all.
+    # Other locations match top-level values only: deepObject and similar styles map to the whole parameter or nothing.
     for container, location in (
         (case.query, ParameterLocation.QUERY),
         (case.path_parameters, ParameterLocation.PATH),

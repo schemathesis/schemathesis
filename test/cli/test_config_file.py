@@ -12,12 +12,10 @@ from flask import jsonify, request
     "config_content",
     [
         pytest.param(
-            # Syntactically incorrect TOML (missing '=' and comma issues)
             "color true\nsuppress-health-check = [data_too_large,]",
             id="syntactic_error",
         ),
         pytest.param(
-            # Valid TOML but contains an unknown top-level property ("unknown_key")
             textwrap.dedent(
                 """
                 unknown_key = true
@@ -27,7 +25,6 @@ from flask import jsonify, request
             id="unknown_property",
         ),
         pytest.param(
-            # Valid TOML but an operations entry is invalid because it does not include any required include/exclude property
             textwrap.dedent(
                 """
                 [[operations]]
@@ -37,7 +34,6 @@ from flask import jsonify, request
             id="operation_missing_includes",
         ),
         pytest.param(
-            # Duplicated filter
             textwrap.dedent(
                 """
                 [[operations]]
@@ -48,7 +44,6 @@ from flask import jsonify, request
             id="operation_duplicate_filter",
         ),
         pytest.param(
-            # Invalid expression
             textwrap.dedent(
                 """
                 [[operations]]
@@ -58,7 +53,6 @@ from flask import jsonify, request
             id="operation_invalid_expression",
         ),
         pytest.param(
-            # Invalid regex
             textwrap.dedent(
                 """
                 [[operations]]
@@ -68,7 +62,6 @@ from flask import jsonify, request
             id="operation_invalid_regex",
         ),
         pytest.param(
-            # NULL byte
             textwrap.dedent(
                 """
                 [reports]

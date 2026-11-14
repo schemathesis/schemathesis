@@ -1,14 +1,4 @@
-"""In-place substitution of captured pool values into argument literals.
-
-Match priority for a scalar argument: (1) bespoke `<Type>ID` scalar names
-the parent type directly; (2) for generic `ID!` arguments, the argument
-name's `<entity>Id`/`<entity>Ids`/`<entity>_id`/`<entity>_ids` token names
-the parent; (3) a bare `id`/`ids` argument falls back to the enclosing
-field's return type, to the resource a mutation result envelope names
-(`DeleteNote` -> `Note`), or, for a cleanup mutation that returns no record, to the
-entity its name carries (`deleteNote` -> `Note`). The same rules apply recursively to fields of
-input-object arguments and to elements of list-typed arguments.
-"""
+"""In-place substitution of captured pool values into argument literals."""
 
 from __future__ import annotations
 
@@ -45,12 +35,10 @@ if TYPE_CHECKING:
     from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.specs.graphql.extra_data_source import GraphQLResourcePool
 
-# Probability that captured values replace matching argument literals;
-# the remaining 0.3 leaves Hypothesis room to explore fresh values.
+# Chance that captured values replace matching argument literals; the rest leaves room for fresh values.
 SUBSTITUTION_PROBABILITY: Final = 0.7
 
-# Per-argument probability that a source-extracted constant replaces a scalar literal.
-# Matches the OpenAPI overlay so Hypothesis keeps room to explore fresh values.
+# Per-argument chance that a harvested constant replaces a scalar literal, as in the Open API overlay.
 CONSTANTS_SUBSTITUTION_PROBABILITY: Final = 0.15
 
 # GraphQL scalar name -> constant pool types eligible to fill it. Follows GraphQL literal
@@ -108,11 +96,10 @@ def substitute_bundle_values(
     schema_index: SchemaIndex | None = None,
     sent: set[Handle],
 ) -> graphql.OperationDefinitionNode:
-    """Replace handle-typed argument literals with values from the given handle to value mapping.
+    """Replace handle-typed argument literals with values from `bundle_values`.
 
-    `exploration_rate` is the per-argument probability of leaving the
-    strategy-generated value in place, forcing discovery of bugs reachable only
-    via unknown ids. `sent` collects the handles whose values the result carries.
+    `exploration_rate` is the per-argument chance to keep the generated value, reaching bugs behind unknown ids;
+    `sent` collects the handles whose values the result carries.
     """
 
     def provider(handle: Handle, random: Random) -> str | None:
@@ -145,10 +132,9 @@ def substitute_constants(
     probability: float = CONSTANTS_SUBSTITUTION_PROBABILITY,
     skip: frozenset[tuple[str, ...]] = frozenset(),
 ) -> tuple[graphql.OperationDefinitionNode, list[ConstantDraw]]:
-    """Replace scalar argument literals with type-compatible constants extracted from the SUT source.
+    """Replace scalar argument literals with type-compatible constants from the SUT source; return the draws too.
 
-    Matches by scalar type rather than id-handle semantics, so it targets free-form scalar
-    arguments the resource pool leaves alone. Returns the substitutions applied too, for provenance.
+    Matching goes by scalar type, so it reaches free-form arguments the resource pool leaves alone.
     """
     root = _root_type_for(client_schema, operation_node.operation)
     assert root is not None, "query and mutation operations always have a root type"
@@ -440,8 +426,8 @@ IDENTIFIER_SUFFIXES: Final = ("Id", "Uuid", "Guid", "Path", "Slug", "Key", "Code
 FREE_TEXT_FIELDS: Final = frozenset({"description", "comment", "body", "content", "text", "message", "summary", "note"})
 # Leading role qualifiers stripped before naming the candidate type (`targetProject` -> `Project`).
 ROLE_PREFIXES: Final = ("target", "source", "new", "old", "parent", "child")
-# Bare argument names that identify a record by a non-id field of the enclosing return type
-# (`product(slug:): Product`). Deliberately excludes `name` to favor precision.
+# Bare argument names identifying a record by a non-id field of the return type (`product(slug:): Product`);
+# `name` is left out for precision.
 BARE_IDENTIFIER_NAMES: Final = frozenset(
     {"slug", "sku", "code", "key", "token", "uuid", "guid", "arn", "handle", "externalreference"}
 )
@@ -499,7 +485,11 @@ def candidate_handle(
     enclosing_field_type: str | None,
     index: SchemaIndex | None = None,
 ) -> Handle | None:
-    """Resolve a scalar argument to the producer Handle it should be filled from."""
+    """Resolve a scalar argument to the producer handle it should be filled from.
+
+    Priority: a `<Type>ID` scalar, an `<entity>Id` argument of an `ID` scalar, then a bare `id` naming the
+    enclosing field's type.
+    """
     if scalar_name != "ID":
         stripped = _strip_id_suffix(scalar_name)
         if stripped is not None:

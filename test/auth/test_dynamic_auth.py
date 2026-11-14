@@ -511,8 +511,7 @@ def test_build_auth_provider_carries_configured_retry_on():
 
 
 def test_reauth_state_not_shared_across_calls(ctx):
-    # Each `call_and_validate` gets a fresh breaker; one call tripping the breaker must not
-    # disable reactive refresh for later, independent calls that share the schema.
+    # Each `call_and_validate` gets a fresh breaker, so one tripped call leaves reactive refresh on for later calls.
     schema = ctx.openapi.load_schema({"/a": {"get": {"responses": {"200": {"description": "OK"}}}}})
     tripped = schema.reauth_state
     for _ in range(REAUTH_BREAKER_THRESHOLD):
@@ -1086,7 +1085,7 @@ def test_refresh_auth_keeps_static_scheme(ctx):
     assert dict(case.headers) == {"X-API-Key": "static-key", "Authorization": "Bearer token-2"}
 
 
-# Single-use token 401s after first use; the hook re-authenticates and replays so the recorded response is the recovered 2xx.
+# A single-use token 401s after first use; the hook re-authenticates and replays, recording the recovered 2xx.
 def test_reauth_recovers_expired_token(ctx, cli, app_runner, tmp_path, snapshot_cli, snapshot_html):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -1217,7 +1216,7 @@ def test_reauth_failure_in_html_report(ctx, cli, app_runner, tmp_path, snapshot_
     assert (report_dir / "index.html").read_text(encoding="utf-8") == snapshot_html
 
 
-# A negated-security case's 401 is the expected outcome, not an expired token - the hook must not re-authenticate for it.
+# A negated-security case expects its 401, so the hook must not re-authenticate for it.
 def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner):
     app = _protected_app(ctx, "ApiKeyAuth", {"type": "apiKey", "in": "header", "name": "X-API-Key"})
     token_requests = []

@@ -13,19 +13,13 @@ if TYPE_CHECKING:
 
 @dataclass
 class StatefulContext:
-    """Mutable context for state machine execution."""
-
     # All seen failure keys, both grouped and individual ones
     seen_in_run: set[Failure] = field(default_factory=set)
-    # Failures keys seen in the current suite
     seen_in_suite: set[Failure] = field(default_factory=set)
     # Whether the current suite saw a failure outside the baseline
     has_new_failures_in_suite: bool = False
-    # Status of the current step
     current_step_status: Status | None = None
-    # The total number of completed test scenario
     completed_scenarios: int = 0
-    # Metrics collector for targeted testing
     metric_collector: MetricCollector = field(default_factory=MetricCollector)
     # Inputs that already passed in the current scenario
     passed_steps: set[int] = field(default_factory=set)

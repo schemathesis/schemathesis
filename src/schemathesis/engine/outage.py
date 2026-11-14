@@ -206,9 +206,8 @@ class ServerMonitor:
             crashed_at = min((item.finished for item in resets), default=0)
             cut_off = [item for item in reversed(resets) if item.started < crashed_at]
             after_crash = [item for item in resets if item.started > crashed_at]
-            # Without a reset, a request still in flight is the likeliest culprit. Only one of them can be it,
-            # and the remaining room goes to what the server is known to have seen - otherwise workers left
-            # hanging by the same outage fill the list and hide the payload that caused it.
+            # Without a reset, a request still in flight is the likeliest culprit. List only one, so workers left
+            # hanging by the same outage do not crowd out the payload that caused it.
             in_flight = [item for item in newest if item.reached_server is None][:1]
             # A crash that hangs the server times out its cause and every later request, so the oldest timeout since the
             # last answer is shown, after requests the server still held when it went away: slow servers time out too.

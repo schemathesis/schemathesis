@@ -150,9 +150,7 @@ def test_integer_eligibility_filters_string_values(ctx):
 
 @pytest.mark.hypothesis_nested
 def test_positive_path_parameter_binding_does_not_break_serialization(ctx):
-    # Path parameters under positive mode pass through `_quote_all_safe` and
-    # `jsonify_python_specific_types` directly; the dictionary overlay wraps
-    # substituted values in `GeneratedValue`, which those helpers cannot iterate.
+    # Path quoting and JSON conversion cannot iterate the `GeneratedValue` the dictionary overlay wraps values in.
     schema = _load_schema_with_dictionaries(
         ctx,
         {
@@ -365,10 +363,7 @@ def test_overlay_does_not_admit_schema_invalid_entries_when_schema_view_is_missi
 
 @pytest.mark.hypothesis_nested
 def test_unexpected_property_feedback_does_not_leak_invalid_dict_entries_into_positive(ctx):
-    # Production trigger for the schema-view-missing case: error-feedback's
-    # UNEXPECTED_PROPERTY adjustment pops a parameter from the strategy schema,
-    # while `resolve_parameter_bindings` keeps the binding (it reads the full
-    # parameter-set schema). The overlay then has a binding without its schema.
+    # Error feedback drops a parameter from the strategy schema while its binding stays, leaving no schema for it.
     schema = _load_schema_with_dictionaries(
         ctx,
         {
@@ -1319,9 +1314,7 @@ def test_body_binding_drops_indexed_mutation_under_wildcard_overwrite(ctx):
     overwrites_seen = 0
     saw_sibling_mutation = False
 
-    # Generous, because the guard below is a distributional claim rather than a property of any one
-    # case: it holds only once enough draws land on the sibling. Every change to the generator re-rolls
-    # which examples this seed produces, and at a thin margin that re-roll is a CI failure, not a bug.
+    # The guard below is distributional, so a thin draw budget turns generator changes into CI failures.
     @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=300, derandomize=True)
     def collect(case):
         nonlocal overwrites_seen, saw_sibling_mutation

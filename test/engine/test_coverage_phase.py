@@ -29,7 +29,7 @@ def _coverage_only(schema) -> EventStream:
 
 
 def _hooked_coverage_stream(ctx, raise_naturally: Callable[[], None]) -> EventStream:
-    # `raise_naturally` must throw via real execution — never `raise SomeException(...)`.
+    # `raise_naturally` must throw through real execution, not `raise SomeException(...)`.
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
 
@@ -147,7 +147,7 @@ def test_coverage_phase_stops_iteration_when_max_failures_reached(ctx):
 
 
 def test_coverage_phase_promotes_success_to_failure_on_continue_on_failure(ctx):
-    # `continue_on_failure` records failed checks without raising — final status must still surface as FAILURE.
+    # `continue_on_failure` records failed checks without raising; the final status must still be FAILURE.
     api = ctx.openapi.apps.failure()
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.continue_on_failure = True
@@ -352,8 +352,7 @@ def test_unique_inputs_dedupes_repeated_explicit_examples(ctx, app_runner):
     def run(unique: bool) -> list[str]:
         captured.clear()
         schema = schemathesis.openapi.from_url(url)
-        # TODO: `phases.update(...)` resets per-phase generation defaults and clobbers user-set
-        # `generation.unique_inputs`. Drop this manual disabling once that bug is fixed.
+        # TODO: `phases.update(...)` clobbers user-set `generation.unique_inputs`; drop this once that is fixed.
         schema.config.phases.coverage.enabled = False
         schema.config.phases.fuzzing.enabled = False
         schema.config.phases.stateful.enabled = False
@@ -420,7 +419,7 @@ def test_coverage_phase_handles_keyboard_interrupt_during_iteration(ctx):
 
 
 def test_coverage_phase_negative_multiple_of_with_float_bounds(ctx, app_runner):
-    # Negating `multipleOf` next to float bounds used to build a schema with a duplicated `type` list.
+    # Negating `multipleOf` next to float bounds must not duplicate the `type` list.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/data": {

@@ -51,10 +51,9 @@ def _call_with_retry(
     on_delay: Callable[[float, int], None],
     classify_status: Callable[[int], StatusClass],
 ) -> tuple[list[Response], Response]:
-    """Call an API, retrying rate-limited responses that carry Retry-After.
+    """Call the API, retrying rate-limited responses that carry Retry-After.
 
-    Returns (rate_limited_responses, final_response).
-    rate_limited_responses contains each rate-limited response received before the final response.
+    Returns the rate-limited responses received before the final one, and the final one.
     """
     retries_left = RATE_LIMIT_AUTO_MAX_RETRIES
     rate_limited: list[Response] = []
@@ -98,10 +97,8 @@ def send_tracked(
 ) -> tuple[list[Response], Response]:
     """Send a request the outage tracker remembers, waiting out rate limits when configured.
 
-    A response signalling expired auth is replayed once with fresh credentials.
-    `send` defaults to `case.call(**kwargs)`; `after_response` runs on every answered attempt,
-    including each retried 429. A request still waiting when the time budget runs out raises `BudgetExpired`.
-    Returns (rate_limited_responses, final_response).
+    Expired auth is replayed once; `after_response` sees every answered attempt, each retried 429 included.
+    A request still waiting when the time budget runs out raises `BudgetExpired`.
     """
     call = send or (lambda kwargs: case.call(**kwargs))
 
@@ -148,8 +145,7 @@ def validate_with_rate_limited(
 ) -> Response:
     """Validate every 429 received before the final response, then the final one.
 
-    Failures from 429s are merged with failures from the final response, and the first failing 429
-    is recorded as the case's response so reports show the response the failure came from.
+    The first failing 429 becomes the case's response, so reports show the response a failure came from.
     """
     pending_failures: list[Failure] = []
     failing: Response | None = None

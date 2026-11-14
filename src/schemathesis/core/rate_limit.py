@@ -17,7 +17,6 @@ RATE_LIMIT_AUTO_REPORT_THRESHOLD = 5
 
 
 def ratelimit(rate_limiter: Limiter | str | None, base_url: str | None) -> AbstractContextManager[None]:
-    """Limit the rate of sending generated requests."""
     from pyrate_limiter import Limiter
 
     label = urlparse(base_url or "").netloc
@@ -27,13 +26,9 @@ def ratelimit(rate_limiter: Limiter | str | None, base_url: str | None) -> Abstr
 
 
 def parse_retry_after(header_value: str) -> float | None:
-    """Parse a Retry-After header value into seconds to wait.
+    """Seconds to wait from a `Retry-After` delay ("120") or HTTP date, clamped to `[0, RATE_LIMIT_AUTO_MAX_WAIT]`.
 
-    Handles both RFC 7231 formats:
-    - Delay-seconds: "120" -> 120.0
-    - HTTP-date: "Fri, 31 Dec 1999 23:59:59 GMT" -> seconds until that time
-
-    Returns None on any parse failure. Result is clamped to [0, RATE_LIMIT_AUTO_MAX_WAIT].
+    `None` when the value does not parse.
     """
     if not header_value:
         return None

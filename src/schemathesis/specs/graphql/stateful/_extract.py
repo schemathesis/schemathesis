@@ -9,10 +9,10 @@ from schemathesis.core.transforms import encode_pointer
 def iter_handle_values(
     response_body: bytes, *, field_name: str, handle_fields: frozenset[str], path: tuple[str, ...] = ()
 ) -> Iterator[tuple[str, str, str]]:
-    """Yield `(handle_field, value, pointer)` of records found at `data[field_name]` and then `path` in a GraphQL response.
+    """Yield `(handle_field, value, pointer)` for records at `data[field_name]`, then `path`, in a GraphQL response.
 
-    Lists at any step are flattened, so `path=("edges", "node")` reads Relay connections. `pointer` is the JSON Pointer
-    to the value in the response. Yields nothing if the body is malformed, contains errors, or the path is missing.
+    Lists at any step are flattened, so `path=("edges", "node")` reads Relay connections. Yields nothing for a
+    malformed body, errors or a missing path.
     """
     try:
         payload = json.loads(response_body)

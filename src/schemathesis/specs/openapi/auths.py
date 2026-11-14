@@ -1,5 +1,3 @@
-"""OpenAPI-specific authentication providers."""
-
 from __future__ import annotations
 
 import json
@@ -33,11 +31,7 @@ def _response_block(status_code: int, text: str, config: OutputConfig) -> str:
 
 @dataclass(slots=True)
 class ApiKeyAuthProvider:
-    """Auth provider for OpenAPI API Key authentication.
-
-    Inserts the configured API key value into headers, query parameters, or cookies
-    based on the OpenAPI security scheme definition.
-    """
+    """Puts the API key into the header, query parameter or cookie its security scheme names."""
 
     value: str
     """The API key value to use."""
@@ -47,11 +41,9 @@ class ApiKeyAuthProvider:
     """Where to place the key: 'header', 'query', or 'cookie'."""
 
     def get(self, _: Case, __: AuthContext) -> str:
-        """Return the configured API key value."""
         return self.value
 
     def set(self, case: Case, data: str, __: AuthContext) -> None:
-        """Apply API key to the appropriate location in the test case."""
         if self.location == "header":
             case.headers[self.name] = data
         elif self.location == "query":
@@ -62,8 +54,6 @@ class ApiKeyAuthProvider:
 
 @dataclass(slots=True)
 class HttpBasicAuthProvider:
-    """Auth provider for HTTP Basic authentication."""
-
     username: str
     """The username for basic auth."""
     password: str
@@ -80,20 +70,13 @@ class HttpBasicAuthProvider:
 
 @dataclass(slots=True)
 class HttpBearerAuthProvider:
-    """Auth provider for HTTP Bearer token authentication.
-
-    Sets the Authorization header with Bearer scheme.
-    """
-
     bearer: str
     """The bearer token value."""
 
     def get(self, _: Case, __: AuthContext) -> str:
-        """Return the configured bearer token."""
         return self.bearer
 
     def set(self, case: Case, data: str, __: AuthContext) -> None:
-        """Apply bearer token to Authorization header."""
         case.headers["Authorization"] = f"Bearer {data}"
 
 
@@ -129,7 +112,7 @@ class DynamicTokenAuthProvider:
                 "get",
                 f"{exc.interface} auth request failed: {exc.cause}",
             ) from exc.cause
-        # OSError: requests surfaces TLS setup failures (e.g. a missing client certificate file) as raw OSError.
+        # `requests` raises TLS setup failures, such as a missing client certificate file, as raw `OSError`.
         except (requests.exceptions.RequestException, OSError) as exc:
             raise AuthenticationError(
                 "DynamicTokenAuthProvider",

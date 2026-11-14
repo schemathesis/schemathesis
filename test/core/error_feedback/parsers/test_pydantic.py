@@ -66,8 +66,7 @@ def test_pydantic_parser_can_parse_rejects_non_pydantic_bodies(body):
     assert PydanticParser().can_parse(body=body) is False
 
 
-# Pydantic v2 error fixtures. `test_pydantic_fixture_matches_runtime` keeps
-# them aligned with the installed Pydantic version.
+# Pydantic v2 errors; `test_pydantic_fixture_matches_runtime` keeps them aligned with the installed version.
 _PYDANTIC_FIXTURES: tuple[tuple[dict, Observation], ...] = (
     (
         {"type": "missing", "loc": ["body", "name"], "msg": "Field required"},
@@ -444,8 +443,7 @@ def test_pydantic_parser_emits_body_required_for_root_missing(type_code, make_op
 
 
 def test_pydantic_parser_coerces_decimal_numeric_bounds(make_operation, case_factory):
-    # Decimal-typed Pydantic fields put a Decimal in `ctx`; the bound must
-    # still produce a NumericBoundPayload (coerced to float).
+    # Decimal fields put a Decimal in `ctx`; the bound still becomes a numeric bound, coerced to float.
     body = {
         "detail": [
             {
@@ -538,8 +536,7 @@ class _PydanticFormats(BaseModel):
     website: AnyUrl = "http://example.com"
 
 
-# `(type_code, model_class, invalid_kwargs, context_key)` — the wire-level
-# `ctx` key the parser reads for this code; empty string means none is read.
+# `(type_code, model_class, invalid_kwargs, context_key)`; `context_key` is the `ctx` key the parser reads, "" if none.
 _PYDANTIC_RUNTIME_CASES: tuple[tuple[str, type[BaseModel], dict, str], ...] = (
     ("missing", _PydanticRequired, {}, ""),
     ("string_too_short", _PydanticStrings, {"name": "x"}, "min_length"),
@@ -563,8 +560,7 @@ _PYDANTIC_RUNTIME_CASES: tuple[tuple[str, type[BaseModel], dict, str], ...] = (
     ids=[case[0] for case in _PYDANTIC_RUNTIME_CASES],
 )
 def test_pydantic_fixture_matches_runtime(type_code, model, invalid_kwargs, context_key):
-    # Drift guard: minor Pydantic version bumps that rename a `type` code or
-    # restructure `ctx` fail this test loudly.
+    # Fails when a Pydantic release renames a `type` code or restructures `ctx`.
     fixtures_by_type = {entry["type"]: entry for entry, _ in _PYDANTIC_FIXTURES}
     fixture = fixtures_by_type[type_code]
     with pytest.raises(ValidationError) as exc_info:

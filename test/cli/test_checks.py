@@ -120,8 +120,7 @@ def test_negative_data_rejection_accepted_path_parameter(ctx, cli, snapshot_cli,
 
 
 def test_negative_data_rejection_path_parameter_number_type_mutation(ctx, cli, snapshot_cli):
-    # Like the integer variant, string mutations for a float path parameter can decode to valid floats.
-    # E.g., "+1.5" becomes /api/rate/%2B1.5 - URL-decoded to "+1.5" which float() accepts.
+    # As with integers, string mutations of a float path parameter can decode to valid floats, e.g. "+1.5".
     app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/api/rate/{value}": {
@@ -157,9 +156,7 @@ def test_negative_data_rejection_path_parameter_number_type_mutation(ctx, cli, s
 
 
 def test_negative_data_rejection_uuid_path_param_with_pattern_no_false_positive(ctx, cli, app_runner):
-    # See GH-3603
-    # UUID path param with an explicit lowercase pattern — when the fuzzing phase injects
-    # a captured valid UUID, the positive value must NOT trigger a failure
+    # GH-3603: a captured valid UUID injected into a patterned path parameter must not fail the check.
     app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/api/tasks": {
@@ -349,11 +346,7 @@ def test_negative_data_rejection_wildcard_media_type_link_body_no_false_positive
 
 
 def test_negative_data_rejection_xml_body_string_type_no_false_positive(ctx, cli, snapshot_cli):
-    # Type mutations for XML body string fields serialize all non-string values to their string
-    # representations via _escape_xml (False -> "False", 0 -> "0", None -> "").
-    # These are indistinguishable from valid strings at the wire level, so no false positive
-    # should be reported when the API correctly accepts the request.
-    # See GH-3525
+    # GH-3525: XML renders type mutations of string fields as text, such as `False` as "False", which stays valid.
     app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/api/negotiations/negotiation": {
@@ -381,9 +374,7 @@ def test_negative_data_rejection_xml_body_string_type_no_false_positive(ctx, cli
 
     @app.route("/api/negotiations/negotiation", methods=["POST"])
     def negotiation():
-        # Accept only valid XML objects with both required string fields present.
-        # Note: XML strips type info - boolean False becomes "False", integer 0 becomes "0",
-        # so we validate structure (required fields present) not value types.
+        # XML strips type info, so the server checks only that both required fields are present.
         try:
             root = ET.fromstring(request.data)
             if root.find("payment_amount") is None or root.find("payment_method_id") is None:
@@ -406,10 +397,7 @@ def test_negative_data_rejection_xml_body_string_type_no_false_positive(ctx, cli
 
 
 def test_negative_data_rejection_number_body_field_accepts_integer_no_false_positive(ctx, cli, app_runner):
-    # See GH-3697
-    # `type: number` in JSON Schema accepts integers — any integer is a valid number.
-    # Sending an integer (e.g., score=3) for a `type: number` field must NOT trigger
-    # AcceptedNegativeData because the server is correct to accept it.
+    # GH-3697: `type: number` accepts integers, so a server accepting `score=3` is right.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/data": {
@@ -457,7 +445,7 @@ def test_negative_data_rejection_number_body_field_accepts_integer_no_false_posi
 
 
 def test_negative_data_rejection_body_override_restoring_mutated_field(ctx, cli):
-    # Only `/rename` is buggy (ignores the type of `name`); `/confirm` validates its body correctly.
+    # Only `/rename` is buggy (ignores the type of `name`); `/confirm` validates its body.
     body_schema = {
         "type": "object",
         "properties": {"token": {"type": "string"}, "name": {"type": "string"}},
@@ -685,8 +673,7 @@ def test_negative_data_rejection_boolean_query_param_with_api_key_query_auth_no_
 
 
 def test_negative_data_rejection_boolean_query_param_accepts_coercible_no_false_positive(ctx, cli, app_runner):
-    # See GH-4254. Lenient parsers read 0/1/true/false as booleans, so those wire values are
-    # not type violations for a boolean parameter and must not be generated as negatives.
+    # GH-4254: lenient parsers read 0/1/true/false as booleans, so these wire values are no negatives.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/users": {
@@ -1010,7 +997,7 @@ def schema(ctx):
 @pytest.mark.parametrize(
     "expected_statuses",
     [
-        None,  # Default case
+        None,
         ["404"],
         ["405"],
         ["200"],
@@ -1200,7 +1187,7 @@ def app(ctx):
         if "name" not in data:
             return jsonify({"error": "Name is missing"}), 422
 
-        # Only check organization existence AFTER validation
+        # Check organization existence only after validation
         if organization_id not in organizations:
             return jsonify({"error": "Not found"}), 404
 
@@ -1268,8 +1255,7 @@ def test_response_schema_conformance(ctx, cli, app_runner, snapshot_cli, app):
         },
     )
     base_url = app_runner.openapi_url(app, path="")
-    # There should be no empty `organization_slug` generated which will lead to request being handled by `GET /organizations/`
-    # onstead of `GET /organizations/{organization_slug}/` and will give a response schema conformance error
+    # An empty `organization_slug` would route to `GET /organizations/` and fail response schema conformance.
     assert (
         cli.run(
             str(schema_file),
@@ -1391,11 +1377,9 @@ def test_negative_data_rejection_array_min_items_zero_no_false_positive(ctx, cli
                             "schema": {
                                 "type": "array",
                                 "items": {"type": "string"},
-                                # Explicitly allows empty array
                                 "minItems": 0,
                             },
                             "style": "form",
-                            # Comma-separated format
                             "explode": False,
                         }
                     ],
@@ -1425,9 +1409,7 @@ def test_negative_data_rejection_array_min_items_zero_no_false_positive(ctx, cli
 
     @app.route("/with-param", methods=["GET"])
     def with_param():
-        # Check if 'ids' parameter is present in the URL
         if "ids" not in request.args:
-            # Required parameter is missing - this is truly invalid
             return jsonify({"error": "Missing required parameter: ids"}), 400
         return jsonify({"foo": "bar"}), 200
 
@@ -1445,7 +1427,7 @@ def test_negative_data_rejection_array_min_items_zero_no_false_positive(ctx, cli
 
 
 def test_negative_data_rejection_form_data_empty_string_false_positive(ctx, cli, snapshot_cli):
-    # Empty string in form data should not be treated as None/null for required string fields
+    # An empty form string is a valid required string, not a missing value.
     app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/suggest": {
@@ -1479,7 +1461,6 @@ def test_negative_data_rejection_form_data_empty_string_false_positive(ctx, cli,
     @app.route("/suggest", methods=["POST"])
     def suggest():
         text = request.form.get("text")
-        # Empty string is valid for a required string field
         if text is None:
             return jsonify({"error": "Missing required field"}), 400
         return jsonify({"results": []}), 200
@@ -1501,7 +1482,7 @@ def test_negative_data_rejection_form_data_empty_string_false_positive(ctx, cli,
     ids=["no-false-positive", "accepted-invalid-reason-reported"],
 )
 def test_negative_data_rejection_form_fields_sent_as_text(ctx, cli, app_runner, server_checks_reason, exit_code):
-    # Form fields arrive as text, so non-string values for a string field are valid; 300 examples reliably reach them.
+    # Form fields arrive as text, so non-string values for a string field are valid; 300 examples reach them.
     schema = {
         "type": "object",
         "properties": {
@@ -1626,9 +1607,7 @@ def test_negative_data_rejection_nullable_query_values_sent_as_text(
     ],
 )
 def test_positive_data_acceptance_required_form_body_no_false_positive(ctx, cli, snapshot_cli, body_schema):
-    # When requestBody.required=true but inner schema allows empty object,
-    # coverage generates {} which serializes to no body content for form-urlencoded.
-    # This should NOT trigger a false positive "Schema-valid request rejected".
+    # A required form body of `{}` serializes to no content; a server rejecting that is no false positive.
     app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/my-method": {
@@ -1755,8 +1734,7 @@ def test_positive_data_acceptance_empty_exploded_object_query_no_false_positive(
 
 
 def test_positive_data_acceptance_additional_properties_hint(ctx, cli, snapshot_cli):
-    # When Hypothesis adds extra properties to a schema without `additionalProperties: false`,
-    # the failure message should include a hint explaining the likely cause.
+    # Without `additionalProperties: false`, generated bodies may carry extra keys, and the failure message hints at it.
     app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/session": {
@@ -1777,7 +1755,6 @@ def test_positive_data_acceptance_additional_properties_hint(ctx, cli, snapshot_
                                         }
                                     },
                                     "required": ["zones"],
-                                    # No `additionalProperties: false` — Hypothesis will add extra keys
                                 }
                             }
                         },
@@ -1796,7 +1773,6 @@ def test_positive_data_acceptance_additional_properties_hint(ctx, cli, snapshot_
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             return jsonify({"error": "Expected object"}), 422
-        # Reject if any key beyond `zones` is present
         if set(data.keys()) - {"zones"}:
             return jsonify({"error": "Unexpected fields"}), 422
         return jsonify({"ok": True}), 200
@@ -1918,8 +1894,7 @@ def test_positive_data_acceptance_body_list_examples_verbatim(ctx, cli, app_runn
                         "content": {
                             "application/json": {
                                 "schema": {"$ref": "#/components/schemas/PaymentsRequest"},
-                                # OAS3 Examples Object should be a dict, but some schemas use a list here.
-                                # Each element is an OAS3-style Example Object with a "value" key.
+                                # Some schemas use a list of Example Objects here instead of the OAS3 dict.
                                 "examples": [{"value": example}],
                             }
                         },
@@ -1989,8 +1964,7 @@ def test_positive_data_acceptance_body_list_examples_verbatim(ctx, cli, app_runn
 
 
 def test_missing_required_header_body_first_server_no_false_negative(ctx, cli, app_runner):
-    # Server validates body before header. With a valid template body the missing-header case
-    # reaches header validation (400), so the check correctly passes — no false negative.
+    # The server validates the body before the header; a valid template body lets the missing-header case reach the 400.
     app = ctx.openapi.make_flask_app_from_schema(
         {
             "openapi": "3.0.0",
@@ -2042,7 +2016,6 @@ def test_missing_required_header_body_first_server_no_false_negative(ctx, cli, a
     @app.route("/items/<kind>", methods=["POST"])
     def items(kind):
         body = request.get_json(silent=True, force=True)
-        # Server validates body before header (common in framework middleware)
         if body is None:
             return jsonify({"error": "body must not be null"}), 422
         header = request.headers.get("X-Required-Header")
@@ -2059,8 +2032,7 @@ def test_missing_required_header_body_first_server_no_false_negative(ctx, cli, a
 
 
 def test_response_schema_conformance_groups_multiple_violations(ctx, cli, snapshot_cli):
-    # 4 violations on one response should render under a single header with a violation count,
-    # not 4 separate `- Response violates schema` blocks.
+    # Four violations on one response render under one header with a count.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/api/user": {
@@ -2104,8 +2076,7 @@ def test_response_schema_conformance_groups_multiple_violations(ctx, cli, snapsh
 
 
 def test_negative_data_rejection_nested_body_description(ctx, cli, snapshot_cli):
-    # Schema with no type at root/intermediate levels so coverage only generates
-    # property constraint violations, surfacing the nested path in the description
+    # Without `type` on outer levels, coverage only violates property constraints, exposing the nested path.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/payment": {
@@ -2304,7 +2275,7 @@ def test_alternative_security_requirements_should_not_trigger_negative_data_reje
 
 
 def test_ignored_auth_probes_each_operation_until_enforcement_is_confirmed(ctx, cli):
-    # Every successful case used to trigger its own unauthenticated requests; one confirmation is enough.
+    # One confirmation of enforcement per operation is enough; other successful cases send no unauthenticated requests.
     api = ctx.openapi.serve(basic.basic_with_query())
 
     cli.run(

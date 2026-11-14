@@ -117,7 +117,7 @@ def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, sn
                             "content": {
                                 "application/json": {
                                     "schema": {
-                                        # allOf triggers canonicalize() call in dependency analysis
+                                        # `allOf` makes dependency analysis canonicalize the schema
                                         "allOf": [
                                             {"$ref": "#/components/schemas/Owner"},
                                             {"description": "An owner"},
@@ -136,7 +136,7 @@ def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, sn
                     "type": "object",
                     "properties": {
                         "id": {"type": "integer"},
-                        # PCRE Unicode property escape - this caused the crash
+                        # PCRE Unicode property escape
                         "firstName": {"type": "string", "pattern": r"^[\p{L}]+([ '-][\p{L}]+){0,2}\.?$"},
                         "lastName": {"type": "string", "pattern": r"^[\p{L}]+([ '-][\p{L}]+){0,2}\.?$"},
                     },
@@ -153,7 +153,7 @@ def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, sn
     def get_owner(owner_id):
         return jsonify({"id": owner_id, "firstName": "John", "lastName": "Doe"})
 
-    # This should not crash with SchemaError about invalid regex
+    # Must not crash with an invalid-regex SchemaError
     assert (
         cli.run_openapi_app(
             app,

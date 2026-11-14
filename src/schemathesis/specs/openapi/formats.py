@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 IS_PYPY = platform.python_implementation() == "PyPy"
 STRING_FORMATS: dict[str, st.SearchStrategy] = {}
-# For some reason PyPy can't send header values with codepoints > 128, while CPython can
+# PyPy cannot send header values with codepoints above 128
 if IS_PYPY:
     MAX_HEADER_CODEPOINT = 128
     DEFAULT_HEADER_EXCLUDE_CHARACTERS = "\n\r\x1f\x1e\x1d\x1c"
@@ -34,8 +34,7 @@ else:
     MAX_HEADER_CODEPOINT = 255
     DEFAULT_HEADER_EXCLUDE_CHARACTERS = "\n\r"
 
-# RFC 9110 Section 5.5: invalid field value chars are 0x00-0x08, 0x0A-0x1F, 0x7F
-# Note: 0x09 (HTAB) is valid per RFC, so excluded from this set
+# RFC 9110 Section 5.5 forbids 0x00-0x08, 0x0A-0x1F and 0x7F in field values; HTAB (0x09) is valid
 INVALID_HEADER_CHARS = "".join(chr(i) for i in range(9)) + "".join(chr(i) for i in range(10, 32)) + "\x7f"
 
 
@@ -115,8 +114,7 @@ def header_values(
         alphabet=st.characters(
             min_codepoint=0, max_codepoint=MAX_HEADER_CODEPOINT, codec=codec, exclude_characters=exclude_characters
         )
-        # `requests` refuses a value opening with whitespace, and servers strip it from the end. Rejecting it keeps
-        # the drawn length, where trimming it afterwards silently returned a shorter value than the one asked for.
+        # `requests` refuses leading whitespace and servers strip trailing; filtering keeps the drawn length.
     ).filter(lambda value: not has_surrounding_whitespace(value))
 
 
@@ -153,28 +151,19 @@ def duration_values() -> st.SearchStrategy[str]:
     )
 
 
-# The generators below cover the JSON Schema `format` vocabulary, written from the grammars the
-# formats name.
-# Lower case only: host names are case-insensitive, so case variety exercises nothing, and a
-# 62-character alphabet costs ~1.7x more to draw from across a `format`-heavy schema.
+# Lower case only: host names are case-insensitive, so mixed case exercises nothing.
 _LABEL_CHARACTERS = string.ascii_lowercase + string.digits
 _TOP_LEVEL_DOMAINS = ("com", "org", "net", "io", "dev", "info", "example", "test")
-# RFC 5322 dot-atom: every character an unquoted local part may carry.
-# The punctuation is what trips naive parsers, so it earns its place; case does not.
+# RFC 5322 dot-atom characters; the punctuation trips naive parsers, case does not.
 _LOCAL_PART_CHARACTERS = string.ascii_lowercase + string.digits + "!#$%&'*+-/=?^_`{|}~"
 
 
 def domain_values() -> st.SearchStrategy[str]:
-    """Generate domain names."""
     from hypothesis import strategies as st
 
-    # Assembled from an alphabet rather than drawn from `hypothesis.provisional.domains`, which
-    # costs ~1.3ms per value and emits the mixed-case ACE prefix validators reject.
-    # One flat draw per label. Building labels out of hyphen-joined chunks nests two more list
-    # draws under every domain, which costs ~2.5x across a `format`-heavy schema.
+    # One flat draw per label: `provisional.domains` is slow and emits the mixed-case ACE prefix validators reject.
     label = st.text(alphabet=_LABEL_CHARACTERS, min_size=1, max_size=8)
-    # At least one label before the top-level one: a dotless domain is well-formed, yet the
-    # stricter checkers real services run reject it.
+    # At least two labels: a dotless domain is well-formed, yet stricter checkers reject it.
     return st.builds(
         lambda labels, top_level: ".".join([*labels, top_level]),
         st.lists(label, min_size=1, max_size=2),
@@ -183,16 +172,14 @@ def domain_values() -> st.SearchStrategy[str]:
 
 
 def email_values() -> st.SearchStrategy[str]:
-    """Generate email addresses."""
     from hypothesis import strategies as st
 
-    # A single dot-atom: `.` is absent from the alphabet, so no leading, trailing or doubled dot
-    # can appear and no second draw is needed to place one.
+    # The alphabet lacks `.`, so no leading, trailing or doubled dot can appear.
     local = st.text(alphabet=_LOCAL_PART_CHARACTERS, min_size=1, max_size=10)
     return st.builds("{}@{}".format, local, domain_values())
 
 
-# RFC 3339, Section 5.6 — each production of the grammar is its own JSON Schema format name.
+# RFC 3339, Section 5.6: each grammar production is its own JSON Schema format name.
 RFC3339_FORMATS = (
     "date-fullyear",
     "date-month",
@@ -278,8 +265,7 @@ def color_values() -> st.SearchStrategy[str]:
     """Generate CSS color values."""
     from hypothesis import strategies as st
 
-    # One integer draw per value; the equivalent `#([a-fA-F0-9]{3}|[a-fA-F0-9]{6})` regex costs
-    # roughly six times as much. Hex digits are case-insensitive, so both cases are admitted.
+    # One integer draw per value, cheaper than a regex; hex digits are case-insensitive, so both cases appear.
     def render(value: int, width: int, upper: bool) -> str:
         return f"#{value:0{width}{'X' if upper else 'x'}}"
 
@@ -288,11 +274,9 @@ def color_values() -> st.SearchStrategy[str]:
     return short | long | st.sampled_from(_CSS21_COLOR_NAMES)
 
 
-# Sampled rather than drawn from `st.from_regex`, which dominates the cost of building a pattern.
-# Anchors and backreferences are absent: they are only valid in positions a quantifier cannot follow.
+# Sampled, as `st.from_regex` is costly; no anchors or backreferences, since a quantifier cannot follow them.
 _REGEX_ATOMS = (".", *(f"\\{character}" for character in "dDsSwW"))
-# Counts stay short and every quantifier is optional. `{99999999999}` overflows the regex compiler
-# rather than failing as a syntax error, and no useful pattern needs counts that large.
+# Short, optional counts: `{99999999999}` overflows the regex compiler instead of raising a syntax error.
 _REGEX_QUANTIFIERS = ("", "+", "*", "?", "+?", "*?", "??", "{0}", "{1}", "{2}", "{1,}", "{1,3}", "{2,4}", "{1,3}?")
 _REGEX_METACHARACTERS = "\\^$.[]|()?*+{}"
 
@@ -306,12 +290,9 @@ def _compiles(pattern: str) -> bool:
 
 
 def regex_values(alphabet: st.SearchStrategy[str]) -> st.SearchStrategy[str]:
-    """Generate regular expressions."""
     from hypothesis import strategies as st
 
-    # Every piece is an atom followed by an optional quantifier, so patterns compile by
-    # construction. Drawing fragments independently instead leaves the majority uncompilable, and
-    # discarding those costs more than everything else in this generator combined.
+    # An atom plus an optional quantifier compiles by construction; independent fragments mostly would not.
     literal = alphabet.filter(lambda character: character not in _REGEX_METACHARACTERS)
     atom = st.sampled_from(_REGEX_ATOMS) | st.text(alphabet=literal, min_size=1, max_size=3)
     piece = st.builds(operator.add, atom, st.sampled_from(_REGEX_QUANTIFIERS))
@@ -320,30 +301,21 @@ def regex_values(alphabet: st.SearchStrategy[str]) -> st.SearchStrategy[str]:
         st.sampled_from(("", "^")),
         st.lists(piece, max_size=5).map("".join),
         st.sampled_from(("", "$")),
-        # Sound net rather than the workhorse: nothing above is expected to fail compilation.
+        # A safety net; the construction above should always compile.
     ).filter(_compiles)
 
 
 def json_pointer_values(alphabet: st.SearchStrategy[str]) -> st.SearchStrategy[str]:
-    """Generate JSON pointers over the character set in force.
-
-    RFC 6901, Section 3: a pointer is a run of `/`-prefixed tokens, and a token spells `~` as `~0`
-    and `/` as `~1`. `~` goes first, or the `/` it introduces would be escaped twice.
-    """
+    """JSON pointers over the character set in force; tokens escape `~` before `/`, or `~1` would become `~01`."""
     from hypothesis import strategies as st
 
-    # Bounded: `format` values are length-filtered downstream, and unbounded tokens push most
-    # draws past the bound, where they are discarded.
+    # Bounded: downstream length filters would discard most draws of unbounded tokens.
     token = st.text(alphabet, max_size=8).map(lambda part: "/" + part.replace("~", "~0").replace("/", "~1"))
     return st.lists(token, max_size=3).map("".join)
 
 
 def relative_json_pointer_values(alphabet: st.SearchStrategy[str]) -> st.SearchStrategy[str]:
-    """Generate relative JSON pointers over the character set in force.
-
-    A non-negative integer of levels to ascend, then either `#` for the key at that level or a
-    JSON pointer down from it.
-    """
+    """Relative JSON pointers: levels to ascend, then `#` for the key there or a JSON pointer down from it."""
     from hypothesis import strategies as st
 
     return st.builds(
@@ -362,9 +334,7 @@ def get_alphabet_format_strategies() -> dict[str, Callable[[st.SearchStrategy[st
     }
 
 
-# Shortest and longest value the built-in generator for each name can produce. A length window
-# outside the range is one no draw lands in, so the caller can answer without searching for it.
-# `test_declared_format_lengths_hold` keeps these in step with the generators above.
+# Length range of each built-in generator; callers skip the search for a length window outside it.
 FORMAT_LENGTHS: dict[str, tuple[int, int]] = {
     "date": (10, 10),
     "full-date": (10, 10),
@@ -467,8 +437,7 @@ def _domain_of_length(total: int) -> st.SearchStrategy[str]:
     head = st.text(alphabet=_LABEL_CHARACTERS, min_size=lengths[0], max_size=lengths[0])
     if len(lengths) == 1:
         return head
-    # Only the first label is drawn; drawing every character of a long domain would outgrow the
-    # generation buffer, and a length boundary is what the rest of it is there for.
+    # Only the first label is drawn: a long domain would outgrow the generation buffer, and only its length matters.
     filler = ".".join("a" * length for length in lengths[1:])
     return head.map(lambda label: f"{label}.{filler}")
 
@@ -555,7 +524,6 @@ def _format_lengths(names: frozenset[str]) -> dict[str, FormatLengths]:
 
 @lru_cache
 def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
-    """Get all default "format" strategies."""
     from hypothesis import strategies as st
     from requests.auth import _basic_auth_str
 
@@ -585,8 +553,7 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
         "binary": st.one_of(st.sampled_from(list(FILE_SAMPLES.values())), st.binary()).map(Binary),
         "byte": st.binary().map(lambda x: b64encode(x).decode()),
         "duration": duration_values(),
-        # `st.uuids` supplies the entropy; drawing the integer directly biases hard toward zero and
-        # makes `00000000-0000-1000-8000-000000000000` the value examples show.
+        # `st.uuids` supplies the entropy; a drawn integer biases toward zero, so examples would show all zeros.
         "uuid": st.builds(
             lambda drawn, version: str(uuid.UUID(int=drawn.int, version=version)),
             st.uuids(),

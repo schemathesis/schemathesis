@@ -1,5 +1,3 @@
-"""Shared helpers for parsers."""
-
 from __future__ import annotations
 
 import re
@@ -77,7 +75,7 @@ def lowercase_first_letter(name: str) -> str:
 
 
 def size_bound(*, direction: BoundDirection) -> RegexHandler:
-    """Build a regex handler that captures one side of a size bound from match group 1."""
+    """Handler for one side of a size bound captured in match group 1."""
 
     def handler(match: re.Match[str]) -> ClassificationResult:
         value = int(match.group(1))
@@ -91,7 +89,7 @@ def size_bound(*, direction: BoundDirection) -> RegexHandler:
 
 
 def size_bound_exact() -> RegexHandler:
-    """Build a regex handler for "exactly N" size phrasings (Rails wrong_length)."""
+    """Handler for "exactly N" size phrasings (Rails `wrong_length`), N in match group 1."""
 
     def handler(match: re.Match[str]) -> ClassificationResult:
         value = int(match.group(1))
@@ -101,7 +99,7 @@ def size_bound_exact() -> RegexHandler:
 
 
 def numeric_bound(*, direction: BoundDirection, exclusive: bool) -> RegexHandler:
-    """Build a regex handler that emits a NumericBoundPayload from match group 1."""
+    """Handler for a numeric bound captured in match group 1."""
 
     def handler(match: re.Match[str]) -> ClassificationResult:
         return ObservationKind.NUMERIC_BOUND, NumericBoundPayload(
@@ -114,13 +112,10 @@ def numeric_bound(*, direction: BoundDirection, exclusive: bool) -> RegexHandler
 
 
 def required_handler(_data: dict) -> tuple[ClassificationResult, ...]:
-    """A `DictHandler` that emits a single MUST_NOT_BE_BLANK observation regardless of input."""
     return ((ObservationKind.MUST_NOT_BE_BLANK, None),)
 
 
 def format_handler(format_name: str) -> DictHandler:
-    """Build a `DictHandler` that emits a constant FORMAT(name=format_name) observation."""
-
     def handler(_data: dict) -> tuple[ClassificationResult, ...]:
         return ((ObservationKind.FORMAT, FormatPayload(name=format_name)),)
 
@@ -128,7 +123,6 @@ def format_handler(format_name: str) -> DictHandler:
 
 
 def int_or_none(value: object) -> int | None:
-    """Parse a string into an int; return None if the value is not a string or not parseable."""
     if not isinstance(value, str):
         return None
     try:

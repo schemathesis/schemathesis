@@ -5,8 +5,6 @@ from dataclasses import dataclass
 
 @dataclass(slots=True)
 class FilteredCount:
-    """Count of total items and those passing filters."""
-
     total: int
     selected: int
 
@@ -37,7 +35,7 @@ class UnmatchedFilter:
 
 @dataclass(slots=True)
 class StatefulInference:
-    """Transition counts measured after inference, over the edge population the state machine traverses."""
+    """Transition counts after inference, over the edges the state machine traverses."""
 
     # Transitions discovered by inference, as opposed to declared in the schema.
     inferred: int
@@ -47,11 +45,9 @@ class StatefulInference:
 
 @dataclass(slots=True)
 class ResourcePoolInventory:
-    """Resource-pool descriptors discovered from the schema.
+    """Resource-pool descriptors from the schema: the N in "exercised M of N known edges".
 
-    The denominator the analyzer uses to compute "engine exercised M of N known edges".
-    Producer/consumer labels are recorded explicitly so runtime synthesised operations
-    (e.g. unexpected-method probes) don't inflate coverage ratios.
+    Explicit producer/consumer labels keep operations synthesized at runtime, like method probes, out of the ratio.
     """
 
     # Labels of operations with at least one descriptor that captures into the pool.
@@ -74,7 +70,6 @@ class ApiStatistic:
     operations: FilteredCount
     transitions: FilteredCount
     resource_pool: ResourcePoolInventory
-    # Filter expressions the user wrote that no operation in the schema matched.
     unmatched_filters: list[UnmatchedFilter]
     # Why nothing is selected when every selected operation is one the specification cannot test.
     unsupported_selection: str | None

@@ -104,6 +104,6 @@ def test_public_check_context_without_class_checks(ctx, swagger_20, response_fac
 
 
 def test_module_access():
-    # It is done via `__getattr__`
+    # Resolved through the module's `__getattr__`.
     _ = schemathesis.checks.negative_data_rejection
     assert "negative_data_rejection" in dir(schemathesis.checks)

@@ -140,8 +140,7 @@ def two_stage_planted_bug() -> OpenAPIApp:
 
 def nested_planted_bug() -> OpenAPIApp:
     # 400 gate keyed on a dotted path (`contact.email`); feedback must lift the bound onto the nested object.
-    # `contact` is required so Hypothesis always emits the nested container the hint targets — without it,
-    # most generated bodies skip `contact` entirely and the bug stays unreachable within --max-examples=10.
+    # `contact` is required, or most bodies skip it and the bug stays out of reach within `--max-examples=10`.
     spec = build_schema(
         {
             "/profiles": {
@@ -177,8 +176,7 @@ def nested_planted_bug() -> OpenAPIApp:
         body = request.get_json(silent=True)
         contact = body.get("contact") if isinstance(body, dict) else None
         email = contact.get("email") if isinstance(contact, dict) else None
-        # Accept any non-empty string — whitespace-only values count, so generators that emit
-        # `" "` from a "must-not-be-blank" hint still reach the planted 500.
+        # Whitespace-only values pass, so a `" "` drawn from a "must-not-be-blank" hint still reaches the planted 500.
         if not isinstance(email, str) or not email:
             return jsonify({"messages": ["contact.email - must not be blank"]}), 400
         return "", 500
@@ -426,9 +424,8 @@ def positive_numeric_gate_planted_bug() -> OpenAPIApp:
 
 
 def unrecognized_property_planted_bug() -> OpenAPIApp:
-    # Body and query each carry one extra schema-declared name the server rejects;
-    # three positive-integer gates layer on top so the planted 500 needs property
-    # removal plus numeric-bound adjustments to surface.
+    # Body and query each carry a declared name the server rejects, plus three positive-integer gates, so the
+    # planted 500 needs both property removal and numeric-bound adjustments.
     spec = build_schema(
         {
             "/cart": {
@@ -548,8 +545,7 @@ def pattern_planted_bug() -> OpenAPIApp:
 
 
 # One field per carrier key so observations for all three cross the threshold during coverage.
-# Each entry pairs a Jackson type name (used in the message text) with the
-# JSON-Schema format the consumer adjustment maps it to (used to gate acceptance).
+# Entries pair the Jackson type named in the message with the format feedback maps it to, which gates acceptance.
 JACKSON_TYPED_FIELDS: tuple[tuple[str, str, str, str], ...] = (
     ("hire_date", "java.time.LocalDate", "msg", "date"),
     ("started_at", "java.time.LocalDateTime", "message", "date-time"),
@@ -607,9 +603,8 @@ def jackson_typed_planted_bug() -> OpenAPIApp:
 
 
 def jackson_typed_planted_bug_ref_bundled() -> OpenAPIApp:
-    # Body schema references `components.schemas.User`, which itself $refs another component —
-    # this two-hop chain is what schemathesis's loader turns into the `x-bundled` form
-    # observed on real Spring specs.
+    # The body refers to `User`, which refers to `Address`; the loader bundles this two-hop chain into `x-bundled`,
+    # the form real Spring specs take.
     address_schema = {"type": "object", "properties": {"street": {"type": "string"}}}
     user_schema = {
         "type": "object",
@@ -651,13 +646,11 @@ def jackson_overflow_planted_bug() -> OpenAPIApp:
                                     "type": "object",
                                     "additionalProperties": False,
                                     "properties": {
-                                        # Spec-side example forces coverage to emit a deterministic
-                                        # overflow value, so feedback always observes the parser's
-                                        # bound and the snapshot stays stable across runs.
+                                        # The example pins the overflow value coverage emits, so feedback
+                                        # always sees the parser's bound and the snapshot stays stable.
                                         "quantity": {"type": "integer", "example": 10_000_000_000},
-                                        # Optional field so coverage produces multiple positive object
-                                        # cases — observations on `quantity` cross the calibration
-                                        # threshold before fuzzing builds its strategy.
+                                        # Optional, so coverage builds several positive objects and `quantity`
+                                        # observations cross the threshold before fuzzing builds its strategy.
                                         "note": {"type": "string"},
                                     },
                                     "required": ["quantity"],
@@ -682,8 +675,7 @@ def jackson_overflow_planted_bug() -> OpenAPIApp:
             return jsonify({"msg": "JSON parse error"}), 400
         value = body.get("quantity")
         if isinstance(value, int) and not isinstance(value, bool) and not _INT32_MIN <= value <= _INT32_MAX:
-            # Fixed placeholder for the actual value keeps the snapshot stable across runs;
-            # the parser regex accepts any non-paren content.
+            # A fixed placeholder keeps the snapshot stable; the parser regex accepts any non-paren content.
             return jsonify(
                 {
                     "message": (
@@ -757,16 +749,14 @@ def jackson_enum_planted_bug() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
-# Required query parameters not declared as such in the spec — Spring rejects
-# their absence with `MissingServletRequestParameterException`. Multiple params
-# so observations cross the calibration threshold during coverage.
+# Query parameters the server requires but the spec does not; Spring answers `MissingServletRequestParameterException`.
+# Several, so observations cross the calibration threshold during coverage.
 MISSING_QUERY_PARAMS: tuple[str, ...] = ("lat", "lon", "raioMaximo")
 
 
 def missing_request_body_planted_bug() -> OpenAPIApp:
-    # Spec marks the body optional; the server requires it and rejects empty bodies
-    # with Spring's `Required request body is missing` exception. The planted 500
-    # only surfaces when generation always sends a body.
+    # The spec marks the body optional; the server rejects a missing one with Spring's `Required request body is
+    # missing`, so the planted 500 surfaces only when generation always sends a body.
     spec = build_schema(
         {
             "/api/v1/airports": {
@@ -844,7 +834,7 @@ def missing_query_param_planted_bug() -> OpenAPIApp:
                     "path": "/v1/hospitais/maisProximo",
                 }
             ), 400
-        return "", 500  # planted bug — surfaces once all three params are required.
+        return "", 500  # planted bug: surfaces once all three params are required.
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
@@ -853,9 +843,8 @@ class _PydanticUser(BaseModel):
     name: str = Field(min_length=3, max_length=8)
     code: str = Field(min_length=5, max_length=20)
     nickname: str = Field(min_length=10, max_length=50)
-    # Optional field so coverage produces multiple positive object cases
-    # (one per optional present/absent), letting the constraint observations
-    # cross the calibration threshold before fuzzing builds its strategy.
+    # Optional, so coverage builds positive cases with and without it, and constraint observations cross the
+    # calibration threshold before fuzzing builds its strategy.
     bio: str | None = None
 
 
@@ -884,8 +873,7 @@ def _drop_constraints(node: object) -> None:
 
 
 def pydantic_planted_bug() -> OpenAPIApp:
-    # Mirror generator drift: the model still enforces its constraints,
-    # the served schema has them dropped (e.g. Pydantic 2.10 HttpUrl).
+    # Generator drift: the model enforces constraints the served schema drops (e.g. Pydantic 2.10 HttpUrl).
     app = FastAPI()
 
     @app.post("/users")
@@ -1136,8 +1124,7 @@ def endlessly_novel_feedback() -> OpenAPIApp:
 
 
 def confluent_planted_bug() -> OpenAPIApp:
-    # 400 envelopes use Confluent's `{error_code, message}` shape with the topic-name
-    # rule so the parser reads the ASCII pattern straight off the message.
+    # 400s use Confluent's `{error_code, message}` shape and topic-name rule, so the parser reads the ASCII pattern.
     paths = {
         "/v3/clusters/{cluster_id}/topics": {
             "post": {

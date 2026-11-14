@@ -25,8 +25,7 @@ if TYPE_CHECKING:
 # Display label for failures produced by class-based checks' `after_run` (not tied to a case).
 RUN_CHECKS_LABEL = "Run checks"
 
-# Python 3.12 renamed several HTTP phrases per RFC 9110. Use the new names
-# consistently across all Python versions so snapshots don't vary by version.
+# Python 3.12+ uses the RFC 9110 phrases; use them on every Python version so output does not vary.
 _RFC9110_PHRASES: dict[int, str] = {
     413: "Content Too Large",
     414: "URI Too Long",
@@ -58,11 +57,8 @@ _SEVERITY_ORDER = {Severity.CRITICAL: 0, Severity.HIGH: 1, Severity.MEDIUM: 2, S
 
 
 class Failure(AssertionError):
-    """API check failure."""
-
-    # Stable identity in reports; a code is never renumbered or reused.
-    # The hundreds digit says what went wrong, never the protocol: 1 response, 2 request handling, 3 stateful,
-    # 4 auth, 9 custom. A protocol-specific failure gets the next free code in its group.
+    # Stable report identity, never renumbered or reused. The hundreds digit says what went wrong, not the protocol:
+    # 1 response, 2 request handling, 3 stateful, 4 auth, 9 custom; protocol-specific failures take the next free code.
     code: ClassVar[str] = "ST901"
     # Checks that report this failure.
     checks: ClassVar[tuple[str, ...]] = ()
@@ -117,7 +113,7 @@ class Failure(AssertionError):
             self.message,
         ) < (other.severity, other.__class__.__name__, other.message)
 
-    # Comparison & hashing is done purely on classes to simplify keeping the minimized failure during shrinking
+    # Hash by class alone, so shrinking keeps the minimized failure
     def __hash__(self) -> int:
         return hash(self.__class__)
 
@@ -128,16 +124,11 @@ class Failure(AssertionError):
 
     @property
     def _unique_key(self) -> str:
-        # Coarse but stable: one finding per operation per failure class. A message-derived key
-        # would change every time wording improves, which a stored key cannot survive.
+        # One finding per operation and failure class; a message-derived key would break stored keys on rewording.
         return ""
 
     def related_case_ids(self) -> tuple[str, ...]:
-        """Other case IDs whose request/response history is needed to reproduce this failure.
-
-        Default: none. Subclasses override when reproduction depends on a sibling case
-        (e.g. `UseAfterFree` references the prior DELETE).
-        """
+        """Other case IDs needed to reproduce this failure, e.g. the prior DELETE for `UseAfterFree`."""
         return ()
 
     def identity_roles(self) -> dict[str, str]:
@@ -203,8 +194,6 @@ class CustomFailure(Failure):
 
 
 class ResponseTimeExceeded(Failure):
-    """Response took longer than expected."""
-
     code = "ST112"
     checks = ("max_response_time",)
     kind_title = "Response time limit exceeded"
@@ -236,8 +225,6 @@ def is_reproducible_failure(failure: Failure) -> bool:
 
 
 class ServerError(Failure):
-    """Server responded with an error."""
-
     code = "ST101"
     checks = ("not_a_server_error",)
     kind_title = "Server error"
@@ -313,8 +300,6 @@ class ContentTypeServerError(ServerError):
 
 
 class MalformedJson(Failure):
-    """Failed to deserialize JSON."""
-
     code = "ST109"
     checks = ("response_schema_conformance",)
     kind_title = "JSON deserialization error"
@@ -360,8 +345,6 @@ class MalformedJson(Failure):
 
 
 class AcceptedNegativeData(Failure):
-    """Response with negative data was accepted."""
-
     code = "ST201"
     checks = ("negative_data_rejection",)
     kind_title = "Schema-violating request accepted"
@@ -445,7 +428,6 @@ def reproducible_by_identity(failures: Sequence[Failure]) -> bool:
 
 
 def case_header(index: int, case_id: str) -> str:
-    """The heading of a numbered failure block."""
     return f"{index}. Test Case ID: {case_id}"
 
 
@@ -459,7 +441,6 @@ def format_failures(
     formatter: BlockFormatter | None = None,
     config: OutputConfig,
 ) -> str:
-    """Format failure information with custom styling."""
     formatter = formatter or (lambda _, x: x)
 
     if case_id is not None:
@@ -476,7 +457,6 @@ def format_failures(
                 output += textwrap.indent(failure.message, "    ")
         output += "\n"
 
-    # Response status
     if isinstance(response, Response):
         # A transport-provided status line already carries its own message, so it ends without a colon.
         if response.status_line is not None:

@@ -96,8 +96,7 @@ def render_replay(
     trailing_blank = False
     for crash, outcome in zip(crashes, outcomes, strict=True):
         trailing_blank = _print_compact_block(console, crash, outcome)
-    # Separate the rollup list from what follows, but only when it printed something
-    # (the run header already emits a trailing blank).
+    # Separate the rollup from what follows when it printed something; the run header already ends with a blank.
     if crashes and not trailing_blank:
         console.print()
 
@@ -235,8 +234,7 @@ def _print_step_chain(
 
     failing_index = len(sequence) - 1
     step_outcomes = outcome.step_outcomes
-    # Size each column to the content actually present (paths truncated to a terminal-derived cap),
-    # so short methods/paths don't leave a wide gap before the status.
+    # Size columns to the content present, with paths capped by terminal width, so short ones leave no wide gap.
     path_limit = min(STEP_PATH_MAX, max(20, get_terminal_width() - 36))
     paths = [truncate_text(_step_path(step), path_limit) for step in sequence]
     operation_labels: list[str | None] = []
@@ -278,8 +276,7 @@ def _print_step_chain(
         else:
             row.append(operation_label.ljust(path_column), style="white")
         row.append("  ")
-        # Show a single status when the step reproduced identically; only spell out
-        # `recorded -> replayed` when the status actually drifted.
+        # One status when the step reproduced it; `recorded -> replayed` only when it drifted.
         row.append(
             status_label(step.response_status, schema.status_name_for_code),
             style=_status_style(schema, step.response_status),

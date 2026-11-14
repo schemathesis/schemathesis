@@ -26,8 +26,7 @@ def test_string_filter(value, expected):
 @pytest.mark.parametrize(
     "value,expected",
     [
-        # 0/1/-1 are unreachable in practice (Hypothesis already drops them),
-        # but the filter is defensive.
+        # Hypothesis already drops 0/1/-1, but the filter rejects them as well.
         (0, False),
         (1, False),
         (-1, False),

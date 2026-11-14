@@ -1,10 +1,4 @@
-"""Stateful testing for gRPC: response fields of one method fill request fields of another.
-
-Links follow Google API conventions:
-
-- `Create<X>` returns a resource whose `name` feeds the `name` request field of `Get<X>`, `Update<X>` and `Delete<X>`.
-- A method with a `page_token` request field and a `next_page_token` response field pages through its own results.
-"""
+"""Stateful testing for gRPC: response fields of one method fill request fields of another."""
 
 from __future__ import annotations
 
@@ -83,7 +77,11 @@ class Produced:
 
 
 def infer_links(operations: Iterable[APIOperation]) -> list[GrpcLink]:
-    """Links between the given unary methods, by Google API naming conventions."""
+    """Links between the given unary methods, by Google API naming conventions.
+
+    `Create<X>` feeds its resource `name` to `Get<X>`, `Update<X>` and `Delete<X>`; a method with `page_token` and
+    `next_page_token` fields pages through its own results.
+    """
     by_label = {operation.label: operation for operation in operations}
     links = []
     for label, operation in by_label.items():

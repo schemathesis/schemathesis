@@ -93,8 +93,7 @@ _NO_SANITIZATION = SanitizationConfig(enabled=False)
 
 @lru_cache
 def get_full_path(base_path: str, path: str) -> str:
-    # `base_path` is already in wire form; doubling its `%` keeps it whole through the `unquote`
-    # that undoes the `quote` guarding `path` from being read as an absolute URL.
+    # Double `%` so wire-form `base_path` survives `unquote`; `quote` stops `path` parsing as an absolute URL.
     return unquote(urljoin(base_path.replace("%", "%25"), quote(path.lstrip("/"))))
 
 
@@ -135,8 +134,7 @@ class BaseSchema(Mapping):
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
-        # Probe-driven runtime state mutated by the engine across phases of a single run.
-        # Concrete schemas may extend with spec-specific overlays.
+        # Engine probes update this state across the phases of one run; spec schemas may extend it.
         self._probe_state = RuntimeProbeState()
 
     @property
@@ -199,11 +197,7 @@ class BaseSchema(Mapping):
 
     @abstractmethod
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
-        """Apply spec-specific authentication to a test case.
-
-        Returns True if authentication was applied, False otherwise.
-        Subclasses should implement this to provide spec-specific auth mechanisms.
-        """
+        """Apply spec-specific authentication to `case`; return whether any was applied."""
         raise NotImplementedError
 
     def auth_flow(self) -> AuthFlow | None:
@@ -362,9 +356,7 @@ class BaseSchema(Mapping):
 
     @property
     def base_path(self) -> str:
-        """Base path for the schema."""
-        # if `base_url` is specified, then it should include base path
-        # Example: http://127.0.0.1:8080/api
+        """Path of the configured `base_url`, else the schema's declared base path; always ends with `/`."""
         if self.config.base_url:
             path = urlsplit(self.config.base_url).path
         else:
@@ -425,9 +417,8 @@ class BaseSchema(Mapping):
     def parametrize(self) -> Callable:
         """Return a decorator that marks a test function for `pytest` parametrization.
 
-        The decorated test function will be parametrized with test cases generated
-        from the schema's API operations. The same base function can be reused with
-        multiple schemas by assigning the result of each call to a distinct name.
+        The decorated function runs with test cases generated from the schema's API operations. To reuse it with
+        several schemas, assign the result of each call to a distinct name.
 
         Returns:
             Decorator function for test parametrization.
@@ -493,9 +484,9 @@ class BaseSchema(Mapping):
         return cloned
 
     def get_local_hook_dispatcher(self) -> HookDispatcher | None:
-        # It might be not present when it is used without pytest via `APIOperation.as_strategy()`
+        # No test function outside pytest, e.g. via `APIOperation.as_strategy()`
         if self.test_function is not None:
-            # Might be missing it in case of `LazySchema` usage
+            # No dispatcher with `LazySchema`
             return HookDispatcherMark.get(self.test_function)
         return None
 
@@ -607,12 +598,7 @@ class BaseSchema(Mapping):
 
     @abstractmethod
     def create_extra_data_source(self) -> ExtraDataSource | None:
-        """Create an extra data source for augmenting test generation with real data.
-
-        Returns:
-            ExtraDataSource instance or None if not supported by this schema type.
-
-        """
+        """Data source that augments generation with real data; `None` when the schema type has none."""
         raise NotImplementedError
 
     def validate_response(
@@ -654,7 +640,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def revalidate_case_metadata(self, case: Case) -> None:
-        """Refresh case metadata after a container was modified; default just clears the dirty markers."""
+        """Refresh case metadata after a container was modified; the default clears the dirty markers."""
         meta = case._meta
         if meta is None or not meta.is_dirty():
             return
@@ -733,8 +719,7 @@ class BaseSchema(Mapping):
         path = prepare_path(case.path, case.path_parameters).lstrip("/")
         if not base_url.endswith("/"):
             base_url += "/"
-        # The base URL is already in wire form, so double its `%` to survive the `unquote` that undoes the path's
-        # `quote` — decoding it would turn an escaped reserved character such as `%3F` into a live delimiter.
+        # Double `%` in the wire-form base URL so `unquote` keeps escapes like `%3F` from turning into delimiters.
         return unquote(urljoin(base_url.replace("%", "%25"), quote(path)))
 
     def build_url_template(self, case: Case, base_url: str) -> str:
@@ -746,37 +731,25 @@ class BaseSchema(Mapping):
         return case.body
 
     def evaluate_server_error(self, case: Case, response: Response) -> None:
-        """Raise a Failure if the schema's own conventions classify this response as a server error.
-
-        Default no-op; specs whose errors aren't fully captured by HTTP status (e.g. GraphQL 200 + errors body) override.
-        """
+        """Raise a failure if spec conventions flag the response as a server error, e.g. GraphQL 200 with `errors`."""
 
     def evaluate_auth(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
-        """Raise a Failure if the operation answers without the credentials the request carried.
+        """Raise a failure if the operation answers without the credentials the request carried.
 
-        Default skips the check; specs that can tell whether credentials are enforced override.
+        The default skips the check; specs that can tell whether credentials are enforced override it.
         """
         return True
 
     def server_error(self, case: Case, response: Response) -> ServerError:
-        """The failure an error status reports.
-
-        Specs whose error responses carry a status name or a machine-readable origin (e.g. gRPC library errors) override.
-        """
+        """The failure an error status reports; specs with status names or error origins, e.g. gRPC, override it."""
         return ServerError(operation=case.operation.label, status_code=response.status_code)
 
     def evaluate_negative_data(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
-        """Raise a Failure if the schema's own conventions show that invalid data was accepted.
-
-        Default no-op; specs that can tell accepted data from rejected data override.
-        """
+        """Raise a failure if the spec's conventions show that invalid data was accepted; the default does nothing."""
         return None
 
     def evaluate_positive_data(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
-        """Raise a Failure if the schema's own conventions show that valid data was rejected.
-
-        Default no-op; specs that can tell accepted data from rejected data override.
-        """
+        """Raise a failure if the spec's conventions show that valid data was rejected; the default does nothing."""
         return None
 
     def status_name_for_code(self, status_code: int) -> str | None:
@@ -815,10 +788,9 @@ class BaseSchema(Mapping):
         return hash((request.method, request.url, headers, request.body))
 
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
-        """Decide what the API did with a request carrying positive test data.
+        """Decide what the API did with a request carrying positive test data, judging by status code.
 
-        Status codes carry the answer by default; specs that respond 200 regardless of the outcome
-        (e.g. GraphQL) override this and read the body instead.
+        Specs that answer 200 regardless of the outcome (e.g. GraphQL) override this to read the body.
         """
         status_code = response.status_code
         if 200 <= status_code < 300:
@@ -997,7 +969,6 @@ class ParameterSet(Generic[P]):
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     def add(self, parameter: P) -> None:
-        """Add a new parameter."""
         self.items.append(parameter)
 
     def get(self, name: str) -> P | None:
@@ -1044,12 +1015,7 @@ class UndeclaredResponses:
 
 @dataclass(repr=False)
 class OperationDefinition:
-    """A wrapper to store not resolved API operation definitions.
-
-    To prevent recursion errors we need to store definitions without resolving references. But operation definitions
-    itself can be behind a reference (when there is a ``$ref`` in ``paths`` values), therefore we need to store this
-    scope change to have a proper reference resolving later.
-    """
+    """API operation definition with references left unresolved, which prevents recursion errors."""
 
     raw: Any
 
@@ -1062,9 +1028,7 @@ class OperationDefinition:
 class APIOperation(Generic[P, R, S, SchemaT]):
     """An API operation (e.g., `GET /users`)."""
 
-    # `path` does not contain `basePath`
-    # Example <scheme>://<host>/<basePath>/users - "/users" is path
-    # https://swagger.io/docs/specification/2-0/api-host-and-base-path/
+    # Excludes `basePath`: in `<scheme>://<host>/<basePath>/users`, `path` is `/users`.
     path: str
     method: HttpMethodSchema
     definition: OperationDefinition = field(repr=False)
@@ -1126,15 +1090,14 @@ class APIOperation(Generic[P, R, S, SchemaT]):
 
     def is_testable_in(self, phase: str) -> bool:
         """Whether the given test phase can send this operation the data its schema describes."""
-        # An operation whose required body has no usable schema cannot be sent valid data, so every phase
-        # but coverage - which tests it by omitting the body - would judge it on data it never described.
+        # A required body with no usable schema rules out valid data; only coverage tests it, by omitting the body.
         return phase == TestPhase.COVERAGE or not self.has_skipped_required_body
 
     def iter_parameters(self) -> Iterator[P]:
         return chain(self.path_parameters, self.headers, self.cookies, self.query)
 
     def _lookup_container(self, location: str) -> ParameterSet[P] | PayloadAlternatives[P] | None:
-        # Hand-rolled chain — the function is hot and is called per parameter on every operation.
+        # Hand-rolled chain: a hot path, called per parameter of every operation.
         if location == "query" or location == "querystring":
             return self.query
         if location == "path":
@@ -1160,10 +1123,7 @@ class APIOperation(Generic[P, R, S, SchemaT]):
         raise ValueError(f"`{location.value}` is not a parameter location")
 
     def add_parameter(self, parameter: P) -> None:
-        # If the parameter has a typo, then by default, there will be an error from `jsonschema` earlier.
-        # But if the user wants to skip schema validation, we choose to ignore a malformed parameter.
-        # In this case, we still might generate some tests for an API operation, but without this parameter,
-        # which is better than skip the whole operation from testing.
+        # A malformed parameter gets here only with schema validation off; drop it and test the rest of the operation.
         container = self._lookup_container(parameter.location)
         if container is not None:
             container.add(parameter)

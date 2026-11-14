@@ -7,7 +7,7 @@ from dataclasses import dataclass
 # Below this many observations, the success/failure ratio is too noisy to act on.
 MIN_SAMPLES = 3
 DEFAULT_USE_PROBABILITY = 1.0
-# Floor selection probability so a recovered op can re-enter the schedule.
+# Floor so a recovered operation can re-enter the schedule.
 MIN_USE_PROBABILITY = 0.05
 TIGHTEN_AFTER_FAILURES = 2
 TIGHTENED_TIMEOUT_SECONDS = 1.0
@@ -20,12 +20,6 @@ PHASE_FATAL_WINDOW_SECONDS = 30.0
 
 @dataclass(slots=True)
 class OperationHealth:
-    """Per-operation completion vs transport-failure bookkeeping.
-
-    `use_probability` is the observed success ratio clamped to a floor;
-    below `MIN_SAMPLES` total observations, returns `DEFAULT_USE_PROBABILITY`.
-    """
-
     completed: int = 0
     transport_failures: int = 0
     # Slowest answered request, in seconds; `None` until a request with known duration is answered.
@@ -44,8 +38,7 @@ class OperationHealth:
 class HealthState:
     """Per-operation answers and transport failures, shared by every phase.
 
-    Mutations are lock-guarded; reads run lock-free on the scheduler hot path
-    and may observe slightly stale snapshots but never torn state.
+    Writes take the lock; scheduler reads skip it and may see stale, never torn, state.
     """
 
     __slots__ = (
@@ -63,8 +56,7 @@ class HealthState:
         self._first_failure_time: float | None = None
         # Transport failures as `(operation label, time)`, oldest first; pruned to the abort window.
         self._recent_failures: deque[tuple[str, float]] = deque()
-        # Per-run snapshot of use-probabilities; stays stable across a Hypothesis replay so generation
-        # is reproducible. Refreshed at suite boundaries by `begin_iteration`; `operations` stays live.
+        # Use-probabilities frozen per suite so a Hypothesis replay stays reproducible; `operations` stays live.
         self._frozen_use_probability: dict[str, float] = {}
         self._lock = threading.Lock()
 

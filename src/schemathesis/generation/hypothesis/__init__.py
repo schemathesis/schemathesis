@@ -47,8 +47,7 @@ def setup() -> None:
 
         entropy.register_random = _register_random
 
-    # Forcefully initializes Hypothesis' global PRNG to avoid races that initialize it
-    # if e.g. Schemathesis CLI is used with multiple workers
+    # Initialize Hypothesis' global PRNG up front; multiple CLI workers would race to initialize it
     with deterministic_PRNG():
         pass
 
@@ -66,8 +65,7 @@ def setup() -> None:
 
     class RepresentationPrinter(pretty.RepresentationPrinter):
         def pretty(self, obj: object, *, cycle: bool = False) -> None:
-            # This one takes way too much - in the coverage phase it may give >2 orders of magnitude improvement
-            # depending on the schema size (~300 seconds -> 4.5 seconds in one of the benchmarks)
+            # Pretty-printing large values is costly, most of all in the coverage phase
             return None
 
     # Hypothesis exposes no hook for its printer, so the class is swapped in place.

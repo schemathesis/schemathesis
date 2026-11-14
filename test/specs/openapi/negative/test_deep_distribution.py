@@ -34,8 +34,7 @@ def test_deep_leaf_bug_detected_via_negative_fuzzing(ctx, cli, snapshot_cli):
 
 
 def test_negative_fuzzing_spreads_mutations_across_depths_and_operators(ctx):
-    # `continue_on_failure` so the whole budget runs: stopping at the first failure leaves too few mutations
-    # for every depth to appear, and heterogeneous cases (~9% chance each secondary fires) never show up.
+    # An early stop leaves too few mutations for every depth and for heterogeneous cases, so the whole budget runs.
     api = ctx.openapi.apps.deep_leaf_bug()
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.seed = 42
@@ -70,7 +69,7 @@ def test_negative_fuzzing_spreads_mutations_across_depths_and_operators(ctx):
 
 
 def test_value_channel_produces_format_uuid_near_miss(ctx):
-    # 300 examples with continue_on_failure: value channel fires ~15%, picking format:uuid ~1/14 times.
+    # Few cases use the value channel and fewer of them pick `format: uuid`, hence 300 examples.
     api = ctx.openapi.serve(nested.additional_properties_bug())
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.seed = 42
@@ -110,9 +109,7 @@ BODY_WITH_NO_ADDITIONAL_PROPERTIES = {
 
 @pytest.mark.hypothesis_nested
 def test_additional_properties_negation_stays_invalid(ctx):
-    # See GH-4332. Negating `additionalProperties` drops the `properties` context it is defined
-    # against, so the mutated schema still admits bodies valid against the original.
-    # 500 examples because only a small fraction of draws pick this keyword combination.
+    # GH-4332: negated `additionalProperties` loses its `properties` context; 500 examples as few draws pick this mix.
     operation = ctx.openapi.load_operation(
         "POST /reset",
         {

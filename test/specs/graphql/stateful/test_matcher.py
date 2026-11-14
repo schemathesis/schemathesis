@@ -66,7 +66,7 @@ def test_candidate_handle(index, scalar, argument, enclosing, expected):
 
 
 def test_id_fast_paths_unchanged_without_index():
-    # With no index only the id fast paths run, matching pre-handle behavior.
+    # Without an index only the id fast paths run.
     assert candidate_handle(scalar_name="ID", argument_name="ownerId", enclosing_field_type=None, index=None) == Handle(
         "Owner", "id"
     )

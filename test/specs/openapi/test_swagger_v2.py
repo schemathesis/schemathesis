@@ -677,7 +677,7 @@ def test_multiple_path_parameters_resolve(ctx):
     captured = api.calls_under("/api/orgs/")
     assert captured
     for call in captured:
-        # Path: /api/orgs/{org_id}/users/{user_id} — both segments must be filled.
+        # `/api/orgs/{org_id}/users/{user_id}` needs both segments filled.
         segments = call.path.split("/")
         assert len(segments) == 6
         assert segments[3] and segments[5]
@@ -722,8 +722,7 @@ def test_diverse_response_headers_accepted(ctx):
 
 
 def test_array_response_header_with_collection_format(ctx):
-    # Swagger 2.0 array response header serialised via collectionFormat: csv —
-    # the validator must split on the delimiter before evaluating against `type: array`.
+    # Swagger 2.0 sends a `csv` array header joined; the validator must split it before checking `type: array`.
     app, spec = ctx.openapi.make_flask_app(
         {
             "/array-header": {

@@ -53,15 +53,13 @@ def test_store_cassette(ctx, cli, cassette_path, hypothesis_max_examples, args, 
     assert len(interactions) >= 2
     assert cassette["seed"] == 1
 
-    # Basic validation on all interactions
     assert all("checks" in interaction for interaction in interactions)
     for interaction in interactions:
         assert len(interaction["checks"]) >= 1
         assert float(interaction["response"]["elapsed"]) >= 0
 
-    # In positive mode, verify we have the /success response
     if mode == "positive":
-        # Find the /success interaction (operation order may vary)
+        # Operation order may vary.
         success_idx = None
         for idx in range(len(interactions)):
             body = load_response_body(cassette, idx)
@@ -81,7 +79,6 @@ def test_store_cassette(ctx, cli, cassette_path, hypothesis_max_examples, args, 
             "message": None,
         }
     else:
-        # In other modes, just verify first interaction has expected properties
         first_interaction = interactions[0]
         assert first_interaction["status"] == "SUCCESS"
         if mode == "all":
@@ -123,7 +120,6 @@ def test_store_timeout(ctx, cli, cassette_path, format):
         assert len(data["log"]["entries"]) == 3
         assert data["log"]["entries"][1]["response"]["bodySize"] == -1
     else:
-        # ndjson format (externally tagged)
         events = load_ndjson(cassette_path)
         assert "Initialize" in events[0]
         assert events[0]["Initialize"]["seed"] == 1
@@ -131,7 +127,6 @@ def test_store_timeout(ctx, cli, cassette_path, format):
 
 def test_interaction_status(ctx, cli, hypothesis_max_examples, cassette_path):
     # See GH-695
-    # When an API operation has responses with SUCCESS and FAILURE statuses
     api = ctx.openapi.apps.flaky()
     cli.run_and_assert(
         api.schema_url,
@@ -142,17 +137,14 @@ def test_interaction_status(ctx, cli, hypothesis_max_examples, cassette_path):
     )
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) >= 1
-    # Then their statuses should be reflected in the "status" field
-    # And it should not be overridden by the overall test status
+    # Each interaction keeps its own status, not the overall test status.
     assert cassette["http_interactions"][0]["status"] == "FAILURE"
     assert "Internal Server Error" in load_response_body(cassette, 0)
 
 
 def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples):
     # See GH-708
-    # When the schema expects an input that is not ascii and represented as UTF-8
-    # And is not representable in CP1251. E.g. "àààà"
-    # And these interactions are recorded to a cassette
+    # A non-ASCII header value that CP1251 cannot encode must still reach the cassette.
     fixed_header = "àààà"
     header_name = "*lh"
     schema_path = ctx.openapi.write_schema(
@@ -184,9 +176,7 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples):
         "--checks=not_a_server_error",
         "--mode=positive",
     )
-    # And there should be no signs of encoding errors
     assert "UnicodeEncodeError" not in result.stdout
-    # And the cassette should be correctly recorded
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 2
     assert cassette["http_interactions"][0]["request"]["headers"][header_name] == [fixed_header]
@@ -442,8 +432,6 @@ def test_output_sanitization(ctx, cli, hypothesis_max_examples, cassette_path, v
 
 
 def test_forbid_preserve_bytes_without_cassette_path(ctx, cli, snapshot_cli):
-    # When `--report-preserve-bytes` is specified without `--report-vcr-path` or `--report=vcr`
-    # Then it is an error
     api = ctx.openapi.apps.success()
     assert cli.run(api.schema_url, "--report-preserve-bytes") == snapshot_cli
 
@@ -451,7 +439,6 @@ def test_forbid_preserve_bytes_without_cassette_path(ctx, cli, snapshot_cli):
 @pytest.mark.parametrize("in_config", [True, False])
 def test_report_dir(ctx, cli, tmp_path, in_config):
     api = ctx.openapi.apps.success()
-    # When report directory is specified with a report format
     report_dir = tmp_path / "reports"
     args = [
         "--max-examples=1",
@@ -462,11 +449,9 @@ def test_report_dir(ctx, cli, tmp_path, in_config):
     else:
         args = ["--report=junit", f"--report-dir={report_dir}", *args]
     cli.run(api.schema_url, *args, **kwargs)
-    # And the report should be created in the specified directory
     assert report_dir.exists()
     assert list(report_dir.glob("*.xml"))
 
-    # When multiple report formats are specified
     args = [
         "--max-examples=1",
     ]
@@ -483,7 +468,6 @@ def test_report_dir(ctx, cli, tmp_path, in_config):
     else:
         args = [f"--report-dir={report_dir}", "--report=vcr,har,ndjson", *args]
     cli.run(api.schema_url, *args, **kwargs)
-    # Then all reports should be created in the specified directory
     assert list(report_dir.glob("*.yaml"))
     assert list(report_dir.glob("*.json"))
     assert list(report_dir.glob("*.ndjson"))

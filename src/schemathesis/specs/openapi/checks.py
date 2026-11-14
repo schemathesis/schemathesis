@@ -221,11 +221,9 @@ def _reraise_malformed_media_type(case: Case, location: str, actual: str, define
 def response_headers_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     from schemathesis.specs.openapi.validation import maybe_raise_one_or_more
 
-    # Find the matching response definition
     response_definition = case.operation.responses.find_by_status_code(response.status_code)
     if response_definition is None:
         return None
-    # Check whether the matching response definition has headers defined
     headers = response_definition.headers
     if not headers:
         return None
@@ -294,9 +292,7 @@ def _coerce_header_value(value: str, schema: dict[str, Any], *, explode: bool = 
 
     # An untyped schema also admits arrays, but its header value is not a delimited list.
     if "array" in types and "type" in schema:
-        # Swagger 2.0: array headers use `collectionFormat` (default `csv`) to define
-        # how items are joined into a single header value. Split the wire form into
-        # items, then coerce each one against `items` so non-string element types validate.
+        # Swagger 2.0 joins items with `collectionFormat` (default `csv`); each split item is coerced against `items`.
         collection_format = schema.get("collectionFormat", "csv")
         delimiter = COLLECTION_FORMAT_DELIMITERS.get(collection_format)
         if delimiter is None:
@@ -319,12 +315,7 @@ def response_schema_conformance(ctx: CheckContext, response: Response, case: Cas
 
 
 def _is_stringifying_media_type(media_type: str) -> bool:
-    """Check if media type serializes all values to strings.
-
-    Textual media types and application/octet-stream convert any value
-    to a string representation during serialization (via str(value)).
-    This means negative-generated non-string values become valid strings after serialization.
-    """
+    """Whether the media type sends every value as a string, as text types and `application/octet-stream` do."""
     return media_types.is_sent_as_text_parts(media_types.parse(media_type)) or media_type == "application/octet-stream"
 
 
@@ -368,16 +359,7 @@ def _has_other_negated_location(case: Case, *locations: ParameterLocation) -> bo
 
 
 def _body_negation_becomes_valid_after_serialization(response: Response, case: Case) -> bool:
-    """Check if body negation becomes valid after serialization.
-
-    For media types like text/plain, any value gets stringified during serialization,
-    making it valid for string schemas. Skip negative_data_rejection ONLY if:
-    1. The body is the only negative component
-    2. AND the media type is stringifying
-
-    If there are other negative components (query, headers, etc.), we should still
-    check them even if the body negation is neutralized by serialization.
-    """
+    """Whether the body is the only negative part and turns valid once serialized, e.g. stringified as `text/plain`."""
     meta = case.meta
     if meta is None:
         return False
@@ -392,12 +374,11 @@ def _body_negation_becomes_valid_after_serialization(response: Response, case: C
     if not _is_stringifying_media_type(media_type) and not _form_body_is_valid_as_sent(response, case, media_type):
         return False
 
-    # Only the body is negative and it becomes valid once serialized
     return not _has_other_negated_location(case, ParameterLocation.BODY)
 
 
 def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str) -> bool:
-    """Whether a form body satisfies its schema as the server reads the fields actually sent."""
+    """Whether a form body satisfies its schema as the server reads the fields sent."""
     body = case.body
     if not isinstance(body, dict):
         return False
@@ -482,10 +463,9 @@ def _sent_form_fields(response: Response, media_type: str) -> Mapping[str, Seque
 
 
 def _body_negation_is_only_forbidden_property(case: Case) -> bool:
-    """Check if the body violates nothing but properties the request schema forbids outright.
+    """Whether the body breaks only properties the request schema forbids, such as read-only ones.
 
-    Read-only properties are rewritten to a schema nothing satisfies. The spec lets the owning
-    authority ignore such input instead of rejecting it, so accepting it is not a failure.
+    The spec lets servers ignore such input, so accepting it is no failure.
     """
     meta = case.meta
     assert meta is not None
@@ -514,26 +494,14 @@ def _body_negation_is_only_forbidden_property(case: Case) -> bool:
             return False
         return make_validator(permissive, validator_cls).is_valid(case.body)
     except Exception:
-        # Schemas or values the validator cannot read — can't tell what was negated
+        # Schemas or values the validator cannot read: what was negated is unknown
         return False
 
 
 def _single_element_array_becomes_valid_after_serialization(response: Response, case: Case) -> bool:
-    """Check if an array value for a scalar query parameter becomes valid after serialization.
+    """Whether array values for scalar query parameters reach the server as valid text.
 
-    Query arrays are serialized as repeated keys:
-    - Single-element [67] -> "?page=67" (identical to scalar 67)
-    - Multi-element [True, 1] -> "?page_size=True&page_size=1"
-
-    For single-element arrays, the serialized form is indistinguishable from a scalar,
-    so the server accepts it only when that element is valid for the original schema.
-
-    For multi-element arrays, some frameworks pick one value from repeated keys (e.g.
-    the last one). If any element in the array is valid for the original scalar schema,
-    the server may accept the request, making it an unreliable negative test.
-
-    Query values are also judged by the text actually sent, as nested lists and objects
-    serialize into repeated keys or their string representation.
+    `[67]` sends `?page=67` like a scalar, and frameworks may pick any repeated key, so one valid element suffices.
     """
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
 
@@ -574,8 +542,6 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
         if _declares_type(schema, "array"):
             continue
 
-        # A single element serializes identically to a scalar; multiple elements become repeated keys and
-        # some frameworks pick one of them. Either way, the request is valid if any element is.
         try:
             validator = param.get_validator()
         except Exception:
@@ -585,8 +551,7 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
             if validator.is_valid(element):
                 neutralized.add((location, param_name))
                 break
-            # Query values are transmitted as strings, so a string element like "44" produces the same wire
-            # form as int 44. Frameworks that coerce the raw query value to integer/number/boolean will accept it.
+            # A string like "44" sends like int 44, and frameworks coerce query text to numbers and booleans.
             if isinstance(element, str):
                 coerced = coerce_wire_string(element, expected_types)
                 if coerced is not None and numeric_wire_value_is_valid(coerced, validator.is_valid):
@@ -610,26 +575,19 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
 
 
 def _wire_value_matches_parameter(parameter: OpenApiParameter, wire_value: str) -> bool:
-    """Check whether the text actually sent for `parameter` satisfies its original schema."""
+    """Whether the text sent for `parameter` satisfies its original schema."""
     try:
         validator = parameter.get_validator()
     except Exception:
-        # Schema rejected by jsonschema_rs - validity is unknown, so don't report a failure.
+        # The validator rejects the schema, so validity is unknown and nothing is reported.
         return True
     return sent_text_is_valid(wire_value, validator.is_valid, parameter_types(parameter.validation_schema))
 
 
 def _type_mutations_become_valid_after_serialization(case: Case) -> bool:
-    """Check if every type mutation of a numeric path/query parameter becomes valid after serialization.
+    """Whether every type mutation of a numeric path or query parameter still parses as that type once sent as text.
 
-    Both path and query parameters are transmitted as strings on the wire, so a negative
-    type mutation for an integer/number parameter can still be accepted when the serialized
-    value is parseable as that numeric type.
-
-    - String mutations: the value is a string (e.g. "5") -> directly parseable.
-    - Object mutations for query: urlencode(doseq=True) iterates over dict keys, so a dict
-      like {"5": "x"} produces ?param=5, which is integer-parseable.
-    - Path parameters are additionally URL-decoded by servers (e.g. `%2B1` -> `+1`).
+    E.g. a string `"5"`, a query object `{"5": "x"}` sent as `?param=5`, or a path `%2B1` decoded to `+1`.
     """
     meta = case.meta
     if meta is None:
@@ -654,7 +612,7 @@ def _type_mutations_become_valid_after_serialization(case: Case) -> bool:
             return False
         locations.add(location)
 
-    # If there are other negative components, we should still validate them.
+    # Other negative locations still need checking
     return not _has_other_negated_location(case, *locations)
 
 
@@ -677,20 +635,13 @@ def _type_mutation_is_valid_on_wire(case: Case, location: ParameterLocation, nam
             wire_value = unquote(wire_value)
         return _wire_value_matches_parameter(parameter, wire_value)
     if location == ParameterLocation.QUERY and isinstance(value, dict):
-        # urlencode(doseq=True) iterates over dict keys, producing one query value per key.
-        # e.g. {"5": "x"} becomes ?page_size=5, which the server sees as a valid integer.
+        # `urlencode(doseq=True)` sends each dict key as a value: `{"5": "x"}` becomes `?page_size=5`.
         return any(_wire_value_matches_parameter(parameter, str(key)) for key in value)
     return False
 
 
 def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
-    """Check if a negative array path parameter reaches the server as a valid value.
-
-    Array path parameters serialize comma-joined (`simple` style). A negative value, whether a
-    string-typed example like `"hello,world"` or a fuzzing type mutation, whose comma-split form
-    validates against the original array schema is wire-identical to a valid array, so the server
-    may accept it.
-    """
+    """Whether a negative array path parameter, sent comma-joined, splits into a valid array, e.g. `"hello,world"`."""
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
 
     meta = case.meta
@@ -719,8 +670,7 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
             validator = parameter.get_validator()
         except Exception:
             return True
-        # `unquote` keeps `str` subclasses intact, and splitting an empty string keeps the input
-        # object; the validator rejects anything but a plain `str`.
+        # `unquote` and splitting an empty string keep `str` subclasses, which the validator rejects.
         items = unquote(str(value)).split(",")
         if validator.is_valid(items):
             return True
@@ -753,7 +703,7 @@ def _url_sent_to_operation(response: Response, case: Case) -> ParseResult | None
 
 
 def _sent_query_values(response: Response, case: Case) -> dict[str, list[str]] | None:
-    """Parse the query actually sent, or `None` if the request was not sent to this case's operation."""
+    """Parse the query sent, or `None` if the request did not go to this case's operation."""
     request_url = _url_sent_to_operation(response, case)
     if request_url is None:
         return None
@@ -766,7 +716,7 @@ def _query_as_sent(
     query: Mapping[str, object],
     container_schema: dict[str, Any],
 ) -> dict[str, object] | None:
-    """Replace generated query values with the text actually sent wherever the server reads that text as is."""
+    """Replace generated query values with the sent text wherever the server reads that text as is."""
     sent_values = _sent_query_values(response, case)
     if sent_values is None:
         return None
@@ -850,7 +800,7 @@ def _headers_as_read(headers: Mapping[str, object]) -> dict[str, object]:
 
 
 def _non_body_negative_values_match_schema(response: Response, case: Case) -> bool:
-    """Check if all negative non-body parameter values are still valid against their original schema."""
+    """Whether every negative non-body value still matches its original schema."""
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
     meta = case.meta
@@ -889,8 +839,7 @@ def _non_body_negative_values_match_schema(response: Response, case: Case) -> bo
                 # At least one parameter is invalid
                 return False
         except Exception:
-            # Schema rejected by jsonschema_rs (e.g. `{,3}` as an incomplete quantifier)
-            # — can't determine validity, so skip this location
+            # The validator rejects the schema (e.g. `{,3}`), so validity is unknown; skip this location
             continue
 
     return has_negative
@@ -946,8 +895,7 @@ def _openapi_negative_data_rejection(ctx: CheckContext, response: Response, case
             ):
                 extra_info = f"\nInvalid component: {phase.data.description}"
             else:
-                # Build structured message: parameter `name` in location - description
-                # For body, don't show parameter name (it's the media type, not useful)
+                # "parameter `name` in location - description"; a body omits the name, which is its media type
                 location = phase.data.parameter_location
                 if phase.data.parameter:
                     names = [phase.data.parameter]
@@ -1213,14 +1161,12 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
     data = meta.phase.data
     if data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD:
         if response.status_code != 405:
-            # Generated path parameters rarely point at an existing resource, and routing 404s before
-            # method dispatch. 405 is only guaranteed when the target resource exists.
+            # Drawn path ids rarely exist, and routing answers 404 before method dispatch can answer 405.
             if response.status_code == 404 and _targets_generated_resource(ctx, case.operation):
                 return None
             from schemathesis.specs.openapi.adapter.security import declares_security
 
-            # Most frameworks authenticate before method dispatch, so a protected operation rejects an
-            # undeclared method with 401/403 without ever reaching routing.
+            # Most frameworks authenticate before method dispatch, so protected operations answer 401/403 instead.
             if response.status_code in AUTH_REJECTION_STATUSES and declares_security(case.operation):
                 return None
             # Rate limiters usually run as middleware ahead of routing and throttle every method alike.
@@ -1285,19 +1231,14 @@ def allow_header_conformance(ctx: CheckContext, response: Response, case: Case) 
 
 
 def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
-    # Check if the case contains only additional properties in query, headers, or cookies.
-    # This function is used to determine if negation is solely in the form of extra properties,
-    # which are often ignored for backward-compatibility by the tested apps
+    # Whether the only negation is extra query, header or cookie properties, which apps often ignore for compatibility
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
     meta = case.meta
     if meta is None or not isinstance(case.operation.schema, OpenApiSchema):
         # Ignore manually created cases
         return False
-    # Component-mode flags overestimate negation: the engine flips a location's mode
-    # to negative whenever it tries to negate, even when it falls back to positive
-    # (e.g. path params that can't be negated). When per-case mutation metadata is
-    # available, trust the actually-targeted location over the coarse flags.
+    # Component modes turn negative on any negation attempt, even one that fell back to positive; mutations are exact.
     phase_data = meta.phase.data
     if isinstance(phase_data, FuzzingPhaseData) and phase_data.mutations:
         targeted = {phase_data.parameter_location, *(mutation.parameter_location for mutation in phase_data.mutations)}
@@ -1358,8 +1299,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                             value_without_additional_properties[name] = None
                 is_valid = make_validator(schema, validator_cls).is_valid(value_without_additional_properties)
             except Exception:
-                # Schema has an invalid pattern (e.g., valid Python regex but invalid ECMA 262)
-                # — can't determine validity, so skip this location
+                # A pattern valid in Python but not in ECMA 262 leaves validity unknown; skip this location
                 continue
             if not is_valid:
                 # Other types of negation found
@@ -1395,17 +1335,7 @@ def _boolean_from_wire_spelling(
 
 
 def _has_serialization_sensitive_types(properties: Mapping[str, JsonSchema], container: OpenApiParameterSet) -> bool:
-    """Check if schema contains array or object types in defined parameters.
-
-    In query/header/cookie parameters, arrays and objects are serialized to strings.
-    This makes post-serialization validation against the original schema unreliable:
-
-    - Generated: ["foo", "bar"] (array)
-    - Serialized: "foo,bar" (string)
-
-    Validation of string against array schema fails incorrectly.
-    A better approach would be to apply serialization later on in the process.
-    """
+    """Whether a declared parameter admits arrays or objects, which are sent as strings the original schema rejects."""
     return any(
         _allows_container_type(prop_schema) for prop_name, prop_schema in properties.items() if prop_name in container
     )
@@ -1425,8 +1355,7 @@ def _parameter_schemas(container_schema: dict[str, Any]) -> dict[str, JsonSchema
     return {name: schema_with_bundle(subschema, container_schema) for name, subschema in properties.items()}
 
 
-# Methods that cannot re-create a resource — reading, modifying-in-place, or removing.
-# Only POST and PUT (and custom verbs not in this set) are considered potential re-creation methods.
+# Methods that read, modify in place or remove, so cannot re-create a resource; POST, PUT and custom verbs can.
 _NON_CREATION_METHODS = frozenset(("get", "head", "options", "query", "delete", "patch"))
 
 
@@ -1437,13 +1366,9 @@ def _resource_recreated_after_delete(
     current_case_id: str,
     delete_path: ResourcePath,
 ) -> bool:
-    """Return True if a resource was re-created after the DELETE and before the current case.
+    """Whether a successful creation on a prefix of the DELETE path ran between the DELETE and the current case.
 
-    Scans all recorded cases in execution order (across every branch and every root
-    transition in the scenario).  Any successful creation whose path is a prefix of
-    the DELETE path that occurs *between* the DELETE step and the current step means
-    the resource may have been re-created — for example via a circular link
-    (DELETE -> POST) or via a second root POST that reuses a freed resource ID.
+    Covers every recorded case in order, so circular links (DELETE then POST) and root POSTs reusing an id count.
     """
     found_delete = False
     for case in ctx.internals.find_all_cases():
@@ -1469,11 +1394,9 @@ def _resource_recreated_after_delete(
 
 
 def _created_a_resource(*, parent: Case, parent_response: Response, case: Case) -> bool:
-    """Whether a successful POST means the resource the follow-up reads was created.
+    """Whether a successful POST created the resource the follow-up reads.
 
-    A POST to a collection creates the item below it. A POST to the item's own URI could equally
-    be a rename, an action, or a delete spelled with the wrong verb, so it has to say that it
-    created something.
+    A POST to a collection does; one to the item URI may be a rename or an action, so it needs 201 or `Location`.
     """
     if len(parent.path.rstrip("/").split("/")) < len(case.path.rstrip("/").split("/")):
         return True
@@ -1495,17 +1418,15 @@ def _stale_cache_hint(response: Response) -> str:
 @requires_openapi_schema
 @skips_on_unexpected_http_status
 def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    # Only check for use-after-free on successful responses (2xx) or redirects (3xx)
-    # Other status codes indicate request-level issues / server errors, not successful resource access
+    # Only 2xx and 3xx show a successful read; other statuses are request issues or server errors
     if not (200 <= response.status_code < 400):
         return None
 
-    # DELETE is idempotent (RFC 7231 §4.2.2 / §4.3.5): a repeated DELETE may return 200/204, not 404.
+    # DELETE is idempotent (RFC 7231, sections 4.2.2 and 4.3.5): a repeated DELETE may return 200/204, not 404.
     if case.operation.method.lower() == "delete":
         return None
 
-    # PUT, POST, and other creation-capable verbs re-create the resource at the target URI,
-    # so a successful response is a re-creation, not a use-after-free.
+    # PUT, POST and other creating verbs re-create the resource, so success is no use-after-free.
     if case.operation.method.lower() not in _NON_CREATION_METHODS:
         return None
 
@@ -1516,8 +1437,7 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
 
         parent_response = ctx.internals.find_response(case_id=parent.id)
 
-        # The DELETE itself must have succeeded for a subsequent read to be a use-after-free —
-        # a 5xx (server crash) or 404 (nothing to delete) leaves the resource intact.
+        # Only a successful DELETE frees the resource; a 5xx or 404 leaves it intact.
         delete_response = ctx.internals.find_response(case_id=related_case.id)
         if (
             related_case.operation.method.lower() == "delete"
@@ -1527,9 +1447,7 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
             and 200 <= delete_response.status_code < 300
             and related_case.path_parameters
         ):
-            # A DELETE without path parameters targets a collection, not a specific
-            # resource — a follow-up read on the same path is a list read, not
-            # use-after-free.
+            # A DELETE without path parameters targets a collection, so a later read on that path is a list read.
             delete_path = ResourcePath(related_case.path, related_case.path_parameters or {})
             if _is_prefix_operation(
                 delete_path,
@@ -1565,10 +1483,7 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
 @requires_openapi_schema
 @skips_on_unexpected_http_status
 def ensure_resource_availability(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    # Only check for 404 (Not Found) responses - other 4XX are not resource availability issues
-    # 422 / 400: Validation errors (bad request data)
-    # 401 / 403: Auth issues (expired tokens, permissions)
-    # 409: Conflict errors
+    # Only 404 signals a missing resource; 400/422 are validation, 401/403 auth and 409 conflict errors
     if response.status_code != 404:
         return None
 
@@ -1601,17 +1516,11 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     if not overrides_all_parameters:
         return None
 
-    # Look for any successful DELETE operations on this resource across all recorded cases,
-    # not just the current root's subtree.
+    # Any successful DELETE of this resource counts, not only those under the current root
     if ctx.internals.recorder is not None and resource_was_deleted(ctx.internals.recorder, case, created_by=parent.id):
-        # Resource was properly deleted, 404 is expected
+        # The resource was deleted, so 404 is expected
         return None
 
-    # If we got here:
-    # 1. Resource was created successfully
-    # 2. Current operation returned 4XX
-    # 3. All parameters come from links
-    # 4. No successful DELETE operations found
     created_with = parent.operation.label
     not_available_with = case.operation.label
     reason = http.client.responses.get(response.status_code, "Unknown")
@@ -1635,7 +1544,7 @@ class AuthKind(enum.StrEnum):
 
 @schemathesis.check
 def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    """Check if an operation declares authentication as a requirement but does not actually enforce it."""
+    """Check if an operation declares authentication as a requirement but does not enforce it."""
     return case.operation.schema.evaluate_auth(ctx, response, case)
 
 
@@ -1650,7 +1559,6 @@ def _openapi_ignored_auth(ctx: CheckContext, response: Response, case: Case) -> 
     if case.meta is not None and case.meta.is_negative_at(ParameterLocation.PATH):
         return None
     security_parameters = get_security_parameters(case.operation)
-    # Authentication is required for this API operation and response is successful
     if security_parameters and 200 <= response.status_code < 300:
         # Probes can't remove credentials the schema doesn't declare, so their outcome proves nothing
         if _has_undeclared_explicit_authorization(ctx, response, security_parameters):
@@ -1664,13 +1572,11 @@ def _openapi_ignored_auth(ctx: CheckContext, response: Response, case: Case) -> 
             # Enforcement is a property of the operation, so one confirmation per run is enough.
             if enforced is not None and case.operation.label in enforced:
                 return None
-            # Auth is explicitly set, it is expected to be valid
-            # Check if invalid auth will give an error
+            # Explicit auth should be valid, so probe without it and with invalid values
             no_auth_case = remove_auth(case, security_parameters)
             no_auth_response = send_probe(ctx, case, no_auth_case)
             if not _enforces_auth(no_auth_response, response):
                 _raise_no_auth_error(no_auth_response, no_auth_case, AuthScenario.NO_AUTH)
-            # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
                 invalid_auth_case = remove_auth(case, security_parameters)
                 set_auth_for_case(invalid_auth_case, parameter)
@@ -1680,8 +1586,7 @@ def _openapi_ignored_auth(ctx: CheckContext, response: Response, case: Case) -> 
             if enforced is not None:
                 enforced.add(case.operation.label)
         elif auth == AuthKind.GENERATED:
-            # If this auth is generated which means it is likely invalid, then
-            # this request should have been an error
+            # Generated auth is likely invalid, so this request should have failed
             _raise_no_auth_error(response, case, AuthScenario.GENERATED_AUTH)
         else:
             # Successful response when there is no auth
@@ -1849,7 +1754,6 @@ def _is_prefix_operation(lhs: ResourcePath, rhs: ResourcePath) -> bool:
     lhs_parts = lhs.value.rstrip("/").split("/")
     rhs_parts = rhs.value.rstrip("/").split("/")
 
-    # Left has more parts, can't be a prefix
     if len(lhs_parts) > len(rhs_parts):
         return False
 
@@ -1861,20 +1765,15 @@ def _is_prefix_operation(lhs: ResourcePath, rhs: ResourcePath) -> bool:
             if target != resource and not target.startswith(f"{resource}:"):
                 return False
         elif left != right and left.rstrip("s") != right.rstrip("s"):
-            # Parts don't match, not a prefix
             return False
 
-    # If we've reached this point, the LHS path is a prefix of the RHS path
     return True
 
 
 def resource_was_deleted(recorder: RecordedScenario, case: Case, *, created_by: str | None = None) -> bool:
-    """Return True if a successful prior request in the scenario removed this case's resource.
+    """Whether a successful earlier request in the scenario removed this case's resource.
 
-    A DELETE covers every path below the one it targets. Any other unsafe verb may be a removal
-    spelled with the wrong method, so it only counts against the resource's own URI. Used to
-    suppress false positives in checks and in link-calibration observations. The request that created
-    the resource is not a removal of it.
+    A DELETE covers paths below its target; other unsafe verbs count only on the resource URI, never its creator.
     """
     case_path = ResourcePath(case.path, case.path_parameters or {})
     for prior_case in recorder.find_all_cases():

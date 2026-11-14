@@ -83,8 +83,7 @@ def flaky() -> OpenAPIApp:
 
 
 def ignored_auth() -> OpenAPIApp:
-    # Endpoint declares heisenAuth but the handler ignores it; used to verify the
-    # `ignored_auth` check fires when the server doesn't actually require declared credentials.
+    # Declares heisenAuth, but the handler ignores it, so the `ignored_auth` check fires.
     return flask_app(schemas.ignored_auth(), handlers.register_ignored_auth, components=_HEISEN_AUTH_SCHEME)
 
 
@@ -175,7 +174,7 @@ def invalid_path_parameter() -> OpenAPIApp:
 
 
 def missing_path_parameter() -> OpenAPIApp:
-    # Path declares `{id}` but no `parameters` section — surfaces as a schema error.
+    # Path declares `{id}` without a `parameters` section, which surfaces as a schema error.
     return flask_app(schemas.missing_path_parameter())
 
 
@@ -220,10 +219,7 @@ def invalid() -> OpenAPIApp:
 
 
 def success_text_and_write_only() -> OpenAPIApp:
-    """Composite for filter-combination tests.
-
-    `/api/success` passes, `/api/text` fails on content-type, `/api/write_only` fails on random input.
-    """
+    """`/api/success` passes, `/api/text` fails on content-type, `/api/write_only` fails on random input."""
     return flask_app(
         {**schemas.success(), **schemas.text(), **schemas.write_only()},
         handlers.register_success,
@@ -262,8 +258,7 @@ def path_variable_and_custom_format() -> OpenAPIApp:
 
 
 def basic() -> OpenAPIApp:
-    # 401 is intentionally undocumented so test cases hitting the endpoint without
-    # auth surface as response-validation failures.
+    # 401 stays undocumented, so unauthenticated cases surface as response-validation failures.
     return flask_app(schemas.basic(), handlers.register_basic, components=_BASIC_AUTH_SCHEME)
 
 
@@ -302,8 +297,7 @@ def sessions_and_log_event() -> OpenAPIApp:
     return flask_app(schemas.sessions_and_log_event(), handlers.register_sessions_and_log_event)
 
 
-# Every fragment in `test/apps/fragments/schemas.py`, including deliberately-broken ones.
-# Used by the local launcher (`python -m test.apps`) to expose everything for manual debugging.
+# Every fragment in `test/apps/fragments/schemas.py`, broken ones included, for `python -m test.apps` debugging.
 _KITCHEN_SINK_FRAGMENTS = (
     "success",
     "failure",

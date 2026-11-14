@@ -48,10 +48,10 @@ EVENT_QUEUE_TIMEOUT = 0.01
 
 
 class _StopFuzzing(KeyboardInterrupt):
-    """Raised inside the scheduler to stop a thread's Hypothesis run without signaling other workers.
+    """Stops one thread's Hypothesis run without signaling other workers.
 
-    Inherits from KeyboardInterrupt so Hypothesis treats it as immediate abort (no shrinking/replay),
-    but is caught before the generic KeyboardInterrupt handler to avoid calling ctx.stop().
+    A `KeyboardInterrupt`, so Hypothesis aborts without shrinking or replay.
+    Caught ahead of the generic interrupt handler, which would call `ctx.stop()`.
     """
 
 
@@ -101,14 +101,14 @@ def _preflight_operations(
                 )
                 viable_modes.append(mode)
             except Unsatisfiable:
-                # Schema constraints make this mode impossible — try the next mode.
+                # Schema constraints rule this mode out; try the next one.
                 last_exc = build_unsatisfiable_error(
                     operation, with_tip=False, filter_tracker=operation.filter_case_tracker
                 )
             except (SkipTest, unittest.SkipTest) as exc:
                 skip_reason = str(exc)
             except Exception as exc:
-                # Real generation errors should exclude the operation entirely.
+                # Other generation errors exclude the operation.
                 last_exc = exc
                 viable_modes = []
                 break
@@ -174,7 +174,7 @@ def build_fuzz_plan(ctx: EngineContext, *, operations: list[APIOperation]) -> Fu
 
 @dataclass(slots=True)
 class ActiveScenario:
-    """Metadata about the currently running scenario, shared between the strategy and test body."""
+    """Metadata about the running scenario, shared between the strategy and test body."""
 
     scenario_id: uuid.UUID
     started_at: float
@@ -274,8 +274,7 @@ def _run_forever(
         ctx.stop()
         raise
     finally:
-        # Workers won't start new scenarios once stopped; they finish their in-flight HTTP call and exit.
-        # join() waits for that bounded cleanup - important for Python API callers where the process doesn't exit.
+        # Stopped workers finish their in-flight call and exit; join them, as a Python API caller's process lives on.
         for thread in threads:
             thread.join()
     outage = ctx.server.take_report(None)
@@ -384,10 +383,7 @@ def _send_step(
     event_queue: queue.Queue[events.EngineEvent],
     seen_error_labels: set[str],
 ) -> tuple[list[Response], Response] | None:
-    """Send the step's request, waiting out rate limits; `None` when a transport error skips the step.
-
-    Returns (rate_limited_responses, final_response).
-    """
+    """Send the step's request, waiting out rate limits; `None` when a transport error skips the step."""
     transport_kwargs = ctx.get_transport_kwargs(operation=operation)
     try:
         return send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=event_queue.put)
@@ -537,7 +533,7 @@ def _handle_session_end(
         # Failures are already captured; without `continue-on-failure` the first one ends the whole run.
         ctx.control.reach_failure_limit()
     elif isinstance(exc, Flaky) and ctx.has_to_stop:
-        # Deadline-induced data-tree noise; campaign already stopping, suppress.
+        # Deadline-induced data-tree noise while the run is already stopping.
         return
     elif isinstance(exc, Unsatisfiable) and rejected_duplicates:
         # Every input this worker drew was already sent, e.g. by other workers.
@@ -572,11 +568,10 @@ def _run_forever_thread(
     continue_on_failure_by_label = plan.continue_on_failure_by_label
 
     suite_id = uuid.uuid4()
-    # Used to communicate scenario start time from hypothesis strategy to the test function
     scenario_cell: Cell = Cell(value=None)
     check_context_cache = CheckContextCache()
 
-    # Per-thread dedup: suppress repeated NonFatalError events for the same operation.
+    # Operations this worker already reported an error for.
     seen_error_labels: set[str] = set()
     # Hypothesis reports an error only when replaying its scenario raises it again, which the time limit can prevent.
     scenario_errors: list[Exception] = []

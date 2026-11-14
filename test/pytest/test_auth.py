@@ -158,7 +158,6 @@ schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
 
 
 def test_python_app(testdir, schema_with_python_app, python_app_auth):
-    # When there is a WSGI / ASGI app
     testdir.make_test(
         f"""
 {schema_with_python_app}
@@ -173,12 +172,10 @@ def test(case):
     """,
     )
     result = testdir.runpytest("-s")
-    # Then there should be a way to get auth from them
     result.assert_outcomes(passed=1)
 
 
 def test_requests_auth(ctx, testdir):
-    # When the user registers auth from `requests`
     api = ctx.openapi.apps.success_and_text()
     testdir.make_test(
         f"""
@@ -201,7 +198,6 @@ def test(case):
         schema=api.spec,
     )
     result = testdir.runpytest("-s")
-    # Then auth should be present in `as_transport_kwargs` output
     result.assert_outcomes(passed=2)
 
 
@@ -274,7 +270,7 @@ def test_api(case):
 
 
 def test_conditional(ctx, testdir):
-    # When the user sets up multiple auths applied to different API operations
+    # Different auths apply to different operations.
     api = ctx.openapi.apps.success_and_text()
     testdir.make_test(
         f"""
@@ -414,8 +410,6 @@ def test_api(case):
 
 def test_openapi_basic_auth_applied_via_wsgi(testdir):
     # See GH-3575
-    # When [auth.openapi.BasicAuth] is configured and the app uses WSGI transport,
-    # the auth should be applied (sent as Authorization header).
     testdir.makefile(
         ".toml",
         schemathesis="""
@@ -482,8 +476,6 @@ def test_api(case):
 
 def test_unused_openapi_auth_warning_in_pytest_mode(testdir):
     # See GH-3575
-    # When a user configures [auth.openapi.WRONG_SCHEME] but WRONG_SCHEME doesn't exist
-    # in the schema's securitySchemes, a warning should be emitted.
     testdir.makefile(
         ".toml",
         schemathesis="""
@@ -529,7 +521,6 @@ def test_api(case):
 """
     )
     result = testdir.runpytest("-W", "always")
-    # The unused OpenAPI auth scheme warning should be emitted
     result.stdout.re_match_lines([r".*WRONG_MISSING_AUTH.*"])
 
 

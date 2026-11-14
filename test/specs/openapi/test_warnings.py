@@ -185,7 +185,6 @@ def test_detect_missing_deserializers_with_malformed_media_type(ctx):
         },
     )
 
-    # Should not raise exception and should only warn about the valid media type
     warnings = detect_missing_deserializers(operation)
 
     assert len(warnings) == 1

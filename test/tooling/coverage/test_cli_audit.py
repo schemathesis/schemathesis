@@ -104,7 +104,7 @@ def test_is_complete_still_false_when_load_failed():
 
 @pytest.mark.skipif(sys.platform != "linux", reason="process group scan needs /proc")
 def test_stopping_the_driver_leaves_no_worker_processes(tmp_path):
-    # Spawn workers outlive a killed parent forever, pinning ~1 GB each.
+    # Spawn-method workers outlive a killed parent forever and keep their memory.
     driver = subprocess.Popen(
         [
             sys.executable,

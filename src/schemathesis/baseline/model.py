@@ -31,7 +31,7 @@ class BaselineEntry:
     first_seen: str | None = None
     last_seen: str | None = None
     expires: str | None = None
-    # Anything else the file carries. Only `expires` means anything to Schemathesis; the rest is yours.
+    # Other fields from the file; Schemathesis reads only `expires`.
     extra: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -89,8 +89,7 @@ class BaselineEntry:
 @dataclass(slots=True)
 class Baseline:
     entries: list[BaselineEntry]
-    # Entries grouped by identity, built on first lookup. Recording and pruning happen after the
-    # run, so nothing invalidates it mid-match.
+    # Entries by identity, built on first lookup; recording and pruning happen after the run, so it never goes stale.
     _index: dict[Identity, BaselineEntry] | None = None
 
     @classmethod

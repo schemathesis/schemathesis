@@ -158,7 +158,6 @@ class LazySchema:
             refresh_given_state()
 
             def wrapped_test(*args: Any, request: FixtureRequest, **kwargs: Any) -> None:
-                """The actual test, which is executed by pytest."""
                 __tracebackhide__ = True
 
                 # Load all checks eagerly, so they are accessible inside the test function
@@ -205,7 +204,7 @@ class LazySchema:
 
 def _fixtures_for(test_func: Callable, request: FixtureRequest, given_kwargs: dict[str, GivenInput]) -> dict[str, Any]:
     __tracebackhide__ = True
-    # Check if test function is a method and inject self from request.instance
+    # Methods get `self` from `request.instance`
     if "self" in signature(test_func).parameters and request.instance is not None:
         return {"self": request.instance, **get_fixtures(test_func, request, given_kwargs)}
     return get_fixtures(test_func, request, given_kwargs)
@@ -219,7 +218,7 @@ def _run_operation_tests(
 ) -> None:
     """Run each operation test as a subtest of the collected test."""
     __tracebackhide__ = True
-    # Changing the node id is required for better reporting - the method and path will appear there
+    # Rename the node so reports show the method and path
     node_id = request.node.nodeid
     if not tests:
         fail_on_no_matches(node_id)
@@ -311,7 +310,7 @@ def _set_node_id(node: pytest.Function, node_id: str) -> None:
 
 
 def _schema_error(subtests: pytest.Subtests, error: InvalidSchema, node_id: str, node: pytest.Function) -> None:
-    """Run a failing test, that will show the underlying problem."""
+    """Run a failing test that shows the underlying problem."""
     sub_test = error.as_failing_test_function()
     _set_node_id(node, f"{node_id}{schema_error_suffix(error)}")
     __tracebackhide__ = True
@@ -325,15 +324,14 @@ def get_schema(*, request: FixtureRequest, name: str, filter_set: FilterSet, tes
     if not isinstance(schema, BaseSchema):
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
 
-    # Merge config-based operation filters with user-provided filters
-    # This ensures operations disabled in schemathesis.toml are respected
+    # Respect operations disabled in `schemathesis.toml` alongside the user's filters
     merged_filter_set = schema.config.operations.filter_set_with(include=filter_set)
 
     return schema.clone(filter_set=merged_filter_set, test_function=test_function)
 
 
 def get_fixtures(func: Callable, request: FixtureRequest, given_kwargs: dict[str, Any]) -> dict[str, Any]:
-    """Load fixtures, needed for the test function."""
+    """Load the fixtures the test function needs."""
     sig = signature(func)
     return {
         name: request.getfixturevalue(name)

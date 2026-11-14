@@ -1,15 +1,4 @@
-"""Generate Hypothesis stateful rules for GraphQL operations.
-
-For each id-typed object type, the state machine has a `<TypeName>_ids` bundle
-plus a parallel `deleted_<TypeName>_ids` bundle. Producer rules call mutations
-whose return type unwraps to a bundle type, extract captured `id` values from
-the response, and feed them back into that bundle. Consumer rules accept ids
-from a bundle as input and call the underlying operation, recording the parent
-case so failure traces can be reconstructed. Cleanup rules consume from the
-alive bundle and target the deleted bundle. Probe rules re-fire cleanup or
-read-only operations against deleted ids to surface mishandling of stale
-identifiers (use-after-delete reads, double-delete errors).
-"""
+"""Hypothesis stateful rules that pass ids between GraphQL operations through alive and deleted bundles."""
 
 from __future__ import annotations
 
@@ -324,7 +313,7 @@ def _inject_field(
 ) -> Callable[[graphql.OperationDefinitionNode, Random], graphql.OperationDefinitionNode]:
     """Ensure the field at `path` is selected inside the producing field, so its value can be captured.
 
-    For Relay connections the path goes through `edges { node { ... } }`, for mutation payloads through the record field.
+    Relay connections go through `edges { node { ... } }`, mutation payloads through the record field.
     """
 
     def mutate(operation_node: graphql.OperationDefinitionNode, _random: Random) -> graphql.OperationDefinitionNode:
@@ -475,11 +464,9 @@ def _make_lifecycle_rule(
     origin: Callable[[Any], dict[tuple[Handle, str], str]],
     track_deletion: bool,
 ) -> tuple[str, Callable]:
-    """Build a rule that operates against a specific bundle for the primary id-typed argument.
+    """Build a rule that acts on a specific bundle for the primary id argument; other ids come from alive bundles.
 
-    Used by cleanup (consumes alive, emits to deleted), double-cleanup probe
-    (consumes deleted), and use-after-delete probe (reads deleted without consuming).
-    Non-primary id arguments are sourced from their alive bundles.
+    Cleanup consumes alive and emits deleted; double-cleanup consumes deleted; use-after-delete reads deleted.
     """
     rule_name = f"{root_label}_{field_name}{rule_name_suffix}"
     primary_argument = next(iter(consumed))

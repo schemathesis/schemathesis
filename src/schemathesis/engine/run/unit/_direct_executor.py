@@ -79,8 +79,7 @@ def run_driver(
         with ignore_hypothesis_output():
             # Match LIFO order from Hypothesis `Phase.explicit` so engine output matches the pytest path.
             for case in reversed(order_for_lifo_execution(_collect_within_budget(generator, ctx))):
-                # One snapshot: reading the clock twice lets the deadline pass in between and turn a
-                # spent budget into a phantom interrupt.
+                # Read the stop reason once: a second clock read could pass the deadline and fake an interrupt.
                 raise_if_stopped(ctx.stop_reason)
                 # Cases are generated before any is sent, so security learned from an earlier response is added here.
                 set_learned_on_case(case)
@@ -88,8 +87,7 @@ def run_driver(
                 try:
                     run_one_case(case=case, ctx=ctx, scenario=scenario, errors=errors, pending_events=pending_events)
                 except UnexpectedError:
-                    # Per-case runtime error — already appended to `errors`. Continue iterating so
-                    # subsequent cases still run; their errors are accumulated and surfaced together.
+                    # Already in `errors`; later cases still run and their errors surface together.
                     any_case_errored = True
                     continue
     except (FailureGroup, Failure):

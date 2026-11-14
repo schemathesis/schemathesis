@@ -46,8 +46,7 @@ def _schema_with_query_and_body_example(ctx, *, query_schema=None, extra_operati
 
 
 def test_create_test_auth_provider_failure_surfaces_as_non_fatal_error(ctx):
-    # Auth provider raising during example strategy materialization must reach the user as a
-    # NonFatalError instead of crashing the worker.
+    # An auth provider raising while example strategies build must surface as a NonFatalError, not crash the worker.
     @schemathesis.auth()
     class _BrokenAuth:
         def get(self, case, context):

@@ -88,7 +88,7 @@ def run_test(operation, test, modes=ALL_MODES, generate_duplicate_query_paramete
     try:
         test_func()
     except unittest.SkipTest as exc:
-        # An empty coverage phase would otherwise silently skip the test instead of failing it.
+        # An empty coverage phase must fail the test, not skip it.
         if "no test cases" not in str(exc):
             raise
         pytest.fail(f"Coverage phase generated no cases for {operation.label}")
@@ -238,11 +238,9 @@ def assert_coverage(schema, modes, expected, path=None):
             assert mode == modes[0]
         else:
             if mode == GenerationMode.POSITIVE:
-                # If the main mode is positive, then all components should have the positive mode
                 for component, info in case.meta.components.items():
                     assert info.mode == mode, f"{component.value} should have {mode.value} mode"
             if mode == GenerationMode.NEGATIVE:
-                # If the main mode is negative, then at least one component should be negative
                 assert any(info.mode == mode for info in case.meta.components.values())
         if (
             mode == GenerationMode.NEGATIVE

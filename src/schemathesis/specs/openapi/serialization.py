@@ -33,8 +33,6 @@ COLLECTION_FORMAT_DELIMITERS = {
 def make_serializer(
     func: Callable[[DefinitionList], Generator[Callable | None, None, None]],
 ) -> Callable[[DefinitionList], Callable | None]:
-    """A maker function to avoid code duplication."""
-
     def _wrapper(definitions: DefinitionList) -> Callable | None:
         return _compose(list(func(definitions)))
 
@@ -56,7 +54,6 @@ def _compose(functions: list[Callable | None]) -> Callable | None:
 
 
 def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | None, None, None]:
-    """Different collection styles for Open API 3.0."""
     for definition in definitions:
         name = definition["name"]
         if "content" in definition:
@@ -69,14 +66,11 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
                 if media_types.is_json_lenient(media_type):
                     yield to_json(name)
         else:
-            # Simple serialization
             location = definition["in"]
             style = definition.get("style")
             explode = definition.get("explode")
             schema = definition.get("schema", {})
-            # Track whether the parameter schema was a bare `$ref` at the top: only then is the
-            # OpenAPI-default `extracted_object` shape structurally ambiguous, and recursive
-            # bracketing the safe choice. Inline schemas keep their declared flat-extract semantics.
+            # Only a bare top-level `$ref` makes the default flat extraction ambiguous; inline schemas keep it.
             schema_was_top_ref = False
             if isinstance(schema, dict):
                 schema_was_top_ref = isinstance(schema.get("$ref"), str)
@@ -84,9 +78,7 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
                 type_ = schema.get("type")
             else:
                 type_ = None
-            # Apply OpenAPI 3 defaults for `style` and `explode`. `style`
-            # defaults to `simple` for path/header and `form` for
-            # query/cookie. `explode` defaults to `true` for `form` and `cookie`.
+            # OpenAPI 3 defaults: `simple` style for path and header, `form` otherwise; `form` and `cookie` explode.
             if style is None:
                 style = "simple" if location in ("path", "header") else "form"
             if explode is None:
@@ -337,10 +329,7 @@ def _query_object_conversions(
     schema: dict[str, Any] | None,
     schema_was_top_ref: bool,
 ) -> Generator[Callable | None, None, None]:
-    # OpenAPI has no spec-defined style for objects with nested-object properties.
-    # Only emit recursive bracket notation when the parameter schema was a bare top-level `$ref`
-    # (matches Spring `@ModelAttribute` and similar consumers). Inline schemas keep their
-    # declared flat-extract semantics so we don't regress documented `extracted_object` behaviour.
+    # OpenAPI defines no style for nested objects, so only a bare top-level `$ref` gets recursive brackets.
     is_nested = schema_was_top_ref and _schema_has_nested_object_properties(schema)
     if style == "deepObject":
         if is_nested:
@@ -381,9 +370,9 @@ def _schema_has_nested_object_properties(schema: dict[str, Any] | None) -> bool:
 def _serialize_header_openapi3(
     name: str, type_: str | None, explode: bool | None
 ) -> Generator[Callable | None, None, None]:
-    # Headers should be coerced to a string so we can check it for validity later
+    # Header values become strings so they can be validated later
     yield to_string(name)
-    # Header parameters always use the "simple" style, that is, comma-separated values
+    # Headers always use the comma-separated `simple` style
     if type_ == "array":
         yield delimited(name, delimiter=",")
     if type_ == "object":
@@ -408,14 +397,13 @@ def _serialize_cookie_openapi3(
 
 
 def _serialize_swagger2(definitions: DefinitionList) -> Generator[Callable | None, None, None]:
-    """Different collection formats for Open API 2.0."""
     for definition in definitions:
         name = definition["name"]
         location = definition["in"]
         collection_format = definition.get("collectionFormat", "csv")
         type_ = definition.get("type")
         if location == "header":
-            # Headers should be coerced to a string so we can check it for validity later
+            # Header values become strings so they can be validated later
             yield to_string(name)
         if type_ in ("array", "object"):
             outer = COLLECTION_FORMAT_DELIMITERS.get(collection_format)
@@ -453,20 +441,14 @@ def make_delimited(data: dict[str, Any] | None) -> str:
 
 
 def force_iterable(value: object) -> list | tuple:
-    """Converts the value to a list or a tuple.
-
-    Only relevant for negative test scenarios where the original types might be changed.
-    """
+    """Wrap a scalar in a list; negative tests may put one where a collection is declared."""
     if isinstance(value, (tuple, list)):
         return value
     return [value]
 
 
 def force_dict(value: object) -> dict:
-    """Converts the value to a dictionary.
-
-    Only relevant for negative test scenarios where the original types might be changed.
-    """
+    """Wrap a non-dict value under an empty key; negative tests may put one where an object is declared."""
     if isinstance(value, dict):
         return value
     return {"": value}
@@ -474,7 +456,6 @@ def force_dict(value: object) -> dict:
 
 @conversion
 def to_json(item: Generated, name: str) -> None:
-    """Serialize an item to JSON."""
     item[name] = json.dumps(item[name])
 
 
@@ -484,8 +465,7 @@ def delimited(item: Generated, name: str, delimiter: str) -> None:
     item[name] = delimiter.join(to_wire_text(value) for value in values)
 
 
-# Wire form of each delimiter. Comma and pipe are valid query/path characters and stay literal;
-# whitespace delimiters must be percent-encoded to survive in a URL.
+# Comma and pipe stay literal in URLs; whitespace delimiters need percent-encoding.
 _WIRE_DELIMITERS = {",": ",", "|": "|", " ": "%20", "\t": "%09"}
 
 
@@ -508,10 +488,7 @@ def delimited_nested(item: Generated, name: str, *, outer: str, inner: str) -> N
 
 @conversion
 def deep_object(item: Generated, name: str) -> None:
-    """Serialize an object with `deepObject` style.
-
-    id={"role": "admin", "firstName": "Alex"} => id[role]=admin&id[firstName]=Alex
-    """
+    """`deepObject` style: `id={"role": "admin"}` becomes `id[role]=admin`."""
     generated = item.pop(name)
     # An empty object expands to nothing, so the parameter is omitted.
     if generated or isinstance(generated, dict):
@@ -533,7 +510,7 @@ def delimited_object(item: Generated, name: str) -> None:
 
 @conversion
 def extracted_object(item: Generated, name: str, stringify: bool = False) -> None:
-    """Merge a child node to the parent one."""
+    """Merge the object's properties into the parent as separate parameters."""
     generated = item.pop(name)
     # An empty object expands to nothing, so the parameter is omitted.
     if isinstance(generated, dict):
@@ -556,10 +533,7 @@ def _expanded(key: str, value: object) -> dict[str, object]:
 
 @conversion
 def nested_object(item: Generated, name: str) -> None:
-    """Serialize a nested object with recursive bracket notation.
-
-    {"pagination": {"pageNumber": 1}} => request[pagination][pageNumber]=1
-    """
+    """Recursive brackets: `request={"pagination": {"page": 1}}` becomes `request[pagination][page]=1`."""
     generated = item.pop(name)
     # An empty object expands to nothing, so the parameter is omitted.
     if generated == {}:
@@ -631,16 +605,7 @@ def _object_exploded(value: object, prefix: str, delimiter: str) -> DelimitedVal
 
 @conversion
 def simple_object(item: Generated, name: str, explode: bool | None) -> None:
-    """Serialize a path object with the `simple` style.
-
-    Explode=True
-
-        id={"role": "admin", "firstName": "Alex"} => "role=admin,firstName=Alex"
-
-    Explode=False
-
-        id={"role": "admin", "firstName": "Alex"} => "role,admin,firstName,Alex"
-    """
+    """`simple` style: `{"role": "admin", "id": 5}` becomes `role=admin,id=5` exploded, `role,admin,id,5` otherwise."""
     if explode:
         item[name] = _object_exploded(item[name], "", ",")
     else:
@@ -649,10 +614,7 @@ def simple_object(item: Generated, name: str, explode: bool | None) -> None:
 
 @conversion
 def label_primitive(item: Generated, name: str) -> None:
-    """Serialize a primitive value with the `label` style.
-
-    5 => ".5"
-    """
+    """`label` style: `5` becomes `.5`."""
     new = item[name]
     if new is not None:
         item[name] = _styled([(".", to_wire_text(new))])
@@ -662,31 +624,13 @@ def label_primitive(item: Generated, name: str) -> None:
 
 @conversion
 def label_array(item: Generated, name: str, explode: bool | None) -> None:
-    """Serialize an array with the `label` style.
-
-    Explode=True
-
-        id=[3, 4, 5] => ".3.4.5"
-
-    Explode=False
-
-        id=[3, 4, 5] => ".3,4,5"
-    """
+    """`label` style: `[3, 4, 5]` becomes `.3.4.5` exploded, `.3,4,5` otherwise."""
     item[name] = _joined(".", "." if explode else ",", _array_items(item[name]))
 
 
 @conversion
 def label_object(item: Generated, name: str, explode: bool | None) -> None:
-    """Serialize an object with the `label` style.
-
-    Explode=True
-
-        id={"role": "admin", "firstName": "Alex"} => ".role=admin.firstName=Alex"
-
-    Explode=False
-
-        id={"role": "admin", "firstName": "Alex"} => ".role,admin,firstName,Alex"
-    """
+    """`label` style: `{"role": "admin", "id": 5}` becomes `.role=admin.id=5` exploded, `.role,admin,id,5` otherwise."""
     if explode:
         item[name] = _object_exploded(item[name], ".", ".")
     else:
@@ -695,10 +639,7 @@ def label_object(item: Generated, name: str, explode: bool | None) -> None:
 
 @conversion
 def matrix_primitive(item: Generated, name: str) -> None:
-    """Serialize a primitive value with the `matrix` style.
-
-    5 => ";id=5"
-    """
+    """`matrix` style: `id=5` becomes `;id=5`."""
     new = item[name]
     if new is not None:
         item[name] = _styled([(f";{name}=", to_wire_text(new))])
@@ -708,31 +649,13 @@ def matrix_primitive(item: Generated, name: str) -> None:
 
 @conversion
 def matrix_array(item: Generated, name: str, explode: bool | None) -> None:
-    """Serialize an array with the `matrix` style.
-
-    Explode=True
-
-        id=[3, 4, 5] => ";id=3;id=4;id=5"
-
-    Explode=False
-
-        id=[3, 4, 5] => ";id=3,4,5"
-    """
+    """`matrix` style: `id=[3, 4]` becomes `;id=3;id=4` exploded, `;id=3,4` otherwise."""
     item[name] = _joined(f";{name}=", f";{name}=" if explode else ",", _array_items(item[name]))
 
 
 @conversion
 def matrix_object(item: Generated, name: str, explode: bool | None) -> None:
-    """Serialize an object with the `matrix` style.
-
-    Explode=True
-
-        id={"role": "admin", "firstName": "Alex"} => ";role=admin;firstName=Alex"
-
-    Explode=False
-
-        id={"role": "admin", "firstName": "Alex"} => ";id=role,admin,firstName,Alex"
-    """
+    """`matrix` style: `id={"role": "admin"}` becomes `;role=admin` exploded, `;id=role,admin` otherwise."""
     if explode:
         item[name] = _object_exploded(item[name], ";", ";")
     else:
@@ -741,5 +664,4 @@ def matrix_object(item: Generated, name: str, explode: bool | None) -> None:
 
 @conversion
 def to_string(item: Generated, name: str) -> None:
-    """Convert the value to a string."""
     item[name] = to_wire_text(item[name])

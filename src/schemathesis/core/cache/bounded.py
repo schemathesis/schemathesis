@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any, Final
 
-# Sentinel returned by `BoundedCache.get` when the key is absent — lets callers distinguish
-# "not cached" from "cached as `None`" without an extra membership check.
 MISSING: Final = object()
 
 
@@ -18,8 +16,7 @@ class BoundedCache:
         self._maxsize = maxsize
 
     def get(self, key: Any, default: Any = MISSING) -> Any:
-        # Read before touching the LRU order: another worker may evict `key` in between,
-        # and on free-threaded builds it regularly does.
+        # Read before reordering: another thread may evict `key` in between, which free-threaded builds hit often.
         value = self._data.get(key, MISSING)
         if value is MISSING:
             return default

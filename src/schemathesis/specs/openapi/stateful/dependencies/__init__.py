@@ -1,7 +1,4 @@
-"""Dependency detection between API operations for stateful testing.
-
-Infers which operations must run before others by tracking resource creation and consumption across API operations.
-"""
+"""Infer which operations must run before others from the resources they produce and consume."""
 
 from __future__ import annotations
 
@@ -107,9 +104,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
             )
             deferred[operation.label] = bindings
 
-    # Replay nested-FK lookups whose target resource was registered later in the scan -
-    # producer paths can sort after their consumers (e.g. /departments alphabetises before
-    # /locations) and the per-operation pass would otherwise drop those slots.
+    # Nested FKs whose target resource appeared later in the scan, as producer paths can sort after their consumers
     for label, bindings in deferred.items():
         for target_resource_name, target_field, body_path, takes_array in bindings.nested_fks:
             target_resource = resources.get(target_resource_name)
@@ -126,8 +121,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 )
             )
 
-    # Bind path parameters named after a field of the resource owning the path (`/projects/{code}` -> `Project.code`,
-    # `/rounds/{round_seq}` -> `Round.seq`). Deferred to here so the resource's fields are known regardless of order.
+    # Path parameters naming a field of the path's resource (`/rounds/{round_seq}` -> `Round.seq`), after the full scan
     for label, bindings in deferred.items():
         for resource_name, parameter_name in bindings.field_named_path_parameters:
             owner = resources.get(resource_name)
@@ -150,8 +144,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 )
             )
 
-    # Bind body fields named after a collection whose responses list the values they accept
-    # (`country` <- `GET /countries`). Deferred to here so the producer is known.
+    # Body fields named after a collection listing their values (`country` <- `GET /countries`), after the full scan
     primitive_producers = set()
     object_collection_producers = set()
     for node in operations.values():
@@ -187,8 +180,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
             )
             bound.add(property_name)
 
-    # An integer field named after a listed collection of integer-keyed objects holds one of their keys (`part` <- the
-    # `pk` of a `Part`) when the response, the field's title or the path says which collection it is.
+    # Integer fields named after a listed collection take its key (`Part.pk`) when the response, title or path names it
     collections = _listed_collections(operations)
     for label, bindings in deferred.items():
         node = operations[label]
@@ -233,11 +225,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     rebind_inherited_suffix_matches(operations, resources)
 
-    # Update input slots with improved resource definitions discovered during extraction
-    #
-    # Example:
-    #   - `DELETE /users/{userId}` initially inferred `User.fields=["userId"]`
-    #   - then `POST /users` response revealed `User.fields=["id", "email"]`
+    # Refresh bindings with resource fields found later in the scan (`User.userId` -> `User.id`)
     update_input_field_bindings(state.updated_resources, operations)
 
     # Merge parameter-inferred resources with schema-defined ones
@@ -267,27 +255,22 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # `fromAirportId` names what responses return under `fromAirport` (`AirportResponse.id`).
     bind_id_fields_to_returned_resources(operations)
 
-    # A bare `{id}` in `/options/{id}/entry` keys what `/options/{id}` takes, and an item carries the key of the parent
-    # it lives under (`Shipment.warehouseId`) when nothing produces the parent.
+    # `{id}` in `/options/{id}/entry` keys `/options/{id}`; items carry an unproduced parent's key (`warehouseId`)
     bind_parent_keys(schema, operations)
 
-    # Bind update body fields to values only the item `GET` returns (`version`, `checksum`), and unbind copied fields
-    # whose `enum` rejects a value the resource returns (`type` <- `Domain.type`).
+    # Bind update fields to values only the item `GET` returns (`version`); unbind those whose `enum` rejects them
     fit_body_fields_to_read_values(schema, operations, deferred)
 
-    # A body field taking an array of identifiers never takes one value (`customer_id: [1, 2]` <- `Customer.id`),
-    # and a UUID parameter never takes a non-string field (`{id}` <- an integer `Group.pk`).
+    # Unbind single values from id arrays (`customer_id: [1, 2]`) and non-string fields from UUID parameters
     unbind_mistyped_values(schema, operations, deferred)
 
-    # Clean up orphaned resources
     remove_unused_resources(operations, resources)
 
     return DependencyGraph(operations=operations, resources=resources)
 
 
 def _accepts_code(schema: JsonSchema, resource: ResourceDefinition) -> bool:
-    # Listed objects are passed around by their plain `code` (`language` <- `GET /languages[*].code`). Ids, slugs
-    # and formatted strings are not: fields named after a collection often take URLs or unrelated enums instead.
+    # Objects travel by plain `code` (`language` <- `GET /languages[*].code`); formatted fields often take URLs instead
     return isinstance(schema, dict) and "format" not in schema and resource.types.get("code") == set(get_type(schema))
 
 
@@ -301,8 +284,7 @@ def _is_plain_integer(schema: JsonSchema) -> TypeGuard[JsonSchemaObject]:
 
 
 def _listed_collections(operations: OperationMap) -> dict[str, set[str]]:
-    # What list operations return as their items, with the paths listing them; not arrays nested inside one object
-    # (`tags: [NestedTag]`).
+    # Items that list operations return, with their paths; arrays inside one object (`tags: [NestedTag]`) do not count
     listed: dict[str, set[str]] = {}
     for node in operations.values():
         if node.method != "get" or naming.trailing_path_parameter(node.path) is not None:
@@ -355,8 +337,7 @@ def _collection_named_by(
     named = [name for name in collections if name.endswith(word) and name not in own]
     if not named:
         return None
-    # The response returns the referenced object for it: `role` as a `NestedDeviceRole` or `rear_port` as a
-    # `FrontPortRearPort` (a name ending in the collection), else `part_detail` as a `PartBrief` (starting with it).
+    # Its response object ends with the collection name (`role` as `NestedDeviceRole`) or starts with it (`PartBrief`)
     referenced = references.get(field) or references.get(f"{field}_detail")
     if referenced is not None:
         related = [name for name in collections if referenced.endswith(name) and name not in own] or [
@@ -371,9 +352,7 @@ def _collection_named_by(
             titled = [name for name in named if naming.normalize_for_matching(name) == normalized_title]
             if titled:
                 return resources[titled[0]]
-    # The path picks one by whole words: `template` on `/parameters` is a `ParameterTemplate`, `type` on `/eventlog`
-    # is no `EventType`. Not a collection kept under the operation's own items: `version` on documents is their
-    # counter, not one of the `DocumentVersion` items under `/documents/{id}/versions`.
+    # Whole path words pick one (`/parameters` -> `ParameterTemplate`) unless it lives under the operation's own items
     own_collection = (
         naming.collection_path(node.path) if naming.trailing_path_parameter(node.path) else node.path.rstrip("/")
     )
@@ -388,8 +367,7 @@ def _collection_named_by(
     ]
     if len(specific) == 1:
         return resources[specific[0]]
-    # A list filter on a field of its items may take the only collection of that name; a body field needs the
-    # evidence above, as names like `version` hold counters, not keys.
+    # Only a list filter may take the sole collection of that name; body fields like `version` often hold counters
     if not specific and location == ParameterLocation.QUERY and named == [word]:
         return resources[word]
     return None
@@ -427,9 +405,8 @@ def inject_links(schema: OpenApiSchema) -> int:
     injected = 0
     # Shared by producers and targets; the same operations recur across thousands of links.
     operation_cache: dict[str, APIOperation] = {}
-    # A response is visited once per inferred link, so normalize its links once and index them by
-    # target - only same-target links can be subsets. Values keep the mapping alive so `id` is unique.
-    # Next to them, the next suffix to try per colliding link name, as names taken once stay taken.
+    # Per links mapping: its links normalized once and indexed by target (only same-target links are subsets), and the
+    # next suffix per colliding name. Values keep the mapping alive so its `id` stays unique.
     normalized_cache: dict[int, tuple[dict[str, Any], dict[tuple[str, str], list[NormalizedLink]], dict[str, int]]] = {}
     shared = _unshare_responses(schema)
     # Operations built earlier still point at the response definitions that were just replaced
@@ -455,12 +432,11 @@ def inject_links(schema: OpenApiSchema) -> int:
         else:
             _, index, next_suffixes = entry
 
-        # Compared against what was known before this response, not against each other.
+        # Compared only against links known before this response
         pending: list[NormalizedLink] = []
         for link_name, definition in _followable_links(response_links.links, reader_paths):
             inferred_link = definition.to_openapi()
 
-            # Check if duplicate / subsets exists
             normalized = _normalize_link(inferred_link, response.resolver, schema, operation_cache)
             if any(
                 _is_subset_link(normalized, existing)
@@ -468,7 +444,6 @@ def inject_links(schema: OpenApiSchema) -> int:
             ):
                 continue
 
-            # Find unique name if collision exists
             final_name = _resolve_link_name_collision(link_name, links, next_suffixes)
             links[final_name] = inferred_link
             pending.append(normalized)
@@ -480,12 +455,9 @@ def inject_links(schema: OpenApiSchema) -> int:
 
 
 def _unshare_responses(schema: OpenApiSchema) -> dict[int, tuple[Mapping[str, Any], list[str]]]:
-    """Give each operation its own copy of a response it shares, so links inferred for one never reach another.
+    """Copy shared responses per operation, as an inferred link may forward path parameters only its producer has.
 
-    A link may forward the producer's own path parameters, which another operation sharing the response lacks.
-    A copy of a response from another document points its references into that document. One whose references
-    resolve against a name a schema gives itself stays in place; those are returned keyed by `id`, with the paths
-    of the operations reading each.
+    Responses whose references resolve against a schema's own `$id` stay shared; returns them by `id` with reader paths.
     """
     slots = list(_response_slots(schema))
     uses = Counter(id(response.source) for *_, response in slots)
@@ -582,7 +554,6 @@ def _find_operation_by_reference(schema: OpenApiSchema, reference: str, cache: d
 def _normalize_link(
     link: Mapping[str, Any], resolver: Resolver, schema: OpenApiSchema, cache: dict[str, APIOperation]
 ) -> NormalizedLink:
-    """Normalize a link definition for comparison."""
     _, link = maybe_resolve_with_resolver(link, resolver)
     operation = find_link_target(schema, link, cache)
 
@@ -601,12 +572,10 @@ def _normalize_parameter_keys(parameters: dict, operation: APIOperation) -> set[
     normalized = set()
 
     for parameter_name in parameters:
-        # If already has location prefix, use as-is
         if "." in parameter_name:
             normalized.add(parameter_name)
             continue
 
-        # Find the parameter and prepend location
         for parameter in operation.iter_parameters():
             if parameter.name == parameter_name:
                 normalized.add(f"{parameter.location.value}.{parameter_name}")
@@ -618,7 +587,6 @@ def _normalize_parameter_keys(parameters: dict, operation: APIOperation) -> set[
 def _resolve_link_name_collision(
     proposed_name: str, existing_links: dict[str, Any], next_suffixes: dict[str, int]
 ) -> str:
-    """Find unique link name if collision exists."""
     if proposed_name not in existing_links:
         return proposed_name
 
@@ -630,32 +598,23 @@ def _resolve_link_name_collision(
 
 
 def _is_subset_link(inferred: NormalizedLink, existing: NormalizedLink) -> bool:
-    """Check if inferred link is a subset of existing link."""
-    # Must target the same operation
     if inferred.path != existing.path or inferred.method != existing.method:
         return False
 
-    # Inferred parameters must be subset of existing parameters
     if not inferred.parameters.issubset(existing.parameters):
         return False
 
-    # Inferred request body must be subset of existing body
     return _is_request_body_subset(inferred.request_body, existing.request_body)
 
 
 def _is_request_body_subset(inferred_body: Any, existing_body: Any) -> bool:
-    """Check if inferred body is a subset of existing body."""
-    # Empty inferred body is always a subset
     if not inferred_body:
         return True
 
-    # If existing is empty but inferred isn't, not a subset
     if not existing_body:
         return False
 
-    # Both must be dicts for subset comparison, otherwise check for equality
     if not isinstance(inferred_body, dict) or not isinstance(existing_body, dict):
         return inferred_body == existing_body
 
-    # Check if all inferred fields exist in existing with same values
     return all(existing_body.get(key, NOT_SET) == value for key, value in inferred_body.items())

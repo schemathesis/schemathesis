@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class Override:
-    """Overrides for various parts of a test case."""
-
     query: dict[str, str] = field(default_factory=dict)
     headers: dict[str, str] = field(default_factory=dict)
     cookies: dict[str, str] = field(default_factory=dict)
@@ -89,11 +87,9 @@ def for_operation(config: ProjectConfig, *, operation: APIOperation) -> Override
     ]
     for container, params in groups:
         for param in params:
-            # Attempt to get the override from the operation-specific configuration.
             value = None
             if operation_config:
                 value = _get_override_value(param, operation_config.parameters)
-            # Fallback to the global project configuration.
             if value is None:
                 value = _get_override_value(param, config.parameters)
             if value is not None:
@@ -103,8 +99,7 @@ def for_operation(config: ProjectConfig, *, operation: APIOperation) -> Override
 
 
 def _get_override_value(param: OperationParameter, parameters: dict[str, Any]) -> Any:
-    # Dictionary bindings are handled by the strategy overlay; the override pipeline
-    # is for scalar "force this value" entries only.
+    # Dictionary bindings go through the strategy overlay; overrides only force scalar values.
     value = lookup_parameter(parameters, name=param.name, location=param.location.value)
     if isinstance(value, ParameterDictionaryBinding):
         return None
@@ -124,23 +119,19 @@ def store_original_state(value: Any) -> Any:
 
 
 def get_component_diff(stored: StoredValue, current: Any) -> dict[str, Any]:
-    """Calculate difference between stored and current components."""
     if not (current and stored.value):
         return {}
     if stored.is_generated:
-        # Only compute diff for mapping types (dicts)
-        # Non-mapping bodies (e.g., GraphQL strings) are not tracked
+        # Non-mapping bodies, e.g. GraphQL strings, are not tracked
         if isinstance(stored.value, Mapping) and isinstance(current, Mapping):
             return diff(stored.value, current)
         return {}
-    # For non-generated components, return current if it's a dict, otherwise empty
     if isinstance(current, Mapping):
         return dict(current)
     return {}
 
 
 def store_components(case: Case) -> dict[ParameterLocation, StoredValue]:
-    """Store original component states for a test case."""
     return {
         kind: StoredValue(
             value=store_original_state(case.get_container(kind)),

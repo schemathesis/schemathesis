@@ -59,17 +59,9 @@ def extract_inputs(
     state: InferenceState,
     deferred: DeferredBindings,
 ) -> Iterator[InputSlot]:
-    """Extract resource dependencies for an API operation from its input parameters.
+    """Resources the operation's inputs need (`userId` -> `User`), adding placeholders for undiscovered ones.
 
-    Connects each parameter (e.g., `userId`) to its resource definition (`User`),
-    creating placeholder resources if not yet discovered from their schemas.
-
-    `deferred` collects what binds only after every operation has been scanned, e.g. nested-body
-    FK lookups whose target resource isn't registered yet.
-
-    `state.candidate_resource_names` gates `<word>_name` body-field synthetics: only
-    creates a placeholder when the inferred name is backed by a path segment or
-    component schema.
+    A `<word>_name` body field adds a placeholder only when a path segment or component schema backs the name.
     """
     known_dependencies = set()
     # Updates address the resource bound by the trailing path parameter, e.g. `PATCH /users/{userId}`.
@@ -153,13 +145,9 @@ def _resolve_parameter_dependency(
     operation: APIOperation,
     state: InferenceState,
 ) -> InputSlot | None:
-    """Connect a parameter to its resource definition, creating placeholder if needed.
+    """Bind a parameter to its resource (`userId` -> `User`).
 
-    Strategy:
-    1. Infer resource name from parameter (`userId` -> `User`)
-    2. Use existing resource if high-quality definition exists
-    3. Try discovering from operation's response schemas
-    4. Fall back to creating placeholder with a single field
+    Lookup order: a schema-defined resource, this operation's responses, a resource sharing the suffix, a placeholder.
     """
     resource_name = naming.from_parameter(
         parameter=parameter_name, path=operation.path, query=parameter_location == ParameterLocation.QUERY
@@ -171,18 +159,15 @@ def _resolve_parameter_dependency(
 
     resource = resources.get(resource_name)
 
-    # Upgrade low-quality resource definitions (e.g., from parameter inference)
-    # by searching this operation's responses for actual schema
+    # A missing or weaker definition: look for a schema in this operation's responses
     if resource is None or resource.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
         resource = _find_resource_in_responses(operation=operation, resource_name=resource_name, state=state)
         if resource is not None:
             resources[resource_name] = resource
 
-    # Determine resource and its field
     is_suffix_matched = False
     if resource is None:
-        # Try to find an existing resource with matching suffix
-        # Example: parameter "file_name" -> inferred "File" not found -> check if "BackupFile" exists
+        # `file_name` infers `File`; with no `File`, try a resource like `BackupFile`
         matched_resource, matched_field = _find_matching_resource_by_suffix(
             resource_name=resource_name,
             parameter_name=parameter_name,
@@ -195,13 +180,10 @@ def _resolve_parameter_dependency(
             field = matched_field
             is_suffix_matched = True
         else:
-            # No schema found - create placeholder resource with inferred field
-            #
-            # Example: `DELETE /users/{userId}` with no response body -> `User` resource with "userId" field
-            #
-            # Later operations with schemas will upgrade this placeholder
+            # A placeholder holding the parameter, until a schema replaces it:
+            # `DELETE /users/{userId}` without a response body -> `User` with a `userId` field
             if resource_name in resources:
-                # Resource exists but was empty - update with parameter field
+                # A fieldless resource takes the parameter as its field
                 resources[resource_name].fields = [parameter_name]
                 resources[resource_name].source = DefinitionSource.PARAMETER_INFERENCE
                 state.updated_resources.add(resource_name)
@@ -238,11 +220,7 @@ def _find_resource_in_responses(
     resource_name: str,
     state: InferenceState,
 ) -> ResourceDefinition | None:
-    """Search operation's successful responses for a specific resource definition.
-
-    Used when a parameter references a resource not yet discovered. Scans this
-    operation's response schemas hoping to find the resource definition.
-    """
+    """`resource_name` as this operation's responses define it."""
     for _, extracted in cached_resources_from_responses(operation=operation, state=state):
         if extracted.resource.name == resource_name:
             return extracted.resource
@@ -272,18 +250,9 @@ def _find_matching_resource_by_suffix(
     operation: APIOperation,
     state: InferenceState,
 ) -> tuple[ResourceDefinition, str] | tuple[None, None]:
-    """Find a resource with matching suffix or prefix when exact match not found.
+    """A schema-defined resource whose name ends or starts with the inferred one, and its field matching the parameter.
 
-    When a parameter like "file_name" infers resource "File" but no "File" exists,
-    check if a resource ending with "File" exists (e.g., "BackupFile") or starting
-    with "File" (e.g., "FileSummary") and if the parameter can be matched to one
-    of its fields.
-
-    Suffix matching example: "file_name" -> "File" -> "BackupFile"
-    Prefix matching example: "group_slug" -> "Group" -> "GroupSummary"
-
-    Only considers high-quality resources (schema-defined with properties) and
-    requires the parameter to match a field via find_matching_field.
+    `file_name` -> `File` -> `BackupFile`; `group_slug` -> `Group` -> `GroupSummary`.
     """
     nested_items = _nested_items(parameter_name, resource_name, operation.path, state.item_collections)
     return next(
@@ -303,23 +272,17 @@ def _find_matching_resource_by_suffix(
 def _iter_suffix_matches(
     *, resource_name: str, parameter_name: str, resources: ResourceMap
 ) -> Iterator[tuple[ResourceDefinition, str]]:
-    # Normalize for case-insensitive matching
     resource_lower = resource_name.lower()
 
     for candidate_name, candidate_resource in resources.items():
-        # Only consider schema-defined resources
         if candidate_resource.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
             continue
 
         candidate_lower = candidate_name.lower()
 
-        # Check if candidate ends with OR starts with the inferred resource name
-        # Suffix: "BackupFile".endswith("file") for resource_name="File"
-        # Prefix: "GroupSummary".startswith("group") for resource_name="Group"
         if not (candidate_lower.endswith(resource_lower) or candidate_lower.startswith(resource_lower)):
             continue
 
-        # Check if parameter can be matched to a field
         matched_field = naming.find_matching_field(
             parameter=parameter_name,
             resource=candidate_name,
@@ -465,7 +428,7 @@ def _resolve_body_dependencies(
     resolved = maybe_resolve_bundled(schema)
     bundled = schema.get(BUNDLE_STORAGE_KEY, {})
 
-    # For `items`, we'll inject an array with extracted resource
+    # An array body sends the resource as its first item
     items = _array_items(resolved, bundled)
     if isinstance(items, dict):
         resource_name = body.resource_name or naming.from_path(operation.path)
@@ -491,8 +454,7 @@ def _resolve_body_dependencies(
                 is_inline_item=not isinstance(items.get("$ref"), str),
             )
 
-    # Inspect each property that could be a part of some other resource.
-    # Flatten composition keywords first so bodies whose top level is allOf/oneOf/anyOf still surface their fields.
+    # Flattening first lets bodies whose top level is `allOf`/`oneOf`/`anyOf` expose their fields.
     properties, required = _flatten_composition(resolved, bundled)
     path = operation.path
     for property_name, subschema in properties.items():
@@ -504,9 +466,8 @@ def _resolve_body_dependencies(
         if property_name in required and _is_scalar(subschema):
             deferred.body_fields.append((property_name, subschema))
         resource_name = naming.from_parameter(property_name, path, body_field=True)
-        # `_name` body fields are usually attributes; only invent a resource when its
-        # name is backed by a path segment or component schema. Otherwise fall through
-        # to the known-dependencies path so the field can still bind to a parent resource.
+        # `_name` fields are usually attributes: only a name a path segment or component schema backs gets a resource.
+        # Other `_name` fields may still bind to a known parent resource below.
         gated = (
             resource_name is not None
             and resource_name not in resources
@@ -549,11 +510,9 @@ def _resolve_body_dependencies(
             # accepted values (`country` <- `GET /countries`). The producer is confirmed later.
             deferred.named_scalars.append((naming.to_pascal_case(property_name), property_name, subschema))
 
-        # Skip generic property names & optional fields (at least for now)
         if property_name in GENERIC_FIELD_NAMES or property_name not in required:
             continue
 
-        # Find candidate resources among known dependencies that actually have this field
         candidates = [
             resources[dep] for dep in known_dependencies if dep in resources and property_name in resources[dep].fields
         ]
@@ -561,12 +520,11 @@ def _resolve_body_dependencies(
         if len(candidates) > 1:
             # An update writes the resource its path addresses, whatever its parents carry
             candidates = [candidate for candidate in candidates if candidate.name == updated_resource]
-        # Skip ambiguous cases when multiple resources have same field name
+        # Ambiguous when several resources have this field
         if len(candidates) != 1:
             continue
 
         resource = candidates[0]
-        # Ensure the target field supports the same type
         if not resource.types[property_name] & set(get_type(subschema)):
             continue
         # A name labels the resource being written: only an update may keep its current one.
@@ -582,7 +540,6 @@ def _resolve_body_dependencies(
         deferred.copied_resource_fields.append((slot, deferred.writable_body_fields[property_name]))
         yield slot
 
-    # Recursively find nested FK fields in request body
     scan = NestedFKScan(
         bundled=bundled, name_to_uri=body.name_to_uri, by_reference=nested_fk_cache, by_schema={}, flattened={}
     )
@@ -609,14 +566,9 @@ def _extract_nested_body_fk_fields(
     scan: NestedFKScan,
     deferred: list[tuple[str, str, BodyPath, bool]],
 ) -> Iterator[InputSlot]:
-    """Recursively extract FK fields from nested request body schemas.
+    """FK fields in nested objects and array items: `{shipping: {warehouse_id}}`, `{items: [{product_id}]}`.
 
-    Scans nested objects and array items to find FK fields like:
-    - {shipping: {warehouse_id: "..."}} -> InputSlot for warehouse_id
-    - {items: [{product_id: "..."}]} -> InputSlot for product_id
-
-    When the FK target resource isn't yet registered, the lookup is appended to
-    `deferred` so the caller can replay it once every operation has been scanned.
+    Lookups of a target resource not registered yet go to `deferred`, replayed once every operation is scanned.
     """
     items = _array_items(schema, scan.bundled)
     children: list[tuple[str | int, Any]]
@@ -676,7 +628,7 @@ def _container_fk_fields(
     if not _COMPOSING_KEYWORDS.isdisjoint(schema):
         fields.extend(_array_branch_fk_fields(schema, scan, max_depth))
 
-    # Composition branches may carry the actual object shape, so flatten before treating as object.
+    # Composition branches may hold the object's fields, so flatten them first.
     properties = scan.flattened.get(id(schema))
     if properties is None:
         properties = scan.flattened[id(schema)] = {
@@ -979,10 +931,8 @@ def _string_identifier_for(slot: InputSlot) -> str | None:
 def rebind_inherited_suffix_matches(operations: OperationMap, resources: ResourceMap) -> None:
     """Re-resolve suffix matches that hold only through a field inherited via `allOf`.
 
-    A field inherited from a shared base schema (`id` from a generic `Resource`) says little about
-    which entity a prefix-named resource is: `ReservationTransaction.id` does not identify a reservation.
-    Once every operation is known, the resource the parameter names wins if the API refers to it,
-    and otherwise a field named after the parameter itself (`ReservationDetailProperties.reservationId`).
+    An inherited `ReservationTransaction.id` does not identify a reservation: the resource the parameter names wins if
+    the API refers to it, otherwise a field named after the parameter (`ReservationDetailProperties.reservationId`).
     """
     produced = _produced_resource_names(operations)
     for operation in operations.values():
@@ -1014,14 +964,13 @@ def rebind_inherited_suffix_matches(operations: OperationMap, resources: Resourc
 
 
 def _match_field(parameter_name: str, resource_name: str, resource: ResourceDefinition) -> str:
-    # Match parameter to resource field (`userId` -> `id`, `Id` -> `ChannelId`, etc.)
     fields = resource.fields
     matched = naming.find_matching_field(
         parameter=parameter_name, resource=resource_name, fields=fields, types=resource.types
     )
     if matched is not None:
         return matched
-    # Conventional fallback: `<resource>Id` parameters point at the resource's `id` field. A name is never an `id`.
+    # `<resource>Id` falls back to the resource's `id` field; a name is never an `id`.
     if "id" in fields and naming.key_kind(parameter_name) != naming.KeyKind.NAME:
         return "id"
     # Without an `id` field, use the parameter name so peer captures reach this slot.
@@ -1060,26 +1009,15 @@ def _string_identifier(resource: ResourceDefinition) -> str | None:
 
 
 def update_input_field_bindings(resource_names: set[str], operations: OperationMap) -> None:
-    """Update input slots field bindings after resource definition was upgraded.
+    """Re-match input fields once their resources gain fields.
 
-    When a resource's fields change (e.g., `User` upgraded from `["userId"]` to `["id", "email"]`),
-    existing input slots may reference stale field names. This re-evaluates field matching
-    for all operations using these resources.
-
-    Example:
-        `DELETE /users/{userId}` created `InputSlot(resource_field="userId")`
-        `POST /users` revealed actual fields `["id", "email"]`
-        This updates DELETE's `InputSlot` to use `resource_field="id"`
-
+    `DELETE /users/{userId}` binds `User.userId` until `POST /users` reveals `["id", "email"]`, then `User.id`.
     """
-    # Re-evaluate field matching for all operations referencing these resources
     for operation in operations.values():
         for input_slot in operation.inputs:
-            # Skip inputs not using these resources
             if input_slot.resource.name not in resource_names or isinstance(input_slot.parameter_name, int):
                 continue
 
-            # Re-match parameter to upgraded resource fields
             new_field = naming.find_matching_field(
                 parameter=input_slot.parameter_name,
                 resource=input_slot.resource.name,
@@ -1103,7 +1041,6 @@ def merge_related_resources(operations: OperationMap, resources: ResourceMap, it
         producer = operations[producer_name]
         consumer = operations[consumer_name]
 
-        # Try to upgrade each input slot
         for input_slot in consumer.inputs:
             # A fieldless resource its own collection returns is real (a polymorphic listing), not a path-named stub.
             if input_slot.resource.source == DefinitionSource.SCHEMA_WITHOUT_PROPERTIES and returned_by.get(
@@ -1117,7 +1054,6 @@ def merge_related_resources(operations: OperationMap, resources: ResourceMap, it
                 # The producer creates the item listed under a bare `{id}`, not what that `{id}` names.
                 if _names_nested_item(input_slot, new_resource_name, consumer.path, item_collections):
                     continue
-                # Update input slot to use the better resource definition
                 input_slot.resource = resources[new_resource_name]
                 input_slot.resource_field = new_field_name
 
@@ -1312,10 +1248,8 @@ def _has_resource_prefix(field: str, resource_name: str) -> bool:
 def rebind_orphan_synthetics(operations: OperationMap, resources: ResourceMap) -> None:
     """Rebind body and query slots from producer-less synthetics to a same-operation parent.
 
-    `<word>_id` fields produce a synthetic `<Word>` resource; when nothing else in
-    the spec backs that name (no path, no schema, no producer) but the operation's
-    own response describes a parent resource carrying the same field, the slot is
-    really a self-FK (`spouse_id` on `POST /contacts`, `?sequence_id=` on `GET /events`).
+    A `<word>_id` resource nothing backs (no path, schema or producer) is a self-FK when the path's resource has that
+    field: `spouse_id` on `POST /contacts`, `?sequence_id=` on `GET /events`.
     """
     producer_resources = _produced_resource_names(operations)
     for operation in operations.values():
@@ -1334,9 +1268,7 @@ def rebind_orphan_synthetics(operations: OperationMap, resources: ResourceMap) -
                 continue
             if not isinstance(input_slot.parameter_name, str):
                 continue
-            # Require an exact field-name match so we only rebind genuine self-FKs
-            # (`spouse_id` on `POST /contacts` when Contact has a `spouse_id` field) and
-            # leave ambiguous cases (`clientId` on `POST /applications`) alone.
+            # Only an exact field name is a self-FK (`Contact.spouse_id`); `clientId` on `POST /applications` stays
             if input_slot.parameter_name in parent.fields:
                 input_slot.resource = parent
                 input_slot.resource_field = input_slot.parameter_name
@@ -1360,8 +1292,7 @@ def _producer_modules(operations: OperationMap) -> dict[str, set[str]]:
 def disambiguate_module_variants(operations: OperationMap, resources: ResourceMap) -> None:
     """Swap to a same-module sibling for spec-suffixed duplicates (`Group` / `Group1`).
 
-    Without this, every consumer in the second module binds to the first module's
-    variant via the path-derived lookup.
+    Otherwise path-derived lookups bind every consumer in the second module to the first module's variant.
     """
     producer_modules = _producer_modules(operations)
 
@@ -1402,10 +1333,8 @@ def disambiguate_module_variants(operations: OperationMap, resources: ResourceMa
 def disambiguate_path_suffix_matches(operations: OperationMap, resources: ResourceMap) -> None:
     """Swap a path slot to a same-module resource that also matches the path-derived name.
 
-    When `_resolve_parameter_dependency` falls back to suffix-matching, it picks the
-    first registered candidate — leaving `/bookings/resources/{id}` bound to
-    `KeyDateResource` instead of `ResourceItem`. This pass corrects only when the
-    consumer's path-derived name picks both the current and a same-module sibling.
+    Suffix matching takes the first registered candidate, so `/bookings/resources/{id}` gets `KeyDateResource` over
+    `ResourceItem`; the swap happens only when the path-derived name matches both the current and the sibling.
     """
     producer_modules = _producer_modules(operations)
 
@@ -1414,9 +1343,7 @@ def disambiguate_path_suffix_matches(operations: OperationMap, resources: Resour
         if not consumer_module:
             continue
         own_output_names = {output.resource.name for output in operation.outputs}
-        # Limit to operations where the rebinding parameter is the leaf — otherwise
-        # `/images/{imageId}/regionproposals` would rebind {imageId} to the response
-        # type instead of Image.
+        # Only the trailing parameter: `/images/{imageId}/regionproposals` keeps `{imageId}` on `Image`.
         leaf_param = naming.trailing_path_parameter(operation.path)
         for input_slot in operation.inputs:
             if input_slot.parameter_location != ParameterLocation.PATH:
@@ -1428,7 +1355,7 @@ def disambiguate_path_suffix_matches(operations: OperationMap, resources: Resour
             modules = producer_modules.get(input_slot.resource.name)
             if not modules or consumer_module in modules:
                 continue
-            # Anchor the lookup on the segment that actually owns this path parameter.
+            # Anchor the lookup on the segment owning this path parameter.
             path_name = naming.from_path(operation.path, parameter_name=input_slot.parameter_name)
             if not path_name:
                 continue
@@ -1436,8 +1363,7 @@ def disambiguate_path_suffix_matches(operations: OperationMap, resources: Resour
             current_lower = input_slot.resource.name.lower()
             if not (current_lower.endswith(path_name_lower) or current_lower.startswith(path_name_lower)):
                 continue
-            # Prefer a sibling that the operation's own response describes — that's the
-            # resource the path actually identifies.
+            # The operation's own response describes the resource its path identifies.
             siblings = [
                 name
                 for name in producer_modules
@@ -1449,8 +1375,7 @@ def disambiguate_path_suffix_matches(operations: OperationMap, resources: Resour
             if len(siblings) != 1:
                 continue
             new_resource = resources[siblings[0]]
-            # Require an exact field-name match; loose synonym matches (`applicationId` -> `id`)
-            # would happily rebind cross-references like `ApplicationInfo` -> `ApplicationEvent`.
+            # Exact names only: synonyms (`applicationId` -> `id`) would rebind `ApplicationInfo` to `ApplicationEvent`.
             if input_slot.parameter_name not in new_resource.fields:
                 continue
             input_slot.resource = new_resource
@@ -1490,7 +1415,7 @@ def bind_item_parameters_to_collections(
             index = segments.index(placeholder)
             if index < 2 or segments[index - 1].startswith("{"):
                 continue
-            # `{warehouse}` under `/warehouses` names a listed warehouse, so a slot nothing can fill takes its identifier
+            # `{warehouse}` under `/warehouses` names a listed warehouse, so a slot nothing fills takes its identifier
             # `/apis/{api}/{version}` keys one resource by two segments, which no single listed field matches
             names_collection = (
                 (
@@ -1879,23 +1804,19 @@ def try_merge_input_resource(
     producer_outputs: list[OutputSlot],
     resources: ResourceMap,
 ) -> tuple[str, str] | None:
-    """Try to upgrade an input's resource to a producer's resource."""
+    """A producer's resource and field to rebind a weakly bound input to, or `None`."""
     consumer_resource = input_slot.resource
 
-    # Only upgrade resources without declared fields (low confidence) or suffix-matched inputs
-    # Suffix-matched inputs may have matched a less specific resource (e.g., "Blog post" instead of "Blog post public")
+    # A suffix match may have picked a less specific resource (`Blog post` over `Blog post public`)
     if consumer_resource.source >= DefinitionSource.SCHEMA_WITH_PROPERTIES and not input_slot.is_suffix_matched:
         return None
 
-    # Try each producer output
     for output in producer_outputs:
         producer_resource = resources[output.resource.name]
 
-        # Only merge to schema-defined resources (high confidence)
         if producer_resource.source != DefinitionSource.SCHEMA_WITH_PROPERTIES:
             continue
 
-        # Try to match the input parameter to producer's fields
         param_name = input_slot.parameter_name
         # A nested body field (`recipient/clientId`) already names its own target, not the producer's resource.
         if not isinstance(param_name, str) or "/" in param_name:
@@ -1916,7 +1837,7 @@ def try_merge_input_resource(
 
 
 def find_producer_consumer_candidates(operations: OperationMap) -> list[tuple[str, str]]:
-    """Find operation pairs that might produce/consume the same resource via REST patterns."""
+    """`(producer, consumer)` pairs a REST collection/item pattern relates: `POST /posts` and `GET /posts/{id}`."""
     candidates = []
 
     # Group by base path to reduce comparisons
@@ -1925,20 +1846,16 @@ def find_producer_consumer_candidates(operations: OperationMap) -> list[tuple[st
         base = _extract_base_path(node.path)
         paths.setdefault(base, []).append(name)
 
-    # Within each path group, find POST/PUT -> GET/DELETE/PATCH patterns
     for names in paths.values():
         for producer_name in names:
             producer = operations[producer_name]
-            # Producer must create/update and return data
             if producer.method not in ("post", "put") or not producer.outputs:
                 continue
 
             for consumer_name in names:
                 consumer = operations[consumer_name]
-                # Consumer must have path parameters
                 if not consumer.inputs:
                     continue
-                # Paths must be related (collection + item pattern)
                 if _is_collection_item_pattern(producer.path, consumer.path):
                     candidates.append((producer_name, consumer_name))
 
@@ -1946,28 +1863,19 @@ def find_producer_consumer_candidates(operations: OperationMap) -> list[tuple[st
 
 
 def _extract_base_path(path: str) -> str:
-    """Extract collection path: /blog/posts/{id} -> /blog/posts."""
+    """`/blog/posts/{id}` -> `/blog/posts`, dropping every parameter segment."""
     parts = [p for p in path.split("/") if not p.startswith("{")]
     return "/".join(parts).rstrip("/")
 
 
 def _is_collection_item_pattern(collection_path: str, item_path: str) -> bool:
-    """Check if paths follow REST collection/item pattern."""
-    # /blog/posts + /blog/posts/{postId}
+    """Whether `item_path` is `collection_path` plus one parameter: `/blog/posts` and `/blog/posts/{postId}`."""
     normalized_collection = collection_path.rstrip("/")
     normalized_item = item_path.rstrip("/")
 
-    # Must start with collection path
     if not normalized_item.startswith(normalized_collection + "/"):
         return False
 
-    # Extract the segment after collection path
     remainder = normalized_item[len(normalized_collection) + 1 :]
 
-    # Must be a single path parameter: {paramName} with no slashes
-    return (
-        remainder.startswith("{")
-        and remainder.endswith("}")
-        and len(remainder) > 2  # Not empty {}
-        and "/" not in remainder
-    )
+    return remainder.startswith("{") and remainder.endswith("}") and len(remainder) > 2 and "/" not in remainder

@@ -44,8 +44,7 @@ HOST = "testserver"
 _LOCK = threading.Lock()
 _STACK = ExitStack()
 _PORTAL: BlockingPortal | None = None
-# Keyed by `id(app)` so applications that are unhashable or reject weak references still work. A started
-# lifespan keeps its application alive for the rest of the process, which is what makes the key stable.
+# Keyed by `id(app)` for unhashable or weakref-rejecting apps; a started lifespan keeps the app, and its id, alive.
 _LIFESPANS: dict[int, _Lifespan] = {}
 _STARTUP_LOCKS: dict[int, threading.Lock] = {}
 
@@ -88,8 +87,7 @@ def _shutdown() -> None:
     try:
         shutdown_lifespans()
     except Exception:
-        # Nothing can act on a shutdown failure at interpreter exit, and raising here would only
-        # replace the process exit status with an unattributable traceback.
+        # Nothing can act on a shutdown failure at exit; raising would replace the exit status with a stray traceback.
         pass
     finally:
         with _LOCK:
@@ -140,8 +138,7 @@ class _Lifespan:
         try:
             await self.app(scope, self._app_receive, self.send_stream.send)
         except Exception:
-            # Rejecting the scope before asking for any message is how applications without lifespan support
-            # signal it, and servers keep serving them. A later failure is a real one.
+            # Apps without lifespan support reject the scope before asking for a message, and servers keep serving them.
             if self.asked_for_message:
                 raise
         finally:
@@ -202,8 +199,7 @@ def _start_lifespan(app: ASGIApp) -> None:
                 raise started.error
             return
         lifespan = _Lifespan(app, portal)
-        # Recorded before startup runs, so a failure is reported to every caller instead of being retried
-        # once per request, and a half-started application is not left running past exit.
+        # Registered first: callers share a startup failure instead of retrying it, and exit stops a half-started app.
         _LIFESPANS[key] = lifespan
         try:
             lifespan.start()

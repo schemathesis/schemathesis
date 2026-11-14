@@ -51,9 +51,9 @@ def test_mutations_by_location_uses_components(tmp_path):
 @pytest.mark.parametrize(
     ("status", "expected_count", "expected_rejected", "expected_accepted"),
     [
-        (422, 1, 1, 0),  # 4xx — server caught the negative mutation (the desired outcome)
-        (200, 1, 0, 1),  # 2xx — wire-side negation (the finding we want to flag)
-        (500, 1, 0, 0),  # 5xx — server crashed; counts but is neither accept nor reject
+        (422, 1, 1, 0),  # 4xx: the server caught the negative mutation
+        (200, 1, 0, 1),  # 2xx: wire-side negation, the finding to flag
+        (500, 1, 0, 0),  # 5xx: counted, but neither accepted nor rejected
     ],
     ids=["rejected", "accepted", "server-error"],
 )
@@ -157,7 +157,7 @@ def test_coverage_scenarios_count_per_kind(tmp_path):
     cases = {"c1": _case("value_above_maximum"), "c2": _case("value_above_maximum"), "c3": _case("missing_parameter")}
     interactions = {
         "c1": {"response": {"status_code": 422}},
-        "c2": {"response": {"status_code": 200}},  # accepted -- wire-side coercion
+        "c2": {"response": {"status_code": 200}},  # accepted: wire-side coercion
         "c3": {"response": {"status_code": 400}},
     }
     path = tmp_path / "run.ndjson"

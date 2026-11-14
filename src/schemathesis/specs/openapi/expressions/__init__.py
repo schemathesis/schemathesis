@@ -1,4 +1,4 @@
-"""Runtime expressions support.
+"""Runtime expressions.
 
 https://swagger.io/docs/specification/links/#runtime-expressions
 """
@@ -28,7 +28,6 @@ class MultiMatch:
 
 
 def evaluate(expr: Any, output: StepOutput, evaluate_nested: bool = False) -> Any:
-    """Evaluate runtime expression in context."""
     if isinstance(expr, (dict, list)) and evaluate_nested:
         return _evaluate_nested(expr, output, _evaluate_nested_value)
     if not isinstance(expr, str):
@@ -43,14 +42,9 @@ def evaluate(expr: Any, output: StepOutput, evaluate_nested: bool = False) -> An
 
 
 def evaluate_wildcard(expr: Any, output: StepOutput) -> Any:
-    """Evaluate a runtime expression, treating `*` segments in JSON Pointers as wildcards.
+    """Evaluate `expr` with `*` pointer segments as wildcards: one value, a `MultiMatch`, or `UNRESOLVABLE` if none.
 
-    Returns the single resolved value on one match, a `MultiMatch` on N>1 matches
-    (the substitution layer picks via Hypothesis `sampled_from`), or UNRESOLVABLE
-    on zero matches or structural failure.
-
-    Inference produces single-node `$response.body#/.../*/...` expressions; that's
-    the only shape this function is contracted to handle. Request bodies are evaluated per value.
+    Handles only single-node `$response.body#/.../*/...` expressions; request bodies are evaluated per value.
     """
     if isinstance(expr, (dict, list)):
         return _evaluate_nested(expr, output, evaluate_wildcard)

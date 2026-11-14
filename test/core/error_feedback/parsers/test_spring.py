@@ -287,9 +287,7 @@ def test_spring_parser_recognizes_format_message_variants(message, expected_name
 
 
 def test_spring_parser_uuid_takes_precedence_over_uri_when_both_match(make_operation, case_factory):
-    # Defensive: a contrived "must be a valid URI UUID" string would match both
-    # the URI and UUID regexes. The classifier checks UUID first so the more
-    # specific format wins.
+    # A message matching both the URI and UUID patterns classifies as the more specific UUID.
     body = {"subErrors": [{"field": "x", "message": "must be a valid UUID"}]}
     obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert obs[0].payload == FormatPayload(name="uuid")
@@ -304,8 +302,7 @@ def test_spring_parser_uuid_takes_precedence_over_uri_when_both_match(make_opera
         ("must be greater than 0.5", 0.5, BoundDirection.MIN, True),
         ("must be less than 99.99", 99.99, BoundDirection.MAX, True),
         ("must be greater than -50", -50.0, BoundDirection.MIN, True),
-        # `@Positive` / `@Negative` / `@PositiveOrZero` / `@NegativeOrZero` —
-        # Hibernate expands these to "greater/less than 0" with the matching suffix.
+        # `@Positive` / `@Negative` / `@PositiveOrZero` / `@NegativeOrZero` expand to "greater/less than 0".
         ("must be greater than 0", 0.0, BoundDirection.MIN, True),
         ("must be less than 0", 0.0, BoundDirection.MAX, True),
         ("must be less than or equal to 0", 0.0, BoundDirection.MAX, False),
@@ -529,8 +526,6 @@ def test_spring_parser_extracts_pagination_type_hint(type_name, expected_bound, 
 
 
 def test_spring_parser_emits_path_location_when_field_is_a_path_parameter(make_operation, case_factory):
-    # `subErrors[].field = "id"` for a path parameter `id` — the Spring parser
-    # historically hardcoded `location=BODY`, leaving the observation orphaned.
     body = {
         "message": "Constraint violation",
         "subErrors": [{"field": "id", "message": "must be a valid UUID", "value": "0", "type": "String"}],
@@ -543,9 +538,7 @@ def test_spring_parser_emits_path_location_when_field_is_a_path_parameter(make_o
 
 
 def test_spring_parser_scans_msg_carrier_for_existing_patterns(make_operation, case_factory):
-    # Custom Spring envelopes use `msg` instead of `message` for the user-facing
-    # text. Existing patterns (`MissingServletRequestParameterException`, etc.)
-    # should fire when their phrasing appears under `msg`.
+    # Custom Spring envelopes carry the user-facing text in `msg` instead of `message`.
     body = {
         "msg": "Required Integer parameter 'page' is not present",
         "throwable": None,
@@ -559,8 +552,7 @@ def test_spring_parser_scans_msg_carrier_for_existing_patterns(make_operation, c
 
 
 def test_spring_parser_extracts_positive_gate_from_market_cart_body(make_operation, case_factory):
-    # Verbatim wire sample: two `Value shall be a positive number` fieldErrors must
-    # surface as exclusive lower bounds at 0.
+    # Verbatim wire sample: each `Value shall be a positive number` becomes an exclusive lower bound at 0.
     body = {
         "message": "Argument validation error",
         "description": "uri=/customer/cart",
@@ -641,8 +633,7 @@ def test_spring_parser_can_parse_recognizes_missing_parameter_envelope():
 
 
 def test_spring_parser_recognizes_method_argument_type_mismatch(make_operation, case_factory):
-    # Field captured from `Method parameter 'ownerId':` prefix; emitted on both
-    # PATH and QUERY because the message doesn't pin the binding.
+    # `Method parameter 'ownerId':` names the field but not its location, so PATH and QUERY both get it.
     obs = SpringParser().parse(
         operation=make_operation(method="get", path="/api/owners/{ownerId}/pets"),
         body=_SPRING_TYPE_COERCION_PROBLEM_DETAIL,
@@ -669,8 +660,7 @@ def test_spring_parser_can_parse_recognizes_type_coercion_envelope():
 
 
 def test_spring_parser_skips_type_coercion_without_method_parameter_prefix(make_operation, case_factory):
-    # Older Spring stdlib envelope omits the `Method parameter 'X':` prefix —
-    # without a field name we can't attribute, so we don't emit.
+    # Older Spring envelopes omit the `Method parameter 'X':` prefix, leaving no field to attribute.
     body = {
         "timestamp": "2026-05-01T01:54:33.490+0000",
         "status": 400,

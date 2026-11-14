@@ -121,7 +121,6 @@ def test_render_markdown_with_time_consuming_operations_snapshot(snapshot):
 
 def test_render_markdown_drift_dominant_headline_snapshot(snapshot):
     run = _sample_run()
-    # Force a single dominant signal: 100% positive_drift.
     run.buckets = Bucket(positive_drift=100)
     assert render_markdown(run) == snapshot
 
@@ -133,7 +132,7 @@ def test_render_markdown_schema_quality_callout_snapshot(snapshot):
 
 
 def test_render_markdown_failure_summary_with_two_fingerprints_snapshot(snapshot):
-    # Same check class, two distinct failure types -> 2 unique fingerprints.
+    # Same check class, two failure types, so two fingerprints.
     run = _sample_run()
     run.failures = [
         FailureRef(
@@ -167,7 +166,7 @@ def test_render_markdown_no_stateful_section_when_absent():
 
 def test_render_markdown_no_headline_when_balanced():
     run = _sample_run()
-    # Every bucket equal -> nothing crosses the 25% threshold.
+    # Equal buckets leave nothing above the 25% threshold.
     run.buckets = Bucket(
         positive_accepted=10,
         negative_rejected=10,
@@ -201,8 +200,7 @@ def test_render_markdown_no_top_time_section_when_no_timings():
 
 
 def test_render_markdown_unaccounted_question_mark_when_negative():
-    # Defensive: gen+net somehow exceeds wall (clock skew, double-counting). Render `?`
-    # rather than a misleading negative number.
+    # Generation plus network time may exceed wall time (clock skew, double-counting); render `?`, not a negative.
     run = _sample_run()
     run.phases = [
         PhaseMetrics(

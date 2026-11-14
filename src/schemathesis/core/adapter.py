@@ -19,12 +19,8 @@ class ResponsesContainer(Protocol[T]):
 
 
 class OperationParameter(Protocol):
-    """API parameter at a specific location (query, header, body, etc.)."""
-
     @property
-    def definition(self) -> JsonSchemaObject:
-        """Raw parameter definition from the API spec."""
-        ...  # pragma: no cover
+    def definition(self) -> JsonSchemaObject: ...  # pragma: no cover
 
     @property
     def media_type(self) -> str | None:
@@ -32,32 +28,24 @@ class OperationParameter(Protocol):
         ...  # pragma: no cover
 
     @property
-    def location(self) -> ParameterLocation:
-        """Location: "query", "header", "body", etc."""
-        ...  # pragma: no cover
+    def location(self) -> ParameterLocation: ...  # pragma: no cover
 
     @property
-    def name(self) -> str:
-        """Parameter name."""
-        ...  # pragma: no cover
+    def name(self) -> str: ...  # pragma: no cover
 
     @property
-    def is_required(self) -> bool:
-        """True if required."""
-        ...  # pragma: no cover
+    def is_required(self) -> bool: ...  # pragma: no cover
 
     def validate(self, value: Any) -> None:
-        """Validate a value against this parameter's schema, raising if it does not conform."""
+        """Raise if `value` does not conform to this parameter's schema."""
         ...  # pragma: no cover
 
-    def is_valid(self, value: Any) -> bool:
-        """True if the value conforms to this parameter's schema."""
-        ...  # pragma: no cover
+    def is_valid(self, value: Any) -> bool: ...  # pragma: no cover
 
 
 @dataclass(slots=True)
 class ParsedParameters:
-    """Parameters of a single API operation, together with those left out as unparsable."""
+    """Parameters of one API operation, plus those skipped as unparsable."""
 
     items: list[OperationParameter]
     skipped: list[SkippedParameter]

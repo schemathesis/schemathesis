@@ -89,7 +89,7 @@ def planted_bug(envelope: Envelope) -> OpenAPIApp:
 
 
 def _render_ajv(violations: list[Violation]) -> object:
-    # Structured `keyword` + `params.limit` carry the size bounds directly.
+    # Structured `keyword` and `params.limit` carry the size bounds.
     return {
         "errors": [
             {

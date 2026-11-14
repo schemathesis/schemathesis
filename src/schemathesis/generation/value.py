@@ -42,7 +42,7 @@ MISSING: object = object()
 
 
 def get_at_path(target: object, path: tuple[str, ...]) -> object:
-    """Read the value at path. Returns the ``MISSING`` sentinel when any segment is absent."""
+    """Return the value at `path`, or `MISSING` when any segment is absent."""
     cursor: object = target
     for segment in path:
         if not isinstance(cursor, dict) or segment not in cursor:

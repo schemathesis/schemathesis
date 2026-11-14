@@ -25,9 +25,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
-# HTTP frameworks (FastAPI, Litestar, Starlette) prepend a location segment to
-# `loc`. When the prefix is absent or unrecognised, treat the whole `loc` as a
-# body-relative path.
+# FastAPI, Litestar and Starlette prefix `loc` with a location; without a known prefix, `loc` is a body path.
 _LOC_PREFIX_TO_LOCATION: dict[str, ParameterLocation] = {
     "body": ParameterLocation.BODY,
     "query": ParameterLocation.QUERY,
@@ -43,9 +41,7 @@ _LOC_PREFIX_TO_LOCATION: dict[str, ParameterLocation] = {
     "parsed_cookies": ParameterLocation.COOKIE,
 }
 
-# `ctx.expected` for `enum`/`literal_error` is a human-readable string like
-# "'USER' or 'ADMIN'". Pydantic switches quote style for values containing the
-# other quote (e.g. `"O'Brien" or 'Smith'`), so accept both forms.
+# `ctx.expected` reads like "'USER' or 'ADMIN'"; values containing `'` get double quotes (`"O'Brien" or 'Smith'`).
 _EXPECTED_TOKEN = re.compile(r"'([^']+)'|\"([^\"]+)\"")
 
 # Some frameworks report every error under one generic `type` and drop `ctx`, leaving only Pydantic's message.
@@ -121,8 +117,7 @@ def _limit_value_size_bound(direction: BoundDirection) -> Handler:
 def _numeric_bound(direction: BoundDirection, exclusive: bool, context_key: str) -> Handler:
     def handler(context: dict) -> HandlerResult:
         bound = context.get(context_key)
-        # Decimal-typed fields (money, prices) put a Decimal in `ctx`; coerce to
-        # float since downstream JSON Schema bounds are numeric-typed anyway.
+        # Decimal fields put a `Decimal` in `ctx`; JSON Schema bounds take a float.
         if isinstance(bound, Decimal):
             bound = float(bound)
         if not isinstance(bound, (int, float)) or isinstance(bound, bool):
@@ -185,8 +180,7 @@ _TYPE_CODE_HANDLERS: dict[str, Handler] = {
     "value_error.str.regex": _string_pattern_mismatch,
     "enum": _enum_handler,
     "literal_error": _enum_handler,
-    # Date/datetime failures surface under several codes depending on the input
-    # shape; map every variant to the same JSON-Schema format.
+    # Date and time failures use a different code per input shape; all map to one format.
     "date_parsing": _format_handler("date"),
     "date_from_datetime_parsing": _format_handler("date"),
     "date_from_datetime_inexact": _format_handler("date"),
@@ -217,7 +211,7 @@ def _detail_entries(body: object) -> list | None:
 
 @PARSERS.register
 class PydanticParser:
-    """Parser for Pydantic `ValidationError` envelopes — `{"detail"|"exception_detail": [{type, loc, ctx}, ...]}`."""
+    """Parser for Pydantic `ValidationError` envelopes: `{"detail"|"exception_detail": [{type, loc, ctx}, ...]}`."""
 
     priority = 7
 

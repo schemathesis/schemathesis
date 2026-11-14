@@ -1,9 +1,4 @@
-"""Substitution of user-configured dictionary entries into GraphQL argument literals.
-
-Bindings are keyed `<Type>.<field>.<argument>`, where `<Type>` is the type that declares the
-field, so a nested field's arguments are addressed exactly like a root field's. `*` stands for
-any type or field, a dotted suffix descends into input objects, and `[*]` targets list elements.
-"""
+"""Substitution of user-configured dictionary entries into GraphQL argument literals."""
 
 from __future__ import annotations
 
@@ -39,8 +34,7 @@ if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig
     from schemathesis.schemas import APIOperation
 
-# GraphQL scalar name -> the JSON Schema type its entries are coerced to. Scalars outside this
-# map (`Boolean`, enums, custom scalars) have no dictionary support.
+# JSON Schema type that entries for each scalar are coerced to; `Boolean`, enums and custom scalars get no dictionaries.
 _SCALAR_TYPE_KEYS: Final[dict[str, str]] = {
     "String": "string",
     "ID": "string",
@@ -122,7 +116,7 @@ def substitute_dictionaries(
     operation_label: str,
     random: Random,
 ) -> tuple[graphql.OperationDefinitionNode, list[DictionaryDraw]]:
-    """Replace argument literals with configured dictionary entries. Returns the draws applied too."""
+    """Replace argument literals with configured dictionary entries; also return the applied draws."""
     root = _root_type_for(client_schema, operation_node.operation)
     if root is None:
         return operation_node, []

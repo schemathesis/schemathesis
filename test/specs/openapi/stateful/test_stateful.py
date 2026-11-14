@@ -74,7 +74,6 @@ def test_response_bundle_for_status_code(ctx, case_factory, response_factory, li
 
 def test_custom_rule(ctx, testdir):
     api = ctx.openapi.apps.success()
-    # When the state machine contains a failing rule that does not expect `Case`
     testdir.make_test(
         f"""
 from hypothesis.stateful import initialize, rule
@@ -94,26 +93,15 @@ TestStateful = APIWorkflow.TestCase
 """,
     )
     result = testdir.runpytest()
-    # Then the reproducing steps should be correctly displayed
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines([r".*state.some\(data='foo'\)"])
 
 
-# With the following tests we try to uncover a bug that requires multiple steps with a shared step
-# There are three operations:
-#   1. Create user via first & last name
-#   2. Get user's details - returns id & full name
-#   3. Update user - update first & last name
-# The problem is that (3) allows you to update a user with non string last name, which is not detectable in its output.
-# However, (2) will fail when it will try to create a full name. Reproducing this bug requires 3 steps:
-#   1. Create a user
-#   2. Update the user with an invalid last name
-#   3. Get info about this user
+# Updating a user with a non-string last name succeeds, but a later GET fails to build the full name.
 
 
 def test_hidden_failure(ctx, testdir):
     api = ctx.openapi.apps.users_crud()
-    # When we run test as a state machine
     testdir.make_test(
         f"""
 schema.config.update(base_url="{api.base_url}")
@@ -131,9 +119,7 @@ TestStateful.settings = settings(
         schema=api.spec,
     )
     result = testdir.runpytest()
-    # Then it should be able to find a hidden error:
     result.assert_outcomes(failed=1)
-    # And there should be cURL command to reproduce the error in the GET call
     result.stdout.re_match_lines([rf".+curl -X GET '{api.base_url}/users/\w+.+"])
 
 
@@ -199,7 +185,6 @@ def test_hidden_failure_app(transport, factory):
 def test_step_override(ctx, testdir):
     # See GH-970
     api = ctx.openapi.apps.users_crud()
-    # When the user overrides the `step` method
     testdir.make_test(
         f"""
 schema.config.update(base_url="{api.base_url}")
@@ -220,15 +205,13 @@ TestStateful.settings = settings(
         schema=api.spec,
     )
     result = testdir.runpytest()
-    # Then it should be overridden
     result.assert_outcomes(failed=1)
-    # And the placed error should pop up to indicate that the overridden code is called
+    # The error comes from the overridden `step`.
     result.stdout.re_match_lines([r".+ValueError: ERROR FOUND!"])
 
 
 def test_trimmed_output(ctx, testdir):
     api = ctx.openapi.apps.multiple_failures()
-    # When an issue is found
     testdir.make_test(
         f"""
 schema.config.update(base_url="{api.base_url}")
@@ -239,7 +222,7 @@ TestStateful = schema.as_state_machine().TestCase
     )
     result = testdir.runpytest("--tb=short")
     result.assert_outcomes(failed=1)
-    # Then internal frames should not appear after the failing-example block
+    # No internal frames after the failing-example block.
     assert " in step" not in result.stdout.str()
 
 
@@ -788,8 +771,7 @@ def test_stateful_disabled_for_op_skips_rules(ctx, disabled_op, expected_rules):
         OperationConfig.from_dict({"include-name": disabled_op, "phases": {"stateful": {"enabled": False}}})
     )
 
-    # No rule should execute the disabled op — root or incoming-transition.
-    # Outgoing transitions whose source is the disabled op stay (their target is still enabled).
+    # Rules never run the disabled operation; transitions out of it stay because their targets are enabled.
     state_machine = schema.as_state_machine()
     assert (
         sorted(name for name, value in state_machine.__dict__.items() if hasattr(value, "hypothesis_stateful_rule"))
@@ -801,9 +783,7 @@ _ID_OBJECT = {"type": "object", "properties": {"id": {"type": "integer"}}, "requ
 
 
 def test_fk_consumer_with_producer_stays_root(ctx):
-    # POST /photos consumes Album.id via body `albumId`; Album has a producer (POST /albums),
-    # so the chain can reach the consumer through a Link. The consumer stays in the reliable
-    # root set, letting the state machine also start chains from it.
+    # POST /photos consumes Album.id via `albumId`; Album has a producer, so POST /photos stays a reliable root.
     schema = ctx.openapi.load_schema(
         {
             "/albums": {
@@ -860,9 +840,7 @@ def test_fk_consumer_with_producer_stays_root(ctx):
 
 
 def test_unsatisfiable_fk_consumer_not_classified_as_root(ctx):
-    # POST /photos consumes Album.id via body `albumId`, but no operation produces Album.
-    # The clean list endpoint keeps the reliable set non-empty so the safety-net fallback
-    # doesn't fire, letting us observe that the unsatisfiable consumer was demoted.
+    # Nothing produces Album; the clean list endpoint keeps the fallback off, so the consumer's demotion shows.
     schema = ctx.openapi.load_schema(
         {
             "/photos": {

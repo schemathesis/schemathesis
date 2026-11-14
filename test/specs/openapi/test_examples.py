@@ -227,13 +227,11 @@ def schema_with_property_examples(dict_with_property_examples) -> OpenApiSchema:
 
 @pytest.fixture
 def operation(schema_with_examples) -> APIOperation:
-    """Returns first (and only) API operation from schema_with_examples."""
     return next(schema_with_examples.get_all_operations()).ok()
 
 
 @pytest.fixture
 def operation_with_property_examples(schema_with_property_examples) -> APIOperation:
-    """Returns first (and only) API operation from schema_with_examples."""
     return next(schema_with_property_examples.get_all_operations()).ok()
 
 
@@ -264,8 +262,7 @@ def test_examples_phase_drops_float32_collapsing(ctx, location):
 
 
 def test_examples_phase_keeps_examples_when_schema_too_malformed_to_validate(ctx):
-    # A schema too broken to compile a validator (invalid `pattern`) must keep its examples rather than
-    # have float32 narrowing silently drop them.
+    # An invalid `pattern` compiles no validator, so float32 narrowing must keep the examples.
     inner = {"type": "number", "format": "float", "exclusiveMinimum": 0, "pattern": "(", "examples": [5e-324]}
     operation = ctx.openapi.load_operation(
         "POST /r",
@@ -474,13 +471,11 @@ def test_examples_from_cli(ctx, cli, schema_with_examples):
         "--phases=examples",
         "--checks=not_a_server_error",
     )
-    # The request body has the 3 examples defined. Because 3 is the most examples defined
-    # for any parameter, we expect to generate 3 requests.
     assert "9 generated" in result.stdout
 
 
 def test_network_error_with_flaky_generation(ctx, cli, snapshot_cli, schema_with_examples):
-    # Assume that there is a user-defined hook that makes data generation flaky
+    # A user hook that makes data generation flaky.
     module = ctx.write_pymodule(
         """
 import schemathesis
@@ -585,8 +580,6 @@ def test_extract_from_schemas(operation_with_property_examples):
 
 
 def test_multipart_examples(ctx):
-    # Regression after parameters refactoring
-    # When the schema contains examples for multipart forms
     raw_schema = {
         "openapi": "3.0.0",
         "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
@@ -615,15 +608,13 @@ def test_multipart_examples(ctx):
         },
     }
     schema = ctx.openapi.from_full_schema(raw_schema)
-    # Then examples should be correctly generated
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
     assert find_first(strategies[0], lambda case: case.body == {"key": "test"}, max_examples=2000)
 
 
 def test_invalid_x_examples(ctx):
-    # See GH-982
-    # When an Open API 2.0 schema contains a non-object type in `x-examples`
+    # GH-982: a non-object type in Open API 2.0 `x-examples` is skipped as invalid.
     operation = ctx.openapi.load_operation(
         "POST /test",
         {
@@ -634,7 +625,6 @@ def test_invalid_x_examples(ctx):
         },
         version="2.0",
     )
-    # Then such examples should be skipped as invalid (there should be an object)
     assert operation.get_strategies_from_examples() == []
 
 
@@ -1054,8 +1044,6 @@ def test_examples_in_any_of_in_schemas(ctx, key):
 
 
 def test_partial_examples(ctx):
-    # When the API schema contains multiple parameters in the same location
-    # And some of them don't have explicit examples and others do
     operation = ctx.openapi.load_operation(
         "POST /test/{foo}/{bar}/",
         {
@@ -1072,7 +1060,6 @@ def test_partial_examples(ctx):
         },
     )
     strategy = operation.get_strategies_from_examples()[0]
-    # Then all generated examples should have those missing parts generated according to the API schema
     example = examples.generate_one(strategy)
     parameters_schema = parameters_to_json_schema(operation.path_parameters, ParameterLocation.PATH)
     jsonschema_rs.validate(parameters_schema, example.path_parameters)
@@ -1080,7 +1067,6 @@ def test_partial_examples(ctx):
 
 def test_partial_path_examples_are_escaped(ctx):
     # See GH-3533
-    # When only some path parameters come from examples, example values should still be escaped.
     operation = ctx.openapi.load_operation(
         "PUT /blocks/{network}/{l3vpn}/{block}",
         {
@@ -1381,15 +1367,13 @@ def test_examples_validity(ctx):
     @given(case=strategy)
     @settings(deadline=None)
     def test(case):
-        # Generated examples should have valid parameters
-        # E.g. headers should be latin-1 encodable
+        # Generated examples must be sendable, e.g. headers must be latin-1 encodable.
         case.call(base_url=f"{api.base_url}/api")
 
     test()
 
 
 def test_external_value(ctx, app_runner):
-    # When the API schema contains examples via `externalValue` keyword
     answer_app = Flask(__name__)
 
     @answer_app.route("/answer.json")
@@ -1413,16 +1397,13 @@ def test_external_value(ctx, app_runner):
         },
     )
     strategy = operation.get_strategies_from_examples()[0]
-    # Then this example should be used
     example = examples.generate_one(strategy)
     assert example.body == b"42"
-    # And this data should be OK to send
     assert_requests_call(example)
     assert WSGI_TRANSPORT.serialize_case(example)["data"] == b"42"
 
 
 def test_external_value_network_error(ctx):
-    # When the external value is not available
     operation = ctx.openapi.load_operation(
         "POST /test/",
         {
@@ -1442,7 +1423,6 @@ def test_external_value_network_error(ctx):
             "responses": {"default": {"description": "OK"}},
         },
     )
-    # Then this example should not be used
     assert not operation.get_strategies_from_examples()
 
 
@@ -2098,7 +2078,6 @@ def test_property_examples_with_all_of(ctx):
 @pytest.mark.parametrize(
     ("parent_example_field", "parent_example_value", "base_example", "expected_count", "expected_values"),
     [
-        # Parent has 'example' field - should take precedence
         (
             "example",
             {"name": "example-name", "numeric_field": 42},
@@ -2106,7 +2085,6 @@ def test_property_examples_with_all_of(ctx):
             1,
             [{"name": "example-name", "numeric_field": 42}],
         ),
-        # Parent has 'examples' array - should take precedence
         (
             "examples",
             [
@@ -2126,8 +2104,6 @@ def test_parent_example_takes_precedence_over_allof(
     ctx, parent_example_field, parent_example_value, base_example, expected_count, expected_values
 ):
     # See GH-3268
-    # When a parent schema has allOf with a base schema that has an example,
-    # and the parent has its own example, only the parent's example should be used.
     operation = _json_body_operation(
         ctx,
         {"$ref": "#/components/schemas/resource"},
@@ -2159,18 +2135,14 @@ def test_parent_example_takes_precedence_over_allof(
 
     extracted = [example_to_dict(example) for example in extract_top_level(operation)]
 
-    # Should only get parent's examples, not base's incomplete example
     assert len(extracted) == expected_count
     for expected_value in expected_values:
         assert any(e["value"] == expected_value for e in extracted), f"Expected {expected_value} in extracted examples"
-    # Ensure base example is NOT included
     assert not any(e["value"] == base_example for e in extracted), "Base example should not be extracted"
 
 
 def test_multiple_allof_items_with_parent_example(ctx):
     # See GH-3268
-    # When allOf contains multiple schemas with their own examples,
-    # parent's example should still take precedence over all of them.
     operation = _json_body_operation(
         ctx,
         {"$ref": "#/components/schemas/resource"},
@@ -2184,12 +2156,11 @@ def test_multiple_allof_items_with_parent_example(ctx):
                         {
                             "type": "object",
                             "properties": {"age": {"type": "integer"}},
-                            "example": {"age": 25},  # Partial example in allOf item
+                            "example": {"age": 25},
                         },
                     ],
                     "required": ["id"],
                     "properties": {"id": {"type": "integer"}},
-                    # Complete example for the merged schema
                     "example": {"name": "John", "age": 30, "id": 123},
                 },
                 "base_resource": {
@@ -2203,14 +2174,12 @@ def test_multiple_allof_items_with_parent_example(ctx):
 
     extracted = [example_to_dict(example) for example in extract_top_level(operation)]
 
-    # Should only get parent's complete example, not the partial ones from allOf items
     assert len(extracted) == 1
     assert extracted[0]["value"] == {"name": "John", "age": 30, "id": 123}
 
 
 def test_allof_example_used_when_parent_has_none(ctx):
     # See GH-3268
-    # When parent has NO example, allOf examples should still be used.
     operation = _json_body_operation(
         ctx,
         {"$ref": "#/components/schemas/resource"},
@@ -2221,7 +2190,6 @@ def test_allof_example_used_when_parent_has_none(ctx):
                     "allOf": [{"$ref": "#/components/schemas/base_resource"}],
                     "required": ["numeric_field"],
                     "properties": {"numeric_field": {"type": "integer"}},
-                    # NO example in parent schema
                 },
                 "base_resource": {
                     "type": "object",
@@ -2565,14 +2533,11 @@ def test_schema_level_body_example_completed_at_nested_level(ctx):
     ],
 )
 def test_property_level_examples_with_allof_and_parent_properties(ctx, components, expected_value):
-    # Tests the code block that handles property-level example extraction
-    # when a schema has both 'allOf' and its own 'properties'.
-    # This ensures we extract property examples from ALL schemas (parent + allOf items).
+    # Property examples come from the parent and every `allOf` member.
     operation = _json_body_operation(ctx, {"$ref": "#/components/schemas/resource"}, components=components)
 
     extracted = [example_to_dict(example) for example in extract_from_schemas(operation)]
 
-    # Should extract property-level examples from BOTH parent and allOf schemas
     assert len(extracted) == 1
     assert extracted[0] == {
         "media_type": "application/json",
@@ -3201,10 +3166,7 @@ def test_allof_with_required_field_should_not_use_incomplete_property_examples(c
 
 
 def test_anyof_with_required_constraints(ctx):
-    # See GH-3404
-    # When a schema uses `anyOf` with `required` constraints (but no properties inside anyOf branches)
-    # to express "either field A or field B must be present", per-branch generation produces one
-    # example per branch - each satisfying its own required constraint
+    # GH-3404: an `anyOf` of bare `required` lists yields one example per branch.
     operation = _json_body_operation(
         ctx,
         {"$ref": "#/components/schemas/Item"},
@@ -3227,7 +3189,6 @@ def test_anyof_with_required_constraints(ctx):
     )
 
     extracted = [example_to_dict(example) for example in extract_from_schemas(operation)]
-    # Two examples produced - one per branch, each with the shared `type` field plus the branch field
     assert extracted == [
         {"media_type": "application/json", "value": {"type": "item", "name": ""}},
         {"media_type": "application/json", "value": {"type": "item", "id": "e3e70682-c209-1cac-a29f-6fbed82c07cd"}},
@@ -3239,8 +3200,6 @@ def test_anyof_with_required_constraints(ctx):
 
 
 def test_non_string_pattern_in_schema(ctx):
-    # When a schema contains an invalid non-string `pattern` value (e.g., integer),
-    # examples extraction should proceed gracefully without crashing
     operation = ctx.openapi.load_operation(
         "PATCH /test",
         {
@@ -3252,7 +3211,7 @@ def test_non_string_pattern_in_schema(ctx):
                             "properties": {
                                 "key": {
                                     "type": "string",
-                                    "pattern": 0,  # Invalid: should be string
+                                    "pattern": 0,
                                 }
                             },
                         }
@@ -3262,12 +3221,11 @@ def test_non_string_pattern_in_schema(ctx):
             "responses": {"200": {"description": "OK"}},
         },
     )
-    # Should not raise TypeError
     assert list(extract_from_schemas(operation)) == []
 
 
 def test_allof_not_referencing_root_schema(ctx):
-    # It used to lead to infinite recursion
+    # Guards against infinite recursion.
     schema = ctx.openapi.load_schema(
         {
             "/first": {
@@ -3320,8 +3278,7 @@ def test_allof_not_referencing_root_schema(ctx):
 
 
 def test_allof_with_nested_refs_to_same_target(ctx):
-    # Regression test for infinite recursion when allOf items reference the same target
-    # and properties are merged into the resolved schema, creating a cycle through mutation
+    # `allOf` items sharing one target form a cycle once their properties merge; extraction must not recurse forever.
     raw_schema = {
         "swagger": "2.0",
         "info": {"version": "0.1.0", "title": "Test"},
@@ -3366,7 +3323,6 @@ def test_allof_with_nested_refs_to_same_target(ctx):
     }
     schema = ctx.openapi.from_full_schema(raw_schema)
     operation = schema["/test"]["POST"]
-    # Should not raise RecursionError
     assert list(extract_from_schemas(operation)) == []
 
 
@@ -3594,7 +3550,6 @@ def _extract_json_body_examples(ctx, body_schema, version="3.0.2", **kwargs):
     ids=["optional", "required"],
 )
 def test_property_without_example_is_generated(ctx, body_schema, expected):
-    # Properties without an explicit example are generated regardless of whether they are required
     assert _extract_json_body_examples(ctx, body_schema) == expected
 
 
@@ -3630,7 +3585,6 @@ def test_generated_property_honors_its_format(ctx):
     ids=["plain", "oneof"],
 )
 def test_gate_preserved_when_no_explicit_examples(ctx, body_schema):
-    # When no property has an explicit example, no examples are produced
     assert _extract_json_body_examples(ctx, body_schema) == []
 
 
@@ -3772,7 +3726,6 @@ def test_fill_missing_uses_defaults(ctx, operation_definition, expected):
 
 @pytest.mark.parametrize("keyword", ["oneOf", "anyOf"])
 def test_branch_required_yields_disjoint_sets(ctx, keyword):
-    # oneOf and anyOf are treated identically — one disjoint set per branch
     assert _extract_json_body_examples(
         ctx,
         {
@@ -3819,9 +3772,7 @@ def test_branch_required_yields_disjoint_sets(ctx, keyword):
                 },
                 "oneOf": [{"required": ["shared_opt"]}, {"required": ["shared_opt", "extra"]}],
             },
-            # Branch 2 requires `shared_opt`, which is also required by branch 1.
-            # Any body satisfying branch 2 also satisfies branch 1, so branch 2 is
-            # unsatisfiable in this oneOf. The body validator correctly filters it out.
+            # A body satisfying branch 2 also satisfies branch 1, so `oneOf` rules branch 2 out.
             [
                 {"media_type": "application/json", "value": {"base": "x", "shared_opt": 0}},
             ],
@@ -4034,8 +3985,7 @@ def test_discriminated_branches_with_all_of_inheritance(ctx):
 
 
 def test_oas31_ref_sibling_example_in_body_properties(ctx):
-    # In OAS 3.1, $ref siblings are valid and must be applied
-    # a sibling `example` on a property should be used as the example value
+    # Open API 3.1 applies `$ref` siblings, so a sibling `example` supplies the value.
     extracted = _extract_json_body_examples(
         ctx,
         {"$ref": "#/components/schemas/FooResponse"},
@@ -4116,8 +4066,6 @@ def test_array_item_example_in_query_parameter(ctx):
 
 
 def test_array_body_property_with_min_items_generates_correct_length():
-    # When a body property is an array with minItems > 1 and items is an object schema with examples,
-    # extract_from_schemas should generate arrays with at least minItems elements, not just 1
     raw = {
         "openapi": "3.0.2",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -4167,16 +4115,12 @@ def test_array_body_property_with_min_items_generates_correct_length():
     }
     schema = schemathesis.openapi.from_dict(raw)
     extracted = [example_to_dict(e) for e in extract_from_schemas(schema["/test"]["POST"])]
-    # params must have 3 items (minItems=3), not just 1
     for ex in extracted:
         assert len(ex["value"]["params"]) == 3, f"Expected 3 params items, got {len(ex['value']['params'])}"
 
 
 def test_body_example_with_property_violating_type_is_skipped(ctx):
-    # When a property's `example` value violates that property's own type
-    # (e.g. type=string but example=["an", "array"]),
-    # the invalid property example must be filtered and not appear in any assembled body.
-    # `title` provides a valid example to anchor assembly; `editor_access` has only an invalid one.
+    # `title` anchors assembly with a valid example; `editor_access` has only an invalid one.
     operation = _json_body_operation(
         ctx,
         {
@@ -4201,9 +4145,6 @@ def test_body_example_with_property_violating_type_is_skipped(ctx):
 
 
 def test_top_level_body_example_violating_schema_is_skipped(ctx):
-    # When a media-type-level `example` violates the body schema
-    # (e.g. a field typed as integer but given a string value),
-    # it must not be yielded by extract_top_level.
     operation = ctx.openapi.load_operation(
         "POST /items",
         {
@@ -4250,8 +4191,6 @@ def test_schema_level_body_example_violating_schema_is_skipped(ctx):
 
 
 def test_property_examples_list_filters_invalid_items(ctx):
-    # When a property schema carries a JSON Schema `examples` array (plural),
-    # items that violate the property's type must be dropped; valid items must still be yielded.
     operation = _json_body_operation(
         ctx,
         {
@@ -4272,8 +4211,6 @@ def test_property_examples_list_filters_invalid_items(ctx):
 
 
 def test_top_level_body_examples_container_filters_invalid(ctx):
-    # When a media-type-level `examples` object contains values that violate the body schema,
-    # only schema-valid values must be yielded by extract_top_level.
     operation = ctx.openapi.load_operation(
         "POST /products",
         {
@@ -4327,7 +4264,6 @@ def test_top_level_parameter_schema_examples_container_filters_invalid(ctx):
 
 
 def test_unsatisfiable_property_schema_does_not_crash(ctx):
-    # When one property has a valid example and another property has an unsatisfiable schema
     operation = _json_body_operation(
         ctx,
         {
@@ -4363,8 +4299,6 @@ def test_assembled_body_missing_required_field_is_not_yielded(ctx):
 
 
 def test_response_derived_parameter_example_violating_schema_is_skipped(ctx):
-    # When a response example contains a field that matches a request parameter name but
-    # violates that parameter's schema constraints
     operation = ctx.openapi.load_operation(
         "GET /items",
         {
@@ -4424,9 +4358,6 @@ def test_response_derived_list_field_does_not_crash_examples_phase(ctx, app_runn
 
 
 def test_schema_level_parameter_example_violating_pattern_is_skipped(ctx):
-    # When the `example` field lives inside the parameter's `schema` object (not on the parameter
-    # definition itself), it is processed via an expanded subschema. The expanded subschema must
-    # still be validated against the full parameter schema — otherwise pattern violations slip through.
     operation = ctx.openapi.load_operation(
         "GET /items",
         {
@@ -4448,9 +4379,6 @@ def test_schema_level_parameter_example_violating_pattern_is_skipped(ctx):
 
 
 def test_response_derived_parameter_example_violating_format_is_skipped(ctx):
-    # When a response-body example provides a value for a path/query parameter whose schema
-    # declares a `format` constraint (e.g. uuid), an example that doesn't satisfy the format
-    # must be rejected rather than emitted as a POSITIVE case.
     operation = ctx.openapi.load_operation(
         "GET /sensors/{sensorId}",
         {
@@ -4479,9 +4407,7 @@ def test_response_derived_parameter_example_violating_format_is_skipped(ctx):
 
 
 def test_assembled_body_with_unsatisfiable_required_property_is_not_yielded(ctx):
-    # When a required property has an unsatisfiable schema (e.g. `not: {}`),
-    # generation fails and that property is absent from the assembled body,
-    # making every assembled example schema-invalid. Such examples must not be yielded.
+    # Generation fails for `not: {}`, so the required property is missing from every assembled body.
     operation = _json_body_operation(
         ctx,
         {
@@ -4541,9 +4467,6 @@ def test_allof_example_violating_anyof_in_parameter_is_not_yielded(ctx):
 
 
 def test_assembled_parameter_example_violating_schema_is_not_yielded(ctx):
-    # When array items are assembled from property examples but each item violates the
-    # items schema (anyOf where assembled properties match no branch exclusively),
-    # no such parameter example should be yielded.
     operation = ctx.openapi.load_operation(
         "GET /search",
         {
@@ -4562,8 +4485,7 @@ def test_assembled_parameter_example_violating_schema_is_not_yielded(ctx):
                                         "category": {"type": "string", "example": "online"},
                                         "value": {"type": "integer", "example": 100},
                                     },
-                                    # Branches are mutually exclusive by additionalProperties type:
-                                    # having both `category` (string) and `value` (integer) violates both.
+                                    # Exclusive `additionalProperties` types: `category` plus `value` violates both.
                                     "anyOf": [
                                         {
                                             "required": ["category"],
@@ -4613,9 +4535,7 @@ def test_parameter_example_with_wrong_type_is_not_yielded(ctx):
 
 
 def test_assembled_body_violating_allof_additional_properties_is_not_yielded(ctx):
-    # When outer schema properties have examples but an allOf reference has
-    # `additionalProperties: false` covering a different property set, assembled
-    # bodies with the outer properties are schema-invalid and must not be yielded.
+    # The `allOf` member's `additionalProperties: false` rejects the outer properties that carry examples.
     operation = ctx.openapi.load_operation(
         "PATCH /gateways",
         {
@@ -4647,7 +4567,7 @@ def test_assembled_body_violating_allof_additional_properties_is_not_yielded(ctx
 
 
 def test_content_encoded_header_parameter_example_is_valid(ctx):
-    # When a header parameter uses `content:` with a nested $ref
+    # The header's `content` schema is a nested `$ref`.
     operation = ctx.openapi.load_operation(
         "POST /files",
         {
@@ -4750,7 +4670,7 @@ def test_get_strategies_with_binary_body_and_pool_does_not_crash(ctx):
 
 
 def test_pool_injected_body_with_multiple_media_types_does_not_crash(ctx):
-    # Captured body variants must carry a media type so make_case can pick one.
+    # Captured body variants need a media type to build a case from.
     schema = ctx.openapi.load_schema(
         {
             "/projects/{projectId}/tags/{tagId}": {
@@ -5181,8 +5101,7 @@ def test_branches_from_both_oneof_and_anyof(ctx):
     ],
 )
 def test_discriminated_branches_with_shared_multi_value_tag(ctx, components, version):
-    # The schema name is not one of the values the shared tag allows, so pinning it to the name
-    # would make both branches impossible and drop their examples.
+    # The schema name is outside the shared tag's values; pinning it would make both branches impossible.
     operation = _json_body_operation(
         ctx,
         {

@@ -1,14 +1,4 @@
-"""Inferencing connections between API operations.
-
-The current implementation extracts information from the `Location` header and same-origin URLs in
-response bodies, and generates OpenAPI links for exact and prefix matches.
-
-When a `Location` header (or a body field) points to `/users/123`, the inference:
-
-    1. Finds the exact match: `GET /users/{userId}`
-    2. Finds prefix matches: `GET /users/{userId}/posts`, `GET /users/{userId}/posts/{postId}`
-    3. Generates OpenAPI links with regex parameter extractors
-"""
+"""Infer links with regex extractors from `Location` headers and same-origin body URLs."""
 
 from __future__ import annotations
 
@@ -32,8 +22,6 @@ if TYPE_CHECKING:
 
 @dataclass(unsafe_hash=True, slots=True)
 class OperationById:
-    """API operation identified by operationId."""
-
     value: str
     method: str
     path: str
@@ -44,8 +32,6 @@ class OperationById:
 
 @dataclass(unsafe_hash=True, slots=True)
 class OperationByRef:
-    """API operation identified by JSON reference path."""
-
     value: str
     method: str
     path: str
@@ -61,7 +47,7 @@ SeenLinkKey = tuple[str, str, int, tuple[str, ...]]
 
 @dataclass(slots=True)
 class MatchList:
-    """Results of matching a location path against API operation."""
+    """Operations matching a location path."""
 
     exact: OperationReference
     inexact: list[OperationReference]
@@ -70,7 +56,7 @@ class MatchList:
 
 @dataclass(slots=True)
 class LinkInferencer:
-    """Infer OpenAPI links from observed URLs for stateful testing."""
+    """Infers OpenAPI links from observed URLs."""
 
     _adapter: MapAdapter
     # Rule argument names to OpenAPI path parameter names, per operation
@@ -83,7 +69,7 @@ class LinkInferencer:
 
     @classmethod
     def from_schema(cls, schema: OpenApiSchema) -> LinkInferencer:
-        # NOTE: Use `matchit` for routing in the future
+        # Use `matchit` for routing in the future
         rules = []
         operations = []
         parameter_names: dict[OperationReference, dict[str, str]] = {}
@@ -115,7 +101,6 @@ class LinkInferencer:
         )
 
     def match(self, path: str) -> tuple[OperationReference, Mapping[str, str]] | None:
-        """Match path to API operation and extract path parameters."""
         try:
             try:
                 operation, arguments = self._adapter.match(path)
@@ -128,37 +113,28 @@ class LinkInferencer:
         return operation, {names[argument]: value for argument, value in arguments.items()}
 
     def _build_links_from_matches(self, matches: MatchList, expression: str) -> list[dict]:
-        """Build links from already-found matches."""
         exact = self._build_link_from_match(matches.exact, matches.parameters, expression)
         parameters = exact["parameters"]
         links = [exact]
         for inexact in matches.inexact:
             link = inexact.to_link_base()
-            # Parameter extraction is the same, only operations are different
+            # Prefix matches reuse the exact match's parameter extractors
             link["parameters"] = parameters
             links.append(link)
         return links
 
     def _find_matches_from_normalized_location(self, normalized_location: str) -> MatchList | None:
-        """Find matches from an already-normalized location."""
         match = self.match(normalized_location)
         if not match:
-            # It may happen that there is no match, but it is unlikely as the API assumed to return a valid Location
-            # that points to an existing API operation. In such cases, if they appear in practice the logic here could be extended
-            # to support partial matches
+            # APIs should return Locations of existing operations; add partial matches if real APIs need them
             return None
         exact, parameters = match
         if not parameters:
-            # Links without parameters don't make sense
+            # A link without parameters carries no data
             return None
         matches = MatchList(exact=exact, inexact=[], parameters=parameters)
 
-        # Find prefix matches, excluding the exact match
-        # For example:
-        #
-        #  Location: /users/123 -> /users/{user_id} (exact match)
-        #  /users/{user_id}/posts , /users/{user_id}/posts/{post_id} (partial matches)
-        #
+        # Location `/users/123` matches `/users/{user_id}` exactly and `/users/{user_id}/posts` by prefix
         for candidate in self._operations:
             if candidate == exact:
                 continue
@@ -193,12 +169,11 @@ class LinkInferencer:
         return link
 
     def _normalize_location(self, location: str) -> str | None:
-        """Normalize location header, handling both relative and absolute URLs."""
+        """Location as a path relative to the base path; None if empty or an absolute URL outside `base_url`."""
         location = location.strip()
         if not location:
             return None
 
-        # Check if it's an absolute URL
         if location.startswith(("http://", "https://")):
             if not self._base_url:
                 # Can't validate absolute URLs without base_url
@@ -207,48 +182,41 @@ class LinkInferencer:
             parsed = urlsplit(location)
             base_parsed = urlsplit(self._base_url)
 
-            # Must match scheme, netloc, and start with the base path
             if parsed.scheme != base_parsed.scheme or parsed.netloc != base_parsed.netloc:
                 return None
 
             return self._strip_base_path_from_location(parsed.path)
 
-        # Relative URL - strip base path if present, otherwise use as-is
         stripped = self._strip_base_path_from_location(location)
         return stripped if stripped is not None else location
 
     def _strip_base_path_from_location(self, path: str) -> str | None:
-        """Strip base path from location path if it starts with base path."""
+        """None when `path` lies outside the base path."""
         base_path = self._base_path.rstrip("/")
         if path != base_path and not path.startswith(f"{base_path}/"):
             return None
 
-        # Strip the base path to get relative path
         relative_path = path[len(base_path) :]
         return relative_path if relative_path.startswith("/") else "/" + relative_path
 
     def inject_links(self, operation: APIOperation, entries: list[LocationHeaderEntry] | list[BodyUrlEntry]) -> int:
-        # To avoid unnecessary work, we need to skip entries that we know will produce already inferred links
+        # Entries that would produce links already inferred in this call
         seen: set[SeenLinkKey] = set()
         injected = 0
 
         for entry in entries:
             location = self._normalize_location(entry.value)
             if location is None:
-                # Skip invalid/empty locations or absolute URLs that don't match base_url
                 continue
 
             matches = self._find_matches_from_normalized_location(location)
             if matches is None:
-                # Skip locations that don't match any API operation
                 continue
 
             key = (matches.exact.method, matches.exact.path, entry.status_code, tuple(sorted(matches.parameters)))
             if key in seen:
-                # Skip duplicate link generation for same operation/status/parameters combination
                 continue
             seen.add(key)
-            # Find the right bucket for the response status or create a new one
             response = operation.responses.find_by_status_code(entry.status_code)
             links: dict[str, dict[str, dict]]
             if response is None:

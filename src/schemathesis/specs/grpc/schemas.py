@@ -765,9 +765,8 @@ def _undeclared_fields(
 ) -> list[str]:
     """Paths to the fields that `decoded` and the messages in it carry without declaring them.
 
-    `root` holds `decoded`: failures name it, and packed values resolve among its types. Fails on what stricter
-    runtimes refuse: a declared field under another wire type, or a `google.protobuf.Any` value of a known type that
-    does not decode.
+    Failures name `root`, among whose types packed values resolve. Raises on what stricter runtimes refuse: a
+    declared field under another wire type, or an undecodable `google.protobuf.Any` value of a known type.
     """
     descriptor = decoded.DESCRIPTOR
     undeclared = []
@@ -966,7 +965,6 @@ class MethodMap(Mapping):
 
 
 if TYPE_CHECKING:
-    # Verify structural conformance to the spec-agnostic protocol; mypy fails here
-    # if a method is renamed or its signature drifts from `ApiSchema`.
+    # mypy fails here when the schema drifts from the `ApiSchema` protocol
     def _verify_api_schema_protocol(schema: GrpcSchema) -> ApiSchema:
         return schema

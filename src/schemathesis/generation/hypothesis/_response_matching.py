@@ -1,5 +1,3 @@
-"""Heuristics for matching parameter values against response example shapes."""
-
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -7,12 +5,9 @@ from typing import Any
 
 
 def find_matching_in_responses(examples: list[tuple[str, object]], param: str) -> Iterator[Any]:
-    """Find matching parameter examples."""
+    """Yield values for `param` from response examples, e.g. `id` or `orderId` of an `Order` for `GET /orders/{id}`."""
     normalized = param.lower()
     is_id_param = normalized.endswith("id")
-    # Extract values from response examples that match input parameters.
-    # E.g., for `GET /orders/{id}/`, use "id" or "orderId" from `Order` response
-    # as examples for the "id" path parameter.
     for schema_name, example in examples:
         if not isinstance(example, dict):
             continue
@@ -32,7 +27,6 @@ def find_matching_in_responses(examples: list[tuple[str, object]], param: str) -
 def _find_matching_in_responses(
     example: dict[str, Any], schema_name: str, param: str, normalized: str, is_id_param: bool
 ) -> Iterator[Any]:
-    # Check for exact match
     if param in example:
         yield example[param]
         return
@@ -47,12 +41,10 @@ def _find_matching_in_responses(
             yield value
             return
 
-    # Check for case-insensitive match
     for key in example:
         if key.lower() == normalized:
             yield example[key]
             return
-    # If no match found and it's an ID parameter, try additional checks
     if is_id_param:
         # Check for 'id' if parameter is '{something}Id'
         if "id" in example:

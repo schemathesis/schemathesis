@@ -117,11 +117,6 @@ class FuzzingPhaseConfig(DiffBase):
 
     @property
     def _is_default(self) -> bool:
-        """Check if this config is still in default state.
-
-        A config is default if enabled is True, operation_ordering is AUTO,
-        and all nested configs are in their default state.
-        """
         return (
             self.enabled
             and self.generation._is_default

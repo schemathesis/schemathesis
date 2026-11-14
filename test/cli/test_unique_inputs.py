@@ -193,9 +193,7 @@ def test_explicit_headers(
             }
         }
     )
-    # When explicit headers are passed to CLI
-    # And they match one of the parameters
-    # Then they should be included in the uniqueness check
+    # An explicit header that matches a parameter counts toward input uniqueness.
     assert (
         run(
             ctx,

@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 WalkPair = tuple[ParameterPath, str]
 LaravelShape = Mapping[str, Sequence[str]]
 
-# Vocabulary discriminator — substrings that, if found in any message, lock detection to Laravel.
+# Substrings that identify Laravel messages.
 _LARAVEL_VOCABULARY: frozenset[str] = frozenset(
     {
         " field is required.",
@@ -129,12 +129,12 @@ def _classify(message: str) -> ClassificationResult | None:
 
 
 def _extract_errors(body: object) -> LaravelShape | None:
-    """Return the validated `errors` dict if `body` matches a Laravel envelope; otherwise None."""
+    """The `errors` dict of a Laravel envelope, or `None` for other bodies."""
     if not isinstance(body, dict):
         return None
     if not isinstance(body.get("message"), str):
         return None
-    # ProblemDetails markers (ASP.NET ModelValidation) — disambiguate by absence.
+    # ASP.NET ProblemDetails carries these markers; Laravel envelopes lack them.
     if "type" in body or "title" in body or "status" in body:
         return None
     errors = body.get("errors")
@@ -156,7 +156,7 @@ def _has_laravel_vocabulary(errors: LaravelShape) -> bool:
 
 @PARSERS.register
 class LaravelParser:
-    """Parser for Laravel validation envelopes — `{"message": "...", "errors": {<field>: ["...", ...]}}`."""
+    """Parser for Laravel validation envelopes: `{"message": "...", "errors": {<field>: ["...", ...]}}`."""
 
     priority = 5
 

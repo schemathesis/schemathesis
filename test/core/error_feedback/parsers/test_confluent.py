@@ -11,8 +11,7 @@ from schemathesis.core.error_feedback import (
 from schemathesis.core.error_feedback.parsers.confluent import ConfluentParser
 from schemathesis.core.parameters import ParameterLocation
 
-# Wire-form envelopes captured against a live cp-kafka-rest; older-release wordings
-# carried in alongside the current ones so both arms of each regex stay covered.
+# Envelopes captured from a live cp-kafka-rest, plus older wordings so both arms of each regex stay covered.
 _CONFLUENT_P4_ALTER_OPERATION = {
     "error_code": 400,
     "message": (

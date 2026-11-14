@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 MIN_SAMPLES = 5
-# Optimistic prior — links start fully trusted until we have evidence otherwise.
+# Optimistic prior for links with fewer than `MIN_SAMPLES` outcomes.
 DEFAULT_USE_PROBABILITY = 0.85
-# Floor — always allow minimal exploration even for bad links.
+# Floor that keeps failing links in exploration.
 MIN_PROBABILITY = 0.05
 
 
@@ -37,12 +37,9 @@ class TransitionScore:
 
 @dataclass(slots=True)
 class LinkCalibrationState:
-    """Double-buffered per-link score store.
+    """Double-buffered per-link scores: one Hypothesis run reads a fixed snapshot, so its data tree stays coherent.
 
-    `read` is the stable snapshot a single Hypothesis run consults; `write` accumulates
-    outcomes during the run and is merged into `read` at iteration boundaries via
-    `begin_iteration()`. The split keeps probabilities stable within one replay so
-    Hypothesis's data tree remains coherent.
+    `begin_iteration` merges the outcomes recorded during the run into that snapshot.
     """
 
     read: dict[str, TransitionScore] = field(default_factory=dict)

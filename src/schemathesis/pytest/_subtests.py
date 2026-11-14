@@ -1,8 +1,4 @@
-"""Per-operation reporting for lazy schemas.
-
-pytest 9 ships subtests in its core. On pytest 8 the equivalent reports are emitted directly through
-the runner hooks, so no extra plugin is required.
-"""
+"""Per-operation reporting for lazy schemas: core subtests on pytest 9, runner-hook reports on pytest 8."""
 
 from __future__ import annotations
 
@@ -40,8 +36,7 @@ else:
     from _pytest._code import ExceptionInfo
     from _pytest.runner import CallInfo, check_interactive_exception
 
-    # Attribute set on reports produced for a single API operation. Plain attributes survive the
-    # `pytest-xdist` round-trip, which a custom report subclass would not without extra hooks.
+    # Marks per-operation reports; plain attributes survive the `pytest-xdist` round-trip, report subclasses do not.
     SUBTEST_MARKER = "_schemathesis_subtest"
 
     def is_subtest_report(report: pytest.TestReport) -> bool:

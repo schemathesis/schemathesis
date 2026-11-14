@@ -45,8 +45,7 @@ pytest_plugins = [
 
 logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
 
-# Register Hypothesis profile. Could be used as
-# `pytest test -m hypothesis --hypothesis-profile <profile-name>`
+# Select a profile with `pytest test -m hypothesis --hypothesis-profile <profile-name>`.
 settings.register_profile("CI", settings.get_profile("ci"), max_examples=2000)
 # Slow CI runners exceed the 200ms default deadline in nested `@given` tests; `--hypothesis-profile` still overrides it.
 settings.register_profile("tests", settings.get_profile(settings.get_current_profile_name()), deadline=None)
@@ -69,7 +68,7 @@ def _get_current_coverage() -> Any | None:
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     coverage = _get_current_coverage()
     if coverage is not None:
-        # Some xdist workers don't reliably persist coverage data during interpreter shutdown.
+        # xdist workers do not always persist coverage data at interpreter shutdown.
         coverage.save()
 
 
@@ -227,10 +226,7 @@ ATTRIBUTES_NESTED = {"nested_reference": {"type": "string", "nullable": True}}
 
 @pytest.fixture
 def complex_schema(testdir):
-    # This schema includes:
-    #   - references to other files
-    #   - local references in referenced files
-    #   - different directories - relative paths to other files
+    # References to other files, local references inside them, and relative paths across directories.
     schema_root = testdir.mkdir("root")
     common = testdir.mkdir("common")
     paths = schema_root.mkdir("paths")

@@ -47,14 +47,10 @@ GENERATION_OPTION_TO_HYPOTHESIS_SETTING = {
 
 
 def get_workers_count() -> int:
-    """Detect the number of available CPUs for the current process, if possible.
-
-    Use ``DEFAULT_WORKERS`` if not possible to detect.
-    """
+    """Number of CPUs available to the current process, or `DEFAULT_WORKERS` when undetectable."""
     if hasattr(os, "sched_getaffinity"):
-        # In contrast with `os.cpu_count` this call respects limits on CPU resources on some Unix systems
+        # Unlike `os.cpu_count`, respects CPU limits on some Unix systems
         return len(os.sched_getaffinity(0))
-    # Number of CPUs in the system, or 1 if undetermined
     return os.cpu_count() or DEFAULT_WORKERS
 
 
@@ -341,10 +337,7 @@ class ProjectConfig(DiffBase):
 
     @property
     def config_path(self) -> str | None:
-        """Filesystem path to the loaded configuration file, if any.
-
-        Returns None if using default configuration.
-        """
+        """Filesystem path to the loaded configuration file; `None` for the default configuration."""
         if self._parent is not None:
             return self._parent.config_path
         return None
@@ -466,7 +459,7 @@ class ProjectConfig(DiffBase):
         return self.rate_limit
 
     def warnings_for(self, *, operation: APIOperation | None = None) -> WarningsConfig:
-        # Operation can be absent on some non-fatal errors due to schema parsing
+        # Some non-fatal schema parsing errors have no operation
         config = self._operation_config(operation)
         if config is not None and config.warnings is not None:
             return config.warnings
@@ -589,7 +582,7 @@ class ProjectConfig(DiffBase):
             verbosity=hypothesis.Verbosity.quiet,
             suppress_health_check=[check for item in self.suppress_health_check for check in item.as_hypothesis()],
             phases=phases,
-            # NOTE: Ignoring any operation-specific config as stateful tests are not operation-specific
+            # Stateful tests span operations, so operation-specific config does not apply
             stateful_step_count=self.phases.stateful.max_steps,
             **kwargs,
         )
@@ -734,8 +727,7 @@ class ProjectsConfig(DiffBase):
         return config
 
     def get(self, schema: dict[str, Any]) -> ProjectConfig:
-        # Highest priority goes to `override`, then config specifically
-        # for the given project, then the "default" project config
+        # Priority: `override`, then the project's own config, then the default project config
         configs = []
         if not isinstance(self._override, NotSet):
             configs.append(self._override)

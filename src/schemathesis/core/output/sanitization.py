@@ -43,10 +43,7 @@ def sanitize_value(item: object, *, config: SanitizationConfig) -> None:
 
 
 def sanitize_url(url: str, *, config: SanitizationConfig) -> str:
-    """Sanitize sensitive parts of a given URL.
-
-    This function will sanitize the authority and query parameters in the URL.
-    """
+    """Mask credentials in the authority and values of sensitive query parameters."""
     return _sanitize_url_cached(
         url,
         config.replacement,
@@ -71,7 +68,6 @@ def _sanitize_url_cached(
 ) -> str:
     parsed = urlsplit(url)
 
-    # Sanitize authority
     netloc_parts = parsed.netloc.split("@")
     if len(netloc_parts) > 1:
         netloc = f"{replacement}@{netloc_parts[-1]}"
@@ -89,6 +85,5 @@ def _sanitize_url_cached(
             pairs[index] = f"{key}={quote_plus(replacement)}"
     sanitized_query = "&".join(pairs)
 
-    # Reconstruct the URL
     sanitized_url_parts = parsed._replace(netloc=netloc, query=sanitized_query)
     return urlunsplit(sanitized_url_parts)

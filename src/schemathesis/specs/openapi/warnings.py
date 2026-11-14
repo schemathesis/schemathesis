@@ -1,5 +1,3 @@
-"""OpenAPI-specific static schema warnings."""
-
 from __future__ import annotations
 
 import difflib
@@ -27,7 +25,7 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class MissingDeserializerWarning(SchemaWarning):
-    """Warning for responses with structured schemas but no registered deserializer."""
+    """Response with a structured schema but no registered deserializer."""
 
     operation_label: str | None
     """Label of the operation (e.g., 'GET /users'). Always set for this warning type."""
@@ -40,12 +38,10 @@ class MissingDeserializerWarning(SchemaWarning):
 
     @property
     def kind(self) -> SchemathesisWarning:
-        """The warning kind for configuration matching."""
         return SchemathesisWarning.MISSING_DESERIALIZER
 
     @property
     def message(self) -> str:
-        """Human-readable description of the warning."""
         return self.status_code
 
     @property
@@ -54,7 +50,6 @@ class MissingDeserializerWarning(SchemaWarning):
 
 
 def detect_missing_deserializers(operation: APIOperation) -> list[MissingDeserializerWarning]:
-    """Detect responses with structured schemas but no registered deserializer."""
     warnings: list[MissingDeserializerWarning] = []
 
     for status_code, response in operation.responses.items():
@@ -90,7 +85,7 @@ def detect_missing_deserializers(operation: APIOperation) -> list[MissingDeseria
 
 @dataclass(slots=True)
 class UnusedOpenAPIAuthWarning(SchemaWarning):
-    """Warning for configured OpenAPI auth schemes that are not used in the schema."""
+    """Configured auth scheme the schema does not declare."""
 
     operation_label: str | None
     """Label of the operation or None for schema-level warnings."""
@@ -103,12 +98,10 @@ class UnusedOpenAPIAuthWarning(SchemaWarning):
 
     @property
     def kind(self) -> SchemathesisWarning:
-        """The warning kind for configuration matching."""
         return SchemathesisWarning.UNUSED_OPENAPI_AUTH
 
     @property
     def message(self) -> str:
-        """Human-readable description of the warning."""
         if self.suggestion:
             return f"'{self.scheme_name}' - Did you mean '{self.suggestion}'?"
         return f"'{self.scheme_name}'"
@@ -164,7 +157,7 @@ def check_dictionary_bindings(
 
 @dataclass(slots=True)
 class DictionaryMismatchWarning(SchemaWarning):
-    """Warning for a dictionary binding whose entries mostly fail the schema of the bound parameter."""
+    """Dictionary binding whose entries mostly fail the schema of the bound parameter."""
 
     operation_label: str | None
     """Always None: one binding is reported once, however many operations it applies to."""
@@ -212,18 +205,15 @@ def detect_dictionary_mismatches(schema: OpenApiSchema) -> list[DictionaryMismat
 
 
 def detect_unused_openapi_auth(schema: OpenApiSchema) -> list[UnusedOpenAPIAuthWarning]:
-    """Detect configured OpenAPI auth schemes that don't exist in the schema."""
     warnings: list[UnusedOpenAPIAuthWarning] = []
 
     configured_schemes = schema.config.auth.all_openapi_schemes
     if not configured_schemes:
         return warnings
 
-    # Get security schemes defined in the OpenAPI schema (via adapter)
     security_schemes = schema.security.security_definitions
 
     for scheme_name in configured_schemes:
-        # Check if scheme exists in the schema definition, and suggest a candidate if it does not
         if scheme_name not in security_schemes:
             suggestion = _find_closest_match(scheme_name, list(security_schemes.keys()))
             warnings.append(
@@ -234,14 +224,13 @@ def detect_unused_openapi_auth(schema: OpenApiSchema) -> list[UnusedOpenAPIAuthW
 
 
 def _find_closest_match(value: str, candidates: list[str]) -> str | None:
-    """Find the closest matching string from candidates."""
     matches = difflib.get_close_matches(value, candidates, n=1, cutoff=0.6)
     return matches[0] if matches else None
 
 
 @dataclass(slots=True)
 class UnsupportedRegexWarning(SchemaWarning):
-    """Warning for a regex pattern Schemathesis cannot use as written."""
+    """Regex pattern Schemathesis cannot use as written."""
 
     operation_label: str | None
     """Label of the operation (e.g., 'GET /users')."""
@@ -264,10 +253,8 @@ class UnsupportedRegexWarning(SchemaWarning):
 
 
 def detect_unsupported_regex(operation: APIOperation) -> list[UnsupportedRegexWarning]:
-    """Detect regex patterns Schemathesis cannot use as written."""
     warnings: list[UnsupportedRegexWarning] = []
 
-    # Check all parameters
     for param in operation.iter_parameters():
         try:
             raw_schema = param.raw_schema
@@ -275,7 +262,6 @@ def detect_unsupported_regex(operation: APIOperation) -> list[UnsupportedRegexWa
             continue
         warnings.extend(_iter_unsupported_regex(operation.label, raw_schema))
 
-    # Check body schemas
     for body in operation.body:
         warnings.extend(_iter_unsupported_regex(operation.label, body.raw_schema))
 
@@ -292,7 +278,6 @@ def _iter_unsupported_regex(operation_label: str, schema: object) -> Iterator[Un
 
 
 def _iter_patterns(schema: Any) -> Iterator[str]:
-    """Yield all pattern values from a schema."""
     if isinstance(schema, dict):
         pattern = schema.get("pattern")
         if isinstance(pattern, str):
@@ -306,7 +291,7 @@ def _iter_patterns(schema: Any) -> Iterator[str]:
 
 @dataclass(slots=True)
 class UnresolvableReferenceWarning(SchemaWarning):
-    """Warning for a part of an operation skipped because its schema names a missing component."""
+    """Part of an operation skipped because its schema names a missing component."""
 
     operation_label: str | None
     """Label of the operation (e.g., 'GET /users')."""
@@ -329,10 +314,7 @@ class UnresolvableReferenceWarning(SchemaWarning):
 def detect_unresolvable_references(
     operation: APIOperation, memo: dict[str, str | None] | None = None
 ) -> list[UnresolvableReferenceWarning]:
-    """Report parts of an operation skipped because a `$ref` in their schema does not resolve.
-
-    `memo` is shared across the operations of one document so a component is inspected only once.
-    """
+    """Parts of an operation skipped for an unresolvable `$ref`; a shared `memo` inspects each component once."""
     skipped: list[tuple[str, str]] = [
         (parameter.label, parameter.reference) for parameter in operation.skipped_parameters
     ]

@@ -71,11 +71,9 @@ def bounds_are_unsatisfiable(minimum: int | float | None, maximum: int | float |
 def resolve_inclusive_bounds(
     schema: dict[str, Any], *, step: Callable[[int | float, bool], int | float]
 ) -> tuple[int | float | None, int | float | None]:
-    """Resolve exclusive numeric bounds to inclusive ones, stepping each past the boundary via `step`.
+    """Inclusive bounds from boolean (Draft 4) or numeric (Draft 6+) exclusive ones, moved inward with `step`.
 
-    Handles both the Draft 4 / OpenAPI 3.0 boolean `exclusiveMinimum`/`exclusiveMaximum` form
-    and the Draft 6+ / OpenAPI 3.1 numeric form. `step(value, going_up)` returns the nearest representable value
-    strictly beyond `value`; the lower bound steps up, the upper bound steps down.
+    `step(value, going_up)` returns the nearest representable value strictly beyond `value`.
     """
     minimum = schema.get("minimum")
     maximum = schema.get("maximum")

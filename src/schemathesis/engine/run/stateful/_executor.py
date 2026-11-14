@@ -75,8 +75,7 @@ if TYPE_CHECKING:
 def _replay_recorders_into_pool(extra_data_source: ResourceRecorder, recorders: list[ScenarioRecorder]) -> None:
     """Feed every captured interaction from this suite into the pool.
 
-    Mirrors `record_extra_data_from_recorder` in the unit phase: the pool stays frozen during
-    Hypothesis runs (shrinking sees a stable strategy) and is refreshed at suite boundaries.
+    The pool stays frozen during a Hypothesis run, so shrinking sees a stable strategy, and refreshes between suites.
     """
     for recorder in recorders:
         for case_id, interaction in recorder.interactions.items():
@@ -93,7 +92,7 @@ def _record_into_pool(extra_data_source: ResourceRecorder, case: Case, response:
 
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
-    """Get the settings that should be overridden to match the defaults for API state machines."""
+    """Settings to override so they match the API state machine defaults."""
     kwargs: dict[str, Any] = {}
     hypothesis_default = hypothesis.settings.get_profile("default")
     if settings.phases == hypothesis_default.phases:
@@ -133,9 +132,7 @@ def _network_error_outcome(state: TestingState) -> SuiteOutcome | None:
 def _classify_failure_group(
     exc: FailureGroup, *, ctx: StatefulContext, engine: EngineContext, state: TestingState
 ) -> SuiteOutcome:
-    # When a check fails, the state machine is stopped
-    # The failure is already sent to the queue by the state machine
-    # Here we need to either exit or re-run the state machine with this failure marked as known
+    # The state machine stopped on a failed check and already queued the failure; exit, or re-run with it marked known
     stored = state.take_unrecoverable_network_error()
     network_events: list[events.EngineEvent] = [_network_nonfatal_error(stored)] if stored is not None else []
     if engine.has_reached_the_failure_limit:
@@ -155,7 +152,7 @@ def _classify_flaky(*, ctx: StatefulContext, engine: EngineContext, state: Testi
     if network_outcome is not None:
         return network_outcome
     retry = bool(ctx.seen_in_suite - ctx.seen_in_run)
-    # Mark all failures in this suite as seen to prevent them being re-discovered
+    # A re-run must not rediscover this suite's failures
     ctx.seen_in_run.update(ctx.seen_in_suite)
     return found, retry, []
 
@@ -170,8 +167,7 @@ def _classify_suite_error(
 ) -> SuiteOutcome:
     """Map a state machine failure into the suite status, whether to re-run it, and the events to emit."""
     if isinstance(exc, BudgetExpired):
-        # The clock ended the suite. A failure found before it surfaces as its own group, so there is
-        # nothing left to report here; the engine reports the limit itself.
+        # The clock ended the suite; a failure found before it is its own group, and the engine reports the limit.
         return Status.SUCCESS, False, []
     if isinstance(exc, UnbuildableOperationFound):
         # A fresh suite never schedules the operation; it is reported when this suite finishes
@@ -179,9 +175,7 @@ def _classify_suite_error(
     if isinstance(exc, ServerWentAway):
         return _network_error_outcome(state) or (Status.FAILURE if ctx.seen_in_suite else Status.SUCCESS, False, [])
     if isinstance(exc, KeyboardInterrupt):
-        # Raised in the state machine when the stop event is set or it is raised by the user's code
-        # that is placed in the base class of the state machine.
-        # Therefore, set the stop event to cover the latter case
+        # Raised on the stop event or by user code in the state machine; stop the engine to cover the latter
         engine.stop()
         return Status.INTERRUPTED, False, [events.Interrupted(phase=PhaseName.STATEFUL_TESTING)]
     if isinstance(exc, (SkipTest, unittest.case.SkipTest)):
@@ -200,9 +194,7 @@ def _classify_suite_error(
         # No rule can run once operations without generatable data are left out; each one is reported on its own
         return Status.ERROR, False, []
     if isinstance(exc, Unsatisfiable) and not isinstance(exc, UnsatisfiableSchema) and ctx.completed_scenarios > 0:
-        # Sometimes Hypothesis randomly gives up on generating some complex cases. However, if we know that
-        # values are possible to generate based on the previous observations, we retry the generation,
-        # unless that many scenarios already ran - then further restarts would never end
+        # Hypothesis may give up on cases earlier scenarios proved possible; retry until `max_examples` scenarios ran
         return Status.SUCCESS, ctx.completed_scenarios < settings.max_examples, []
     clear_hypothesis_notes(exc)
     # Any other exception is an inner error and the test run should be stopped
@@ -687,7 +679,6 @@ def execute_state_machine_loop(
     event_queue: queue.Queue,
     engine: EngineContext,
 ) -> None:
-    """Execute the state machine testing loop."""
     configured_hypothesis_settings = engine.config.get_hypothesis_settings(phase="stateful", apply_ci_profile=False)
     kwargs = _get_hypothesis_settings_kwargs_override(configured_hypothesis_settings)
     hypothesis_settings = hypothesis.settings(configured_hypothesis_settings, **kwargs)
@@ -696,9 +687,7 @@ def execute_state_machine_loop(
     ctx = StatefulContext(metric_collector=MetricCollector(metrics=generation.maximize))
     state = TestingState()
 
-    # Recorders from every scenario in the current suite. The pool stays frozen during the
-    # suite (so Hypothesis shrinking sees a stable strategy); writes are replayed once the
-    # suite finishes, before the next iteration's strategies are built.
+    # Recorders of the current suite; the pool stays frozen for shrinking and takes their writes before the next suite.
     suite_recorders: list[ScenarioRecorder] = []
     instrumented = instrument(
         state_machine, engine=engine, ctx=ctx, state=state, event_queue=event_queue, suite_recorders=suite_recorders
@@ -707,7 +696,7 @@ def execute_state_machine_loop(
     suites_started = 0
     try:
         while True:
-            # This loop is running until no new failures are found in a single iteration
+            # Runs until an iteration finds no new failures
             _begin_suite(engine, suite_recorders)
             suite_started = events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING)
             instrumented.suite_id = suite_started.id
@@ -765,7 +754,6 @@ def validate_response(
     additional_checks: tuple[CheckFunction, ...] = (),
     baseline: Baseline | None = None,
 ) -> None:
-    """Validate the response against the provided checks."""
     checked_by: dict[Failure, str] = {}
 
     def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
@@ -774,8 +762,7 @@ def validate_response(
             return
         failure_data = recorder.find_failure_data(parent_id=case.id, failure=failure)
 
-        # Some failures (e.g. use-after-free) reference a prior case that may live on a
-        # sibling branch; include it so the reproduce isn't missing the triggering step.
+        # A failure like use-after-free may reference a case on a sibling branch; the reproduction needs it too.
         recorder.record_reproducible_failure(
             name=name,
             case_id=failure_data.case.id,

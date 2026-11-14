@@ -146,7 +146,7 @@ def _classify(body: object) -> tuple[ParameterPath, ClassificationResult] | None
 
 @PARSERS.register
 class RestlerParser:
-    """Parser for Luracast Restler envelopes — `{"error": {"code": 400, "message": "Bad Request: ..."}}`."""
+    """Parser for Luracast Restler envelopes: `{"error": {"code": 400, "message": "Bad Request: ..."}}`."""
 
     priority = 5
 

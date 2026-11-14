@@ -12,7 +12,7 @@ __all__ = [
 
 
 CASE_ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-# Separate `Random` as Hypothesis might interfere with the default one
+# A separate `Random`, since Hypothesis reseeds the global one inside tests
 RANDOM = random.Random()
 
 

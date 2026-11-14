@@ -1,1 +1,1 @@
-# Intentionally empty: yields no constants for extraction-warning tests.
+# Empty on purpose: yields no constants for extraction-warning tests.

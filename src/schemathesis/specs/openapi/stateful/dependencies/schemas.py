@@ -45,17 +45,16 @@ def resolve_all_refs(schema: JsonSchemaObject, flattened: FlattenCache) -> dict[
     in_flight: set[str] = set()
 
     def resolve(ref: str) -> dict[str, Any]:
-        # All references here are bundled, therefore it is safe to avoid full reference resolving
+        # References here are bundled, so a key lookup resolves them
         if ref in resolved_cache:
             return resolved_cache[ref]
         if ref in in_flight:
-            # The reference points back at a target still being resolved. Cut the cycle here:
-            # deeper levels repeat property names that the enclosing level already carries.
+            # Cycle: deeper levels repeat property names that the enclosing level already carries
             return {}
         key = ref.split("/")[-1]
         in_flight.add(ref)
         try:
-            # No clone needed, as it will be cloned inside `merged`
+            # No clone needed: the schema was cloned during conversion to JSON Schema
             result = resolve_all_refs_inner(bundled[key], resolve=resolve, flattened=flattened)
         finally:
             in_flight.discard(ref)
@@ -121,9 +120,8 @@ def canonicalize(
     bundled = to_json_schema(bundled, nullable_keyword, update_quantifiers=False)
     if not isinstance(bundled, dict):
         return {} if bundled is True else {"not": {}}
-    # Flatten before resolving so sibling `$ref` branches collapse to the first one;
-    # resolving first would inline every branch and over-merge unrelated definitions.
-    # Each resolved target is shared by all its references; flattening it once keeps this linear in the schema size.
+    # Flatten first: sibling `$ref` branches collapse to the first one instead of inlining and over-merging all of them.
+    # Resolved targets are shared by their references; flattening each once keeps this linear in the schema size.
     flattened: FlattenCache = {}
     resolved = resolve_all_refs(_flatten_all_of(bundled, {}), flattened)
     resolved.pop(BUNDLE_STORAGE_KEY, None)
@@ -133,16 +131,14 @@ def canonicalize(
 
 
 def _combine_branch_values(existing: Any, incoming: Any, flattened: FlattenCache) -> Any:
-    # A later branch specializing what the base only sketched must keep its own sub-fields;
-    # earlier branches still win on the plain keywords.
+    # Dicts merge, so a later branch keeps sub-fields the base only sketched; earlier branches win on plain keywords.
     if isinstance(existing, dict) and isinstance(incoming, dict):
         return _flatten_all_of({"allOf": [existing, incoming]}, flattened)
     return existing if existing is not None else incoming
 
 
 def _flatten_all_of(schema: JsonSchemaObject, flattened: FlattenCache) -> JsonSchemaObject:
-    # Merge `allOf` structurally: union `properties` and `required` across branches so every property name
-    # survives for FK discovery.
+    # Union `properties` and `required` across `allOf` branches so every property name survives for FK discovery.
     shared = flattened.get(id(schema))
     if shared is not None and shared[1] is not None:
         return shared[1]
@@ -192,7 +188,7 @@ def _flatten_all_of(schema: JsonSchemaObject, flattened: FlattenCache) -> JsonSc
 
 
 def try_unwrap_composition(schema: Mapping[str, Any], resolver: Resolver) -> Mapping[str, Any]:
-    """Unwrap oneOf/anyOf if we can safely extract a single schema."""
+    """First structured `anyOf`/`oneOf` alternative, or `schema` when none is structured."""
     keys = ("anyOf", "oneOf")
     composition_key = None
     for key in keys:
@@ -208,18 +204,14 @@ def try_unwrap_composition(schema: Mapping[str, Any], resolver: Resolver) -> Map
     if not isinstance(alternatives, list):
         return schema
 
-    # Filter to interesting alternatives
     interesting = _filter_composition_alternatives(alternatives, resolver)
 
-    # If no interesting alternatives, return original
     if not interesting:
         return schema
 
-    # If exactly one interesting alternative, unwrap it
     if len(interesting) == 1:
         return interesting[0]
 
-    # Pick the first one
     # TODO: Support multiple alternatives
     return interesting[0]
 
@@ -241,7 +233,6 @@ def try_unwrap_all_of(schema: Mapping[str, Any]) -> Mapping[str, Any]:
 
 
 def _filter_composition_alternatives(alternatives: list[JsonSchema], resolver: Resolver) -> list[JsonSchemaObject]:
-    """Filter oneOf/anyOf alternatives to keep only interesting schemas."""
     interesting: list[JsonSchemaObject] = []
 
     for alternative_schema in alternatives:
@@ -250,44 +241,36 @@ def _filter_composition_alternatives(alternatives: list[JsonSchema], resolver: R
         _, resolved = maybe_resolve_with_resolver(alternative_schema, resolver)
 
         if _is_interesting_schema(resolved):
-            # Keep original (with $ref)
+            # Keep the unresolved alternative so its `$ref` survives
             interesting.append(alternative_schema)
 
     return interesting
 
 
 def _is_interesting_schema(schema: Mapping[str, Any]) -> bool:
-    """Check if a schema represents interesting structured data."""
-    # Has $ref - definitely interesting (references a named schema)
+    """True for references, compositions, arrays of interesting items, and non-primitive schemas with keywords."""
     if "$ref" in schema:
         return True
 
     ty = schema.get("type")
 
-    # Primitives are not interesting
     if ty in {"string", "number", "integer", "boolean", "null"}:
         return False
 
-    # Arrays - check items
     if ty == "array":
         items = schema.get("items")
         if not isinstance(items, dict):
             return False
-        # Recursively check if items are interesting
         return _is_interesting_schema(items)
 
-    # allOf/anyOf/oneOf - interesting (composition)
     if any(key in schema for key in ["allOf", "anyOf", "oneOf"]):
         return True
 
-    # Objects (or untyped) - check if they have any keywords
     return bool(set(schema).intersection(ALL_KEYWORDS))
 
 
 @dataclass(slots=True)
 class UnwrappedSchema:
-    """Result of wrapper pattern detection."""
-
     pointer: str
     schema: Mapping[str, Any]
     ref: str | None
@@ -325,7 +308,7 @@ def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, 
         pointer = f"/{encode_pointer(array_field)}"
         ref = array_schema.get("$ref")
 
-        # Try to unwrap one more time
+        # List items may wrap the resource under a tag
         if resolved.get("type") == "array" or "items" in resolved:
             nested_items = resolved.get("items")
             if isinstance(nested_items, dict):
@@ -365,15 +348,12 @@ def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, 
             pointer=f"/{encode_pointer(external_tag_)}", schema=resolved, ref=ref, resolver=tagged_resolver
         )
 
-    # No wrapper - single object at root
+    # No wrapper: a single object at root
     return UnwrappedSchema(pointer="/", schema=schema, ref=schema.get("$ref"), resolver=resolver)
 
 
 def _detect_hal_embedded(schema: Mapping[str, Any]) -> str | None:
-    """Detect HAL _embedded pattern.
-
-    Spring Data REST uses: {_embedded: {users: [...]}}
-    """
+    """Array property under HAL `_embedded`, as in Spring Data REST's `{_embedded: {users: [...]}}`."""
     properties = schema.get("properties")
     if not isinstance(properties, dict):
         return None
@@ -384,10 +364,8 @@ def _detect_hal_embedded(schema: Mapping[str, Any]) -> str | None:
 
     embedded_properties = embedded.get("properties", {})
 
-    # Find array properties in _embedded
     for name, subschema in embedded_properties.items():
         if isinstance(subschema, dict) and subschema.get("type") == "array":
-            # Found array in _embedded
             return name
 
     return None
@@ -396,15 +374,14 @@ def _detect_hal_embedded(schema: Mapping[str, Any]) -> str | None:
 def _is_pagination_wrapper(
     schema: Mapping[str, Any], path: str, parent_ref: str | None, resolver: Resolver
 ) -> str | None:
-    """Detect if schema is a pagination wrapper."""
+    """Name of the array field when `schema` wraps a list, e.g. `{data: [...], total: 5}`."""
     properties = schema.get("properties")
     if not isinstance(properties, dict) or not properties:
         return None
 
     metadata_fields = frozenset(["links", "errors"])
 
-    # Find array-of-objects properties; arrays of primitive items act as metadata
-    # (e.g. Docker `/volumes` returns `{Volumes: [Volume], Warnings: [string]}`).
+    # Arrays of primitives act as metadata, e.g. Docker `/volumes` returns `{Volumes: [Volume], Warnings: [string]}`
     arrays = []
     for name, subschema in properties.items():
         if name in metadata_fields:
@@ -417,13 +394,11 @@ def _is_pagination_wrapper(
                     continue
                 arrays.append(name)
 
-    # Must have exactly one array property
     if len(arrays) != 1:
         return None
 
     array_field = arrays[0]
 
-    # Check if array field name matches common patterns
     common_data_fields = {
         "data",
         "items",
@@ -445,8 +420,7 @@ def _is_pagination_wrapper(
     matched_via_known_wrapper = array_field.lower() in common_data_fields
 
     if not matched_via_known_wrapper:
-        # Check if field name matches resource-specific pattern
-        # Example: path="/items/runner-groups" -> resource="RunnerGroup" -> "runner_groups"
+        # `/items/runner-groups` -> `RunnerGroup` -> `runner_groups`
         resource_name_from_path = naming.from_path(path)
         if resource_name_from_path is None:
             return None
@@ -454,14 +428,12 @@ def _is_pagination_wrapper(
         plural = naming.to_plural(to_snake_case(resource_name_from_path))
         singular = to_snake_case(resource_name_from_path).lower()
         af = array_field.lower()
-        # Exact match (plural or singular) handles `compliance` for Compliance (uncountable / domain noun);
-        # suffix match handles compound keys like `source_fields` for the `Field` resource on `/.../fields`.
+        # Exact match covers uncountable nouns (`compliance`), suffix match compound keys (`source_fields` for `Field`)
         if af not in {plural, singular} and not any(
             af.endswith(f"_{candidate}") or af.endswith(f"-{candidate}") for candidate in (plural, singular)
         ):
             return None
 
-    # Check for pagination metadata indicators
     others = [p for p in properties if p != array_field]
 
     pagination_indicators = {
@@ -515,14 +487,11 @@ def _is_pagination_wrapper(
         "meta",
     }
 
-    # Check if any other property looks like pagination metadata
     has_pagination_metadata = any(
         prop.lower().replace("_", "").replace("-", "") in pagination_indicators for prop in others
     )
 
-    # Accept directly when the array field is an unambiguous wrapper word (`data`, `records`, `items`, ...).
-    # Otherwise require pagination metadata signal or a near-trivial shape, to avoid treating a
-    # single-resource response as a wrapper just because one of its fields happens to be an array.
+    # Other names need pagination metadata or at most 2 properties; a single resource may also have one array field
     if matched_via_known_wrapper or has_pagination_metadata or len(properties) <= 2:
         return array_field
 
@@ -532,15 +501,7 @@ def _is_pagination_wrapper(
 def _detect_externally_tagged_pattern(
     schema: Mapping[str, Any], path: str, parent_ref: str | None, resolver: Resolver
 ) -> tuple[str, bool] | None:
-    """Detect externally tagged resource pattern.
-
-    Pattern: {ResourceName: [...]} or {resourceName: [...]}
-
-    Examples:
-        - GET /merchants -> {"Merchants": [...]}
-        - GET /users -> {"Users": [...]} or {"users": [...]}
-
-    """
+    """Property named after the path resource, e.g. `GET /users` -> `{"Users": ...}`; flags names from `parent_ref`."""
     properties = schema.get("properties")
     if not isinstance(properties, dict) or not properties:
         return None
@@ -550,13 +511,10 @@ def _detect_externally_tagged_pattern(
     if not resource_name:
         return None
 
-    # For example, for `DataRequest`:
+    # `DataRequest` -> `datarequest`, `datarequests`, `data_request`
     possible_names = {
-        # `datarequest`
         resource_name.lower(),
-        # `datarequests`
         naming.to_plural(resource_name.lower()),
-        # `data_request`
         to_snake_case(resource_name),
     }
     parent_names = set()

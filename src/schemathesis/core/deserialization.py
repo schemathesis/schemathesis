@@ -49,15 +49,7 @@ def _iter_matching_deserializers(media_type: str) -> Iterator[tuple[str, Respons
 
 
 def has_deserializer(media_type: str) -> bool:
-    """Check if a deserializer is registered or built-in for the given media type.
-
-    Args:
-        media_type: The media type to check (e.g., "application/msgpack")
-
-    Returns:
-        True if a deserializer is available (either registered or built-in like JSON/YAML/XML)
-
-    """
+    """True if a registered or built-in (JSON, YAML, XML, plain text) deserializer handles `media_type`."""
     return (
         media_types.is_json(media_type)
         or media_types.is_yaml(media_type)
@@ -76,8 +68,8 @@ def register_deserializer(func: ResponseDeserializer, *media_types: str) -> Resp
 def deserializer(*media_types: str) -> Callable[[ResponseDeserializer], ResponseDeserializer]:
     """Register a deserializer for custom response media types.
 
-    Converts API responses with custom content types (MessagePack, domain-specific formats, etc.)
-    into Python objects for schema validation. Built-in formats (JSON, YAML) work automatically.
+    Converts responses with custom content types (MessagePack, domain-specific formats, etc.)
+    into Python objects for schema validation. JSON and YAML need no registration.
 
     Args:
         *media_types: One or more MIME types (e.g., "application/msgpack", "application/vnd.custom+json")
@@ -99,11 +91,11 @@ def deserializer(*media_types: str) -> Callable[[ResponseDeserializer], Response
         ...         raise ValueError(f"Invalid MessagePack: {exc}")
 
     Notes:
-        - Raise appropriate exceptions if deserialization fails; Schemathesis will report them
-        - `ctx.operation` provides access to the API operation being tested (always available)
-        - `ctx.case` provides the generated test case (None when validating responses directly)
-        - Responses with unsupported media types are silently skipped during validation
-        - Handle unexpected data defensively, especially during negative testing
+        - Raise an exception when deserialization fails; Schemathesis reports it
+        - `ctx.operation` is the API operation under test (always set)
+        - `ctx.case` is the generated test case (`None` when validating responses directly)
+        - Validation skips responses with unsupported media types without a warning
+        - Handle unexpected data, especially during negative testing
 
     """
 
@@ -115,7 +107,7 @@ def deserializer(*media_types: str) -> Callable[[ResponseDeserializer], Response
 
 @lru_cache
 def get_yaml_loader() -> type[yaml.SafeLoader]:
-    """Create a YAML loader, that doesn't parse specific tokens into Python objects."""
+    """YAML loader that keeps timestamps, non-string keys and `!!binary` values as strings."""
     import yaml
 
     try:
@@ -133,16 +125,14 @@ def get_yaml_loader() -> type[yaml.SafeLoader]:
         for key, mapping in cls.yaml_implicit_resolvers.copy().items()
     }
 
-    # These documents are YAML 1.2, where `true` and `false` are the only booleans. YAML 1.1 also
-    # reads `on`, `off`, `yes` and `no`, turning a parameter named `on` into a boolean.
+    # YAML 1.2 booleans only: YAML 1.1 would read a parameter named `on`, `off`, `yes` or `no` as a boolean.
     cls.add_implicit_resolver(
         "tag:yaml.org,2002:bool",
         re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$"),
         list("tTfF"),
     )
 
-    # Fix pyyaml scientific notation parse bug
-    # See PR: https://github.com/yaml/pyyaml/pull/174 for upstream fix
+    # Work around pyyaml's scientific notation parsing, see https://github.com/yaml/pyyaml/pull/174
     cls.add_implicit_resolver(
         "tag:yaml.org,2002:float",
         re.compile(
@@ -162,9 +152,7 @@ def get_yaml_loader() -> type[yaml.SafeLoader]:
             self.flatten_mapping(node)
         mapping = {}
         for key_node, value_node in node.value:
-            # If the key has a tag different from `str` - use its string value.
-            # With this change all integer keys or YAML 1.1 boolean-ish values like "on" / "off" will not be cast to
-            # a different type
+            # Keep non-string keys (integers, `on` / `off`) as their source text
             if key_node.tag != "tag:yaml.org,2002:str":
                 key = key_node.value
             else:
@@ -194,13 +182,11 @@ def deserialize_response(
     *,
     context: DeserializationContext,
 ) -> Any:
-    # Check cache first to avoid re-parsing the same response
     if response._deserialized is not NOT_SET:
         return response._deserialized
 
     for _, deserializer in _iter_matching_deserializers(content_type):
         data = deserializer(context, response)
-        # Cache the result for future calls
         response._deserialized = data
         return data
     raise NotImplementedError(
@@ -234,8 +220,7 @@ class ServerSentEvent(TypedDict):
 
 
 SSE_RETRY_RE = re.compile(r"^[0-9]+$")
-# Only CR, LF and CRLF end an SSE line; `str.splitlines` would also break on U+2028 and other
-# control characters, truncating payloads that legitimately contain them.
+# Only CR, LF and CRLF end an SSE line; `str.splitlines` also splits on U+2028 and others inside payloads.
 SSE_LINE_RE = re.compile(r"\r\n|\r|\n")
 
 
@@ -262,7 +247,6 @@ def _flush_sse_event(
 
 
 def _parse_sse_events(content: bytes, encoding: str = "utf-8") -> list[ServerSentEvent]:
-    """Parse SSE event stream into a list of event objects."""
     # Some servers include a UTF-8 BOM in the first chunk
     text = content.decode(encoding).removeprefix("\ufeff")
 
@@ -286,7 +270,6 @@ def _parse_sse_events(content: bytes, encoding: str = "utf-8") -> list[ServerSen
                 # Per SSE spec, strip a single leading space from the value
                 value = value.removeprefix(" ")
             else:
-                # Line with no colon: field name is the entire line, value is empty
                 field = line
                 value = ""
             if field == "data":
@@ -310,7 +293,7 @@ def _parse_sse_events(content: bytes, encoding: str = "utf-8") -> list[ServerSen
 
 @deserializer("text/event-stream")
 def _deserialize_sse(_ctx: DeserializationContext, response: Response) -> list[ServerSentEvent]:
-    # SSE streams are always UTF-8 per spec, regardless of transport-level default encoding heuristics.
+    # The SSE spec mandates UTF-8, whatever encoding the transport guesses.
     return _parse_sse_events(response.content, "utf-8")
 
 

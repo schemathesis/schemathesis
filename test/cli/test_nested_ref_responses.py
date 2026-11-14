@@ -58,10 +58,7 @@ def test_external_ref_in_failure_schema_resolves(ctx, cli, snapshot_cli, referen
 
 
 def test_bundled_ref_schema_path_display(ctx, cli, snapshot_cli):
-    # When response validation fails inside a $ref-ed component, the "Schema at" path
-    # should show the original component path (e.g. /components/schemas/Host/properties/host)
-    # not the internal bundled form (e.g. /x-bundled/schema1/properties/host).
-    # See GH-3567
+    # GH-3567: "Schema at" shows the component path, not the internal bundled `/x-bundled/...` form.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/search": {
@@ -95,7 +92,6 @@ def test_bundled_ref_schema_path_display(ctx, cli, snapshot_cli):
 
     @app.route("/search", methods=["GET"])
     def search():
-        # Return an integer for host instead of a string — always a type error
         return jsonify({"host": 42}), 200
 
     assert (
@@ -109,8 +105,7 @@ def test_bundled_ref_schema_path_display(ctx, cli, snapshot_cli):
 
 
 def test_bundled_ref_in_error_message(ctx, cli, snapshot_cli):
-    # When a response schema has array items with $ref, the bundled ref path like `#/x-bundled/schema1`
-    # should not appear in error messages - it should show the original reference path instead
+    # Errors for `$ref` array items name the original reference, not the bundled `#/x-bundled/schema1`.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -148,8 +143,6 @@ def test_bundled_ref_in_error_message(ctx, cli, snapshot_cli):
 
     @app.route("/items", methods=["GET"])
     def get_items():
-        # Returns a string instead of array - triggers type mismatch error
-        # The error message should show `#/components/schemas/Item` instead of `#/x-bundled/schema1`
         return jsonify("not an array"), 200
 
     assert (
@@ -163,8 +156,6 @@ def test_bundled_ref_in_error_message(ctx, cli, snapshot_cli):
 
 
 def test_nested_ref_in_response_definition(ctx, cli, snapshot_cli):
-    # Response 200 -> #/definitions/UserResponse -> actual response with schema
-    # Without fix: nested $ref won't be resolved, schema validation won't work
     app, _ = ctx.openapi.make_flask_app(
         {"/users": {"get": {"responses": {"200": {"$ref": "#/definitions/UserResponse"}}}}},
         version="2.0",
@@ -183,10 +174,8 @@ def test_nested_ref_in_response_definition(ctx, cli, snapshot_cli):
 
     @app.route("/api/users", methods=["GET"])
     def get_users():
-        # Violates schema: missing "name", wrong type for "id"
         return jsonify({"id": "not-an-integer", "email": "test@example.com", "name": "test"}), 200
 
-    # Should detect schema violations via response_schema_conformance
     assert (
         cli.run_openapi_app(
             app,
@@ -199,9 +188,7 @@ def test_nested_ref_in_response_definition(ctx, cli, snapshot_cli):
 
 @pytest.mark.snapshot(replace_invalid_component=True)
 def test_bundled_ref_in_negative_testing_description(ctx, cli, snapshot_cli):
-    # When a request body schema has $ref with multiple definitions, the negative testing (fuzzing)
-    # phase may negate the $ref constraint. The error description should show the original reference
-    # path (e.g., `#/components/schemas/Item`) instead of the internal bundled path (e.g., `#/x-bundled/schema1`).
+    # A negated `$ref` body is described by the original reference, not the bundled `#/x-bundled/schema1`.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -269,8 +256,7 @@ def test_bundled_ref_in_negative_testing_description(ctx, cli, snapshot_cli):
 
 
 def test_whole_external_file_reference_in_schema_location(ctx, cli, app_runner, snapshot_cli):
-    # A `$ref` without a fragment points at the whole referenced file, so the "Schema at"
-    # location must name that file instead of coming out empty.
+    # A `$ref` without a fragment targets the whole file, which "Schema at" must name.
     paths = {
         "/pets": {
             "get": {
@@ -290,7 +276,7 @@ def test_whole_external_file_reference_in_schema_location(ctx, cli, app_runner, 
 
     @app.route("/api/pets", methods=["GET"])
     def pets():
-        # Missing "name" — always violates the externally referenced schema
+        # Missing `name` violates the referenced schema.
         return jsonify([{"x": 1}]), 200
 
     assert (

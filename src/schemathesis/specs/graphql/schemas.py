@@ -87,11 +87,10 @@ if TYPE_CHECKING:
     from schemathesis.resources import ResourcePool
 
 
-# Reused on every per-draw call; allocating once avoids ~600ns of `LazyStrategy` construction.
+# Shared by every draw, so `LazyStrategy` construction happens once.
 _NONE_STRATEGY: st.SearchStrategy = st.none()
 
-# Query fields every Apollo Federation subgraph must expose. They belong to the federation gateway
-# protocol rather than to the API under test, so they stay out of the tested surface unless asked for.
+# Query fields every federation subgraph exposes for the gateway; tested only when requested.
 FEDERATION_FIELDS = frozenset({"_entities", "_service"})
 
 
@@ -189,8 +188,7 @@ class GraphQLSchema(BaseSchema):
 
     @override
     def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
-        # All GraphQL transitions are derived from schema structure (no `links` keyword equivalent),
-        # so inference accounts for the entire population.
+        # GraphQL has no `links`; every transition is inferred from schema structure
         count = self.analysis.transition_count
         return StatefulInference(inferred=count, total=count, selected=count)
 
@@ -416,10 +414,9 @@ class GraphQLSchema(BaseSchema):
 
     @override
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
-        """Decide what the API did with a positive case, from the body rather than the status code.
+        """Decide what the API did with a positive case from the body: GraphQL answers the same status either way.
 
-        A GraphQL server answers the same status whether it served the query or refused it, and an
-        `errors` entry means the operation was not carried out in full.
+        An `errors` entry means the operation was not carried out in full.
         """
         if is_uninformative_status(response.status_code):
             return CallOutcome.UNINFORMATIVE
@@ -521,10 +518,7 @@ def _response_failure(case: Case, response: Response) -> Failure | None:
 
 @dataclass
 class FieldMap(Mapping):
-    """Container for accessing API operations.
-
-    Provides a more specific error message if API operation is not found.
-    """
+    """Operations by field name, with a specific error message for a missing one."""
 
     _schema: GraphQLSchema
     _root_type: RootType
@@ -600,7 +594,6 @@ def graphql_cases(
         # Negative mode is not possible for this operation (no required arguments or scalar types to violate)
         if generation.modes == [GenerationMode.NEGATIVE]:
             raise SkipTest("Impossible to generate negative test cases for this GraphQL operation") from None
-        # Fall back to positive mode when both modes are enabled
         effective_mode = GenerationMode.POSITIVE
         fallback_strategy = strategy_factory(
             operation.schema.client_schema,
@@ -623,8 +616,7 @@ def graphql_cases(
     dictionary_draws: tuple[DictionaryDraw, ...] = ()
     if operation_node is not None:
         original_operation_node = operation_node
-        # A captured identifier would overwrite the argument the negative strategy deliberately
-        # corrupted, turning the query valid and making the server's acceptance look like a bug.
+        # In negative mode, a captured id would undo the corrupted argument and make acceptance look like a bug
         if isinstance(feedback.extra_data_source, GraphQLResourcePool) and effective_mode.is_positive:
             random_source = draw(st.randoms())
             if random_source.random() < SUBSTITUTION_PROBABILITY:
@@ -635,8 +627,7 @@ def graphql_cases(
                     random=random_source,
                     schema_index=operation.schema.analysis.schema_index,
                 )
-        # A dictionary entry is explicit user intent, so it overwrites whatever the resource pool
-        # put in the same argument - and a harvested constant does not overwrite it in turn.
+        # Dictionary entries are explicit intent: they overwrite pool values, and constants never overwrite them
         if effective_mode.is_positive:
             dictionary_bindings = resolve_bindings(operation, generation)
             if not dictionary_bindings.is_empty:
@@ -743,7 +734,7 @@ def _generate_parameter(
     context: HookContext,
     hooks: HookDispatcher | None,
 ) -> Any:
-    # Schemathesis does not generate anything but `body` for GraphQL, hence use `None`
+    # GraphQL cases carry only a body
     container = location.container_name
     if explicit is None or isinstance(explicit, NotSet):
         strategy = apply_to_all_dispatchers(operation, context, hooks, _NONE_STRATEGY, container)
@@ -768,7 +759,6 @@ def _noop(node: graphql.DocumentNode) -> graphql.DocumentNode:
 
 
 if TYPE_CHECKING:
-    # Verify structural conformance to the spec-agnostic protocol; mypy fails here
-    # if a method is renamed or its signature drifts from `ApiSchema`.
+    # mypy fails here when the schema drifts from the `ApiSchema` protocol
     def _verify_api_schema_protocol(schema: GraphQLSchema) -> ApiSchema:
         return schema

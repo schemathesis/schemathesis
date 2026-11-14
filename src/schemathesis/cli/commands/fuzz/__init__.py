@@ -200,10 +200,8 @@ def fuzz(
 ) -> None:
     """Continuously fuzz your API with multi-step operation sequences.
 
-    Generates chains of API calls across operations and validates each
-    response. Stops at the first failure, when --max-time is reached, or when
-    interrupted. With --continue-on-failure it keeps fuzzing until
-    --max-failures failures.
+    Validates every response. Stops at the first failure, at --max-time, or on interrupt;
+    with --continue-on-failure, it keeps fuzzing until --max-failures failures.
 
     \b
     LOCATION can be:

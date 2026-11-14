@@ -1,5 +1,3 @@
-"""Integrating `hypothesis.given` into Schemathesis."""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -35,7 +33,6 @@ GivenKwargsMark = Mark[dict[str, Any]](attr_name="given_kwargs", default=dict)
 GIVEN_TARGET_ATTR = "_schemathesis_given_target"
 GIVEN_REFRESH_ATTR = "_schemathesis_given_refresh"
 
-# Error messages for incompatible @schema.given() usage
 GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE = (
     "Cannot combine `@schema.given()` with explicit `@example()` decorators.\n\n"
     "When you use `@schema.given(param=...)`, your test function gains additional parameters beyond 'case'. "
@@ -48,7 +45,6 @@ GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE = (
 
 
 def format_given_and_schema_examples_error(param_names: str) -> str:
-    """Format error message when @schema.given() is used with schema examples."""
     return (
         f"Cannot combine `@schema.given()` with schema examples.\n\n"
         f"Your test uses `@schema.given()` with custom strategies for: {param_names}\n"
@@ -93,10 +89,7 @@ def given_proxy(*args: GivenInput, **kwargs: GivenInput) -> Callable[[Callable],
 
 
 def merge_given_args(func: Callable, args: tuple, kwargs: dict[str, Any]) -> dict[str, Any]:
-    """Merge positional arguments to ``@schema.given`` into a dictionary with keyword arguments.
-
-    Kwargs are modified inplace.
-    """
+    """Fold positional `@schema.given` arguments into `kwargs`, mutating it in place."""
     if args:
         argspec = getfullargspec(func)
         for name, strategy in zip(

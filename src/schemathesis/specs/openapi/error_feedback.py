@@ -30,11 +30,7 @@ if TYPE_CHECKING:
 
 
 class Adjustment(Protocol):
-    """Mutates a JSON Schema in response to accumulated server-error observations.
-
-    `handles` filters which observations the adjustment receives — the dispatcher
-    only invokes `apply` when at least one observation's `kind` is in the set.
-    """
+    """Mutates a schema per server-error observations; `apply` gets only observations whose `kind` is in `handles`."""
 
     handles: frozenset[ObservationKind]
 
@@ -46,7 +42,7 @@ class Adjustment(Protocol):
         schema: JsonSchema,
         observations: tuple[Observation, ...],
     ) -> JsonSchema:
-        """Mutate `schema` in place (or return a replacement) to reflect the observations."""
+        """Mutate `schema` in place or return a replacement."""
         ...  # pragma: no cover
 
 
@@ -60,10 +56,7 @@ def apply_adjustments(
     schema: JsonSchema,
     store: ErrorFeedbackStore,
 ) -> JsonSchema:
-    """Run every registered adjustment over `schema`, threading the result through.
-
-    Each adjustment sees only the observations matching its `handles` set.
-    """
+    """Run every registered adjustment over `schema` in turn, each with the observations its `handles` matches."""
     observations = store.observations(operation_label=operation.label, location=location)
     if not observations:
         return schema
@@ -120,8 +113,7 @@ def _closes_key(schema: dict[str, Any], step: str | int, bundled: object) -> boo
 def _path_groups(schema: dict[str, Any], path: ParameterPath) -> list[list[tuple[dict[str, Any], ParameterPath]]]:
     """Subschemas a value at `schema` must hold `path` against, grouped so that each group needs one of its members.
 
-    The declared property holds the rest of the path and each `allOf` branch the whole path; a `oneOf`/`anyOf`
-    group needs one of its branches.
+    The property takes the rest of `path`, each `allOf` branch all of it; `oneOf`/`anyOf` branches form one group.
     """
     step, rest = path[0], path[1:]
     properties = schema.get("properties")
@@ -203,8 +195,7 @@ def _require_unless_closed(obj: dict[str, Any], leaf: str, bundled: object) -> N
 
 
 def _is_object_schema(schema: dict[str, Any]) -> bool:
-    # `type` may be a list (OpenAPI 3.1 / JSON Schema unions); presence of
-    # `properties`/`required` is enough to treat as object when `type` is omitted.
+    # Without `type`, `properties` or `required` mark an object.
     if "type" in schema:
         return "object" in get_type(schema)
     return "properties" in schema or "required" in schema
@@ -250,13 +241,10 @@ def _ensure_required_in_object(obj: dict[str, Any], leaf: str) -> None:
 
     prop = properties.get(leaf)
     if not isinstance(prop, dict):
-        # Field absent or declared as a boolean schema (`true`/`false`) — server
-        # demands a real value, so install our non-blank string default.
+        # Absent or a boolean schema: the server demands a real value, so install a non-blank string.
         properties[leaf] = {"type": "string", "minLength": 1}
     elif "string" in get_type(prop):
-        # Only tighten string constraints; never coerce a declared non-string type.
-        # `get_type` handles single types, type unions (e.g. ["string", "null"]),
-        # and missing `type` (treated as any-type, which covers string).
+        # Tighten strings only; never coerce a declared non-string type.
         current = prop.get("minLength")
         if not isinstance(current, int) or current < 1:
             prop["minLength"] = 1
@@ -267,11 +255,9 @@ def _ensure_required_in_object(obj: dict[str, Any], leaf: str) -> None:
 
 
 def _walk_and_apply(schema: dict[str, Any], path: ParameterPath, bundled: object) -> None:
-    """Descend along `path` and mark the leaf as required.
+    """Mark the leaf of `path` as required, creating missing objects only on paths without array steps.
 
-    Missing intermediate objects under `properties` are synthesized only on string-only
-    paths; a path through an array element needs the declared `items` schema, since
-    synthesizing one requires knowing the element shape, which we don't have.
+    An array step needs a declared `items` schema, as the element shape is unknown.
     """
     if not path or not isinstance(path[-1], str):
         return
@@ -293,9 +279,7 @@ def _walk_and_apply(schema: dict[str, Any], path: ParameterPath, bundled: object
     _ensure_required_in_object(current, leaf)
 
 
-# Per JSON-Schema container type, the keyword pair that mirrors a Bean-validation
-# `@Size`/`@Length` constraint. Numeric/boolean/null types have no length-like
-# keyword and are skipped at the consumer level.
+# Length keywords per container type, mirroring Bean Validation `@Size`/`@Length`; other types have none.
 _SIZE_KEYWORDS: dict[str, tuple[str, str]] = {
     "string": ("minLength", "maxLength"),
     "array": ("minItems", "maxItems"),
@@ -310,9 +294,7 @@ def _apply_size_bound_to_property(prop: dict[str, Any], payload: SizeBoundPayloa
         if keywords is None:
             continue
         min_keyword, max_keyword = keywords
-        # Tighter wins: server's bound only overrides if it's stricter than what
-        # the schema already declares. This keeps user-supplied constraints intact
-        # while still narrowing under-specified ones.
+        # Tighter wins: a server bound overrides only a looser declared one, so user constraints stay intact.
         if payload.min is not None:
             existing_min = prop.get(min_keyword)
             if not isinstance(existing_min, int) or payload.min > existing_min:
@@ -339,9 +321,7 @@ def _walk_to_properties(schema: dict[str, Any], path: ParameterPath, bundled: ob
 def _walk(schema: dict[str, Any], path: ParameterPath, bundled: object) -> tuple[ParameterPath, list[dict[str, Any]]]:
     """Descend `schema` along `path`, returning the path with array steps as integers and the leaves it reaches.
 
-    A step navigates `properties[<name>]` (object properties), then composition branches that declare it;
-    a digit step no node declares as a property navigates `items` (array elements). The index value itself
-    is irrelevant for JSON Schema's uniform-items model — every element shares the `items` schema.
+    A step follows `properties` and branches declaring it; a digit step no node declares follows `items`.
     """
     if not path:
         return path, []
@@ -371,8 +351,7 @@ def _declared_properties(node: dict[str, Any], name: str, bundled: object, seen:
     declared = properties.get(name) if isinstance(properties, dict) else None
     if isinstance(declared, dict):
         return [declared]
-    # A value may match any `oneOf`/`anyOf` branch, so each declaring branch needs the constraint;
-    # repeating it on several `allOf` branches is harmless.
+    # Any `oneOf`/`anyOf` branch may match, so each declaring branch gets the constraint; `allOf` repeats are harmless.
     found = []
     for keyword in ("allOf", "oneOf", "anyOf"):
         branches = node.get(keyword)
@@ -394,11 +373,7 @@ def _apply_format_to_property(prop: dict[str, Any], name: str) -> None:
 
 @ADJUSTMENTS.register
 class FormatAdjustment:
-    """Inject `format` onto string properties when the server reveals it via 4xx.
-
-    Writes `format: <name>` to the resolved property only when it's a string
-    (or includes string in a type union) and doesn't already declare a format.
-    """
+    """Set the `format` a 4xx reveals on string properties that declare none."""
 
     handles = frozenset({ObservationKind.FORMAT})
 
@@ -428,13 +403,7 @@ class FormatAdjustment:
 
 @ADJUSTMENTS.register
 class SizeBoundAdjustment:
-    """Apply server-reported `@Size`/`@Length` bounds to declared properties.
-
-    Branches on the resolved schema's `type`: strings get `minLength`/`maxLength`,
-    arrays `minItems`/`maxItems`, objects `minProperties`/`maxProperties`. Other
-    types and missing properties are skipped — this adjustment narrows existing
-    declarations rather than synthesising new ones.
-    """
+    """Apply server-reported `@Size`/`@Length` bounds to declared properties; missing ones are not created."""
 
     handles = frozenset({ObservationKind.SIZE_BOUND})
 
@@ -488,8 +457,7 @@ def _apply_numeric_bound_to_property(
     format = prop.get("format")
     format_bounds = INTEGER_FORMAT_BOUNDS.get(format) if "integer" in types and isinstance(format, str) else None
     if payload.direction is BoundDirection.MIN:
-        # A bound matching the integer format's own width was synthesized from `format`, not declared,
-        # so what the server reports is sharper.
+        # A bound equal to the integer format's width came from `format`, so the server's bound is sharper.
         synthetic = format_bounds is not None and prop.get("minimum") == format_bounds[0]
         if not synthetic and ("minimum" in prop or "exclusiveMinimum" in prop):
             return
@@ -548,8 +516,7 @@ def _apply_pattern_to_property(prop: dict[str, Any], regex: str) -> None:
         return
     if "pattern" in prop:
         return
-    # `is_valid_python_regex` accepts `\A`/`\Z` (Python-only anchors that
-    # `jsonschema_rs` rejects), so route those through `normalize_regex` too.
+    # Python accepts `\A`/`\Z` but the validator does not, so those anchors get translated too.
     needs_translation = not is_valid_python_regex(regex) or regex.startswith("\\A") or regex.endswith("\\Z")
     if not needs_translation:
         prop["pattern"] = regex
@@ -589,8 +556,7 @@ class PatternAdjustment:
         return schema
 
 
-# Java-type-to-JSON-Schema-format map. Covers the standard `java.time` and
-# `java.net`/`java.util` types; unknown types are skipped at the consumer level.
+# Formats of the standard `java.time`, `java.net` and `java.util` types; unknown types are skipped.
 _JAVA_TYPE_TO_FORMAT: dict[str, str] = {
     "java.time.LocalDate": "date",
     "java.time.LocalDateTime": "date-time",
@@ -604,8 +570,6 @@ _JAVA_TYPE_TO_FORMAT: dict[str, str] = {
 }
 
 
-# Reuse the canonical seven-token JSON Schema type set from core.jsonschema.types
-# rather than inlining a parallel literal — duplication risks the two drifting.
 _JSON_SCHEMA_TYPES = frozenset(ALL_TYPES)
 
 
@@ -614,15 +578,10 @@ def _apply_type_correction(prop: dict[str, Any], type_name: str) -> None:
     if "anyOf" in prop or "oneOf" in prop or "allOf" in prop:
         return
     declared = prop.get("type")
-    # `get_type(prop)` collapses "any-type" (no `type` key) and explicit composed
-    # `type: [...]` lists to the same shape — we need to distinguish them, so
-    # read the raw value here rather than going through `get_type`.
+    # Read the raw `type`: `get_type` cannot tell a missing `type` from an explicit list.
     if isinstance(declared, list):
         return  # explicitly composed
-    # Existing object/array declarations carry structural keys (`properties`,
-    # `items`) that would be orphaned by a scalar rewrite. The schema/server
-    # disagreement is real but resolving it here would silently corrupt the
-    # schema; leave it to surface as a regular validation gap.
+    # A scalar rewrite would orphan `properties` or `items`, so the mismatch stays.
     if declared in ("object", "array"):
         return
     if declared == type_name:
@@ -707,9 +666,8 @@ class EnumAdjustment:
 
 @ADJUSTMENTS.register
 class RequiredFieldAdjustment:
-    """Mark fields the server told us are mandatory as `required` with `minLength: 1`.
+    """Mark fields the server calls mandatory as `required` with `minLength: 1`, in the root and every object branch.
 
-    Applied to the root object schema and to each object branch of `oneOf`/`anyOf`/`allOf`.
     An object that forbids undeclared properties never gains one.
     """
 
@@ -742,11 +700,7 @@ class RequiredFieldAdjustment:
 
 @ADJUSTMENTS.register
 class UnexpectedPropertyAdjustment:
-    """Drop properties the server reported as unrecognized.
-
-    Body and merged query schemas both carry `additionalProperties: false`, so
-    removing the name from `properties` and `required` is enough.
-    """
+    """Drop properties the server reported as unrecognized; closed body and query schemas then never send them."""
 
     handles = frozenset({ObservationKind.UNEXPECTED_PROPERTY})
 
@@ -766,8 +720,7 @@ class UnexpectedPropertyAdjustment:
             return schema
 
         for observation in observations:
-            # Spring is the only emitter of UNEXPECTED_PROPERTY and always
-            # produces a single-string path naming the rejected field.
+            # Unexpected-property observations always carry a one-name path.
             assert observation.parameter_path
             name = observation.parameter_path[0]
             assert isinstance(name, str)
@@ -790,10 +743,7 @@ class UnexpectedPropertyAdjustment:
 
 @ADJUSTMENTS.register
 class AdditionalPropertiesAdjustment:
-    """Set `additionalProperties: false` on objects that rejected unknown keys.
-
-    Empty path targets the body object; a path targets a nested one.
-    """
+    """Set `additionalProperties: false` on objects that rejected unknown keys; an empty path means the body."""
 
     handles = frozenset({ObservationKind.FORBIDS_ADDITIONAL_PROPERTIES})
 

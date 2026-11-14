@@ -187,8 +187,7 @@ def validate_documented_response(
                         failure.message = f"Item #{failure.instance_path[0]}: {failure.message}"
                     failures.append(failure)
         except ValueError as exc:
-            # jsonschema_rs raises ValueError for lone Unicode surrogate characters (e.g. \uDCF3);
-            # not valid JSON per RFC 8259 even though Python's json.loads accepts them.
+            # Lone surrogates (e.g. \uDCF3) are invalid JSON per RFC 8259, though Python's `json.loads` accepts them.
             doc = response.content.decode("latin-1")
             position, lineno, colno = _find_surrogate_location(doc)
             failures.append(

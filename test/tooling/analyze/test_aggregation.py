@@ -55,14 +55,13 @@ def test_analyze_wasted_by_location_tracks_positive_drift(analyzer_ndjson):
 
 
 def test_analyze_negative_rejected_present(analyzer_ndjson):
-    # `--mode=all` fires negative tests, which must classify as negative_rejected (4xx)
-    # rather than spilling into positive_drift.
+    # Negative cases from `--mode=all` must classify as negative_rejected (4xx), not positive_drift.
     run = analyze(analyzer_ndjson)
     assert run.buckets.negative_rejected > 0
 
 
 def test_analyze_server_error_recorded(analyzer_ndjson):
-    # /always-500 always returns 5xx and must be counted as server_error, not lumped into useful.
+    # `/always-500` must count as server_error, not useful.
     run = analyze(analyzer_ndjson)
     assert run.buckets.server_error >= 1
 
@@ -249,8 +248,7 @@ def test_analyze_per_operation_timings_accumulate(tmp_path):
 
 
 def test_analyze_phase_timings_skip_missing_fields(tmp_path):
-    # Older NDJSON may omit generation.time and response.elapsed; per-phase totals
-    # must stay at 0.0 rather than counting absent values as zero contributions.
+    # Older NDJSON may omit `generation.time` and `response.elapsed`; per-phase totals must stay at 0.0.
     path = tmp_path / "run.ndjson"
     payload = scenario(
         "GET /a",
@@ -273,8 +271,7 @@ def test_analyze_phase_timings_skip_missing_fields(tmp_path):
 
 
 def test_analyze_fuzz_scenario_uses_per_case_label(tmp_path):
-    # FuzzScenarioFinished carries the synthetic "Fuzz tests" recorder label; per-case
-    # method/path must drive operation attribution.
+    # Fuzz scenarios carry the synthetic "Fuzz tests" label, so the per-case method and path pick the operation.
     payload = {
         "FuzzScenarioFinished": {
             "timestamp": 101.0,
@@ -306,9 +303,7 @@ def test_analyze_fuzz_scenario_uses_per_case_label(tmp_path):
 
 
 def test_analyze_coverage_method_mutation_404_classified_as_route_rejected(tmp_path):
-    # Coverage `unspecified_http_method` mutates case.method (e.g. TRACE on a POST-only
-    # operation). Route-match must use the *declared* method, so a 404 lands in
-    # route_rejected — not positive_drift.
+    # A coverage method mutation (e.g. TRACE on POST-only) matches routes by the declared method: 404 is route_rejected.
     payload = scenario(
         "POST /widgets",
         {
@@ -341,8 +336,7 @@ def test_analyze_coverage_method_mutation_404_classified_as_route_rejected(tmp_p
 
 
 def test_analyze_stateful_404_with_matching_method_not_route_rejected(tmp_path):
-    # The synthetic "Stateful tests" recorder label must not drive route matching, otherwise
-    # every case would compare its method against itself.
+    # The synthetic "Stateful tests" label must not drive route matching, or each case compares its method to itself.
     payload = scenario(
         "Stateful tests",
         {
@@ -373,9 +367,7 @@ def test_analyze_stateful_404_with_matching_method_not_route_rejected(tmp_path):
 
 
 def test_analyze_stateful_scenario_dual_bumps_per_op_and_phase_aggregate(tmp_path):
-    # Stateful cases with a real per-case method+path must show up in BOTH
-    # `run.operations[<op>]` (so per-op drill-downs include stateful contribution) AND
-    # `run.stateful` (the phase-level aggregate stays available for stateful-only views).
+    # Stateful cases with a real method and path count in both `run.operations[<op>]` and the `run.stateful` aggregate.
     payload = scenario(
         "Stateful tests",
         {"c1": {"value": {"method": "GET", "path": "/owners", "meta": {"generation": {"mode": "positive"}}}}},

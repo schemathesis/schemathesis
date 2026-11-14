@@ -32,9 +32,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
-# Wrapper keys used by webargs / flask-smorest / APIFlask. Treated as wrappers
-# only when the value is a dict, so a field literally named `errors` carrying
-# a list of messages still attributes correctly.
+# webargs / flask-smorest / APIFlask wrapper keys, only when the value is a dict: a field may be named `errors`.
 _ENVELOPE_WRAPPERS: frozenset[str] = frozenset({"errors", "detail", "messages"})
 
 _LOCATION_KEYS: dict[str, ParameterLocation] = {
@@ -99,7 +97,7 @@ _ONEOF = re.compile(r"^Must be one of: (?P<choices>.+?)\.$")
 
 
 def _classify(message: str) -> tuple[ClassificationResult, ...]:
-    """Return classifications for `message` — Range emits two, others zero or one."""
+    """Classifications for `message`: two for a range, otherwise zero or one."""
     literal = _LITERAL_MESSAGES.get(message)
     if literal is not None:
         return (literal,)
@@ -174,7 +172,7 @@ def _has_recognized_message(body: object, *, default_location: ParameterLocation
 
 @PARSERS.register
 class MarshmallowParser:
-    """Parser for marshmallow validation envelopes — plain, webargs, flask-smorest, APIFlask."""
+    """Parser for marshmallow validation envelopes: plain, webargs, flask-smorest, APIFlask."""
 
     priority = 4
 

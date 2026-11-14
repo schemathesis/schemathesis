@@ -18,11 +18,7 @@ def _is_link_attributed(
     observations: tuple[Observation, ...],
     applied_parameters: list[tuple[ParameterLocation, str | None]],
 ) -> bool:
-    """Return True iff at least one observation names a parameter the link wrote.
-
-    A `(location, None)` entry means the link replaced the whole body and matches any
-    body-located observation.
-    """
+    """True if an observation names a parameter the link wrote; `(location, None)` matches any body observation."""
     if not observations or not applied_parameters:
         return False
     for location, name in applied_parameters:
@@ -43,9 +39,9 @@ def record_link_outcome(
     step_input: StepInput,
     recorder: ScenarioRecorder,
 ) -> None:
-    """Update a link's score from parser-attributed blame, dropping 404/409 as resource-state evidence.
+    """Score a link from parser-attributed blame; 404/409 reflect resource state and do not count.
 
-    A 4xx that no parser explains is recorded as unattributed: it lowers the score only of a link that never succeeded.
+    A 4xx no parser explains lowers the score only of a link that never succeeded.
     """
     if (
         step_input.transition is None

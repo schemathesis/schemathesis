@@ -120,7 +120,6 @@ def test_missing_deserializer_warning_names_unvalidated_media_type(cli, ctx, sna
 
 
 def test_missing_deserializer_warning_with_fail_on(cli, ctx, tmp_path, monkeypatch):
-    # Given a schema with a custom media type and config that fails on missing deserializer
     schema_path = ctx.openapi.write_schema(
         {
             "/users": {
@@ -152,13 +151,11 @@ fail-on = ["missing_deserializer"]
         str(schema_path), f"--url={api.base_url}/api", "--max-examples=1", exit_code=ExitCode.TESTS_FAILED
     )
 
-    # Then the warning should be displayed and test should fail
     assert "WARNINGS" in result.stdout
     assert "Schema validation skipped" in result.stdout
 
 
 def test_warnings_off_via_cli(cli, ctx):
-    # When --warnings=off is used, warnings should not be displayed
     schema_path = ctx.openapi.write_schema(
         {
             "/users": {
@@ -181,13 +178,12 @@ def test_warnings_off_via_cli(cli, ctx):
     api = ctx.openapi.apps.success()
     result = cli.run(str(schema_path), f"--url={api.base_url}/api", "--warnings=off", "--max-examples=1")
 
-    # Then no warnings should be displayed
     assert "WARNINGS" not in result.stdout
     assert "Schema validation skipped" not in result.stdout
 
 
 def test_final_line_counts_all_warning_kinds_in_run(cli, ctx, app_runner, snapshot_cli):
-    # Regression test: the footer "N warnings in Xs" should count warning *kinds*, not just missing_auth operations
+    # The footer counts warning kinds, not only operations with missing auth.
     schema = ctx.openapi.build_schema(
         {
             "/auth": {
@@ -219,8 +215,6 @@ def test_final_line_counts_all_warning_kinds_in_run(cli, ctx, app_runner, snapsh
 
 def test_warning_on_no_2xx(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.always_incorrect()
-    # When endpoint does not return 2xx at all
-    # Then the output should contain a warning about it
     assert (
         cli.run(
             api.schema_url,
@@ -291,8 +285,6 @@ def test_warning_on_no_2xx_options_only(ctx, cli, snapshot_cli):
 )
 def test_warning_on_all_not_found(ctx, cli, snapshot_cli, args, kwargs):
     api = ctx.openapi.apps.success_and_failure()
-    # When all endpoints return 404
-    # Then the output should contain a warning about it
     assert (
         cli.run(
             api.schema_url,
@@ -575,10 +567,7 @@ def test_missing_test_data_warning_withdrawn_by_documented_redirect(ctx, cli, ap
 
 
 def test_missing_test_data_advice_from_dependency_graph(ctx, cli, snapshot_cli):
-    # No links are declared, so the advice comes from the inferred dependency graph:
-    # `POST /orders` supplies what `GET /orders/{orderId}/receipt` needs, nothing in the schema
-    # supplies what `GET /invoices/{invoiceId}` needs, and `GET /status` consumes no resource at
-    # all, so it keeps the generic advice.
+    # Inferred graph advice: `POST /orders` feeds the receipt, nothing feeds invoices, `GET /status` needs no resource.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/orders": {

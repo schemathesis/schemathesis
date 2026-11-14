@@ -45,9 +45,7 @@ def test_auth_for(operation, matcher, expected):
         }
     )
     project = config.projects.get_default()
-    # No specific API operation - global auth
     assert project.auth_for() == ("user", "global")
-    # Specific for operation
     assert project.auth_for(operation=operation) == ("user", expected)
 
 
@@ -72,15 +70,12 @@ def test_headers_for_override_and_fallback(operation, matcher, expected):
     )
     project = config.projects.get_default()
 
-    # No operation passed -> global headers
     assert project.headers_for() == {"X-Test": "global"}
 
-    # Operation passed -> override or fallback per matcher
     assert project.headers_for(operation=operation) == expected
 
 
 def test_headers_for_none_when_unset(operation):
-    # No headers defined globally or per-operation -> empty dict
     config = SchemathesisConfig.from_dict({})
     project = config.projects.get_default()
 
@@ -117,9 +112,8 @@ def test_hypothesis_database_and_reuse_phase(operation, db_value, expected_type,
     assert hypothesis.Phase.explain not in settings.phases
     assert hypothesis.Phase.shrink in settings.phases
 
-    # operation-specific should be identical (no overrides)
     op_settings = project.get_hypothesis_settings(operation=operation)
-    # __eq__ implementation is not available in older Hypothesis versions
+    # Older Hypothesis databases lack `__eq__`.
     assert str(op_settings.database) == str(settings.database)
     assert op_settings.phases == settings.phases
 

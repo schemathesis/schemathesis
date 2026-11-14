@@ -41,10 +41,8 @@ def test_should_use_color(monkeypatch, ctx_color, argv, env_no_color, expected):
 @pytest.mark.parametrize(
     ("command", "args", "use_env"),
     [
-        # Root command
         ("root", ["--no-color", "-h"], False),
         ("root", ["-h"], True),
-        # Run command
         ("run", ["run", "--no-color", "-h"], False),
         ("run", ["run", "-h", "--no-color"], False),
         ("run", ["run", "-h"], True),
@@ -56,11 +54,10 @@ def test_help_output_no_colors(cli, monkeypatch, command, args, use_env):
 
     result = cli.main(*args)
 
-    # Should not contain ANSI escape codes
     assert "\x1b[" not in result.stdout
 
 
-# Colors are decided from sys.argv; --force-color is not a root option, so it is only patched into argv
+# The CLI picks colors from sys.argv; --force-color is not a root option, so it goes into argv only.
 def test_root_help_force_color(cli, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["st", "--force-color", "-h"])
 

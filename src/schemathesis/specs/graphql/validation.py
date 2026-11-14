@@ -35,9 +35,8 @@ def parse_payload(response: Response) -> Any:
         return load_json_lossy(response.content, response.encoding)
 
 
-# Error markers meaning the caller sent something the server refused, as emitted by Apollo Server (`code`)
-# and graphql-java based servers (`classification`). Authentication and authorization codes are deliberately
-# absent: a request that never reached the resolvers says nothing about the data it carried.
+# `code` or `classification` values for a request the server refused. Auth codes are absent: a request that
+# never reached the resolvers says nothing about its data.
 CLIENT_ERROR_MARKERS = frozenset(
     {
         "BAD_USER_INPUT",
@@ -74,14 +73,10 @@ def _error_markers(errors: list[GraphQLFormattedError]) -> list[str]:
 
 
 def is_client_error(payload: dict) -> bool:
-    """Check if the GraphQL response indicates a client error (query validation/syntax error).
+    """Whether the server refused the query itself, e.g. over missing required arguments or wrong types.
 
-    Client errors occur when the query itself is invalid (missing required args, wrong types, etc.)
-    and the server refuses to serve it.
-
-    Servers that label their errors are trusted, and a label reporting a server-side failure outweighs any
-    rejection reported beside it. Otherwise, server errors have a `path` field pointing to the resolver that
-    failed, or return partial `data`.
+    Error labels decide when present, a server-side one outweighing any rejection; otherwise resolver errors carry
+    a `path` or partial `data`.
     """
     errors = payload.get("errors")
     if not errors or len(errors) == 0:
@@ -92,7 +87,7 @@ def is_client_error(payload: dict) -> bool:
     if any(marker in CLIENT_ERROR_MARKERS for marker in markers):
         return True
     data = payload.get("data")
-    # No `path` means the error occurred during query validation, not resolver execution
+    # Without `path`, the error came from query validation
     return data is None and "path" not in errors[0]
 
 
@@ -106,7 +101,7 @@ POLICY_REJECTION = re.compile(
 
 
 def is_policy_rejection(errors: list[GraphQLFormattedError]) -> bool:
-    """Check whether the server refused the query only because of its own limits, which says nothing about the data."""
+    """Whether the server refused the query only over its own limits, which says nothing about the data."""
     return all(isinstance(error, dict) and POLICY_REJECTION.match(error["message"]) for error in errors)
 
 
@@ -118,7 +113,7 @@ NON_NULLABLE_FIELD_MARKERS = (
 )
 
 
-# graphql-java labels this condition, so its wording does not have to be matched at all
+# graphql-java labels this condition, so no wording match is needed
 NON_NULLABLE_FIELD_CLASSIFICATION = "NullValueInNonNullableField"
 
 
@@ -130,19 +125,15 @@ def _is_non_nullable_field_error(error: GraphQLFormattedError) -> bool:
 
 
 def is_schema_violation(errors: list[GraphQLFormattedError]) -> bool:
-    """Check whether every error reports a field that resolved to null despite being declared non-nullable.
+    """Whether every error reports a non-nullable field that resolved to null, contradicting the published schema.
 
-    Such a response contradicts the schema the server publishes. Responses that also carry unrelated errors stay
-    plain server errors so that those are not hidden.
+    Unrelated errors alongside keep the response a plain server error, so they stay visible.
     """
     return bool(errors) and all(_is_non_nullable_field_error(error) for error in errors)
 
 
 def validate_graphql_response(case: Case, payload: object) -> None:
-    """Validate GraphQL response.
-
-    Semantically valid GraphQL responses are JSON objects and may contain `data` or `errors` keys.
-    """
+    """Raise when the response is not a JSON object or reports errors other than a policy rejection."""
     if not isinstance(payload, dict):
         raise UnexpectedGraphQLResponse(
             operation=case.operation.label,
@@ -154,10 +145,8 @@ def validate_graphql_response(case: Case, payload: object) -> None:
     if errors is not None and len(errors) > 0:
         if is_policy_rejection(errors):
             return
-        # Check if this is a client error (query validation failed)
         if is_client_error(payload):
             raise GraphQLClientError(operation=case.operation.label, message=errors[0]["message"], errors=errors)
-        # Otherwise it's a server error (resolver execution failed)
         if len(errors) > 1:
             message = "\n\n".join([f"{idx}. {error['message']}" for idx, error in enumerate(errors, 1)])
         else:

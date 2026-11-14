@@ -14,31 +14,18 @@ GROUPS: dict[str, OptionGroup] = {}
 
 
 def should_use_color(ctx: click.Context) -> bool:
-    """Determine whether to use colored output in help text.
-
-    Priority (highest to lowest):
-    1. ctx.color (if explicitly set via callbacks)
-    2. --no-color flag (from command line)
-    3. --force-color flag (from command line)
-    4. NO_COLOR environment variable
-    5. TTY detection (colorize only if stdout is a TTY)
-    6. Default (False for non-TTY environments)
-    """
+    """Whether help text uses color: `ctx.color`, then `--no-color`, `--force-color`, `NO_COLOR`, then TTY detection."""
     color_setting = getattr(ctx, "color", None)
     if color_setting is not None:
-        # Explicit setting via --no-color or --force-color takes precedence
         return bool(color_setting)
+    # `sys.argv` catches the flags in any order relative to `-h`
     if "--no-color" in sys.argv:
-        # Check command line for --no-color flag (handles any order with -h)
         return False
     if "--force-color" in sys.argv:
-        # Check command line for --force-color flag (handles any order with -h)
         return True
     if "NO_COLOR" in os.environ:
-        # Respect NO_COLOR environment variable (https://no-color.org/)
         return False
-    # Default based on TTY detection (matches Click's auto-detection)
-    # In test environments (CliRunner), stdout is not a TTY, so colors are disabled
+    # Matches Click's auto-detection; `CliRunner` output is not a TTY, so tests get no colors
     return sys.stdout.isatty() if hasattr(sys.stdout, "isatty") else False
 
 
@@ -59,7 +46,7 @@ class OptionGroup:
 
 
 OPTION_COLOR = "cyan"
-# Use default terminal color for better readability
+# `None` keeps the default terminal color, which reads best
 HELP_COLOR: str | None = None
 SECTION_COLOR = "green"
 
@@ -89,7 +76,6 @@ class CommandWithGroupedOptions(click.Command):
         use_color = should_use_color(ctx)
 
         def style(text: str, **kwargs: Any) -> str:
-            # Only apply styling if colors are enabled
             if use_color:
                 return click.style(text, **kwargs)
             return text
@@ -120,7 +106,6 @@ class CommandWithGroupedOptions(click.Command):
                         global_group.options.append((styled_option, styled_message))
 
         groups = sorted(GROUPS.values(), key=lambda g: g.order)
-        # Format each group
         for group in groups:
             with formatter.section(style(group.name, fg=SECTION_COLOR, bold=True)):
                 if group.description:
@@ -146,7 +131,6 @@ class StyledGroup(click.Group):
         use_color = should_use_color(ctx)
 
         def style(text: str, **kwargs: Any) -> str:
-            # Only apply styling if colors are enabled
             if use_color:
                 return click.style(text, **kwargs)
             return text
@@ -168,7 +152,6 @@ class StyledGroup(click.Group):
         use_color = should_use_color(ctx)
 
         def style(text: str, **kwargs: Any) -> str:
-            # Only apply styling if colors are enabled
             if use_color:
                 return click.style(text, **kwargs)
             return text

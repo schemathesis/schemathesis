@@ -21,11 +21,7 @@ if TYPE_CHECKING:
 
 
 class FeedbackPipeline:
-    """Dispatches a response through registered parsers with MRU bias.
-
-    A server almost always emits one error shape; the MRU slot lets us try
-    the last winner first instead of re-checking every parser on each call.
-    """
+    """Runs responses through registered parsers, last match first, as a server tends to use one error shape."""
 
     __slots__ = ("_parsers", "_last_match", "_lock")
 
@@ -59,16 +55,15 @@ class FeedbackPipeline:
                 context=DeserializationContext(operation=operation, case=case),
             )
         except Exception:
-            # User-registered deserializer raised; surfaced elsewhere — skip here.
+            # A user deserializer failed; that error is reported elsewhere.
             return ()
 
-        # Same-shape consecutive calls go through the MRU slot only.
         last = self._last_match
         if last is not None and last.can_parse(body=body):
             observations = last.parse(operation=operation, body=body, case=case)
             if observations:
                 return observations
-        # It is possible to have different parsers applied for API gateways, where the actual backends are different
+        # API gateways may front backends with different error shapes.
         for parser in self._parsers:
             if parser is last or not parser.can_parse(body=body):
                 continue

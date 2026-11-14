@@ -97,15 +97,11 @@ def _to_json_schema(
         if isinstance(nested_bundle, dict):
             bundle = nested_bundle
 
-    # Conversion rewrites the schema into Draft 4/7 shapes, so a dialect declared by an embedded
-    # JSON Schema resource no longer describes it and would drive meta-validation to the wrong draft.
-    # Draft 3 is kept so it is still reported as unsupported instead of generating data for it.
+    # Converted schemas are Draft 4/7, so drop an embedded dialect; Draft 3 stays so it is reported as unsupported.
     if schema.get("$schema", DRAFT_03_DIALECT) != DRAFT_03_DIALECT:
         del schema["$schema"]
 
-    # OpenAPI 3.0 / Swagger 2.0: keys alongside `$ref` are ignored. Drop them so generation and
-    # validation observe the same shape; otherwise a sibling like `type: string` next to a `$ref`
-    # to an object schema produces strings the validator rejects.
+    # OpenAPI 3.0 and Swagger 2.0 ignore `$ref` siblings; dropping them keeps generation in line with validation.
     if not merge_ref_siblings and "$ref" in schema:
         nullable = schema.get(nullable_keyword)
         for key in list(schema):
@@ -128,8 +124,7 @@ def _to_json_schema(
             if bundled:
                 schema[BUNDLE_STORAGE_KEY] = bundled
     schema_type = schema.get("type")
-    # An `enum` that omits null makes null invalid even when `type` lists it. Responses tolerate the
-    # mismatch as a likely incomplete `enum`; requests keep the enum as written so generation never sends null.
+    # Responses read an `enum` missing a `type`-listed null as incomplete; requests keep it and never send null.
     if is_response_schema and isinstance(schema_type, list) and "null" in schema_type:
         enum = schema.get("enum")
         if isinstance(enum, list) and None not in enum:
@@ -141,11 +136,9 @@ def _to_json_schema(
     if not is_response_schema:
         _restrict_integer_format(schema)
 
-    # Handle unsupported regex patterns - try translation first, remove if that fails
     pattern = schema.get("pattern")
     if isinstance(pattern, str):
-        # One the validator compiles is kept even where Python cannot read it - the API enforces it,
-        # so dropping it would draw values the API turns down.
+        # Keep a pattern the validator compiles though Python cannot: dropping it draws values the API rejects.
         enforced = pattern if is_negated and is_valid_jsonschema_rs_regex(pattern) else enforced_pattern(pattern)
         if enforced is None:
             del schema["pattern"]
@@ -156,7 +149,7 @@ def _to_json_schema(
         del schema["pattern"]
     if update_quantifiers:
         update_pattern_in_schema(schema)
-    # Sometimes `required` is incorrectly has a boolean value
+    # Some schemas put a boolean `required` on the property itself
     properties = schema.get("properties")
     if isinstance(properties, dict):
         for name, subschema in properties.items():
@@ -187,8 +180,7 @@ def _to_json_schema(
 
     ensure_required_properties(schema)
 
-    # Draft 4/7 spells a tuple as `items: [...]`, which is what generation reads there.
-    # Skipped when the consumer needs `prefixItems` to stay intact (e.g. for Draft 2020-12 validators).
+    # Generation reads Draft 4/7 tuples, `items: [...]`; Draft 2020-12 validators need `prefixItems` intact.
     if convert_prefix_items and "prefixItems" in schema:
         prefix_items = schema.pop("prefixItems")
         if "items" in schema:
@@ -196,8 +188,7 @@ def _to_json_schema(
             schema["additionalItems"] = schema.pop("items")
         schema["items"] = prefix_items
 
-    # Convert `if`/`then`/`else` to anyOf so coverage's anyOf machinery handles the conditional.
-    # Skipped when the consumer needs the originals to stay intact (e.g. for Draft 2020-12 validators).
+    # Rewrite `if`/`then`/`else` as `anyOf` for coverage; Draft 2020-12 validators need the originals.
     if convert_if_then_else:
         _rewrite_if_then_else(schema)
 
@@ -253,8 +244,7 @@ def _to_json_schema(
                     bundle=bundle,
                 )
 
-    # A property forbidden inside an `allOf` branch (read/write-only rewrite produces `{"not": {}}`)
-    # must also be removed from the parent's `required`, otherwise the schema is unsatisfiable.
+    # A property an `allOf` branch forbids, e.g. after the read/write-only rewrite, would make `required` unsatisfiable.
     required = schema.get("required")
     if isinstance(required, list) and required:
         forbidden = _forbidden_in_allof_branches(schema, None if is_response_schema else bundle)
@@ -271,8 +261,7 @@ def _to_json_schema(
 def _forbidden_in_allof_branches(schema: dict[str, Any], read_only_bundle: Mapping[str, Any] | None) -> set[str]:
     """Properties no value satisfies in an `allOf` branch, nested branches included.
 
-    With `read_only_bundle`, branches behind references count too; they may not be converted yet,
-    so a property `readOnly` applies to is forbidden as well.
+    With `read_only_bundle`, referenced branches count too, including their not yet converted `readOnly` properties.
     """
     forbidden: set[str] = set()
     all_of = schema.get("allOf")
@@ -304,12 +293,7 @@ def _pin_discriminator_property(
     name_to_uri: dict[str, str] | None,
     bundle: dict[str, Any] | None = None,
 ) -> None:
-    """Pin the discriminator property to its expected value in each oneOf/anyOf branch.
-
-    When a schema has a `discriminator`, each branch in oneOf/anyOf is wrapped in
-    `allOf` with an `enum` constraint on the discriminator property, so each branch
-    carries the discriminator value that names it.
-    """
+    """Wrap each oneOf/anyOf branch in `allOf` with an `enum` pinning the discriminator value that names it."""
     discriminator = schema.get("discriminator")
     if not isinstance(discriminator, dict):
         return
@@ -334,7 +318,7 @@ def _pin_discriminator_property(
             ref = item.get("$ref")
             if not isinstance(ref, str):
                 continue
-            # Resolve bundled ref (e.g. "#/x-bundled/schema1") back to original URI for schema name extraction
+            # Map a bundled ref (e.g. "#/x-bundled/schema1") back to its original URI to get the schema name
             resolved_ref = ref
             branch_name = bundled_name(ref)
             if name_to_uri and branch_name is not None:
@@ -342,32 +326,27 @@ def _pin_discriminator_property(
                 if "#" in original_uri:
                     resolved_ref = "#" + original_uri.split("#", 1)[1]
                 elif original_uri:
-                    # A whole-file reference is named after its file: `cat.json` -> `cat`.
+                    # A whole-file reference is named after its file: `cat.json` names `cat`.
                     resolved_ref = get_implicit_discriminator_value(original_uri)
             disc_values = ref_to_values.get(resolved_ref)
             if disc_values is not None:
                 if disc_values:
                     items[idx] = {"allOf": [item, {"properties": {property_name: {"enum": disc_values}}}]}
                 continue
-            # Without an explicit mapping, prefer the branch's own const/enum so the literal
-            # tag (`"function"`) wins over the schema name (`FunctionTool`).
+            # Without an explicit mapping, the branch's literal tag (`"function"`) wins over its name (`FunctionTool`).
             disc_value = _branch_literal_tag(ref, property_name, bundle)
             if disc_value is None:
-                # Fall back to schema name -- unless the target is itself polymorphic,
-                # in which case the real discriminator values live on its inner branches
-                # and pinning here would force a value none of them accept.
+                # A polymorphic target keeps its tags on inner branches, which would all reject its schema name.
                 if _branch_is_polymorphic(ref, bundle):
                     continue
                 disc_value = get_implicit_discriminator_value(resolved_ref)
                 allowed = branch_tag_values(ref, property_name, bundle)
-                # The branch spells out which values it takes and this is not one of them;
-                # pinning it would leave the branch impossible to satisfy.
+                # The branch lists the values it takes and this one is not among them.
                 if allowed is not None and disc_value not in allowed:
                     continue
             if not disc_value:
                 continue
-            # `enum` is used instead of `const` so the pin is recognized under Draft 4
-            # (used by OpenAPI 2.0 / 3.0); Draft 4 silently ignores `const`.
+            # Draft 4, used by OpenAPI 2.0 and 3.0, ignores `const`, so the pin is an `enum`.
             items[idx] = {"allOf": [item, {"properties": {property_name: {"enum": [disc_value]}}}]}
 
 
@@ -452,8 +431,7 @@ def _branch_is_polymorphic(ref: str, bundle: dict[str, Any] | None) -> bool:
 
 
 def _rewrite_allof_of_contains_consts(schema: dict[str, Any]) -> None:
-    # Draft 4 has no `contains`, so it reads as an annotation and the values never land. A
-    # positional `items` prefix forces them in. Draft 2020-12 places them via `contains` instead.
+    # Draft 4 ignores `contains`, so a positional `items` prefix forces the values in; Draft 2020-12 uses `contains`.
     all_of = schema.get("allOf")
     if not isinstance(all_of, list) or len(all_of) < 2:
         return
@@ -468,8 +446,7 @@ def _rewrite_allof_of_contains_consts(schema: dict[str, Any]) -> None:
             and isinstance(entry.get("contains"), dict)
             and entry["contains"].keys() == {"const"}
         ):
-            # A single-value `enum`, not `const`: OpenAPI 3.0 schemas are read as draft 4, which
-            # has no `const` and would silently leave the position unconstrained.
+            # OpenAPI 3.0 schemas are read as Draft 4, which has no `const`.
             consts.append({"enum": [entry["contains"]["const"]]})
         else:
             keep.append(entry)
@@ -526,16 +503,13 @@ def _rewrite_if_then_else(schema: dict[str, Any]) -> None:
 
 INTEGER_FORMAT_BOUNDS = {"int32": INT32_RANGE, "int64": INT64_RANGE}
 
-# Bounds the schema declares outside the width its integer `format` implies. Values are drawn inside the
-# format range, but a request has to step past the bound the schema itself declares to violate it.
+# Declared bounds outside the integer `format` range: values stay inside the format, violations step past these bounds.
 DECLARED_MINIMUM_KEY = "x-schemathesis-declared-minimum"
 DECLARED_MAXIMUM_KEY = "x-schemathesis-declared-maximum"
 
 
 def _restrict_integer_format(schema: dict[str, Any]) -> None:
-    # `format` is annotation-only, so the range it implies has to become real keywords - otherwise
-    # generation draws arbitrary-precision integers that a fixed-width-int server rejects.
-    # Keywords (not clamping) so negative generation can still negate the bound.
+    # `format` is an annotation; bound keywords keep integers in the fixed-width range and stay negatable.
     format = schema.get("format")
     if not isinstance(format, str):
         return
@@ -602,7 +576,6 @@ def ensure_required_properties(schema: dict[str, Any]) -> None:
     if not isinstance(properties, dict):
         return
 
-    # Add missing required properties as empty schemas
     for name in required:
         if name not in properties:
             properties[name] = {}
@@ -649,8 +622,7 @@ def update_pattern_in_schema(schema: dict[str, Any]) -> None:
     max_length = schema.get("maxLength")
     if pattern and (min_length or max_length):
         new_pattern = update_quantifier(pattern, min_length, max_length)
-        # A bound the schema states in the thousands becomes a quantifier the validator's regex
-        # engine refuses to compile; the pattern it started from is the one that still works.
+        # The validator's regex engine refuses quantifiers with bounds in the thousands; the original pattern works.
         if new_pattern != pattern and is_valid_jsonschema_rs_regex(new_pattern):
             apply_rewritten_pattern(schema, new_pattern, min_length, max_length)
 
@@ -683,10 +655,7 @@ def rewrite_properties(schema: dict[str, Any], predicate: Callable[[dict[str, An
 
 
 def permit_forbidden_properties(schema: object) -> bool:
-    """Let properties nothing can satisfy accept any value again.
-
-    Mutates `schema` in place; returns whether anything changed.
-    """
+    """Let properties nothing can satisfy accept any value again, in place; returns whether anything changed."""
     changed = False
     if isinstance(schema, dict):
         properties = schema.get("properties")
@@ -713,8 +682,7 @@ def is_write_only(schema: object, bundle: Mapping[str, Any] | None = None) -> Ty
 def is_read_only(schema: object, bundle: Mapping[str, Any] | None) -> bool:
     """Whether a truthy `readOnly` applies to `schema`.
 
-    Any applicable declaration counts: on the schema itself, behind a bundled `$ref`, in an `allOf` branch,
-    or on the non-null side of a nullable union.
+    Counts the schema itself, a bundled `$ref` target, `allOf` branches and the non-null side of a nullable union.
     """
     return has_annotation(schema, ("readOnly",), bundle, _follow_bundled_reference)
 
@@ -739,8 +707,7 @@ def has_annotation(
 ) -> bool:
     """Whether a truthy annotation from `keywords` applies to `schema`.
 
-    `follow_reference` gives the target of a `$ref` node within `scope`, with the scope for references inside it,
-    or `None` when the reference does not resolve.
+    `follow_reference` returns a `$ref` target with the scope for references inside it, or `None` if unresolvable.
     """
     pending: list[tuple[Scope, object]] = [(scope, schema)]
     seen: set[int] = set()

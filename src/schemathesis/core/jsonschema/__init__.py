@@ -21,8 +21,7 @@ from schemathesis.core.jsonschema.bundler import (
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue, get_type
 
-# Support ECMA-262 lookahead/lookbehind. The limit fits legit large quantifiers but fast-fails
-# degenerate ones (e.g. `{0,10000000}` from a huge `maxLength`) instead of burning seconds + ~1GB.
+# ECMA-262 lookaround; the size limit fails fast on huge quantifiers, e.g. `{0,10000000}` from a large `maxLength`.
 FANCY_REGEX_OPTIONS = jsonschema_rs.FancyRegexOptions(size_limit=150_000_000)
 
 # Draft 3 predates the keyword semantics every conversion here assumes and is rejected outright
@@ -102,9 +101,7 @@ def _is_valid_duration(value: str) -> bool:
     return _DURATION_RE.match(value) is not None
 
 
-# Formats that newer JSON Schema drafts validate natively but Draft 4 (used by
-# OpenAPI 2.0 / 3.0) does not. Registered only for Draft4Validator so built-in
-# implementations in newer drafts are not overridden.
+# Formats newer drafts validate natively but Draft 4 (OpenAPI 2.0 / 3.0) does not; newer drafts keep their own checks.
 DRAFT4_SUPPLEMENTAL_FORMATS: dict[str, Callable[[Any], bool]] = {
     "duration": _is_valid_duration,
     "uuid": _is_valid_uuid,
@@ -140,10 +137,7 @@ STANDARD_FORMATS = frozenset(
     }
 )
 
-# Format names that each `jsonschema_rs` validator class actually validates (after
-# the supplemental `uuid` registration for Draft 4 above). Anything outside the
-# matching set is annotation-only under that draft: negative-format generation
-# cannot produce a value the validator considers wrong, so callers should skip.
+# Formats each validator class checks, Draft 4 supplements included; others are annotations no negative value violates.
 VALIDATED_FORMATS_BY_DRAFT: dict[type[jsonschema_rs.Validator], frozenset[str]] = {
     jsonschema_rs.Draft4Validator: frozenset(
         {
@@ -255,11 +249,7 @@ def _bundle_registry(bundled: dict[str, Any], validator_cls: type) -> tuple[str,
 
 
 def _split_bundle(schema: JsonSchema, validator_cls: type) -> tuple[JsonSchema, jsonschema_rs.Registry | None]:
-    """Move the bundle out of the schema, so compiling it does not copy the whole bundle in.
-
-    Spliced in, every validator compiles the entire bundle whether or not it references it -
-    a shared registry compiles it once for all of them.
-    """
+    """Move the bundle into a shared registry, compiled once instead of inside every validator."""
     schema, uri, registry = _detach_bundle(schema, validator_cls)
     if uri is None:
         return schema, registry
@@ -431,16 +421,12 @@ def resolve_bundled_ref(schema: dict[str, Any], bundled: object) -> dict[str, An
 
 
 def is_unsatisfiable(schema: object) -> bool:
-    """True for a schema no value satisfies — `false`, or `not` against the schema that accepts everything."""
+    """True for a schema no value satisfies: `false`, or `not` against the schema that accepts everything."""
     return schema is False or (isinstance(schema, dict) and schema.get("not") == {})
 
 
 def is_valid(value: object, schema: JsonSchema) -> bool:
-    """Return True if value satisfies schema, False if it does not.
-
-    Returns True on any validation error so that values that cannot be checked
-    are passed through rather than silently dropped.
-    """
+    """Whether `value` satisfies `schema`; `True` when the check itself errors, so unverifiable values pass through."""
     try:
         return make_validator_for(schema).is_valid(value)
     except Exception:

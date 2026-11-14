@@ -47,8 +47,6 @@ class BodyUrlEntry:
 
 @dataclass(slots=True)
 class Observations:
-    """Repository for observations collected during test execution."""
-
     location_headers: dict[APIOperation, list[LocationHeaderEntry]]
     body_urls: dict[APIOperation, list[BodyUrlEntry]]
     fruitless_body_scans: dict[APIOperation, int]
@@ -59,14 +57,12 @@ class Observations:
         self.fruitless_body_scans = {}
 
     def extract_observations_from(self, recorder: RecordedScenario) -> None:
-        """Extract observations from completed test scenario."""
         for id, interaction in recorder.interactions.items():
             response = interaction.response
             if response is not None:
                 operation = recorder.cases[id].value.operation
                 location = response.headers.get("location")
                 if location:
-                    # Group location headers by the operation that produced them
                     entries = self.location_headers.setdefault(operation, [])
                     if len(entries) < MAX_LOCATION_HEADER_SAMPLES:
                         entries.append(

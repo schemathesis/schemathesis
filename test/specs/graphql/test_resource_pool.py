@@ -475,7 +475,7 @@ def test_capture_skips_enum_typed_fields(ctx, rng):
         operation_node=operation,
         response_data={"authors": [{"id": "a-1", "status": "ACTIVE"}]},
     )
-    # Enum field is silently skipped; only the scalar `id` is captured.
+    # The enum field is skipped; only the scalar `id` is captured.
     assert pool.draw(handle=Handle("Author", "id"), random=rng) == "a-1"
 
 
@@ -487,7 +487,7 @@ def test_substitution_skips_subscription_operations(ctx, rng):
     schema, pool = _schema_and_pool(ctx, sdl)
     operation = _parse("subscription { event }")
     operation = substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
-    # No-op: substitution silently skips operation types other than query/mutation.
+    # Substitution skips operation types other than query and mutation.
     assert "event" in graphql.print_ast(operation)
 
 
@@ -550,7 +550,6 @@ def test_substitution_into_list_argument(ctx, arg_name, scalar_type, rng):
     operation = _parse(f'query {{ books({arg_name}: ["a", "b"]) {{ id }} }}')
     operation = substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
     printed = graphql.print_ast(operation)
-    # Both list elements get replaced by captured ids; original placeholders are gone.
     assert '"a"' not in printed and '"b"' not in printed
     assert any(captured in printed for captured in ("id-1", "id-2"))
 

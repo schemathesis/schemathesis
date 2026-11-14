@@ -17,7 +17,7 @@ def parse_observations(
     case: Case,
     response: Response,
 ) -> tuple[Observation, ...]:
-    """Parse a client error response into structured observations without storing them.
+    """Parse a client error response into observations without storing them.
 
     Returns `()` for other statuses, auth failures, and negative-mode cases.
     """
@@ -26,7 +26,7 @@ def parse_observations(
         # Only client errors are actionable: server errors are already check findings; auth failures are noise.
         not status_class.is_client_error
         or status_class.is_auth_failure
-        # Negative-mode is meant to fail — recording it would poison the signal.
+        # Negative cases are meant to fail; recording them would poison the signal.
         or (case.meta is not None and case.meta.generation.mode.is_negative)
     ):
         return ()

@@ -55,8 +55,7 @@ def plan_link_values(
     transition: Transition, *, merge_body: bool, use_probability: float, calibrated: bool, random: Random
 ) -> LinkPlan:
     """Choose which values extracted by the link the next request uses."""
-    # Picks stay out of Hypothesis's data tree: the producer's response shape can vary across runs of the same byte
-    # stream when the API has mutable state, and a tracked draw would be flagged as inconsistent.
+    # Picks bypass Hypothesis draws: mutable API state can change response shapes on replay, flagged as inconsistent.
     index = _choose_match_index(transition, random)
     overrides, applied_parameters = _plan_parameters(
         transition, index, use_probability=use_probability, calibrated=calibrated, random=random
@@ -122,7 +121,7 @@ def _plan_parameters(
 
 
 def _usable_parameters(transition: Transition) -> Iterator[tuple[ContainerName, str, bool, Any]]:
-    """Container, name, requiredness and value of every successfully extracted parameter."""
+    """Extracted parameters whose value resolved to something other than null."""
     for container, data in transition.parameters.items():
         for name, extracted in data.items():
             if isinstance(extracted.value, Ok) and extracted.value.ok() not in (None, UNRESOLVABLE):
@@ -134,8 +133,7 @@ def _parameter_use_probability(
 ) -> float:
     if calibrated:
         return use_probability
-    # No data yet: path parameters are critical for routing, required parameters should follow links more, and
-    # optional parameters get more exploration.
+    # No data yet: path (routing) and required parameters follow links more, optional ones explore more.
     exploration_rate = BASE_EXPLORATION_RATE
     if container == "path_parameters":
         exploration_rate *= 0.5

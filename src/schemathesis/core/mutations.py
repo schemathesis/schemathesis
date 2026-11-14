@@ -19,15 +19,14 @@ class OperatorKind(StrEnum):
     NEGATE_CONSTRAINTS = "negate_constraints"
     # Drops a name from a `required` list.
     REMOVE_REQUIRED_PROPERTY = "remove_required_property"
-    # Keeps the schema valid but rewrites a generated leaf so it fails one keyword
-    # (UUID near-miss, off-by-one numeric, pattern violation).
+    # Rewrites a generated leaf to fail one keyword (UUID near-miss, off-by-one number, pattern miss).
     VALUE_VIOLATOR = "value_violator"
     # Replaces the body with random bytes that aren't valid JSON.
     SYNTAX_FUZZING = "syntax_fuzzing"
 
 
 class MutationChannel(StrEnum):
-    """Where a mutation lives in the per-case pipeline."""
+    """Whether a mutation changed the schema or a generated value."""
 
     SCHEMA = "schema"
     VALUE = "value"
@@ -35,11 +34,7 @@ class MutationChannel(StrEnum):
 
 @dataclass(slots=True)
 class Mutation:
-    """One mutation applied during a negative-fuzzing case.
-
-    Records the schema/value alteration so callers can attribute the case to a
-    specific path, operator, and keyword set.
-    """
+    """One mutation in a negative case, attributing it to a path, operator and keywords."""
 
     path: ParameterPath
     parameter_location: ParameterLocation
@@ -80,11 +75,7 @@ class Mutation:
 
 
 def _render_mutation_value(value: JsonValue, *, bare: bool) -> str:
-    """Render a mutation's before/after value for display in a failure message.
-
-    `bare=True` skips string quoting; use it for `type`-keyword mutations where the
-    value is a type name (`object`, `integer`) rather than a string literal.
-    """
+    """A before/after value for a failure message; `bare` skips quoting, for type names like `integer`."""
     if isinstance(value, list):
         return ", ".join(str(v) for v in value)
     if isinstance(value, str) and not bare:
@@ -125,7 +116,7 @@ def render_mutations(mutations: Sequence[Mutation]) -> list[str]:
 
 
 class MutationMetadata:
-    """Per-case metadata: the structured Mutation records applied this case."""
+    """Mutations applied to one case."""
 
     __slots__ = ("mutations",)
 

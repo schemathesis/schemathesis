@@ -196,8 +196,7 @@ class JsonSchemaError(Failure):
         else:
             schema = self._root_schema
 
-        # Read-only and write-only properties are rewritten to a schema nothing satisfies, and the raw
-        # validator message spells that rewrite rather than naming what it rejects.
+        # Read/write-only properties become an unsatisfiable schema whose raw message hides the rejected property.
         if schema == {"not": {}} and self.schema_path and self.schema_path[-1] == "not":
             name = self.instance_path[-1] if self.instance_path else None
             validation_message = (
@@ -230,7 +229,7 @@ class JsonSchemaError(Failure):
                     **{k: v for k, v in schema.items() if k != failing_keyword},
                 }
 
-        # Restore original $ref paths for display if mapping is available
+        # Restore original `$ref` paths for display
         if self._name_to_uri:
             schema = unbundle(schema, self._name_to_uri)
 

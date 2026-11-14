@@ -382,7 +382,6 @@ class OpenApiContext:
         config: SchemathesisConfig | None = None,
         **kwargs: dict[str, Any],
     ) -> APIOperation:
-        # `label` is "METHOD /path", e.g. "POST /users".
         method, path = label.split(" ", 1)
         schema = self.load_schema({path: {method.lower(): definition}}, version=version, config=config, **kwargs)
         return schema[path][method]
@@ -418,8 +417,6 @@ class OpenApiContext:
 
 @dataclass
 class Context:
-    """Helper to localize common actions for testing API schemas."""
-
     request: pytest.FixtureRequest
 
     @property

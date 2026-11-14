@@ -17,9 +17,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
-# Confluent's `error_code` runs in two ranges: 4xx HTTP mirrors plus a 5-digit
-# extended namespace. Skip 5xx in either range — those signal broker / runtime
-# faults, not request shape.
+# `error_code` is a 4xx HTTP code or a 5-digit 4xxxx code; 5xx codes in either range are broker faults.
 _HTTP_STATUS_LOW = 400
 _HTTP_STATUS_HIGH = 500
 _EXTENDED_LOW = 40000
@@ -28,13 +26,11 @@ _EXTENDED_HIGH = 50000
 _TOPIC_NAME_REGEX = "^[a-zA-Z0-9._-]+$"
 
 _COERCE_EMPTY_STRING = re.compile(r'Cannot coerce empty String \(""\) to `\w+` value')
-# Recognized but not actionable: cannot pin a field path without per-endpoint
-# knowledge of the root container.
+# Recognized but not actionable: the field path depends on each endpoint's root container.
 _PAYLOAD_NULL_OR_EMPTY = re.compile(r"Payload error\. (?:Null|Empty) input provided\.|Request body is empty")
 _EMPTY_BATCH = re.compile(r"^Empty batch\.?$")
 _BATCH_ENTRY_IDENTIFIER = re.compile(r"^Batch entry identifier is not a valid string\.?$")
-# `<field> cannot be <value>` — recognized but not emitted: narrowing an enum
-# requires the allowed-value list, which the message doesn't carry.
+# Recognized but not emitted: the message lacks the allowed values an enum needs.
 _FIELD_CANNOT_BE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]* cannot be [A-Z][A-Z0-9_]*$")
 # Two wordings observed across releases; second arm is the post-collapse form.
 _TOPIC_NAME_INVALID = re.compile(
@@ -74,7 +70,7 @@ def _message_recognized(message: str) -> bool:
 
 
 def _find_unique_empty_string_path(body: object) -> ParameterPath | None:
-    """Locate the single body slot whose value is `""`; ambiguous matches drop."""
+    """The only body slot holding `""`, or `None` when there are none or several."""
     matches: list[ParameterPath] = []
     stack: list[tuple[ParameterPath, object]] = [((), body)]
     while stack:

@@ -400,8 +400,7 @@ def test_coverage_pool_overlay_respects_stricter_destination_constraints(cli, sn
 
 
 def test_coverage_pool_overlay_respects_destination_format(cli, snapshot_cli, ctx):
-    # A producer with no `format` constraint must not contribute values that violate a consumer's `format: uuid`.
-    # The producer caps `txnId` length at 5 — no value can satisfy uuid (36 chars), so any pool injection fails.
+    # A producer without `format` caps `txnId` at 5 chars, so its values never fit the consumer's `format: uuid`.
     paths = {
         "/a-create": {
             "post": {
@@ -521,7 +520,6 @@ def test_coverage_pool_overlays_reach_top_level_and_nested_body_slots(ctx):
 
 
 def test_coverage_pool_overlay_dict_value_with_undeclared_keys(ctx):
-    # Pool object value for "address_id" contains "country", absent from the property schema.
     address = {"type": "object", "properties": {"city": {"type": "string"}}}
     schema = ctx.openapi.load_schema(
         {

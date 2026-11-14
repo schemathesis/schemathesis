@@ -106,7 +106,7 @@ def to_float32(value: float) -> float:
 
 
 def merge_recursively(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
-    """Merge two dictionaries recursively."""
+    """Merge `b` into `a` in place and return `a`."""
     for key in b:
         if key in a:
             if isinstance(a[key], dict) and isinstance(b[key], dict):
@@ -156,9 +156,9 @@ def assert_list(value: Any, predicate: Callable = noop) -> None:
 
 
 def assert_requests_call(case: Case):
-    """Verify that all generated input parameters are usable by requests."""
+    """Assert `requests` accepts every generated parameter of `case`."""
     with pytest.raises((requests.exceptions.ConnectionError, urllib3.exceptions.NewConnectionError)):
-        # On Windows it may take time to get the connection error, hence we set a timeout
+        # Windows can be slow to report the connection error, so the call has a timeout.
         case.call(base_url="http://127.0.0.1:1", timeout=0.001)
 
 
@@ -263,7 +263,7 @@ class EventStream:
         return self
 
     def find(self, ty: type[E], **attrs) -> E | None:
-        """Find first event of specified type matching all attribute predicates."""
+        """First event of type `ty` whose attributes match `attrs`, each a value or a predicate."""
         return next(
             (
                 e
@@ -275,7 +275,7 @@ class EventStream:
         )
 
     def find_all(self, ty: type[E], **attrs) -> list[E]:
-        """Find all events of specified type matching all attribute predicates."""
+        """All events of type `ty` whose attributes match `attrs`, each a value or a predicate."""
         return [
             e
             for e in self.events

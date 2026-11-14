@@ -55,12 +55,7 @@ class _OperationRecord:
 
 
 class Supervisor:
-    """Per-operation runtime supervisor consulted by the scheduler.
-
-    `observe` is called for every response and may flip an operation's
-    verdict once a rule fires. `verdict` is the read path the scheduler
-    consults before queueing each scenario.
-    """
+    """Per-operation verdicts: `observe` sees every response and may flip one; the scheduler reads them."""
 
     __slots__ = ("_records", "_lock")
 
@@ -104,10 +99,9 @@ class Supervisor:
                 record = _OperationRecord()
                 self._records[operation_label] = record
             elif record.verdict.directive is not SchedulingDirective.RUN:
-                # Verdict already issued — further signal can only confirm it.
+                # A verdict is already issued; further signal can only confirm it.
                 return
-            # Documented 405s mean the spec contract anticipates them; respect that and
-            # don't treat them as evidence of an unimplemented method.
+            # A documented 405 is part of the contract, so it does not count toward the streak.
             if status_code == 405 and not is_documented_status:
                 record.counters.method_not_allowed += 1
             elif not_served_status is not None:

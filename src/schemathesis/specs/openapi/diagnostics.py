@@ -96,8 +96,7 @@ def find_slow_parameter(operation: APIOperation, reason: HealthCheck) -> SlowPar
 
 
 def build_unsatisfiable_schema_error(operation: APIOperation) -> UnsatisfiableSchema:
-    # Drawing is already under way here, so the parameter is found by reading the schemas rather than
-    # by generating from each of them.
+    # Drawing is already under way, so find the parameter by reading the schemas instead of generating from each.
     for location, parameter in _iter_parameters(operation):
         unsatisfiable = _build_unsatisfiable_parameter(operation, location, parameter)
         if unsatisfiable.detail is not None:

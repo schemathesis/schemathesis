@@ -37,14 +37,13 @@ def test_layered_scheduler_single_layer(ctx):
 
     scheduler = LayeredScheduler([ops])
 
-    # Should be able to get both operations
     result1 = scheduler.next_operation()
     assert result1 is not None
 
     result2 = scheduler.next_operation()
     assert result2 is not None
 
-    # Layer exhausted - with single worker, returns None immediately
+    # With a single worker, an exhausted layer returns None immediately.
     result3 = scheduler.next_operation()
     assert result3 is None
 
@@ -64,23 +63,20 @@ def test_layered_scheduler_multiple_layers(ctx):
 
     ops = _operations(loaded)
 
-    # Manually create layers: POST first, then GET
     post_ops = _ops_by_method(ops, "POST")
     get_ops = _ops_by_method(ops, "GET")
 
     scheduler = LayeredScheduler([post_ops, get_ops])
 
-    # Get POST operation from layer 0
     result = scheduler.next_operation()
     assert result is not None
     assert result.ok().method.upper() == "POST"
 
-    # Layer 0 exhausted, automatically advances to layer 1
+    # An exhausted layer advances to the next one.
     result = scheduler.next_operation()
     assert result is not None
     assert result.ok().method.upper() == "GET"
 
-    # All layers exhausted
     result = scheduler.next_operation()
     assert result is None
 
@@ -203,9 +199,7 @@ def test_layered_scheduler_multi_worker_coordination(ctx):
 
 
 def test_create_scheduler_respects_layer_order_for_single_layer(ctx):
-    # Methods listed GET-first to demonstrate that schema-iteration order does
-    # not happen to match the desired RESTful order. The scheduler should
-    # follow the layer's POST-first sort regardless of dict order.
+    # Methods listed GET-first so the schema order differs from the layer's POST-first order.
     loaded = ctx.openapi.load_schema(
         {
             "/products/{productName}": {

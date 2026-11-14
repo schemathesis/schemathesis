@@ -54,8 +54,7 @@ def user_schema_builder(ctx):
             "/users": {
                 "post": {"responses": {status_code: {"content": {"application/json": {"schema": response_schema}}}}}
             },
-            # GET /users/{id} consumes User.id so the descriptor stays reachable under
-            # the orphan-resource filter; record_response can populate the User pool.
+            # A consumer of `User.id` keeps the descriptor past the orphan-resource filter.
             "/users/{id}": {
                 "get": {
                     "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
@@ -249,8 +248,7 @@ def test_many_cardinality_extracts_each_item(user_schema_builder):
 
 
 def test_wildcard_pointer_unresolvable_before_wildcard_yields_no_entries():
-    # Wildcard descriptor pointer where the literal prefix is missing in the payload.
-    # `_extract_payload` short-circuits to an empty result without reaching fan-out.
+    # The payload lacks the wildcard pointer's literal prefix, so extraction yields nothing.
     repository = ResourceRepository(
         [
             ResourceDescriptor(
@@ -692,7 +690,7 @@ def test_pool_captures_individuals_from_get_list_envelope(
 
 
 def test_pool_map_by_id_unrecoverable_path_emits_no_descriptor(ctx):
-    # Path resolves to no resource name (only path-param segments); helper returns None.
+    # A path of only parameter segments names no resource.
     schema = ctx.openapi.load_schema(
         {
             "/{slug}": {
@@ -723,8 +721,7 @@ def test_pool_map_by_id_unrecoverable_path_emits_no_descriptor(ctx):
 
 
 def test_orphan_resource_descriptors_are_filtered(ctx):
-    # Producer creates a Widget; no operation consumes Widget. The descriptor would only ever
-    # write into a bucket nothing reads, so it must not be built.
+    # Nothing consumes Widget, so a descriptor would fill a bucket nothing reads.
     schema = ctx.openapi.load_schema(
         {
             "/widgets": {
@@ -751,7 +748,6 @@ def test_orphan_resource_descriptors_are_filtered(ctx):
 
 
 def test_descriptor_kept_when_consumer_exists(ctx):
-    # Sibling regression guard: with a consumer present, the descriptor must still be built.
     schema = ctx.openapi.load_schema(
         {
             "/widgets": {
@@ -832,7 +828,6 @@ def test_captured_variants_filter_values_invalid_for_destination(ctx):
     )
 
     assert [v.overlay for v in variants] == [{"itemId": 5}]
-    # Each variant carries provenance back to the producing operation.
     assert variants[0].draws[0].source_operation == "POST /items"
     assert variants[0].draws[0].parameter_name == "itemId"
 
@@ -1407,7 +1402,7 @@ def test_record_successful_delete_uses_only_resource_linked_params(ctx):
                     },
                 }
             },
-            # DELETE has two path params: itemId (resource-linked) and version (not resource-linked)
+            # Only `itemId` links to a resource; `version` does not.
             "/items/{itemId}/history/{version}": {
                 "delete": {
                     "operationId": "deleteItem",
@@ -1429,7 +1424,6 @@ def test_record_successful_delete_uses_only_resource_linked_params(ctx):
 
     data_source.record_successful_delete(operation=delete_operation, case=case)
 
-    # The key should only contain the resource-linked parameter (itemId), not version
     assert len(data_source.usage_tracker._delete_attempts) == 1
     for key in data_source.usage_tracker._delete_attempts:
         assert "itemId" in key
@@ -1474,7 +1468,7 @@ def test_wildcard_status_code_matching(user_schema_builder):
         ),
         pytest.param(
             [{"id": str(i)} for i in range(PER_CONTEXT_CAPACITY + 100)],
-            PER_CONTEXT_CAPACITY,  # All have same (empty) context, so limited by per-context capacity
+            PER_CONTEXT_CAPACITY,  # Same empty context, so per-context capacity applies
             id="respects-capacity-limit",
         ),
     ],
@@ -1677,12 +1671,11 @@ def test_prepopulate_from_response_examples(ctx):
     )
     data_source = schema.create_extra_data_source()
 
-    # Without calling record_response(), pool should already have the example value
+    # The pool holds the example before any response is recorded.
     resources = list(data_source.repository.iter_instances(USER_RESOURCE))
     assert len(resources) == 1
     assert resources[0].data["id"] == "example-user-123"
 
-    # Verify example is used in captured variants
     get_operation = schema["/users/{user_id}"]["GET"]
     path_schema = get_operation.path_parameters.schema
     variants = data_source.get_captured_variants(
@@ -1775,26 +1768,22 @@ def test_object_level_augmentation_preserves_relationships(ctx):
     )
     data_source = schema.create_extra_data_source()
 
-    # Record a post creation with userId in context (from path parameter)
     data_source.repository.record_response(
         operation="POST /users/{userId}/posts",
         status_code=201,
         payload={"id": "post-123", "userId": "user-456"},
-        context={"userId": "user-456"},  # Path parameter from request
+        context={"userId": "user-456"},
     )
 
-    # Get the path parameters for GET /users/{userId}/posts/{postId}
     get_operation = schema["/users/{userId}/posts/{postId}"]["GET"]
     path_schema = get_operation.path_parameters.schema
 
-    # get_captured_variants() returns the variants for hybrid strategy
     variants = data_source.get_captured_variants(
         operation=get_operation, location=ParameterLocation.PATH, schema=path_schema
     )
     assert variants is not None
     assert len(variants) == 1
 
-    # Variant contains both userId and postId with correct values
     variant = variants[0].overlay
     assert variant["userId"] == "user-456"
     assert variant["postId"] == "post-123"
@@ -1825,7 +1814,7 @@ def test_context_aware_eviction_maintains_diversity(ctx):
     )
     data_source = schema.create_extra_data_source()
 
-    # Record pets from multiple owners - more than would fit in a single context bucket
+    # More pets than one context bucket holds
     for owner_id in range(1, 6):
         for pet_id in range(1, 100):
             data_source.repository.record_response(
@@ -1837,16 +1826,13 @@ def test_context_aware_eviction_maintains_diversity(ctx):
 
     instances = data_source.repository.iter_instances("Pet")
 
-    # Should have instances from all 5 owners (context diversity preserved)
     owner_ids = {inst.context.get("ownerId") for inst in instances}
     assert len(owner_ids) == 5
 
-    # Each owner should have at most PER_CONTEXT_CAPACITY pets
     for owner_id in range(1, 6):
         owner_pets = [inst for inst in instances if inst.context.get("ownerId") == owner_id]
         assert len(owner_pets) <= PER_CONTEXT_CAPACITY
 
-    # Total instances capped by contexts * per-context capacity
     assert len(instances) <= MAX_CONTEXTS_PER_TYPE * PER_CONTEXT_CAPACITY
 
 
@@ -1976,9 +1962,7 @@ def test_consumer_strategies_use_values_captured_after_previous_builds(ctx, mode
 
 
 def test_pool_overlay_keeps_required_fields_for_body_without_type_object(ctx):
-    # Body schema declares `properties` and `required` but omits `type: object`. The generator
-    # may then draw non-dict values (None, scalars) and the captured-variant overlay must not
-    # silently coerce those to `{}` and produce a body missing required fields.
+    # Without `type: object` the body may be a non-dict, which the overlay must not coerce into an incomplete `{}`.
     schema = ctx.openapi.load_schema(
         {
             "/clients": {
@@ -2278,10 +2262,7 @@ def test_positive_form_urlencoded_body_pool_overlay_survives_form_prep(ctx):
                     "operationId": "createSession",
                     "requestBody": {
                         "required": True,
-                        # Both content types share a schema. The JSON body lets descriptor
-                        # inference link `user_id` to `User.id`; the form-urlencoded body is
-                        # the path under test (must survive form prep when the hybrid picks
-                        # a captured pool variant).
+                        # The JSON body lets inference link `user_id` to `User.id`; the form body is under test.
                         "content": {
                             "application/json": {"schema": consumer_body_schema},
                             "application/x-www-form-urlencoded": {"schema": consumer_body_schema},
@@ -2303,8 +2284,7 @@ def test_positive_form_urlencoded_body_pool_overlay_survives_form_prep(ctx):
         operation=operation, phase=TestPhase.FUZZING, feedback=FeedbackSources(extra_data_source=data_source)
     )
 
-    # Counts only the form-urlencoded slice: that's the path the form-prep map/filter
-    # rewrites. With the pre-fix code, captured-variant draws were filtered out here.
+    # Count only form-urlencoded draws, the ones form preparation rewrites.
     form_pool_hits = 0
 
     @run_given(cases_strategy, max_examples=200)
@@ -2437,11 +2417,9 @@ def test_primitive_identifier_adds_field_to_empty_resource(ctx):
         }
     )
 
-    # Verify resource has "id" field added by POST
     graph = schema.analysis.dependency_graph
     assert "id" in graph.resources["Item"].fields
 
-    # Verify primitive capture works
     data_source = schema.create_extra_data_source()
     data_source.repository.record_response(operation="POST /items", status_code=201, payload="item-123")
 
@@ -2451,12 +2429,11 @@ def test_primitive_identifier_adds_field_to_empty_resource(ctx):
 
 
 def test_primitive_response_ignored_for_root_path(ctx):
-    # POST at "/" can't derive resource name, should produce no outputs
+    # POST at `/` names no resource, so it has no outputs.
     schema = ctx.openapi.load_schema(
         {"/": {"post": {"responses": {"201": {"content": {"application/json": {"schema": {"type": "string"}}}}}}}}
     )
 
-    # Verify no outputs for POST / in dependency graph
     graph = schema.analysis.dependency_graph
     operation = graph.operations.get("POST /")
     assert operation is None or operation.outputs == []
@@ -2580,8 +2557,7 @@ def test_pick_correlated_values_rotate_across_consecutive_picks(user_schema_buil
         data_source.pick_correlated_values(operation=get_operation).values.get((ParameterLocation.PATH, "user_id"))
         for _ in range(4)
     ]
-    # Deterministic rotation: each draw deprioritizes the chosen variant, so
-    # the first four picks cover all four values.
+    # Each draw deprioritizes its pick, so the first four picks cover all four values.
     assert set(picks) == {"a", "b", "c", "d"}
 
 
@@ -2615,7 +2591,6 @@ def test_pick_correlated_values_single_family_correlated_pair(user_schema_builde
     operation = schema["/users/{user_id}"]["GET"]
     result = data_source.pick_correlated_values(operation=operation)
     assert result.values == {(ParameterLocation.PATH, "user_id"): "1"}
-    # Draws record provenance back to POST /users that captured the resource.
     assert len(result.draws) == 1
     draw = result.draws[0]
     assert draw.location == ParameterLocation.PATH.value

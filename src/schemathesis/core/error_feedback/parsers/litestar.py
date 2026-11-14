@@ -26,8 +26,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
-# Wire envelope: `{status_code, detail, extra: [{message, key, source}]}`.
-# `source` carries the request location of the offending value.
+# Envelope: `{status_code, detail, extra: [{message, key, source}]}`; `source` is the offending value's location.
 _SOURCE_LOCATIONS: dict[str, ParameterLocation] = {
     "body": ParameterLocation.BODY,
     "query": ParameterLocation.QUERY,
@@ -37,8 +36,7 @@ _SOURCE_LOCATIONS: dict[str, ParameterLocation] = {
 }
 
 
-# Scalar names mapped to JSON Schema types. Unmapped values pass through verbatim
-# so user-defined types reach the consumer's format-vs-type dispatch unchanged.
+# Scalar names to JSON Schema types; unmapped user-defined types pass through for the consumer to dispatch.
 _TYPE_ALIASES: dict[str, str] = {
     "str": "string",
     "int": "integer",
@@ -57,10 +55,9 @@ _TYPE_MISMATCH = re.compile(r"^Expected `(?P<expected>[^`]+)`, got `(?P<got>[^`]
 
 
 def _resolve_type(expected: str) -> str | None:
-    """Map an expected type name to a JSON Schema type, or `None` for genuine multi-arm unions.
+    """JSON Schema type for an expected type name, ignoring `null` arms.
 
-    `int | null` collapses to `int` (the Optional pattern); `int | str` returns `None` so we
-    don't over-narrow a property the server actually accepts under multiple types.
+    `None` for unions like `int | str`, so a property the server accepts as either stays unnarrowed.
     """
     non_null_arms = [arm.strip() for arm in expected.split("|") if arm.strip() != "null"]
     if len(non_null_arms) != 1:
@@ -102,8 +99,7 @@ def _classify(message: str) -> ClassificationResult | None:
         return ObservationKind.PATTERN, PatternPayload(regex=regex_match.group("regex"))
     type_match = _TYPE_MISMATCH.match(message)
     if type_match is not None:
-        # `got null` means the value can't be null — nullability is reported via
-        # MUST_NOT_BE_BLANK regardless of which type the schema expected.
+        # `got null`: the value can't be null, reported as must-not-be-blank whatever type was expected.
         if type_match.group("got") == "null":
             return ObservationKind.MUST_NOT_BE_BLANK, None
         type_name = _resolve_type(type_match.group("expected"))
@@ -142,7 +138,7 @@ def _extract_issues(body: object) -> list[LitestarIssue] | None:
 
 
 def _resolve_path(key: str, message: str) -> ParameterPath:
-    """Compose the parameter path; required-missing appends the captured field name."""
+    """Parameter path for `key`; a missing-field message appends the missing field's name."""
     base = () if key == "data" else split_field_path(key)
     missing_required = _MISSING_REQUIRED.match(message)
     if missing_required is not None:

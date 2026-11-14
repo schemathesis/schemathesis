@@ -1,5 +1,3 @@
-"""Aggregated derived data for a GraphQL schema, computed once per schema instance."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

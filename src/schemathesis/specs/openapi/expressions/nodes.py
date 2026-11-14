@@ -1,5 +1,3 @@
-"""Expression nodes description and evaluation logic."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -26,8 +24,6 @@ def link_media_type(response: Response) -> str:
 
 @dataclass
 class Node:
-    """Generic expression node."""
-
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
         raise NotImplementedError
 
@@ -43,17 +39,11 @@ class NodeType(StrEnum):
 
 @dataclass(slots=True)
 class String(Node):
-    """A simple string that is not evaluated somehow specifically."""
+    """Literal text, such as `foo` in `foo{$request.path.id}`."""
 
     value: str
 
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
-        """String tokens are passed as they are.
-
-        ``foo{$request.path.id}``
-
-        "foo" is String token there.
-        """
         return self.value
 
 
@@ -170,7 +160,7 @@ class BodyResponse(Node):
         document = deserialize_response(response, content_type, context=context)
 
         if self.pointer is None:
-            # We need the parsed document - data will be serialized before sending to the application
+            # Keep the parsed document; it gets serialized before sending to the application
             return document
         value = resolve_pointer(document, self.pointer[1:])
         if self.extractor is not None:

@@ -21,11 +21,7 @@ MAX_EXAMPLES = profile_max_examples() or 20
 
 @pytest.fixture(scope="module")
 def mocked_schema():
-    """Module-level mock for fast hypothesis tests.
-
-    We're checking the input validation part, what comes from the network is not important in this context,
-    the faster run will be, the better.
-    """
+    """Serves a fixed schema without network access, since these tests target input validation."""
     response = Response()
     response._content = b"""openapi: 3.0.0
 info:
@@ -46,7 +42,7 @@ servers:
 
 @pytest.fixture(scope="module")
 def schema_url():
-    # `mocked_schema` intercepts the network fetch, so the URL just needs to parse.
+    # `mocked_schema` intercepts the network fetch, so the URL only needs to parse.
     return "http://127.0.0.1/schema.yaml"
 
 
@@ -67,7 +63,6 @@ def csv_strategy(enum, exclude=()):
     return st.lists(st.sampled_from([item.name for item in enum if item.name not in exclude]), min_size=1).map(",".join)
 
 
-# The following strategies generate CLI parameters, for example "--workers=5" or "--max-failures=10"
 @settings(
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
     phases=[Phase.explicit, Phase.reuse, Phase.target, Phase.generate],
@@ -259,7 +254,6 @@ def test_random_config(cli, config, schema_url, tmp_path):
             report_enabled = True
         if report.get("enabled"):
             report_enabled = True
-    # Add prefix to the 'directory' path if it exists
     if "directory" in reports:
         reports["directory"] = str(tmp_path / reports["directory"])
     elif report_enabled:

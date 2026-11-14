@@ -59,7 +59,6 @@ class RunCheck(Protocol):
 
 # A registered check class implements `after_response`, `after_run`, or both.
 CheckClass = type[ResponseCheck] | type[RunCheck]
-# An instantiated check class — the runtime object held by RunChecks.
 CheckInstance = ResponseCheck | RunCheck
 CheckT = TypeVar("CheckT", bound=CheckFunction | CheckClass)
 
@@ -124,7 +123,7 @@ class CheckInternals:
 class CheckContext:
     """Runtime context passed to validation check functions during API testing.
 
-    Provides access to configuration for currently checked endpoint.
+    Holds the configuration for the checked endpoint.
     """
 
     config: ChecksConfig
@@ -188,9 +187,9 @@ def is_check_class(obj: object) -> TypeIs[CheckClass]:
 
 
 def implements_method(obj: object, name: CheckMethodName) -> bool:
-    """Whether a check class (or instance) defines the given check method.
+    """Whether a check class or instance defines the given check method.
 
-    Check classes are a dynamic, user-defined plugin surface, so attribute probing is intentional.
+    Check classes are a user-defined plugin surface, so attribute probing is intentional.
     """
     return callable(getattr(obj, name, None))
 
@@ -340,8 +339,7 @@ _RUN_CHECKS_LOCK = threading.Lock()
 
 
 def run_checks_for(schema: BaseSchema) -> RunChecks:
-    # Per-schema cache (non-engine paths) so `after_response`/`after_run` share one instance.
-    # Lazy + atomic: built on first access, once, even under concurrency.
+    # Cached per schema outside the engine and built once under a lock, so `after_response` and `after_run` share it.
     cached = schema._run_checks
     if cached is None:
         with _RUN_CHECKS_LOCK:
@@ -353,7 +351,7 @@ def run_checks_for(schema: BaseSchema) -> RunChecks:
 
 
 def load_all_checks() -> None:
-    # NOTE: Trigger registering all Open API checks
+    # Importing registers all Open API checks
     from schemathesis.specs.openapi.checks import status_code_conformance  # noqa: F401
 
 
@@ -375,10 +373,9 @@ def check(func: CheckT) -> CheckT:
                 raise AssertionError("Missing CORS headers")
         ```
 
-    A class-based check may implement `after_response` (called per response) and/or `after_run`
-    (called once after all phases). A common pattern accumulates data per response and asserts at
-    the end; since `after_response` may be re-invoked during shrinking and replay, keep any such
-    accumulation idempotent (use sets or min/max, not counters):
+    A class-based check may implement `after_response` (per response) and `after_run` (once after all phases).
+    Shrinking and replay may call `after_response` again, so keep accumulated data idempotent (sets or min/max,
+    not counters):
 
         ```python
         @schemathesis.check
@@ -401,8 +398,7 @@ def check(func: CheckT) -> CheckT:
                     raise AssertionError("never returned 2xx: " + ", ".join(sorted(unreachable)))
         ```
 
-    If the class defines `__init__` with keyword arguments, Schemathesis forwards matching config
-    values from the config file, so each check can be tuned per project without changing code:
+    Schemathesis passes matching config file values to the keyword arguments of the class's `__init__`:
 
         ```toml
         [checks.EnsureReachability]
@@ -428,8 +424,7 @@ def _check_content_type_probe(
     """Report a server error only when the probe's `Content-Type` causes it."""
     headers = case.headers.copy()
     headers.pop("Content-Type", None)
-    # The same request with the operation's own media type. When it fails too, the header is not the cause and
-    # the operation's ordinary requests report that server error with a plain reproducer.
+    # Same request with the operation's own media type; if it fails too, ordinary requests report the error instead.
     control = case.derive(headers=headers, keep_auth=True)
     control_response = ctx.internals.send_probe(case, control, dict(ctx.internals.transport_kwargs or {}))
     if not case.operation.schema.is_response_status_expected(control_response, expected_statuses):
@@ -451,7 +446,7 @@ def _check_content_type_probe(
 
 @check
 def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    """A check to verify that the response is not a server-side error."""
+    """Verify that the response is not a server-side error."""
     expected_statuses = ctx.config.not_a_server_error.expected_statuses or []
 
     status_code = response.status_code
@@ -507,7 +502,6 @@ def run_checks(
     on_failure: Callable[[str, set[Failure], Failure], None],
     on_success: Callable[[str, Case], None] | None = None,
 ) -> set[Failure]:
-    """Run a set of checks against a response."""
     collected: set[Failure] = set()
 
     for check in checks:

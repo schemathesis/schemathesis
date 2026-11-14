@@ -79,7 +79,6 @@ def _load_entries(path: Path) -> list[Entry]:
         try:
             entries.append(Entry.from_dict(data))
         except ValueError:
-            # Forward-compat: an older reader meets a newer kind. Skip the entry rather than
-            # rejecting the whole file. JSON decode errors propagate up to `load`.
+            # Skip entry kinds from a newer version instead of rejecting the file; JSON errors still reach `load`.
             continue
     return entries

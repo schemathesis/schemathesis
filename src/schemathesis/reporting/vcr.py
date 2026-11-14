@@ -118,7 +118,6 @@ class VcrWriter:
         for case_id, interaction in recorder.interactions.items():
             case = recorder.cases[case_id]
 
-            # Determine status and checks
             if interaction.response is not None:
                 if case_id in recorder.checks:
                     checks = recorder.checks[case_id]
@@ -134,10 +133,8 @@ class VcrWriter:
                 checks = []
                 status = Status.ERROR
 
-            # Write interaction header
             stream.write(f"\n- id: '{case_id}'\n  status: '{status.name}'")
 
-            # Write metadata if present
             meta = case.value.meta
             if meta is not None:
                 stream.write(
@@ -172,7 +169,6 @@ class VcrWriter:
             else:
                 stream.write("\n  metadata: null")
 
-            # Sanitize URL if needed
             if config.sanitization.enabled:
                 uri = sanitize_url(interaction.request.uri, config=config.sanitization)
             else:
@@ -188,7 +184,6 @@ class VcrWriter:
             write_headers(interaction.request.headers)
             write_request_body(interaction.request)
 
-            # Write response
             if interaction.response is not None:
                 stream.write(
                     f"\n  response:\n"
@@ -209,7 +204,6 @@ class VcrWriter:
                 stream.write("\n  response: null")
 
     def close(self) -> None:
-        """Close the output file."""
         if self._owned_file is not None:
             self._owned_file.close()
             self._owned_file = None
@@ -240,10 +234,7 @@ def write_double_quoted(stream: IO, text: str | None) -> None:
         stream.write("null")
         return
 
-    # Adapted from `yaml.Emitter.write_double_quoted`:
-    #   - Doesn't split the string, therefore doesn't track the current column
-    #   - Doesn't encode the input
-    #   - Allows Unicode unconditionally
+    # Adapted from `yaml.Emitter.write_double_quoted`, without line splitting or encoding, and allowing all Unicode
     stream.write('"')
     start = end = 0
     length = len(text)
@@ -260,7 +251,6 @@ def write_double_quoted(stream: IO, text: str | None) -> None:
                 stream.write(text[start:end])
                 start = end
             if ch is not None:
-                # Escape character
                 if ch in Emitter.ESCAPE_REPLACEMENTS:
                     data = "\\" + Emitter.ESCAPE_REPLACEMENTS[ch]
                 elif ch <= "\xff":

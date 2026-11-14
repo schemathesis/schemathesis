@@ -58,7 +58,6 @@ def test_empty_path_servers_falls_through_to_global(ctx):
 
 
 def test_no_per_scope_servers_uses_global(ctx):
-    # Global-only schemas keep today's behavior.
     schema = ctx.openapi.load_schema(
         {
             "/admin": {"get": {"responses": {"200": {"description": "OK"}}}},
@@ -211,7 +210,7 @@ def test_find_operation_by_id_returns_per_op_base_url(ctx):
 
 
 def test_find_operation_by_reference_returns_per_op_base_url(ctx):
-    # Lazy branch: never iterate so the lookup tables are empty when this fires.
+    # No prior iteration, so the lookup tables are still empty.
     schema = ctx.openapi.from_full_schema(_per_op_schema_dict(ctx))
     operation = schema.find_operation_by_reference("#/paths/~1admin/get")
     assert operation.base_url == "https://op.example.com/o"

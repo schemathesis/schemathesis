@@ -20,7 +20,6 @@ def test_deduplication(ctx, response_factory):
     recorder = ScenarioRecorder(label="test")
     recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
     recorder.record_response(case_id=case.id, response=response)
-    # When there are two checks that raise the same failure
     with pytest.raises(FailureGroup):
         validate_response(
             case=case,
@@ -29,7 +28,6 @@ def test_deduplication(ctx, response_factory):
             response=response,
             continue_on_failure=False,
         )
-    # Then the resulting output should be deduplicated
     assert (
         len([check for checks in recorder.checks.values() for check in checks if check.failure_info is not None]) == 1
     )

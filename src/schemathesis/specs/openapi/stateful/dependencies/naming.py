@@ -8,28 +8,17 @@ from typing import TypeAlias
 
 from schemathesis.core.text import to_pascal_case
 
-# Generic parameter prefixes that don't identify a specific resource type.
-# When a parameter like "item_id" or "resource_uuid" is detected, the prefix
-# is not meaningful for resource identification, so we fall back to path-based naming.
+# Prefixes like `item_id` name no resource type, so these parameters take the resource from the path
 GENERIC_PREFIXES = frozenset({"item", "resource", "object", "entity"})
 
 
 @lru_cache(maxsize=512)
 def strip_version_prefix(path: str) -> str:
-    """Remove leading /api and /vN prefix segments from an API path.
-
-    Examples:
-        /v1/users/{id}    -> /users/{id}
-        /api/v2/orders    -> /orders
-        /api/users        -> /users
-        /oauth2/files     -> /oauth2/files  (NOT stripped)
-        /giving/tags      -> /giving/tags   (NOT stripped)
-
-    """
+    """Drop leading `/api` and `/vN` segments: `/api/v2/orders` -> `/orders`, `/oauth2/files` stays."""
     if not path:
         return path
     segments = path.split("/")
-    # segments[0] is always '' (from leading /)
+    # Skip the empty segment before the leading `/`
     start = 1
     while start < len(segments):
         seg = segments[start]
@@ -116,15 +105,13 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False, query
     if lower in ("id", "ids"):
         return from_path(path, parameter_name=parameter)
 
-    # Capital-sensitive — plurals first so array-shaped FK fields (`siteIds`) resolve
-    # before the singular check would otherwise apply.
+    # Case-sensitive, plurals first so array fields like `siteIds` resolve before the singular suffixes
     capital_suffixes = ("Ids", "Uuids", "Guids", "Id", "Uuid", "Guid", "Arn", "Address")
     for suffix in capital_suffixes:
         if parameter.endswith(suffix):
             prefix = parameter[: -len(suffix)]
             if len(prefix) >= 2:
-                # Generic prefixes like "itemId" should use path context,
-                # but only if this is a path parameter (placeholder exists in path)
+                # A generic prefix (`itemId`) on a path parameter takes the resource from the path
                 if prefix.lower() in GENERIC_PREFIXES and f"{{{parameter}}}" in path:
                     return from_path(path, parameter_name=parameter)
                 return to_pascal_case(prefix)
@@ -133,8 +120,7 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False, query
     if query and parameter.endswith("Name") and len(parameter) >= 6:
         return to_pascal_case(parameter[:-4])
 
-    # Snake_case (case-insensitive is fine here)
-    # Composite suffixes first (longer patterns match before shorter ones)
+    # Case-insensitive, composite suffixes before shorter ones
     snake_suffixes = (
         "_id_or_slug",
         "-id-or-slug",
@@ -164,21 +150,18 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False, query
         if lower.endswith(suffix):
             prefix = parameter[: -len(suffix)]
             if len(prefix) >= 2:
-                # Generic prefixes like "item_id" should use path context,
-                # but only if this is a path parameter (placeholder exists in path)
+                # A generic prefix (`item_id`) on a path parameter takes the resource from the path
                 if prefix.lower() in GENERIC_PREFIXES and f"{{{parameter}}}" in path:
                     return from_path(path, parameter_name=parameter)
                 return to_pascal_case(prefix)
 
-    # Special cases that need exact match
-    # Twilio-style, capital S
+    # Case-sensitive `Sid` suffix
     if parameter.endswith("Sid"):
         prefix = parameter[:-3]
         if len(prefix) >= 2:
             return to_pascal_case(prefix)
 
-    # Bare identifier-shaped parameter - use path context if it's a path parameter.
-    # Strip API version prefixes first so `/v1/{name}` doesn't infer a fictitious `V1`.
+    # Bare identifiers like `{name}` take the resource from the path, minus version prefixes (`/v1/{name}` is no `V1`)
     BARE_IDENTIFIER_NAMES = (
         "identifier",
         "uuid",
@@ -198,12 +181,7 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False, query
     if lower in BARE_IDENTIFIER_NAMES and f"{{{parameter}}}" in path:
         return from_path(strip_version_prefix(path), parameter_name=parameter)
 
-    # Concatenated identifier suffix without separator (e.g., `username`, `userid`).
-    # Single-token parameters can't be split unambiguously by name alone, so require
-    # the path to confirm: the prefix must match the path-derived resource name.
-    # Longest suffix wins to avoid `userid` matching as `useri`+`d`.
-    # For body fields the prefix-match against the path-derived resource is the
-    # safety check, so the `{parameter}` template requirement is dropped.
+    # `userid` splits only when its prefix names the path's resource; body fields need no `{parameter}` in the path
     if body_field or f"{{{parameter}}}" in path:
         prefix_lower = _concatenated_prefix(parameter, path, body_field=body_field)
         if prefix_lower is not None:
@@ -211,9 +189,7 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False, query
             if path_resource is not None and path_resource.lower() == prefix_lower:
                 return path_resource
 
-    # Path parameter named after its parent collection (`/sessions/{session}` -> Session).
-    # Common route-model-binding convention; bind only when the name equals the singularized
-    # owning segment so unrelated params (`/users/{session}`) stay unmatched.
+    # `/sessions/{session}` -> `Session` when the name equals the singular owning segment, unlike `/users/{session}`
     if f"{{{parameter}}}" in path:
         path_resource = from_path(strip_version_prefix(path), parameter_name=parameter)
         if path_resource is not None and normalize_for_matching(path_resource) == normalize_for_matching(parameter):
@@ -224,8 +200,7 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False, query
 
 def _concatenated_prefix(parameter: str, path: str, *, body_field: bool) -> str | None:
     lower = parameter.lower()
-    # `/entry/{entrypk}` keys an entry. A body field like `serverpk` often holds a public key, and a parent
-    # `{orderpk}` in `/orders/{orderpk}/items` would take the resource of the items under it.
+    # `pk` only for a trailing path parameter (`/entry/{entrypk}`); a body `serverpk` often holds a public key
     primary_key = ("pk",) if trailing_path_parameter(path) == parameter and not body_field else ()
     for suffix in ("uuid", "guid", "slug", "name", "id", *primary_key):
         if lower.endswith(suffix) and len(lower) > len(suffix):
@@ -241,25 +216,21 @@ def is_concatenated_primary_key(parameter: str) -> bool:
 
 @lru_cache(maxsize=512)
 def from_path(path: str, parameter_name: str | None = None) -> str | None:
-    """Detect resource name from OpenAPI path."""
+    """Resource owning `{parameter_name}`, else the singular last static segment (`/users/me` -> `User`)."""
     segments = _resource_segments(path)
 
     if not segments:
-        # API Root
         return None
 
-    # If parameter name provided, find the resource it refers to
     if parameter_name:
         owner = _owning_segment_resource(segments, parameter_name)
         if owner is not None:
             return owner
 
-    # Fallback to last non-parameter segment
     non_param_segments = [s for s in segments if "{" not in s]
     if non_param_segments:
         last_segment = non_param_segments[-1]
-        # Handle special suffixes that refer to "current instance" of parent resource
-        # e.g., /groups/self -> Group, /users/me -> User, /accounts/current -> Account
+        # `self`, `me` and `current` name an instance of the parent collection
         if last_segment.lower() in ("self", "me", "current") and len(non_param_segments) > 1:
             last_segment = non_param_segments[-2]
         singular = to_singular(last_segment)
@@ -337,8 +308,7 @@ CollectionShape: TypeAlias = tuple[str, ...]
 def qualified_collections(paths: frozenset[str]) -> frozenset[CollectionShape]:
     """Collections behind a static segment that key their items unlike the plain collection of the same name.
 
-    `/sites/{id}/managed/devices/{deviceId}` lists other things than `/devices/{serial}` does, while
-    `/stock/devices/{serial}` lists the same devices.
+    `/sites/{id}/managed/devices/{deviceId}` differs from `/devices/{serial}`; `/stock/devices/{serial}` does not.
     """
     placeholders = _collection_placeholders(paths)
     # `/urls/{list_type}` without `/urls` selects a list rather than naming an item
@@ -637,14 +607,11 @@ UNCOUNTABLE = frozenset(
 
 @lru_cache(maxsize=2048)
 def _is_word_like(s: str) -> bool:
-    """Check if string looks like a word (not a path, technical term, etc)."""
-    # Skip empty or very short
+    """Two or more characters, each a letter, `_` or `-`."""
     if not s or len(s) < 2:
         return False
-    # Skip if contains non-word characters (except underscore and hyphen)
     if not all(c.isalpha() or c in ("_", "-") for c in s):
         return False
-    # Skip if has numbers
     return not any(c.isdigit() for c in s)
 
 
@@ -656,7 +623,6 @@ def to_singular(word: str) -> str:
         return word
     known_lower = IRREGULAR_TO_SINGULAR.get(word.lower())
     if known_lower is not None:
-        # Preserve case: if input was capitalized, capitalize result
         if word[0].isupper():
             return known_lower.capitalize()
         return known_lower
@@ -668,10 +634,8 @@ def to_singular(word: str) -> str:
         return word[:-2]
     if word.endswith(("xes", "zes", "ches", "shes")):
         return word[:-2]
-    # Handle "ses" ending: check if it was "se" + "s" or "s" + "es"
+    # `gases` -> `gas`; `-se` nouns like `case` come from the irregular table
     if word.endswith("ses") and len(word) > 3:
-        # "gases" has 's' at position -3, formed from "gas" + "es"
-        # "statuses" has 's' at position -3, formed from "status" + "es"
         return word[:-2]
     if word.endswith("s"):
         return word[:-1]
@@ -692,16 +656,13 @@ def to_plural(word: str) -> str:
         if word[0].isupper():
             return known_lower.capitalize()
         return known_lower
-    # Only change y -> ies after consonants (party -> parties, not day -> days)
+    # party -> parties, day -> days
     if word.endswith("y") and len(word) > 1 and word[-2] not in "aeiou":
         return word[:-1] + "ies"
-    # class -> classes
     if word.endswith("ss"):
         return word + "es"
-    # words that normally take -es: box -> boxes
     if word.endswith(("s", "x", "z", "ch", "sh")):
         return word + "es"
-    # just add 's' (car -> cars)
     return word + "s"
 
 
@@ -738,7 +699,6 @@ PAGINATION_FIELDS = frozenset(
 def find_matching_field(
     *, parameter: str, resource: str, fields: list[str], types: Mapping[str, set[str]] | None = None
 ) -> str | None:
-    """Find which resource field matches the parameter name."""
     if not fields:
         return None
     if parameter in fields:
@@ -843,8 +803,7 @@ def _match_identifier_synonym(
 def _match_resource_hint(
     fields: list[str], parameter: str, prefix: str, suffix: str, resource_normalized: str
 ) -> str | None:
-    # `file_name` -> `BackupFile.name`, `group_slug` -> `GroupSummary.slug`: the part before the last underscore
-    # hints at the resource, the rest is the field name.
+    # `file_name` -> `BackupFile.name`: the part before the last underscore hints at the resource
     last_underscore = parameter.rfind("_")
     if last_underscore <= 0:
         return None
@@ -871,38 +830,19 @@ _FIELD_MATCHING_STRATEGIES = (
 
 @lru_cache(maxsize=4096)
 def normalize_for_matching(text: str) -> str:
-    """Normalize text for case-insensitive, separator-insensitive matching.
-
-    Examples:
-        "channelId" -> "channelid"
-        "channel_id" -> "channelid"
-        "ChannelId" -> "channelid"
-        "Channel" -> "channel"
-
-    """
+    """Lowercase without `_` and `-`: `channel_id` -> `channelid`."""
     return text.lower().replace("_", "").replace("-", "")
 
 
 @lru_cache(maxsize=2048)
 def _split_parameter_name(parameter_name: str) -> tuple[str, str]:
-    """Split parameter into (prefix, suffix) components.
-
-    Examples:
-        "channelId" -> ("channel", "Id")
-        "userId" -> ("user", "Id")
-        "containerGroupName" -> ("containerGroup", "Name")
-        "user_id" -> ("user", "_id")
-        "id" -> ("", "id")
-        "channel_id" -> ("channel", "_id")
-        "league_id_or_slug" -> ("league", "_id_or_slug")
-
-    """
-    # Capital-suffix camelCase variants - longest first so `Uuid` doesn't get caught by `Id`
+    """Split into (prefix, suffix): `channelId` -> (`channel`, `Id`); no known suffix gives ("", parameter_name)."""
+    # camelCase suffixes, longest first
     for cap_suffix in ("Uuid", "Guid", "Name", "Slug", "Id"):
         if parameter_name.endswith(cap_suffix) and len(parameter_name) > len(cap_suffix):
             return parameter_name[: -len(cap_suffix)], cap_suffix
 
-    # Composite suffixes first (longer patterns before shorter ones)
+    # Composite suffixes before shorter ones
     if parameter_name.endswith("_id_or_slug") and len(parameter_name) > 11:
         return parameter_name[:-11], "_id_or_slug"
 
@@ -928,17 +868,15 @@ def _split_parameter_name(parameter_name: str) -> tuple[str, str]:
 
 
 def strip_affixes(name: str, prefixes: list[str], suffixes: list[str]) -> str:
-    """Remove common prefixes and suffixes from a name (case-insensitive)."""
+    """Remove one of `prefixes` and one of `suffixes`, matched against the lowercased name."""
     result = name.strip()
     name_lower = result.lower()
 
-    # Remove one matching prefix
     for prefix in prefixes:
         if name_lower.startswith(prefix):
             result = result[len(prefix) :]
             break
 
-    # Remove one matching suffix
     for suffix in suffixes:
         if name_lower.endswith(suffix):
             result = result[: -len(suffix)]
@@ -948,8 +886,7 @@ def strip_affixes(name: str, prefixes: list[str], suffixes: list[str]) -> str:
 
 
 _HYPHENATED_SCHEMA_SUFFIXES = ("-Output", "-Input", "-Response", "-Request")
-# NOTE: "Response"/"Request" excluded - often wrappers, not variants
-# NOTE: "Summary" excluded - ambiguous (may have different identifier)
+# No `Response`/`Request` (often wrappers) or `Summary` (may use another identifier)
 _PASCALCASE_SCHEMA_SUFFIXES = ("Output", "Input", "Out", "In", "DTO", "Dto")
 _MIN_BASE_LENGTH = 2
 
@@ -979,8 +916,7 @@ def normalize_schema_name(name: str) -> str:
 def collect_candidate_resource_names(raw_schema: dict) -> frozenset[str]:
     """Resource names backed by a path segment or component schema in this spec.
 
-    Used to gate synthetic-resource creation from body-field FK suffixes — without
-    backing, a `<word>_name` is more likely an attribute (`first_name`) than an FK.
+    Body-field FK suffixes create a resource only with this backing, as `first_name` is more likely an attribute.
     """
     names: set[str] = set()
 

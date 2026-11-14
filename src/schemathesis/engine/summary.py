@@ -69,7 +69,7 @@ class WarningData:
     dictionary_mismatch: set[str] = field(default_factory=set)
     # Acceptance counts for every operation and phase, keyed by label then phase, for reporting.
     valid_rates: dict[str, dict[str, ValidRate]] = field(default_factory=dict)
-    # Operations the stateful phase actually sent a request for.
+    # Operations the stateful phase sent a request for.
     stateful_exercised: set[str] = field(default_factory=set)
     # Operations some other operation links to; `None` until an operation warns.
     linked_operations: set[str] | None = None
@@ -82,8 +82,7 @@ class WarningData:
     def low_valid_rate_reported(self) -> set[str]:
         """Operations reported for a low rate, minus those a stronger warning already explains.
 
-        An operation can be rejected outright in one phase and accepted occasionally in another;
-        reporting both says the same thing twice, and the stricter warning says more about why.
+        An operation rejected outright in one phase may be accepted at times in another; the stricter warning says more.
         """
         return self.low_valid_rate - self.missing_test_data - self.validation_mismatch
 
@@ -118,7 +117,6 @@ class WarningData:
 
     @property
     def kind_count(self) -> int:
-        """Count distinct warning kinds currently recorded."""
         return sum(1 for labels in self.as_labels().values() if labels)
 
 
@@ -326,7 +324,7 @@ def reduce_baseline(
     today = date.today()
     observed = set(statistic.known_failures.values())
     known_ids = sorted(observed)
-    # Pruned entries are gone from the file, so reporting them as unobserved would describe a state that no longer exists.
+    # Pruned entries are gone from the file, so they do not count as unobserved.
     seen = observed.union(pruned or ())
     unobserved = [entry.id for entry in statistic.baseline.entries if entry.id not in seen]
     return BaselineSummary(

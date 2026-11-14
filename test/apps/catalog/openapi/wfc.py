@@ -27,7 +27,7 @@ def _valid_credentials() -> bool:
 
 
 def wfc_login() -> OpenAPIApp:
-    # Rich body covers every token-extraction branch: string, coerced number, null, and non-string.
+    # The body covers every token-extraction branch: string, coerced number, null, and non-string.
     spec = build_schema(_PROTECTED)
     app = make_flask_app_from_schema(spec)
     _register_protected(app)
@@ -202,8 +202,7 @@ def wfc_role_gated(deny_status: int = 403) -> OpenAPIApp:
 
     @app.route("/api/validated", methods=["POST"])
     def validated() -> object:
-        # Every other payload is rejected before the role is looked at, so the denials an escalation
-        # needs arrive interleaved with rejections whatever the generator happens to draw.
+        # Every other payload is rejected before the role check, so denials interleave with rejections for any draw.
         posted.append(1)
         if len(posted) % 2:
             return jsonify({"detail": "rejected"}), 409
@@ -219,8 +218,7 @@ def wfc_role_gated(deny_status: int = 403) -> OpenAPIApp:
 
 def wfc_expiring_token() -> OpenAPIApp:
     """Login issues a token that dies after `TOKEN_USES` requests; re-login mints a fresh one."""
-    # Schema examples give the operation a fixed number of requests, so the token expires regardless
-    # of how many cases the generator happens to draw on a given platform.
+    # Schema examples fix the request count, so the token expires however many cases a platform draws.
     spec = build_schema(
         {
             "/api/protected": {

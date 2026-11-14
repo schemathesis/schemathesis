@@ -133,11 +133,7 @@ def _drop_malformed_media_types(
 
 
 def _named_after_placeholder(parameters: list[OperationParameter], path: str) -> list[OperationParameter]:
-    """Give a path parameter whose name is not text the placeholder it stands for.
-
-    A document converted from YAML 1.1 spells a parameter named `on` as the boolean `true`, and the
-    path template is the only place the original name survives.
-    """
+    """Name a non-text path parameter after its placeholder, e.g. `on`, which YAML 1.1 reads as `true`."""
     unnamed = [
         parameter
         for parameter in parameters
@@ -187,8 +183,7 @@ class OperationLoader:
         self._built_at = schema.raw_schema_version.value
         # Re-entrant: hooks run during a build may look up other operations.
         self._lock = threading.RLock()
-        # Filter hot path mutates the shared operation's identity fields instead of allocating a fresh one per call.
-        # `method` is a placeholder that gets overwritten on every `_should_skip` call.
+        # The filter hot path reuses this operation and overwrites its identity fields, `method` included, per check.
         filter_operation: APIOperation = APIOperation(
             method=cast("HttpMethodSchema", ""),
             path="",
@@ -203,9 +198,7 @@ class OperationLoader:
     def iter_all(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Yield every operation as `Ok` or `Err`.
 
-        Three `Err` shapes are possible: missing required `paths` (neither path nor method known),
-        unresolved path-level reference (path known, methods unknown) and per-operation parsing failure
-        (path and method known).
+        An `Err` knows no path for a missing `paths`, no method for a bad Path Item, both for an operation failure.
         """
         __tracebackhide__ = True
         schema = self.schema
@@ -292,8 +285,7 @@ class OperationLoader:
         if paths is None:
             return statistic
 
-        # Hoist the filter check out of the per-operation loop: when no filters are
-        # configured, every operation is selected and we skip the per-call dispatch.
+        # Without filters every operation is selected, so the loop skips the per-operation check.
         filters_active = not schema.filter_set.is_empty()
         should_skip = self._should_skip
         usage = FilterUsage(schema.filter_set) if filters_active else None
@@ -315,7 +307,7 @@ class OperationLoader:
                     complete_walk = False
                     continue
                 for method, definition in iter_path_item_operations(path_item):
-                    # A malformed node is still an operation the document declares; it just cannot be parsed.
+                    # A malformed node is still an operation the document declares, one that fails to parse.
                     if not is_parsable_operation(definition):
                         complete_walk = False
                         statistic.operations.total += 1
@@ -373,8 +365,7 @@ class OperationLoader:
             if is_link_selected(resolver, link):
                 statistic.transitions.selected += 1
 
-        # Hook/schema errors raised by `analyze` re-fire during engine iteration where
-        # they're handled; defer to that path so the loader doesn't crash.
+        # Hook and schema errors here fire again during engine iteration, which handles them.
         try:
             descriptors = schema.analysis.resource_descriptors
             graph = schema.analysis.dependency_graph
@@ -470,8 +461,7 @@ class OperationLoader:
         )
 
     def _parse_security(self, definition: OperationObject) -> OpenApiSecurityParameters:
-        # Security schemes live at the schema root; refs in `securitySchemes` resolve relative
-        # to the root document, not to whichever path-scoped resolver the operation was loaded with.
+        # References in `securitySchemes` resolve against the root document, not the operation's resolver.
         schema = self.schema
         return OpenApiSecurityParameters.from_definition(
             schema=schema.raw_schema,
@@ -562,8 +552,7 @@ class OperationLoader:
                 schema.adapter.build_path_parameter({"name": name, INJECTED_PATH_PARAMETER_KEY: True})
             )
         config = schema.config.generation_for(operation=operation)
-        # An empty `{}` requirement documents unauthenticated access as a valid alternative. A synthesized
-        # credential can only ever be rejected, so such requests are sent without one.
+        # An empty `{}` requirement allows anonymous access, and a synthesized credential could only be rejected.
         if config.with_security_parameters and not has_optional_auth(schema.raw_schema, definition):
             for param in operation.security.iter_parameters():
                 if operation.get_parameter(name=param.name, location=param.location) is not None:

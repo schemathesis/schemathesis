@@ -1,8 +1,3 @@
-"""Unit testing by Schemathesis Engine.
-
-This module provides high-level flow for single-, and multi-threaded modes.
-"""
-
 from __future__ import annotations
 
 import uuid
@@ -89,12 +84,7 @@ def _scheduler_for_layers(
 
 
 def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> events.EventGenerator:
-    """Run a set of unit tests.
-
-    Implemented as a producer-consumer pattern via a task queue.
-    The main thread provides an iterator over API operations and worker threads create test functions and run them.
-    """
-    # Create scheduler based on ordering configuration
+    """Run one unit-test phase; worker threads pull operations from the scheduler and test them."""
     try:
         scheduler, total_entries = _create_scheduler(engine, phase, only=only)
     except HookExecutionError as exc:
@@ -134,7 +124,7 @@ def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None 
     yield from report_outage(engine, phase.name, progress)
     yield from _report_unreached(engine, scheduler, phase.name, suite_started.id)
     status = progress.final_status(phase)
-    # NOTE: Right now there is just one suite, hence two events go one after another
+    # A unit phase has one suite, so the two events go back to back
     yield events.SuiteFinished(id=suite_started.id, phase=phase.name, status=status)
     yield events.PhaseFinished(phase=phase, status=status, payload=None)
 
@@ -213,7 +203,6 @@ def worker_task(
             while not ctx.has_to_stop:
                 result = scheduler.next_operation()
                 if result is None:
-                    # All operations exhausted
                     break
 
                 if isinstance(result, Ok):
@@ -343,10 +332,8 @@ def _run_hypothesis_test(
             exc = InvalidRegexPattern.from_jsonschema_rs_error(exc)
         _finish_with_error(events_queue, exc, scenario_started)
         return
-    # The test is blocking, meaning that even if CTRL-C comes to the main thread, this tasks will
-    # continue executing. However, as we set a stop event, it will be checked before the next
-    # network request. However, this is still suboptimal, as there could be slow requests and they
-    # will block for longer
+    # The test blocks: after CTRL-C it runs until the next network request checks the stop event,
+    # so slow requests delay the stop.
     _put_all(
         events_queue,
         run_test(

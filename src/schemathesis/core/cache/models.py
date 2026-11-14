@@ -15,7 +15,7 @@ class Kind(StrEnum):
 
 @dataclass(slots=True)
 class Request:
-    """Components needed to reconstruct an `operation.Case(...)` for replay."""
+    """Request parts that rebuild a `Case` for replay."""
 
     method: str
     path_parameters: dict[str, Any] = field(default_factory=dict)
@@ -23,7 +23,7 @@ class Request:
     headers: dict[str, str] = field(default_factory=dict)
     cookies: dict[str, Any] = field(default_factory=dict)
     body: Any = None
-    # Media type the body was sent with; absent in files written before it was persisted.
+    # Media type the body was sent with; `None` when the file lacks it.
     media_type: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -56,12 +56,9 @@ class Entry:
     kind: Kind
     operation: str
     request: Request
-    # Observation fingerprints this entry's request covers. Empty for AUTH_REQUIRED /
-    # METHOD_NOT_ALLOWED (at most one entry per operation); populated for ERROR_FEEDBACK
-    # where one request can elicit multiple observations.
+    # Observation fingerprints the request covers; empty for kinds with one entry per operation (auth, 405).
     observation_keys: list[str] = field(default_factory=list)
-    # Run-counter snapshot when this entry was last replayed; 0 means never. Replay picks
-    # the lowest values first, rotating tail entries to the front on the next run.
+    # Run id of the last replay, 0 for never; replay picks the lowest first, so entries rotate across runs.
     last_replayed_run: int = 0
 
     def to_dict(self) -> dict[str, Any]:
@@ -76,7 +73,7 @@ class Entry:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Entry:
-        """Raises `ValueError` on unknown `kind`; callers may catch to skip forward-compat entries."""
+        """Raise `ValueError` on an unknown `kind`, so readers can skip entries from newer versions."""
         kind = Kind(data["kind"])
         return cls(
             id=data["id"],
@@ -95,7 +92,7 @@ class Manifest:
     schema_location: str
     base_url: str
     created_at: str
-    # Monotonic counter; bumped each time `cache.run()` rewrites the file.
+    # Incremented each time a run rewrites the file.
     next_run_id: int = 1
     # Operation label -> WFC auth entry name that got past authorization last run.
     auth_identities: dict[str, str] = field(default_factory=dict)
@@ -113,7 +110,7 @@ class Manifest:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Manifest:
-        """Raises `ValueError` if `format_version` is missing or unsupported."""
+        """Raise `ValueError` on an unsupported `format_version`."""
         format_version = data["format_version"]
         if not isinstance(format_version, int) or format_version != FORMAT_VERSION:
             raise ValueError(f"Unsupported format_version: {format_version!r}")

@@ -52,10 +52,8 @@ def test_auth_is_not_checked(ctx, with_generated):
     kwargs = {}
     if not with_generated:
         kwargs["with_security_parameters"] = False
-    # When auth is present
-    # And endpoint declares auth as a requirement but doesn't actually require it
+    # The endpoint declares auth but does not check it
     event = run(api.schema_url, **kwargs)
-    # Then it is a failure
     recorder = event.recorder
     case = list(recorder.cases.values())[-1].value
     check = recorder.checks[case.id][-1]
@@ -73,18 +71,13 @@ def test_auth_is_not_checked(ctx, with_generated):
 
 def test_auth_is_checked(ctx):
     api = ctx.openapi.apps.basic()
-    # When auth is present (generated)
-    # And endpoint declares auth as a requirement and checks it
     event = run(api.schema_url, headers={"Authorization": "Basic dGVzdDp0ZXN0"})
-    # Then there is no failure
     assert event.status == Status.SUCCESS
 
 
 def test_no_failure(ctx):
     api = ctx.openapi.apps.success()
-    # When there is no auth
     event = run(api.schema_url)
-    # Then there is no failure
     assert event.status == Status.SUCCESS
 
 
@@ -336,11 +329,11 @@ def test_remove_auth_from_case(ctx, key, parameters):
 @pytest.mark.parametrize(
     ("cookie_header", "param_name", "expected_cookie_header"),
     [
-        # Single cookie that is the security param — Cookie header removed entirely.
+        # A lone security cookie removes the Cookie header
         ("session=abc", "session", None),
-        # Multiple cookies — only the security param is stripped; others remain.
+        # Other cookies stay; only the security one is stripped
         ("session=abc; other=xyz", "session", "other=xyz"),
-        # Unparsable header — dropped wholesale so the retried request carries no auth cookie.
+        # An unparsable header is dropped, so the retry carries no auth cookie
         ("session=a; $=b", "session", None),
     ],
     ids=["only-param", "mixed", "unparsable"],
@@ -820,7 +813,7 @@ def test_explicit_auth_tuple_in_call_and_validate():
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
     case = schema["/"]["GET"].Case()
     client = ASGIClient(app)
-    # Valid auth passed as tuple - should NOT raise IgnoredAuth
+    # Valid auth as a tuple must not raise `IgnoredAuth`
     case.call_and_validate(session=client, auth=("test", "test"), checks=[ignored_auth])
 
 

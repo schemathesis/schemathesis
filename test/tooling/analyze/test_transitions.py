@@ -34,7 +34,7 @@ def _stateful_case(case_id, *, parent_id=None, transition=None, applied=False, s
             "POST /pets -> [201] GetPet -> GET /pets/{id}",
             ("POST /pets", "GET /pets/{id}", "GetPet", "201"),
         ),
-        # Unparsable shape (e.g. GraphQL, malformed) returns empty pieces rather than raising.
+        # Unparsable shapes (e.g. GraphQL, malformed) yield empty pieces instead of raising.
         ("opaque-id-without-arrows", ("", "", "", "")),
     ],
     ids=["openapi-200", "openapi-201", "unparsable"],
@@ -53,7 +53,7 @@ def test_walk_depth_chain():
 
 
 def test_walk_depth_handles_orphan_parent():
-    # parent_id points outside the scenario — treat as root.
+    # A parent outside the scenario counts as a root.
     parents = {"a": "missing"}
     assert _walk_depth("a", parents, {}) == 0
 
@@ -71,8 +71,7 @@ def test_accumulate_transitions_counts_per_id_with_status_split(tmp_path):
     }
     cases = {}
     interactions = {}
-    # 3 root cases (no transition), then 5 hits on LinkA (3x 2xx, 1x 4xx, 1x 5xx) and 2 hits
-    # on LinkB (both 2xx). Mixed `applied` flag on LinkA.
+    # 3 root cases, then LinkA: 3x 2xx, 1x 4xx, 1x 5xx with mixed `applied` flags; LinkB: 2x 2xx.
     for cid in ("p1", "p2", "p3"):
         c, i = _stateful_case(cid, status=200)
         cases.update(c)
