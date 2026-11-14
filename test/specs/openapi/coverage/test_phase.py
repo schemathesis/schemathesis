@@ -605,6 +605,36 @@ def test_negative_json_sequence_bodies_read_as_invalid_streams(ctx):
     assert [stream for stream in streams if validator.is_valid(stream)] == []
 
 
+RECORD = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        ({"application/jsonl": {"itemSchema": RECORD}}, []),
+        ({"application/json-seq": {"itemSchema": RECORD}}, []),
+        ({"application/jsonl": {"itemSchema": RECORD, "schema": {"minItems": 1}}}, ["Missing request body"]),
+        (
+            {"application/json": {"schema": RECORD}, "application/jsonl": {"itemSchema": RECORD}},
+            ["Missing request body"],
+        ),
+        ({"application/jsonl": {"itemSchema": {"enum": [b"\x00", 1]}}}, ["Missing request body"]),
+    ],
+    ids=["jsonl", "json-seq", "min-items", "with-json", "yaml-binary-schema"],
+)
+def test_missing_json_sequence_body_is_the_empty_stream(ctx, content, expected):
+    # An empty sequence serializes to no content, so a missing body is a valid request when the schema admits it.
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {"requestBody": {"required": True, "content": content}, "responses": {"200": {"description": "OK"}}},
+        version="3.2.0",
+    )
+    assert [
+        case.meta.phase.data.description
+        for case in scenario_cases(iter_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.MISSING_PARAMETER)
+    ] == expected
+
+
 @pytest.mark.parametrize("media_type", ["application/x-www-form-urlencoded", "multipart/form-data"])
 def test_required_form_body_positive_cases_are_never_empty(ctx, media_type):
     # An empty form serializes to no content, which a required body forbids.

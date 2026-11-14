@@ -1405,8 +1405,19 @@ def _missing_required(run: CoverageRun) -> Generator[Case, None, None]:
             )
             if case is not None:
                 yield case
-    if template.has_required_body:
+    if template.has_required_body and not all(_admits_empty_sequence(body) for body in operation.body):
         yield from _missing_body(run)
+
+
+def _admits_empty_sequence(body: OpenApiBody) -> bool:
+    """Whether a JSON sequence body admits no records, which travel as no content, the same as no body at all."""
+    if not media_types.is_json_sequence(body.media_type):
+        return False
+    try:
+        return body.is_valid([])
+    except ValueError:
+        # A schema no validator loads, e.g. one holding YAML `!!binary` values, leaves validity unknown.
+        return False
 
 
 def _missing_body(run: CoverageRun) -> Generator[Case, None, None]:
