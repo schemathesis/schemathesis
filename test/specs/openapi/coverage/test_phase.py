@@ -466,6 +466,21 @@ def test_optional_parameter_combinations_per_location(ctx):
     ]
 
 
+@pytest.mark.parametrize("location", ["query", "header", "cookie"])
+def test_optional_parameter_without_a_positive_value_stays_out_of_positive_cases(ctx, location):
+    parameters = [
+        {"in": location, "name": "key", "schema": {"type": "integer", "minimum": 5, "maximum": 1}},
+        {"in": "query", "name": "page", "schema": {"type": "boolean"}},
+    ]
+    operation = load_schema(ctx, parameters, body={"type": "boolean"})["/foo"]["post"]
+    container = LOCATION_TO_CONTAINER[location]
+    assert {
+        case.meta.generation.mode
+        for case in iter_cases(operation, GenerationMode.POSITIVE, GenerationMode.NEGATIVE)
+        if "key" in (getattr(case, container) or {})
+    } == {GenerationMode.NEGATIVE}
+
+
 def test_optional_parameter_without_a_positive_value_keeps_later_parameters(ctx):
     # No header can carry a "-", so the header has no positive value and is left out.
     parameters = [
