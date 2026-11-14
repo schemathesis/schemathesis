@@ -9,9 +9,10 @@ from typing import TYPE_CHECKING
 from schemathesis.cli.commands.run.handlers.base import BackgroundWriterHandler
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.core.cache.io import effective_directory
+from schemathesis.core.fs import file_exists
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import RecordedScenario
-from schemathesis.reporting.crashes import CrashWriter, build_crashes_from_recorder
+from schemathesis.reporting.crashes import CrashWriter, build_crashes_from_recorder, schema_crash_directory
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
@@ -51,12 +52,16 @@ class CrashHandler(BackgroundWriterHandler["_Process"]):
 
     def _start_worker(self, project_title: str | None) -> None:
         assert self.worker is None
-        directory = effective_directory(self.cache_directory, project_title) / "crashes"
+        # An absolute path keeps one schema file apart from same-named files elsewhere and replays from any directory.
+        location = self.schema_location
+        if file_exists(location):
+            location = str(Path(location).resolve())
+        crashes_directory = effective_directory(self.cache_directory, project_title) / "crashes"
         self._start_writer(
             "SchemathesisCrashWriter",
             _run,
-            directory=directory,
-            schema_location=self.schema_location,
+            directory=schema_crash_directory(crashes_directory, location),
+            schema_location=location,
             base_url=self.base_url,
             tls_verify=self.tls_verify,
             sanitization=self.sanitization,
