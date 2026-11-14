@@ -6,10 +6,11 @@ from fractions import Fraction
 
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, Phase, assume, given, settings
+from hypothesis import HealthCheck, Phase, assume, find, given, settings
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, NoSuchExample, Unsatisfiable
 from hypothesis.internal.observability import with_observability_callback
+from hypothesis.statistics import collector
 from jsonschema_rs import canonical
 
 from schemathesis.config import GenerationConfig
@@ -1528,6 +1529,107 @@ def test_canonical_recursion_is_drawn_at_any_depth(node):
 
     # Inlining a pointer bounds how deep a value can go; naming it does not.
     find_first(built, lambda value: depth(value) >= 3, max_examples=2000)
+
+
+DEEP_RECURSIVE_SHAPES = [
+    {
+        "type": "object",
+        "properties": {
+            "left": {"$ref": "#/$defs/node"},
+            "middle": {"$ref": "#/$defs/node"},
+            "right": {"$ref": "#/$defs/node"},
+            "name": {"type": "string"},
+        },
+    },
+    {
+        "type": "object",
+        "properties": {"all": {"$ref": "#/$defs/list"}, "any": {"$ref": "#/$defs/list"}, "expr": {"type": "string"}},
+        "additionalProperties": False,
+        "allOf": [{"oneOf": [{"required": ["all"]}, {"required": ["any"]}, {"required": ["expr"]}]}],
+    },
+    {"anyOf": [{"type": "integer"}, {"type": "array", "items": {"$ref": "#/$defs/node"}, "minItems": 1}]},
+    # Every name is needed to reach the floor, the one leading back included.
+    {
+        "type": "object",
+        "propertyNames": {"enum": ["other", "name"]},
+        "properties": {"other": {"$ref": "#/$defs/other"}, "name": {"type": "string"}},
+        "minProperties": 2,
+    },
+]
+
+
+@pytest.mark.parametrize(
+    "node",
+    [*RECURSIVE_SHAPES, *DEEP_RECURSIVE_SHAPES],
+    ids=[str(shape) for shape in [*RECURSIVE_SHAPES, *DEEP_RECURSIVE_SHAPES]],
+)
+def test_canonical_recursion_never_abandons_draws_at_max_depth(node):
+    # Abandoned draws count against the filter health check and end a run with few examples.
+    schema = {
+        "$ref": "#/$defs/node",
+        "$defs": {
+            "node": node,
+            "other": {"type": "object", "properties": {"back": {"$ref": "#/$defs/node"}}},
+            "list": {
+                "type": "object",
+                "required": ["of"],
+                "properties": {"of": {"type": "array", "items": {"$ref": "#/$defs/node"}, "minItems": 1}},
+            },
+        },
+    }
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    statistics = []
+
+    # One draw in a hundred can run past the depth limit.
+    @given(built)
+    @settings(max_examples=100, database=None, derandomize=True, phases=[Phase.generate], deadline=None)
+    def test(value):
+        pass
+
+    with collector.with_value(statistics.append):
+        test()
+
+    events = {
+        event for stats in statistics for case in stats["generate-phase"]["test-cases"] for event in case["events"]
+    }
+    assert "gave up because: max depth exceeded" not in events
+
+
+def test_canonical_recursion_shrinks_to_the_smallest_value():
+    leaf = {
+        "type": "object",
+        "required": ["lit"],
+        "properties": {"lit": {"type": "integer"}},
+        "additionalProperties": False,
+    }
+    operation = {
+        "type": "object",
+        "required": ["op", "l", "r"],
+        "properties": {"op": {"enum": ["+", "*"]}, "l": {"$ref": "#/$defs/e"}, "r": {"$ref": "#/$defs/e"}},
+        "additionalProperties": False,
+    }
+    schema = {"$ref": "#/$defs/e", "$defs": {"e": {"oneOf": [leaf, operation]}}}
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+
+    def depth(value):
+        if isinstance(value, dict):
+            return 1 + max((depth(item) for item in value.values()), default=0)
+        return 0
+
+    # A cap only: the search stops at the first value deep enough, then shrinks it.
+    found = find(
+        built, lambda value: depth(value) >= 5, settings=settings(max_examples=2000, database=None, derandomize=True)
+    )
+
+    assert found == {
+        "l": {"lit": 0},
+        "op": "*",
+        "r": {
+            "l": {"lit": 0},
+            "op": "*",
+            "r": {"l": {"lit": 0}, "op": "*", "r": {"l": {"lit": 0}, "op": "*", "r": {"lit": 0}}},
+        },
+    }
 
 
 def test_canonical_negated_recursive_additional_properties():
