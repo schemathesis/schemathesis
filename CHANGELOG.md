@@ -2,6 +2,34 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.33.4...HEAD) - TBD
 
+### :rocket: Added
+
+- Testing Open API 3.2 `additionalOperations` with custom methods like `COPY` or `PURGE`.
+- Open API 3.2 request body examples given as `serializedValue`.
+- Request bodies for `application/jsonl`, `x-ndjson` and `json-seq`, sent as one JSON record per line.
+- Array bodies for `multipart/mixed` and other non-form multipart types sent as ordered parts.
+- XML request bodies place children of `nodeType: none` objects directly in the parent element.
+- Error feedback learns integer, hex and ObjectId formats from Java and MongoDB parse errors.
+
+### :bug: Fixed
+
+#### Schema loading
+
+- Path parameter names containing `.`, `:`, `!` or `[` failing to load.
+- Open API 3.2 references to the `$self` URI, or relative to it, failing to resolve.
+
+#### Reporting
+
+- Crash in HAR reports when the base URL contains credentials.
+- Lost or misattributed pytest report entries for stateful tests and calls to other operations.
+- `HookExecutionError` in pytest reports when tests validate responses from their own HTTP client.
+- `ModuleNotFoundError` for `allure_commons` in pytest reports when `allure-pytest` is not installed.
+- `<BINARY>` shown for text responses cut mid-character by `max-recorded-payload-size`.
+
+#### `st replay`
+
+- Crash files deleted or replayed against the wrong schema after a run against another API.
+
 ## [4.33.4](https://github.com/schemathesis/schemathesis/compare/v4.33.3...v4.33.4) - 2026-11-12
 
 ### :bug: Fixed
