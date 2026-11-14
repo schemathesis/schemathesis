@@ -19,9 +19,7 @@ def analyze(ctx: EngineContext, phase: Phase) -> Generator[EngineEvent, None, bo
     try:
         warnings = ctx.schema.iter_schema_warnings()
     except HookExecutionError as exc:
-        yield events.NonFatalError(
-            error=exc, phase=phase.name, label=f"`{exc.hook_name}` hook", related_to_operation=False
-        )
+        yield events.hook_error(phase.name, exc)
         return True
     # Runs for any loaded app and any `@schemathesis.python.constants` source; records failures for the
     # latter so a registered source that silently produced nothing is surfaced as a warning.

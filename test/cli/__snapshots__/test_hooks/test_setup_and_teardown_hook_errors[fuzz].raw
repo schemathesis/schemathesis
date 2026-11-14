@@ -1,0 +1,61 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ 🚫  Fuzzing (in 0.00s)
+
+     ✅ N scenarios  🚫 N errors
+
+==================================== ERRORS ====================================
+_________________________________ `setup` hook _________________________________
+Hook Error
+
+Error in `setup` hook: ValueError: setup failed
+
+    Traceback (most recent call last):
+      File "/package-root/hooks.py", line XXX, in _dispatch_to_all
+        hook(context, *args)
+      File "/tmp/module.py", line XXX, in setup
+        raise ValueError("setup failed")
+    ValueError: setup failed
+_______________________________ `teardown` hook ________________________________
+Hook Error
+
+Error in `teardown` hook: ValueError: teardown failed
+
+    Traceback (most recent call last):
+      File "/package-root/hooks.py", line XXX, in dispatch_teardown
+        hook(context, schema)
+      File "/tmp/module.py", line XXX, in teardown
+        raise ValueError("teardown failed")
+    ValueError: teardown failed
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: N
+
+Stop reason: Completed
+
+Errors:
+  🚫 Hook Error: 2
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+============================== 2 errors in 1.00s ===============================

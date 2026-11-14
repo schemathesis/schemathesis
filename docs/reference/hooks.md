@@ -16,6 +16,32 @@ Hooks that execute during schema loading and operation initialization.
 
     All schema-level hooks return `None` and modify their arguments in-place.
 
+## Run-Lifecycle Hooks
+
+Hooks that run once per `st run` or `st fuzz` invocation.
+
+| Hook | Signature | Execution Stage | Purpose |
+|------|-----------|-----------------|---------|
+| **setup** | `(ctx, schema: BaseSchema) -> None` | After API probes, sign-up and dictionary loading, before the first test case | Seed test data, start services |
+| **teardown** | `(ctx, schema: BaseSchema) -> None` | After testing ends, including failed or interrupted runs | Remove test data, stop services |
+
+```python
+import requests
+import schemathesis
+
+
+@schemathesis.hook
+def setup(ctx, schema):
+    requests.post(f"{schema.get_base_url()}/test-data/seed")
+
+
+@schemathesis.hook
+def teardown(ctx, schema):
+    requests.post(f"{schema.get_base_url()}/test-data/reset")
+```
+
+An error in a `setup` hook is reported, fails the run, and testing still proceeds. Every `teardown` hook runs even when another one fails. The pytest plugin does not call these hooks.
+
 ## Data Generation Hooks
 
 Control how test data is generated for each request component.
@@ -68,7 +94,7 @@ Use it for failures that depend on the response rather than on which operation w
 |-------|-------------------|-----------------|
 | **Global** | `@schemathesis.hook` or `@schemathesis.hook("hook_name")` | All hooks |
 | **Schema** | `@schema.hooks.hook` or `@schema.hooks.hook("hook_name")` | All hooks except `before_load_schema`, `after_load_schema`, `before_call` |
-| **Test** | `@schema.hooks.apply(hook_func)` | All hooks except `before_load_schema`, `after_load_schema`, `before_call`, `after_call`, `after_network_error` |
+| **Test** | `@schema.hooks.apply(hook_func)` | All hooks except `before_load_schema`, `after_load_schema`, `before_call`, `after_call`, `after_network_error`, `setup`, `teardown` |
 
 **Hook Name Detection:** If not specified, uses function name (must match hook name exactly).
 
@@ -99,7 +125,7 @@ Apply hooks selectively using filters.
 | `operation_id_regex` | `str` | `"(get|list)_user"` | operationId pattern match |
 
 !!! note
-    Filters are not available for `before_process_path`, `before_load_schema`, and `after_load_schema` hooks.
+    Filters are not available for `before_process_path`, `before_load_schema`, `after_load_schema`, `setup`, and `teardown` hooks.
 
 ## Phase Compatibility
 
@@ -134,4 +160,4 @@ Schema-level hooks (`before_load_schema`, `after_load_schema`, `before_process_p
 
 ## Execution Order
 
-When multiple hooks of the same type are registered, they execute in registration order. For `filter_*` hooks, the value is discarded as soon as any hook returns `False` - subsequent hooks for that event are not called. For `map_*` hooks, each hook receives the output of the previous. For `flatmap_*` hooks, each hook receives the output of the previous, as with `map_*` hooks. Schema-level hooks run before test-level hooks of the same type.
+When multiple hooks of the same type are registered, they execute in registration order, except `teardown` hooks, which run last-registered first. For `filter_*` hooks, the value is discarded as soon as any hook returns `False` - subsequent hooks for that event are not called. For `map_*` hooks, each hook receives the output of the previous. For `flatmap_*` hooks, each hook receives the output of the previous, as with `map_*` hooks. Schema-level hooks run before test-level hooks of the same type.

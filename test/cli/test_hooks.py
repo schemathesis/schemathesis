@@ -1,9 +1,12 @@
+import _thread
 import re
+import time
 from collections import Counter
+from itertools import groupby
 
 import pytest
 from _pytest.main import ExitCode
-from flask import jsonify
+from flask import jsonify, request
 
 from test.apps.catalog.openapi import basic, users
 
@@ -409,3 +412,112 @@ def {hook}:
 """
     )
     assert cli.main(command, api.schema_url, hooks=module) == snapshot_cli
+
+
+LIFECYCLE_HOOKS = """
+import requests
+
+@schemathesis.hook
+def setup(context, schema):
+    requests.post(f"{schema.get_base_url()}/lifecycle", data="setup")
+
+@schemathesis.hook
+def teardown(context, schema):
+    requests.post(f"{schema.get_base_url()}/lifecycle", data="teardown")
+"""
+
+
+def _lifecycle_app(ctx, calls, *, interrupt=False):
+    app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/items")
+    def items():
+        if interrupt:
+            _thread.interrupt_main()
+        calls.append("test")
+        return jsonify([])
+
+    @app.route("/lifecycle", methods=["POST"])
+    def lifecycle():
+        calls.append(request.get_data(as_text=True))
+        return ""
+
+    return app
+
+
+@pytest.mark.parametrize("args", [("run", "--max-examples=1"), ("fuzz", "--max-time=1")], ids=["run", "fuzz"])
+def test_setup_and_teardown_hooks_wrap_testing(ctx, cli, app_runner, args):
+    calls = []
+    url = app_runner.openapi_url(_lifecycle_app(ctx, calls))
+    cli.main(args[0], url, args[1], hooks=ctx.write_pymodule(LIFECYCLE_HOOKS))
+    assert [call for call, _ in groupby(calls)] == ["setup", "test", "teardown"]
+
+
+def test_teardown_hook_runs_after_interrupt(ctx, cli, app_runner):
+    calls = []
+    url = app_runner.openapi_url(_lifecycle_app(ctx, calls, interrupt=True))
+    result = cli.main("run", url, "--max-examples=1", hooks=ctx.write_pymodule(LIFECYCLE_HOOKS))
+    assert (result.exit_code, [call for call, _ in groupby(calls)]) == (130, ["setup", "test", "teardown"])
+
+
+@pytest.mark.parametrize("args", [("run", "--max-examples=1"), ("fuzz", "--max-time=1")], ids=["run", "fuzz"])
+def test_setup_and_teardown_hook_errors(ctx, cli, snapshot_cli, args):
+    api = ctx.openapi.apps.success()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def setup(context, schema):
+    raise ValueError("setup failed")
+
+@schemathesis.hook
+def teardown(context, schema):
+    raise ValueError("teardown failed")
+"""
+    )
+    assert cli.main(args[0], api.schema_url, args[1], hooks=module) == snapshot_cli
+
+
+def test_setup_hook_skipped_when_probing_spends_time_budget(ctx, cli, app_runner):
+    calls = []
+    app = _lifecycle_app(ctx, calls)
+
+    @app.route("/")
+    def root():
+        time.sleep(1)
+        return ""
+
+    cli.main("run", app_runner.openapi_url(app), "--max-time=1", hooks=ctx.write_pymodule(LIFECYCLE_HOOKS))
+    assert calls == ["teardown"]
+
+
+def test_teardown_hook_interrupt(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def teardown(context, schema):
+    raise KeyboardInterrupt
+"""
+    )
+    assert cli.main("run", api.schema_url, "--max-examples=1", hooks=module) == snapshot_cli
+
+
+def test_teardown_hooks_run_last_registered_first_past_failures(ctx, cli, app_runner):
+    calls = []
+    url = app_runner.openapi_url(_lifecycle_app(ctx, calls))
+    module = ctx.write_pymodule(
+        """
+import requests
+
+@schemathesis.hook("teardown")
+def first(context, schema):
+    requests.post(f"{schema.get_base_url()}/lifecycle", data="first")
+
+@schemathesis.hook("teardown")
+def second(context, schema):
+    requests.post(f"{schema.get_base_url()}/lifecycle", data="second")
+    raise ValueError("second failed")
+"""
+    )
+    result = cli.main("run", url, "--max-examples=1", hooks=module)
+    assert (result.exit_code, calls[-2:]) == (ExitCode.TESTS_FAILED, ["second", "first"])

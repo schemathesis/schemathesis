@@ -14,6 +14,7 @@ from schemathesis.engine.context import EngineContext
 from schemathesis.engine.events import EventGenerator, StatefulPhasePayload
 from schemathesis.engine.observations import Observations
 from schemathesis.engine.run import ELASTIC_PHASES, TESTING_PHASES, Phase, PhaseName, PhaseSkipReason
+from schemathesis.hooks import defines_teardown
 
 if TYPE_CHECKING:
     from schemathesis.core.spec import ApiSchema
@@ -320,6 +321,10 @@ class ExecutionPlan:
             phase.name is PhaseName.CONTINUOUS_FUZZING for phase in self.phases
         )
         failures = run_after_run_checks(ctx) if completed else []
+        if defines_teardown(ctx.schema):
+            teardown = Phase(PhaseName.TEARDOWN)
+            yield events.PhaseStarted(phase=teardown, payload=None)
+            yield from run.execute(ctx, teardown)
         yield events.EngineFinished(
             running_time=ctx.running_time,
             stop_reason=ctx.stop_reason,
