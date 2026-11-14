@@ -197,7 +197,8 @@ def serialize_xml_with_schema(value: Any, schema: JsonSchema, resource_name: str
     if isinstance(value, ((Binary, str))) and definition.get("format") in ("binary", "file"):
         # Opaque payloads are already the wire representation and carry no XML structure to wrap.
         return {"data": value.data if isinstance(value, Binary) else value}
-    tag = _get_xml_tag(definition, resource_name)
+    # A payload schema without a reference has no name to infer
+    tag = resource_name if resource_name is not None else DEFAULT_TAG_NAME
     buffer = StringIO()
     # Collect all namespaces to ensure that all child nodes with prefixes have proper namespaces in their parent nodes
     namespace_stack: list[str] = []
@@ -226,17 +227,6 @@ def _resolve_xml_schema(resolver: Resolver, schema: dict[str, Any]) -> tuple[Res
     return resolver, {**schema, "xml": {**schema.get("xml", {}), **xml}}
 
 
-def _get_xml_tag(schema: dict[str, Any] | None, resource_name: str | None) -> str:
-    # On the top level we need to detect the proper XML tag, in other cases it is known from object properties
-    if (schema or {}).get("xml", {}).get("name"):
-        return (schema or {})["xml"]["name"]
-    if resource_name is not None:
-        return resource_name
-
-    # Here we don't have any name for the payload schema - no reference or the `xml` property
-    return DEFAULT_TAG_NAME
-
-
 def _write_xml(
     buffer: StringIO,
     value: JsonValue,
@@ -245,10 +235,13 @@ def _write_xml(
     namespace_stack: list[str],
     resolver: Resolver,
 ) -> None:
+    # `tag` is the inferred name; an array's `xml.name` names only its wrapping element, so arrays apply it themselves
+    if isinstance(value, list):
+        _write_array(buffer, value, tag, schema, namespace_stack, resolver)
+        return
+    tag = (schema or {}).get("xml", {}).get("name", tag)
     if isinstance(value, dict):
         _write_object(buffer, value, tag, schema, namespace_stack, resolver)
-    elif isinstance(value, list):
-        _write_array(buffer, value, tag, schema, namespace_stack, resolver)
     else:
         _write_primitive(buffer, value, tag, schema, namespace_stack)
 
@@ -317,18 +310,17 @@ def _write_object(
                 attributes[attr_name] = f'{attr_name}="{_escape_xml(value)}"'
             continue
 
-        elements.append((child_tag, value, property_schema, child_options, child_resolver))
+        elements.append((child_name, value, property_schema, child_options, child_resolver))
 
-    for child_tag, value, property_schema, child_options, child_resolver in elements:
+    for child_name, value, property_schema, child_options, child_resolver in elements:
         node_type = child_options.get("nodeType")
         # Text and CDATA nodes carry a scalar as this element's content, with no tag of their own
         if node_type in ("text", "cdata") and not isinstance(value, (dict, list)):
             children_buffer.write(_escape_xml(value) if node_type == "text" else _cdata_section(value))
             continue
         push_namespace_if_any(stack, child_options)
-        child_tag = _sanitize_xml_name(child_tag)
         _validate_prefix(child_options, stack)
-        _write_xml(children_buffer, value, child_tag, property_schema, stack, child_resolver)
+        _write_xml(children_buffer, value, child_name, property_schema, stack, child_resolver)
         pop_namespace_if_any(stack, child_options)
 
     # Write namespace declarations for attributes and `nodeType: none` objects
@@ -379,11 +371,14 @@ def _write_array(
 ) -> None:
     options = (schema or {}).get("xml", {})
     push_namespace_if_any(stack, options)
+    wrapped = options.get("wrapped", False) or options.get("nodeType") == "element"
+    # Items of an unwrapped array keep the inferred name, as the array has no element for its own `xml.name`
+    if wrapped:
+        tag = options.get("name", tag)
     tag = _sanitize_xml_name(tag)
     child_tag = tag
     if options.get("prefix"):
         tag = f"{options['prefix']}:{tag}"
-    wrapped = options.get("wrapped", False) or options.get("nodeType") == "element"
     is_namespace_specified = False
     if wrapped:
         buffer.write(f"<{tag}")
@@ -402,7 +397,6 @@ def _write_array(
     # The array's namespace and prefix apply to its items only here, not to other arrays sharing the items schema.
     items = dict(items)
     child_options = dict(items.get("xml", {}))
-    child_tag = child_options.get("name", child_tag)
     # Items with their own namespace declare it on every element they write.
     items_bind_prefix = "namespace" in child_options
     if not is_namespace_specified and "namespace" in options:
