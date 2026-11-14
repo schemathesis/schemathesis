@@ -262,7 +262,7 @@ class Template:
         return TemplateValue(kwargs=kwargs, raw=raw, components=components)
 
     def with_parameter(self, *, location: ParameterLocation, name: str, value: GeneratedValue) -> TemplateValue:
-        container = self._template[location.container_name]
+        container = self._template.get(location.container_name, {})
         return self.with_location(
             location=location,
             value={**container, name: value.value},
@@ -961,8 +961,15 @@ def _seed_parameters(run: CoverageRun) -> None:
                 continue
             template.add_parameter(location, name, fallback)
             continue
-        # Positive values precede negative ones, so a negative seed means the required parameter has no
-        # positive value; the positive case built from this template would be invalid.
+        # Positive values precede negative ones, so a negative seed means the parameter has no positive value.
+        without_positive = (
+            value.generation_mode == GenerationMode.NEGATIVE and GenerationMode.POSITIVE in generation_modes
+        )
+        if without_positive and not parameter.is_required and location != ParameterLocation.PATH:
+            # Left out, so positive cases built from this template stay valid.
+            generators[(location, name)] = _replay(value, gen)
+            continue
+        # The positive case built from this template would be invalid.
         if parameter.is_required and value.generation_mode == GenerationMode.NEGATIVE:
             template.unsatisfiable_required_parameter = True
         template.add_parameter(location, name, value)
