@@ -1186,22 +1186,26 @@ def test_wsgi_multipart_binary_property_arrives_as_a_file(ctx):
     )
 
 
-def test_wsgi_multipart_mixed_body_arrives_intact(ctx):
-    operation = _multipart_upload_echo(ctx, {"note": {"type": "string"}}, "multipart/mixed")
-    received = operation.Case(body={"note": "hello"}, media_type="multipart/mixed").call().json()
-    boundary = received["content_type"].partition("boundary=")[2].strip('"')
-    assert received["raw"] == (
-        f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="note"\r\n\r\nhello\r\n--{boundary}--\r\n'
+@pytest.mark.parametrize("media_type", ["multipart/mixed", "multipart/related"], ids=["mixed", "related"])
+def test_wsgi_non_form_multipart_body_arrives_intact(ctx, media_type):
+    operation = _multipart_upload_echo(ctx, {"note": {"type": "string"}}, media_type)
+    received = operation.Case(body={"note": "hello"}, media_type=media_type).call().json()
+    sent_media_type, _, boundary = received["content_type"].partition("; boundary=")
+    boundary = boundary.strip('"')
+    assert (sent_media_type, received["raw"]) == (
+        media_type,
+        f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="note"\r\n\r\nhello\r\n--{boundary}--\r\n',
     )
 
 
-def test_requests_multipart_mixed_body_arrives_intact(ctx, app_runner):
-    app = _multipart_upload_app(ctx, {"note": {"type": "string"}}, "multipart/mixed")
+@pytest.mark.parametrize("media_type", ["multipart/mixed", "multipart/related"], ids=["mixed", "related"])
+def test_requests_non_form_multipart_body_arrives_intact(ctx, app_runner, media_type):
+    app = _multipart_upload_app(ctx, {"note": {"type": "string"}}, media_type)
     operation = schemathesis.openapi.from_url(app_runner.openapi_url(app))["/upload"]["POST"]
-    received = operation.Case(body={"note": "hello"}, media_type="multipart/mixed").call().json()
-    media_type, _, boundary = received["content_type"].partition("; boundary=")
-    assert (media_type, received["raw"]) == (
-        "multipart/mixed",
+    received = operation.Case(body={"note": "hello"}, media_type=media_type).call().json()
+    sent_media_type, _, boundary = received["content_type"].partition("; boundary=")
+    assert (sent_media_type, received["raw"]) == (
+        media_type,
         f'--{boundary}\r\nContent-Disposition: form-data; name="note"\r\n\r\nhello\r\n--{boundary}--\r\n',
     )
 

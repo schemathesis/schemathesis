@@ -707,12 +707,12 @@ def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, An
                 "data": f"--{boundary}--\r\n".encode("latin-1"),
                 "headers": {"Content-Type": content_type},
             }
-        if sub == "mixed":
+        if sub not in ("form-data", "*"):
             # `requests` labels every encoded body `multipart/form-data`; keep the declared subtype instead.
             prepared = requests.PreparedRequest()
             prepared.prepare_headers(None)
             prepared.prepare_body(data, files)
-            content_type = prepared.headers["Content-Type"].replace("multipart/form-data", "multipart/mixed", 1)
+            content_type = prepared.headers["Content-Type"].replace("multipart/form-data", f"{main}/{sub}", 1)
             return {"data": prepared.body, "headers": {"Content-Type": content_type}}
         return {"files": files, "data": data}
     raw_data, content_type = encode_non_object_multipart(ctx, value)

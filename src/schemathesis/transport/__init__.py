@@ -129,11 +129,16 @@ class BaseTransport(Generic[S]):
                 elif media_types.matches_parts((main, sub), (target_main, target_sub)):
                     matched = True
                     yield registered_media_type, serializer
-            if not matched and not is_range and media_types.is_sent_as_text_parts((main, sub)):
-                # Any other textual subtype goes on the wire as text, under the media type the schema declares
-                plain_text = self._serializers.get("text/plain")
-                if plain_text is not None:
-                    yield media_type, plain_text
+            if not matched and not is_range:
+                fallback = None
+                if media_types.is_sent_as_text_parts((main, sub)):
+                    # Any other textual subtype goes on the wire as text, under the media type the schema declares
+                    fallback = self._serializers.get("text/plain")
+                elif main == "multipart":
+                    # Any other multipart subtype follows the syntax of `multipart/mixed`, under the declared media type
+                    fallback = self._serializers.get("multipart/mixed")
+                if fallback is not None:
+                    yield media_type, fallback
 
     def _resolve_serializer(self, input_media_type: str) -> tuple[str, Serializer]:
         """Find the concrete media type to send and the serializer that encodes the body for it."""
