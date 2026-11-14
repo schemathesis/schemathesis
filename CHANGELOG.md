@@ -14,6 +14,7 @@
 ### :wrench: Changed
 
 - `st fuzz` probes API capabilities and runs sign-up before fuzzing, like `st run`.
+- One `setup` phase replaces `probing`, `schema_analysis` and `auth_bootstrap` in NDJSON reports.
 
 ### :bug: Fixed
 
