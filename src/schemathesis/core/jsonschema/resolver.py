@@ -12,7 +12,12 @@ from urllib.request import urlopen
 import jsonschema_rs
 
 from schemathesis.core.deserialization import deserialize_yaml
-from schemathesis.core.errors import RefResolutionError, RemoteDocumentError, unresolvable_reference
+from schemathesis.core.errors import (
+    RefResolutionError,
+    RemoteDocumentError,
+    get_request_error_message,
+    unresolvable_reference,
+)
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
@@ -186,7 +191,10 @@ def load_remote_uri(uri: str) -> Any:
 def _load_remote_uri(uri: str) -> Any:
     import requests
 
-    response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT)
+    try:
+        response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT)
+    except requests.RequestException as exc:
+        raise RemoteDocumentError(f"Failed to fetch {uri} ({get_request_error_message(exc)})") from exc
     content_type = response.headers.get("Content-Type", "")
     body = response.content or b""
 
@@ -194,16 +202,17 @@ def _load_remote_uri(uri: str) -> Any:
         return f"(HTTP {response.status_code}, Content-Type={content_type}, size={len(body)})"
 
     if not (200 <= response.status_code < 300):
-        raise RemoteDocumentError(f"Failed to fetch {_suffix()}")
+        raise RemoteDocumentError(f"Failed to fetch {uri} {_suffix()}")
 
     if _looks_like_html(content_type, body):
-        raise RemoteDocumentError(f"Expected YAML/JSON, got HTML {_suffix()}")
+        raise RemoteDocumentError(f"Expected YAML/JSON, got HTML from {uri} {_suffix()}")
 
     document = deserialize_yaml(response.content)
 
     if not isinstance(document, (dict, list)):
         raise RemoteDocumentError(
-            f"Remote document is parsed as {type(document).__name__}, but an object/array is expected {_suffix()}"
+            f"Remote document at {uri} is parsed as {type(document).__name__}, but an object/array is expected "
+            f"{_suffix()}"
         )
 
     return document

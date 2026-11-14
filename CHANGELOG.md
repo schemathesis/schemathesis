@@ -21,6 +21,7 @@
 #### Schema loading
 
 - Path parameter names containing `.`, `:`, `!` or `[` failing to load.
+- Unresolvable remote references written as relative paths reported as missing files.
 - Open API 3.2 references to the `$self` URI, or relative to it, failing to resolve.
 
 #### Reporting
