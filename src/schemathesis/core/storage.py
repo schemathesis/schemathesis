@@ -26,7 +26,7 @@ def project_directory(root: Path, project_title: str | None) -> Path:
 
 
 def retry_while_locked(operation: Callable[[], None]) -> None:
-    # A refusal outliving the budget is not ours to hide - the caller decides whether losing the file is acceptable.
+    # A refusal past the budget propagates; the caller decides whether losing the file is acceptable.
     deadline = time.monotonic() + LOCK_RETRY_TIMEOUT
     while True:
         try:

@@ -97,8 +97,7 @@ if TYPE_CHECKING:
 
 # Probability of generating valid headers in negative mode
 VALID_HEADER_PROBABILITY = 0.95
-# Strategies that take no varying input are deterministic and reusable; allocating
-# them once at import avoids ~300–600ns of fresh `LazyStrategy` construction per call.
+# Strategies without varying input are deterministic, so they are built once at import.
 _NONE_STRATEGY: st.SearchStrategy = st.none()
 _JUST_NOT_SET: st.SearchStrategy = st.just(NOT_SET)
 _LOCATION_NAME_TO_ENUM: dict[str, ParameterLocation] = {
@@ -112,8 +111,7 @@ _LOCATION_NAME_TO_ENUM: dict[str, ParameterLocation] = {
 
 def _draw(draw: st.DrawFn, strategy: st.SearchStrategy, operation: APIOperation) -> Any:
     if strategy is EMPTY_STRATEGY:
-        # Drawing from an empty strategy only rejects the input, which reads as "nothing to generate here"
-        # in phases that recover from rejection - stateful testing would report success without testing this.
+        # An empty strategy only rejects, and stateful testing would then report success without testing this.
         raise build_unsatisfiable_schema_error(operation)
     try:
         return draw(strategy)
@@ -143,17 +141,9 @@ def openapi_cases(
     phase: TestPhase = TestPhase.FUZZING,
     feedback: FeedbackSources = NO_FEEDBACK,
 ) -> Any:
-    """A strategy that creates `Case` instances.
+    """Strategy for `Case` instances that keeps explicit `path_parameters`, `headers`, `cookies`, `query` and `body`.
 
-    Explicit `path_parameters`, `headers`, `cookies`, `query`, `body` arguments will be used in the resulting `Case`
-    object.
-
-    If such explicit parameters are composite (not `body`) and don't provide the whole set of parameters for that
-    location, then we generate what is missing and merge these two parts. Note that if parameters are optional, then
-    they may remain absent.
-
-    The primary purpose of this behavior is to prevent sending incomplete explicit examples by generating missing parts
-    as it works with `body`.
+    A partial explicit container gets its missing parameters generated; optional ones may stay absent.
     """
     started_at = Instant()
 
@@ -290,8 +280,7 @@ def _mode_for(
 
 
 def _ensure_explicit_body_is_serializable(operation: APIOperation, body: Any, media_type: str | None) -> None:
-    # This explicit body payload comes for a media type that has a custom strategy registered
-    # Such strategies only support binary payloads, otherwise they can't be serialized
+    # Custom media type strategies produce only bytes, so a non-bytes explicit body cannot be serialized
     if not isinstance(body, bytes) and media_type and find_media_type_strategy(media_type) is not None:
         all_media_types = operation.schema.get_request_payload_content_types(operation)
         raise SerializationNotPossible.from_media_types(*all_media_types)
@@ -324,14 +313,12 @@ def _generate_body(
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
     if media_types.is_form_urlencoded(media_type):
-        # The hybrid strategy wraps in `GeneratedValue` when it picks a captured pool
-        # variant, so both positive and negative paths must unwrap before
-        # transforming/filtering and rewrap to keep `pool_draws` flowing.
+        # The hybrid strategy wraps captured pool variants in `GeneratedValue`; rewrapping keeps their `pool_draws`.
         strategy = strategy.map(
             wrap_map_hook_for_generated_value(_prepare_urlencoded_form, prune_constants=False)
         ).filter(wrap_filter_hook_for_generated_value(_is_valid_urlencoded_form))
     generated = _draw(draw, strategy, operation)
-    # Negative strategy returns GeneratedValue, positive returns just value
+    # Negative strategies return `GeneratedValue`, positive ones a plain value
     if not isinstance(generated, GeneratedValue):
         generated = GeneratedValue(generated, None)
     body = generated.value
@@ -356,11 +343,9 @@ def _body_candidates(
     items: list[OpenApiBody], generation_mode: GenerationMode
 ) -> tuple[list[OpenApiBody], GenerationMode]:
     if generation_mode.is_negative:
-        # Consider only schemas that are possible to negate
         candidates = [item for item in items if item.is_negatable]
         if candidates:
             return candidates, generation_mode
-        # Not possible to negate body, fallback to positive data generation
         return items, GenerationMode.POSITIVE
     return items, generation_mode
 
@@ -381,7 +366,7 @@ def _draw_body_media_type(draw: st.DrawFn, operation: APIOperation, parameter: O
             operation.schema.transport.get_first_matching_media_type(media_type) is None
             for media_type in all_media_types
         ):
-            # None of media types defined for this operation are not supported
+            # No media type of this operation is supported
             raise SerializationNotPossible.from_media_types(*all_media_types) from None
         # Other media types are possible - avoid choosing this media type in the future
         event_text = f"Can't serialize data to `{parameter.media_type}`."
@@ -409,8 +394,7 @@ def _describe_generation(
     generation_mode: GenerationMode, phase: TestPhase, containers: tuple[ValueContainer, ...]
 ) -> tuple[GenerationMode, PhaseData]:
     """The mode the drawn case ended up in, and what made it negative."""
-    # A schema-invalid dictionary draw carries negative content even when no mutator
-    # produced surviving metadata (the overlay strips mutations for overwritten parameters).
+    # An invalid dictionary draw is negative even when the overlay stripped its parameter's mutation metadata.
     first_invalid_dictionary_draw: DictionaryDraw | None = next(
         (draw for container in containers for draw in container.dictionary_draws if not draw.matches_schema),
         None,
@@ -520,15 +504,14 @@ class FormBodyWithContentTypes:
     """Form body data with selected content types for properties."""
 
     body: dict[str, Any]
-    content_types: dict[str, str]  # property_name -> selected content type
+    content_types: dict[str, str]  # selected content type per property name
 
 
 def _body_required_per_feedback(operation: APIOperation, error_feedback: ErrorFeedbackStore | None) -> bool:
     """Return True when the server reported the body itself as missing for this operation."""
     if error_feedback is None:
         return False
-    # Any body-location `must not be blank` — body-level or field-level — implies the body
-    # itself is required, since omitting it would have produced a different error.
+    # Any body `must not be blank`, even a field one, means the body is required: omitting it gives another error.
     for observation in error_feedback.observations(operation_label=operation.label, location=ParameterLocation.BODY):
         if observation.kind == ObservationKind.MUST_NOT_BE_BLANK:
             return True
@@ -589,11 +572,9 @@ def _build_form_strategy_with_encoding(
     generation_mode: GenerationMode,
     constants_value_source: ConstantsPool | None = None,
 ) -> st.SearchStrategy | None:
-    """Build a strategy for form bodies that have custom encoding contentType.
+    """Strategy for form bodies whose encoding sets a `contentType`, wildcards like `image/*` included.
 
-    Supports wildcard media type matching (e.g., "image/*" matches "image/png").
-
-    Returns `None` if no custom encoding with registered strategies or comma-separated content types is found.
+    `None` without a registered strategy or a comma-separated list of content types.
     """
     schema = resolve_bundled_root(as_object_schema(parameter.optimized_schema))
     # A schema composing its properties through `allOf` may leave `type` to its branches.
@@ -604,9 +585,9 @@ def _build_form_strategy_with_encoding(
     if not properties:
         return None
 
-    # Maps property_name to strategy returning (content_type, data strategy) tuple
+    # Property name to a strategy of (content type, data strategy) pairs
     property_with_content_type_strategies: dict[str, st.SearchStrategy] = {}
-    # Maps property_name to list of content types (for comma-separated without custom strategy)
+    # Property name to its comma-separated content types that have no custom strategy
     property_content_type_selections: dict[str, list[str]] = {}
 
     for property_name in properties:
@@ -617,15 +598,13 @@ def _build_form_strategy_with_encoding(
             strategies_for_types = []
             for ct in content_types:
                 for media_type, strategy in iter_matching_media_type_strategies(ct):
-                    # Pair strategy with its content type so we know which was selected
+                    # Keep each strategy with its content type to know which one was drawn
                     strategies_for_types.append((media_type, strategy))
 
             if strategies_for_types:
-                # Store strategy that returns (content_type, data strategy) tuple
                 property_with_content_type_strategies[property_name] = st.sampled_from(strategies_for_types)
             elif len(content_types) > 1:
-                # No custom strategy found, but multiple content types specified
-                # Store them for random selection
+                # No custom strategy: pick one of the content types at random
                 property_content_type_selections[property_name] = content_types
 
     if not property_with_content_type_strategies and not property_content_type_selections:
@@ -710,7 +689,6 @@ def _get_body_strategy(
     feedback: FeedbackSources = NO_FEEDBACK,
     mix_examples: bool = True,
 ) -> st.SearchStrategy:
-    # Check for custom encoding in form bodies (multipart/form-data or application/x-www-form-urlencoded)
     if parameter.media_type in FORM_MEDIA_TYPES:
         custom_strategy = _build_form_strategy_with_encoding(
             parameter,
@@ -722,12 +700,9 @@ def _get_body_strategy(
         if custom_strategy is not None:
             return custom_strategy
 
-    # Check for custom media type strategy
     custom_strategy = find_media_type_strategy(media_type)
     if custom_strategy is not None:
-        # Always use custom strategies for raw bodies - they produce transmittable bytes.
-        # In negative mode, bypassing them would generate non-bytes values (e.g., integers)
-        # that can't be sent over HTTP for raw binary media types like application/x-tar.
+        # Negative values like integers cannot be sent as raw binary bodies such as `application/x-tar`.
         return custom_strategy
 
     strategy = _get_body_value_strategy(
@@ -749,7 +724,6 @@ def _get_body_value_strategy(
     file_sample = next(parameter.iter_file_samples(media_type), None)
     if file_sample is not None and generation_mode.is_positive:
         return st.just(Binary(file_sample[1]))
-    # Use the cached strategy from the parameter
     return parameter.get_strategy(
         operation,
         generation_config,
@@ -772,11 +746,7 @@ def get_parameters_value(
     mix_examples: bool = True,
     exclude: frozenset[str] = frozenset(),
 ) -> GeneratedValue:
-    """Get the final value for the specified location.
-
-    If the value is not set, then generate it from the relevant strategy. Otherwise, check what is missing in it and
-    generate those parts.
-    """
+    """Generate the value for `location`, or only the parts an explicit `value` misses."""
     if value is None:
         strategy = get_parameters_strategy(
             operation,
@@ -789,7 +759,7 @@ def get_parameters_value(
         )
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         result = _draw(draw, strategy, operation)
-        # Negative strategy returns GeneratedValue, positive returns just value
+        # Negative strategies return `GeneratedValue`, positive ones a plain value
         if isinstance(result, GeneratedValue):
             return result
         return GeneratedValue(value=result, meta=None)
@@ -841,7 +811,7 @@ def get_parameters_value(
 
 @dataclass(slots=True)
 class ValueContainer:
-    """Container for a value generated by a data generator or explicitly provided."""
+    """A generated or explicitly provided value."""
 
     value: Any
     location: str
@@ -854,7 +824,6 @@ class ValueContainer:
 
     @property
     def is_generated(self) -> bool:
-        """If value was generated."""
         return self.generator is not None and (self.location == "body" or self.value is not None)
 
     @property
@@ -888,13 +857,11 @@ def _pin_content_type_header(
 
 
 def any_negated_values(values: list[ValueContainer]) -> bool:
-    """Check if any generated values are negated."""
     return any(value.generator == GenerationMode.NEGATIVE for value in values if value.is_generated)
 
 
-# Percent-encoded backslash, control chars (0x00-0x1F), and DEL — what strict URL decoders
-# (Tomcat, common WAFs) reject before routing. After `quote_all`, every occurrence in the
-# encoded string represents a raw unsafe byte, so the replacement is safe regardless of source.
+# Percent-encoded backslash, control characters and DEL, which strict URL decoders reject before routing.
+# After `quote_all`, every match stands for a raw unsafe byte.
 _UNSAFE_PATH_PERCENT = re.compile(r"%(?:5[Cc]|[01][0-9A-Fa-f]|7[Ff])")
 
 
@@ -918,16 +885,12 @@ def generate_parameter(
     mix_examples: bool = True,
     exclude: frozenset[str] = frozenset(),
 ) -> ValueContainer:
-    """Generate a value for a parameter.
-
-    Fallback to positive data generator if parameter can not be negated.
-    """
+    """Generate a parameter value, in positive mode when the location cannot be negated."""
     if generator.is_negative and (
         (location == ParameterLocation.PATH and not can_negate_path_parameters(operation))
         or (location.is_in_header and not can_negate_headers(operation, location))
     ):
-        # If we can't negate any parameter, generate positive ones
-        # If nothing else will be negated, then skip the test completely
+        # Nothing here can be negated
         generator = GenerationMode.POSITIVE
     generated = get_parameters_value(
         explicit,
@@ -949,8 +912,7 @@ def generate_parameter(
             value = _strip_path_decoder_unsafe(value)
 
     used_generator: GenerationMode | None = generator
-    # When we pass `explicit`, then its parts are excluded from generation of the final value
-    # If the final value is the same, then other parameters were not generated, unless a mutation removed them
+    # Generation skips explicit parts, so an unchanged value means nothing was generated, unless a mutation ran
     if value == explicit and generated.meta is None:
         used_generator = None
     return ValueContainer(
@@ -1005,13 +967,10 @@ def _draw_negated_locations(
 
 
 def can_negate_path_parameters(operation: APIOperation) -> bool:
-    """Check if any path parameter can be negated."""
-    # No path parameters to negate
     parameters = cast(OpenApiParameterSet, operation.path_parameters).schema["properties"]
     if not parameters:
         return True
-    # A path value always serializes to a string, so a type change is invisible on the wire and the
-    # constraint keywords the mutator will accept are the whole negatable surface.
+    # Path values are sent as strings, so type changes vanish and only constraint keywords can be negated.
     return any(
         has_negatable_target(
             parameter,
@@ -1023,9 +982,7 @@ def can_negate_path_parameters(operation: APIOperation) -> bool:
 
 
 def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> bool:
-    """Check if any header can be negated."""
     container = cast(OpenApiParameterSet, operation.get_parameter_set(location))
-    # No headers to negate
     headers = container.schema["properties"]
     if not headers:
         return True
@@ -1066,7 +1023,6 @@ def get_parameters_strategy(
     feedback: FeedbackSources = NO_FEEDBACK,
     mix_examples: bool = True,
 ) -> st.SearchStrategy:
-    """Create a new strategy for the case's component from the API operation parameters."""
     container = cast(OpenApiParameterSet, operation.get_parameter_set(location))
     # Direct list bool check skips ParameterSet.__len__ method dispatch.
     if container.items:
@@ -1083,10 +1039,7 @@ def get_parameters_strategy(
 
 
 def jsonify_query_parameters(value: dict[str, Any], optional: frozenset[str]) -> dict[str, Any]:
-    """Convert query values to their JSON equivalents, omitting optional parameters that carry no value.
-
-    Query strings have no rendering for a JSON null; leaving the parameter out is what "no value" means there.
-    """
+    """Convert query values to JSON equivalents, leaving out optional ones without a value, as a query has no null."""
     return {
         key: jsonify_python_specific_types(item)
         for key, item in value.items()
@@ -1123,7 +1076,7 @@ def _build_custom_formats_uncached(
     elif not generation_config.allow_x00:
         header_values_kwargs["exclude_characters"] = DEFAULT_HEADER_EXCLUDE_CHARACTERS + "\x00"
     if generation_config.codec not in (None, "utf-8"):
-        # User explicitly set a non-default codec - use it directly
+        # A non-default codec from the user wins
         header_values_kwargs["codec"] = generation_config.codec
         custom_formats[HEADER_FORMAT] = header_values(**header_values_kwargs)
     else:
@@ -1131,7 +1084,7 @@ def _build_custom_formats_uncached(
         valid_exclude = "".join(sorted(set(base_exclude + INVALID_HEADER_CHARS)))
 
         if mode.is_positive:
-            # Positive mode: Always generate RFC-valid headers
+            # Positive mode: RFC-valid headers only
             custom_formats[HEADER_FORMAT] = header_values(codec="ascii", exclude_characters=valid_exclude)
         else:
             # Negative mode: Occasionally allow invalid characters
@@ -1280,8 +1233,7 @@ def _canonical_strategy(
     media_type: str | None = None,
 ) -> st.SearchStrategy[JsonValue]:
     """Strategy for a fully modeled document; raises `UnsupportedSchema` when the schema is not one."""
-    # What a header may carry is a rule about characters, so it is spelled as one: every string
-    # in the container obeys it, and the length and pattern keywords around it keep working.
+    # Header rules are about characters, so they become the alphabet; length and pattern keywords keep working.
     alphabet = alphabet_for(location, generation_config)
     if location is not None and location.is_in_header:
         formats = _build_header_formats(generation_config, GenerationMode.POSITIVE)
@@ -1299,11 +1251,7 @@ def _canonical_strategy(
 
 
 def _build_header_formats(generation_config: GenerationConfig, mode: GenerationMode) -> dict[str, st.SearchStrategy]:
-    """Format generators for a header container, minus the one the alphabet replaces.
-
-    Leaving the plain header-value generator in would hand every plain string an opaque strategy
-    that no length or pattern keyword can steer.
-    """
+    """Header format generators without the plain header-value one, which no length or pattern keyword could steer."""
     cache_key = (*_custom_formats_cache_key(generation_config, mode), "header")
     cached = custom_formats_cache.get(cache_key)
     if cached is not MISSING:
@@ -1367,11 +1315,7 @@ def apply_hooks(
     strategy: st.SearchStrategy,
     location: ParameterLocation,
 ) -> st.SearchStrategy:
-    """Apply all hooks related to the given location.
-
-    Passes `GeneratedValue` (de)wrapping helpers so user hooks see plain values even
-    when negative-mode strategies wrap them.
-    """
+    """Apply hooks for `location`; user hooks see plain values even when negative strategies wrap them."""
     return apply_to_all_dispatchers(
         operation,
         ctx,

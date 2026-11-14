@@ -22,8 +22,7 @@ def test_get_survives_concurrent_eviction():
 
     worker = threading.Thread(target=churn)
     original_interval = sys.getswitchinterval()
-    # Under the GIL the check-then-act window is a handful of bytecodes; without this the
-    # scheduler practically never lands inside it, while free-threaded builds hit it on their own.
+    # Without this, the GIL scheduler almost never preempts inside the check-then-act window; free-threaded builds do.
     sys.setswitchinterval(1e-6)
     worker.start()
     try:

@@ -253,7 +253,7 @@ def test_walker_resolves_one_of_to_branch_with_properties():
 
 
 def test_walker_excludes_bool_from_integer_pool():
-    # `isinstance(True, int)` is True in Python; integer pools must not silently absorb booleans.
+    # `isinstance(True, int)` is True in Python; integer pools must not absorb booleans.
     schema = {
         "type": "object",
         "properties": {"count": {"type": "integer", "format": "int32", "minimum": 0, "maximum": 100}},
@@ -274,8 +274,7 @@ def test_walker_excludes_bool_from_integer_pool():
     ids=["unbounded-integer", "int32-no-bounds", "int64-no-bounds", "unbounded-number", "double-no-bounds"],
 )
 def test_walker_skips_unbounded_numeric(leaf_schema, value):
-    # Numeric formats only declare bit width; without `minimum`/`maximum` we cannot tell
-    # unrelated numeric domains apart and pooling them creates cross-resource noise.
+    # Bit width alone cannot tell numeric domains apart, so pooling them mixes unrelated resources.
     schema = {"type": "object", "properties": {"x": leaf_schema}}
     assert list(iter_ingestion_leaves(schema, {"x": value})) == []
 
@@ -331,7 +330,7 @@ def test_walker_falls_back_to_name_when_no_format_or_pattern():
             {"description": "lorem ipsum dolor sit"},
             [IngestionLeaf("string", None, None, "description", "lorem ipsum dolor sit")],
         ),
-        # Without a schema we cannot read numeric bounds, so numerics and booleans are skipped.
+        # Without a schema there are no numeric bounds, so numerics and booleans are skipped.
         ({"count": 42, "ratio": 1.5, "enabled": True}, []),
     ],
     ids=["email-shape-inferred", "uuid-shape-skipped", "freeform-name-only", "numeric-and-boolean-skipped"],
@@ -382,8 +381,7 @@ def test_consumer_walker_yields_descriptor_per_primitive_property():
 
 
 def test_consumer_walker_skips_const_and_enum_leaves():
-    # Fixed-domain leaves are not substitutable slots: a pool value would violate the constraint
-    # (e.g. a `type` discriminator), producing data the API rejects.
+    # A pool value in a fixed-domain leaf (e.g. a `type` discriminator) produces data the API rejects.
     schema = {
         "type": "object",
         "properties": {
@@ -431,7 +429,7 @@ def test_consumer_walker_records_path_for_nested_property():
 
 
 def test_consumer_walker_includes_uuid_descriptors():
-    # Index gates by allowlist; consumer descriptors stay symmetric so lookup just returns empty.
+    # The index gates by allowlist; consumer descriptors stay symmetric, so lookup returns empty.
     schema = {"type": "object", "properties": {"id": {"type": "string", "format": "uuid"}}}
     [descriptor] = iter_consumer_leaves(schema)
     assert descriptor.format == "uuid"
@@ -1521,9 +1519,7 @@ def test_parameter_set_cache_distinguishes_semantic_source_from_no_source(ctx):
 
 
 def test_parameter_set_strategy_does_not_leak_generated_value_through_filter(ctx):
-    # `is_valid_query` / `is_valid_header` expect a dict; the overlay can wrap the body in
-    # `GeneratedValue` on a substitution. Positive mode must unwrap before the location-specific
-    # filter, or the filter crashes with `AttributeError: 'GeneratedValue' object has no attribute 'items'`.
+    # A substitution can wrap the body in `GeneratedValue`; positive mode must unwrap it before the dict-only filters.
     schema = ctx.openapi.load_schema(
         {
             "/api/items": {
@@ -1566,8 +1562,7 @@ def test_parameter_set_strategy_does_not_leak_generated_value_through_filter(ctx
 
     drawn: list[object] = []
 
-    # 30 draws at 0.5 per-leaf substitution probability make it overwhelmingly likely the
-    # overlay fires at least once; a single substitution exercises the filter path.
+    # At 0.5 per-leaf probability, 30 draws make at least one substitution near-certain.
     drawn.extend(generate_many(strategy, 30))
     assert drawn, "strategy produced no values"
 
@@ -2099,8 +2094,7 @@ def test_overlay_records_multiple_substitutions_in_a_single_draw():
 
     multi_subs: list[GeneratedValue] = []
 
-    # Two independent substitutions at p=0.5 each, so ~25% of draws hit both; 80 examples make
-    # missing every multi-substitution draw vanishingly unlikely.
+    # Two substitutions at p=0.5 hit together in ~25% of draws; 80 examples make missing all of them unlikely.
     @run_given(overlay, max_examples=80, derandomize=True)
     def collect(value):
         if isinstance(value, GeneratedValue) and len(value.semantic_draws) == 2:
@@ -2216,8 +2210,7 @@ def test_overlay_continues_when_container_validator_construction_fails():
 
 
 def test_semantic_overlay_drops_overwritten_constant_provenance():
-    # A field that is both a constants candidate and a semantic consumer-leaf: when the semantic value
-    # overwrites the substituted constant, its ConstantDraw must not survive as false provenance.
+    # When a semantic value overwrites a substituted constant, the constant's provenance must not survive.
     pool = ConstantsPool()
     pool.add(
         ConstantEntry(value="CONST_TOKEN_1234", type="string", origins=(Origin(source="s", module="m", adapter=None),))

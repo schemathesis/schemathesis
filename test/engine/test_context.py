@@ -55,7 +55,7 @@ def test_get_transport_kwargs_skips_override_for_no_operation(ctx):
     schema, operation = _build_schema_and_operation(ctx)
     schema.config.update(request_timeout=5.0)
     engine = EngineContext(schema=schema, stop_event=threading.Event())
-    # Even with failures recorded, override doesn't apply when no operation is passed.
+    # With no operation passed, the override does not apply even after recorded failures.
     engine.health.record_transport_failure(operation_label=operation.label, now=10.0)
     engine.health.record_transport_failure(operation_label=operation.label, now=11.0)
     assert engine.get_transport_kwargs()["timeout"] == 5.0

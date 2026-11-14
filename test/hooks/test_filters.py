@@ -83,7 +83,7 @@ def test_simple_filter(ctx, is_include):
 
 def test_map_case_filter(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
-    # All these hooks should not be called because of the applied filter
+    # The filter matches no operation, so none of these hooks run.
     module = ctx.write_pymodule(
         r"""
 @schemathesis.hook.apply_to(path_regex=r"/fake/path")

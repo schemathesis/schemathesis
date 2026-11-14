@@ -9,7 +9,6 @@ reports = { directory = "reports" }
 
 
 def test_discover_in_current_directory(tmp_path, monkeypatch):
-    # Write the config file in the current directory
     config_file = tmp_path / "schemathesis.toml"
     config_file.write_text(TOML_CONTENT)
 
@@ -23,7 +22,6 @@ def test_discover_in_current_directory(tmp_path, monkeypatch):
 
 
 def test_discover_in_parent_directory(tmp_path, monkeypatch):
-    # Create a config file in the parent directory
     config_file = tmp_path / "schemathesis.toml"
     config_file.write_text(TOML_CONTENT)
     child_dir = tmp_path / "child"
@@ -46,14 +44,12 @@ def test_discover_not_found(tmp_path, monkeypatch):
 
 
 def test_discover_stops_at_git_root(tmp_path, monkeypatch):
-    # Create a structure where a .git folder exists in the parent directory.
     parent = tmp_path / "parent"
     parent.mkdir()
-    (parent / ".git").mkdir()  # simulate git repository root
+    (parent / ".git").mkdir()
     child = parent / "child"
     child.mkdir()
 
-    # Place a config file outside of the git repo (should not be discovered)
     outside = tmp_path / "outside"
     outside.mkdir()
     config_file = outside / "schemathesis.toml"
@@ -62,5 +58,4 @@ def test_discover_stops_at_git_root(tmp_path, monkeypatch):
     monkeypatch.chdir(child)
 
     config = SchemathesisConfig.discover()
-    # Since we stop at the git repo root, no config file should be found.
     assert config.color is None

@@ -29,7 +29,6 @@ def has_surrounding_whitespace(value: str) -> bool:
 
 
 def is_latin_1_encodable(value: object) -> TypeGuard[str]:
-    """Check if a value is a Latin-1 encodable string."""
     if not isinstance(value, str):
         return False
     try:

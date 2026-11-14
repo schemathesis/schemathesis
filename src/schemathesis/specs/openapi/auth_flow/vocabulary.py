@@ -17,7 +17,6 @@ _PRIVILEGED = frozenset({"admin", "administrator", "superadmin", "superuser", "r
 
 
 def normalize(name: str) -> str:
-    """Lowercase and strip `_` and `-` separators."""
     return name.lower().replace("_", "").replace("-", "")
 
 

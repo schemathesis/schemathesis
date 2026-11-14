@@ -6,8 +6,6 @@ from schemathesis.core.warnings import SchemathesisWarning
 
 
 class SchemaWarning(Protocol):
-    """Shared interface for static schema analysis warnings."""
-
     operation_label: str | None
 
     @property

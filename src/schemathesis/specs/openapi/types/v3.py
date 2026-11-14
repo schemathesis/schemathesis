@@ -74,8 +74,6 @@ RequestBodyOrRef: TypeAlias = RequestBody | Reference
 
 
 class ParameterWithSchema(TypedDict):
-    """OpenAPI 3.0/3.1 parameter with schema."""
-
     name: str
     description: NotRequired[str]
     required: NotRequired[bool]
@@ -93,14 +91,10 @@ _ParameterIn = TypedDict("_ParameterIn", {"in": Literal["path", "query", "querys
 
 
 class ParameterWithSchemaAndIn(ParameterWithSchema, _ParameterIn):
-    """Parameter with schema and 'in' field."""
-
     pass
 
 
 class ParameterWithContent(TypedDict):
-    """OpenAPI 3.0/3.1 parameter with content."""
-
     name: str
     description: NotRequired[str]
     required: NotRequired[bool]
@@ -109,8 +103,6 @@ class ParameterWithContent(TypedDict):
 
 
 class ParameterWithContentAndIn(ParameterWithContent, _ParameterIn):
-    """Parameter with content and 'in' field."""
-
     pass
 
 
@@ -119,8 +111,7 @@ Parameter: TypeAlias = ParameterWithSchemaAndIn | ParameterWithContentAndIn | Re
 
 
 class Operation(TypedDict):
-    # `responses` is required in 3.0 but NotRequired in 3.1+ — we use NotRequired so the type
-    # works for both, then guard at use sites where 3.0 strictness applies.
+    # Required in 3.0, optional in 3.1+; use sites guard where 3.0 strictness applies.
     responses: NotRequired[Responses]
     requestBody: NotRequired[RequestBodyOrRef]
     parameters: NotRequired[list[Parameter]]

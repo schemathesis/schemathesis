@@ -33,7 +33,6 @@ KNOWN_INCORRECT_FIELD_MAPPINGS = {
 
 
 def make_user_paths(content, include_operation_id=True, post_status: str = "201"):
-    """Build User CRUD paths with optional operationId."""
     post = {
         "responses": {post_status: {"content": content}},
     }
@@ -80,17 +79,14 @@ def operation(method: str, path: str, response_status: str, response_schema=None
 
 
 def ref(ref_path: str):
-    """Build a $ref object."""
     return {"$ref": ref_path}
 
 
 def component_ref(schema_name: str):
-    """Build a reference to a component schema."""
     return ref(f"#/components/schemas/{schema_name}")
 
 
 def json_response(status: str, schema):
-    """Shorthand for JSON response."""
     return response(status, schema, "application/json")
 
 
@@ -1622,7 +1618,6 @@ def snapshot_json(snapshot):
             },
             id="slug-suffix-field-matching",
         ),
-        # POST returns bare string identifier - like Mealie POST /api/recipes returning slug
         pytest.param(
             {
                 **operation("post", "/recipes", "201", {"type": "string"}),
@@ -1648,8 +1643,6 @@ def snapshot_json(snapshot):
             },
             id="post-returns-string-identifier",
         ),
-        # Sub-resource inside array items should be discovered
-        # Like Mealie's AllBackups.imports which is an array of BackupFile refs
         pytest.param(
             {
                 **operation(
@@ -1694,9 +1687,7 @@ def snapshot_json(snapshot):
             },
             id="subresource-in-array-items",
         ),
-        # Prefix matching: parameter "group_slug" -> inferred "Group" not found
-        # but "GroupSummary" starts with "Group" and has "slug" field
-        # Like Mealie's /api/explore/groups/{group_slug}/... endpoints
+        # `group_slug` finds no `Group`, but `GroupSummary` starts with `Group` and has a `slug` field
         pytest.param(
             {
                 **operation(
@@ -1734,13 +1725,9 @@ def snapshot_json(snapshot):
             },
             id="prefix-matching-group-slug",
         ),
-        # Foreign key field linking: producer returns object with customer_id FK field,
-        # consumer expects Customer.id in path parameter
         pytest.param(
             {
-                # Producer: returns Order with customer_id FK field
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
-                # Consumer: needs Customer.id
                 **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id")]),
             },
             {
@@ -1759,7 +1746,6 @@ def snapshot_json(snapshot):
             },
             id="foreign-key-field-linking",
         ),
-        # Multiple FK fields: booking with customer_id and event_id
         pytest.param(
             {
                 **operation("get", "/bookings/{id}", "200", component_ref("Booking"), [path_param("id")]),
@@ -1783,7 +1769,6 @@ def snapshot_json(snapshot):
             },
             id="multiple-foreign-key-fields",
         ),
-        # Array FK field: event with site_ids array
         pytest.param(
             {
                 **operation("get", "/events/{id}", "200", component_ref("Event"), [path_param("id")]),
@@ -1804,9 +1789,6 @@ def snapshot_json(snapshot):
             },
             id="array-foreign-key-field",
         ),
-        # FK field with _uuid suffix does NOT link to consumer expecting id
-        # user_uuid -> GET /users/{id} (no match because consumer expects id, not uuid)
-        # This ensures FK suffix types are respected
         pytest.param(
             {
                 **operation("get", "/sessions/{id}", "200", component_ref("Session"), [path_param("id")]),
@@ -1827,7 +1809,6 @@ def snapshot_json(snapshot):
             },
             id="foreign-key-uuid-no-match-to-id-consumer",
         ),
-        # Multi-word snake_case FK: shipping_address_id -> ShippingAddress
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -1850,8 +1831,6 @@ def snapshot_json(snapshot):
             },
             id="foreign-key-multi-word-snake-case",
         ),
-        # Embedded resource: Order contains embedded Customer object
-        # Should link GET /orders/{id} -> GET /customers/{id} via customer.id
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -1864,7 +1843,7 @@ def snapshot_json(snapshot):
                         "properties": {
                             "id": {"type": "string"},
                             "total": {"type": "number"},
-                            "customer": component_ref("Customer"),  # Embedded resource
+                            "customer": component_ref("Customer"),
                         },
                         "required": ["id"],
                     },
@@ -1873,7 +1852,6 @@ def snapshot_json(snapshot):
             },
             id="embedded-resource-linking",
         ),
-        # Nested FK field: Order.shipping.warehouse_id -> Warehouse
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -1900,7 +1878,6 @@ def snapshot_json(snapshot):
             },
             id="nested-fk-field-linking",
         ),
-        # Array of embedded resources: Order.line_items[].product_id -> Product
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -1930,8 +1907,6 @@ def snapshot_json(snapshot):
             },
             id="array-nested-fk-field-linking",
         ),
-        # Request body with nested FK field: POST /orders with {shipping: {warehouse_id: "..."}}
-        # Should create link from GET /warehouses to POST /orders
         pytest.param(
             {
                 **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
@@ -1971,7 +1946,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-nested-fk-field",
         ),
-        # Request body with FK field in array items: POST /orders with {items: [{product_id: "..."}]}
         pytest.param(
             {
                 **operation("get", "/products", "200", {"type": "array", "items": component_ref("Product")}),
@@ -2014,7 +1988,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-array-nested-fk-field",
         ),
-        # Request body with boolean schema for a property
         pytest.param(
             {
                 **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
@@ -2046,7 +2019,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-property-boolean-schema",
         ),
-        # Nested object with boolean schema for a property
         pytest.param(
             {
                 **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
@@ -2083,7 +2055,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-nested-property-boolean-schema",
         ),
-        # Deeply nested FK field - multiple levels of non-FK objects
         pytest.param(
             {
                 **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
@@ -2124,7 +2095,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-deeply-nested-fk-field",
         ),
-        # Array items with boolean schema for a property
         pytest.param(
             {
                 **operation("get", "/products", "200", {"type": "array", "items": component_ref("Product")}),
@@ -2164,7 +2134,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-array-item-boolean-schema",
         ),
-        # Deeply nested structure that exceeds the recursion depth limit
         pytest.param(
             {
                 **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
@@ -2247,11 +2216,10 @@ def snapshot_json(snapshot):
             },
             id="requestbody-max-depth-exceeded",
         ),
-        # FK field points to non-existent resource (target_resource is None)
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
-                # No /customers endpoint - Customer resource doesn't exist
+                # No /customers endpoint
             },
             {
                 "schemas": {
@@ -2259,7 +2227,7 @@ def snapshot_json(snapshot):
                         "type": "object",
                         "properties": {
                             "id": {"type": "string"},
-                            "customer_id": {"type": "string"},  # FK to non-existent Customer
+                            "customer_id": {"type": "string"},
                         },
                         "required": ["id"],
                     },
@@ -2267,11 +2235,10 @@ def snapshot_json(snapshot):
             },
             id="fk-field-to-nonexistent-resource",
         ),
-        # Nested FK field pointing to non-existent resource
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
-                # No /warehouses endpoint - Warehouse resource doesn't exist
+                # No /warehouses endpoint
             },
             {
                 "schemas": {
@@ -2282,7 +2249,7 @@ def snapshot_json(snapshot):
                             "shipping": {
                                 "type": "object",
                                 "properties": {
-                                    "warehouse_id": {"type": "string"},  # FK to non-existent Warehouse
+                                    "warehouse_id": {"type": "string"},
                                 },
                             },
                         },
@@ -2292,11 +2259,10 @@ def snapshot_json(snapshot):
             },
             id="nested-fk-to-nonexistent-resource",
         ),
-        # Two consumers for the same resource - creates duplicate FK link names
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
-                # Two consumers for Customer, both expecting id - creates duplicate "GetCustomer" link
+                # Both consumers expect `id`, so both links are named "GetCustomer"
                 **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id")]),
                 **operation(
                     "get", "/customers/{customerId}", "200", component_ref("Customer"), [path_param("customerId")]
@@ -2317,7 +2283,6 @@ def snapshot_json(snapshot):
             },
             id="fk-duplicate-link-names",
         ),
-        # Response schema with $ref that needs resolution for nested FK extraction
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -2329,7 +2294,7 @@ def snapshot_json(snapshot):
                         "type": "object",
                         "properties": {
                             "id": {"type": "string"},
-                            "shipping": component_ref("ShippingDetails"),  # $ref needs resolution
+                            "shipping": component_ref("ShippingDetails"),
                         },
                         "required": ["id"],
                     },
@@ -2345,7 +2310,6 @@ def snapshot_json(snapshot):
             },
             id="nested-fk-with-ref-resolution",
         ),
-        # Response with array of items containing nested FK fields - tests MANY cardinality
         pytest.param(
             {
                 **operation("get", "/orders", "200", {"type": "array", "items": component_ref("Order")}),
@@ -2371,7 +2335,6 @@ def snapshot_json(snapshot):
             },
             id="nested-fk-many-cardinality",
         ),
-        # Nested FK field that is an array (site_ids inside nested object)
         pytest.param(
             {
                 **operation("get", "/events/{id}", "200", component_ref("Event"), [path_param("id")]),
@@ -2386,7 +2349,7 @@ def snapshot_json(snapshot):
                             "location": {
                                 "type": "object",
                                 "properties": {
-                                    "site_ids": {"type": "array", "items": {"type": "string"}},  # Array FK
+                                    "site_ids": {"type": "array", "items": {"type": "string"}},
                                 },
                             },
                         },
@@ -2397,7 +2360,6 @@ def snapshot_json(snapshot):
             },
             id="nested-fk-array-field",
         ),
-        # Consumer expects body parameter - FK linking should skip this
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -2426,7 +2388,6 @@ def snapshot_json(snapshot):
             },
             id="fk-skip-body-parameter-consumer",
         ),
-        # Multiple nested FK fields creating duplicate link names
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -2447,7 +2408,7 @@ def snapshot_json(snapshot):
                             "billing": {
                                 "type": "object",
                                 "properties": {
-                                    "warehouse_id": {"type": "string"},  # Duplicate FK to same resource
+                                    "warehouse_id": {"type": "string"},
                                 },
                             },
                         },
@@ -2458,7 +2419,6 @@ def snapshot_json(snapshot):
             },
             id="nested-fk-duplicate-link-names",
         ),
-        # Nested FK with mismatched target field (uuid vs id)
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -2473,7 +2433,7 @@ def snapshot_json(snapshot):
                             "shipping": {
                                 "type": "object",
                                 "properties": {
-                                    "warehouse_uuid": {"type": "string"},  # uuid FK, but consumer expects id
+                                    "warehouse_uuid": {"type": "string"},
                                 },
                             },
                         },
@@ -2484,9 +2444,7 @@ def snapshot_json(snapshot):
             },
             id="nested-fk-mismatched-target-field",
         ),
-        # Self-referencing nested FK - operation is both producer and consumer for FK target
-        # GET /users/{user_id}/posts/{id} returns Post with nested FK user_id -> User
-        # Same operation needs User via user_id path parameter (self-reference)
+        # GET /users/{user_id}/posts/{id} returns a Post whose `user_id` points back at its own path parameter
         pytest.param(
             {
                 **operation(
@@ -2509,7 +2467,7 @@ def snapshot_json(snapshot):
                             "mentioned": {
                                 "type": "object",
                                 "properties": {
-                                    "user_id": {"type": "string"},  # Nested FK to User (same as path param)
+                                    "user_id": {"type": "string"},
                                 },
                             },
                         },
@@ -2519,7 +2477,6 @@ def snapshot_json(snapshot):
             },
             id="nested-fk-self-reference",
         ),
-        # Nested FK where consumer expects body parameter (should be skipped)
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -2557,7 +2514,6 @@ def snapshot_json(snapshot):
             },
             id="nested-fk-skip-body-consumer",
         ),
-        # Two consumers for nested FK - creates duplicate link names
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -2586,7 +2542,6 @@ def snapshot_json(snapshot):
             },
             id="nested-fk-duplicate-consumers",
         ),
-        # Response schema property with boolean value (not a dict)
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -2597,8 +2552,8 @@ def snapshot_json(snapshot):
                         "type": "object",
                         "properties": {
                             "id": {"type": "string"},
-                            "metadata": True,  # Boolean schema property
-                            "config": True,  # Another boolean schema property
+                            "metadata": True,
+                            "config": True,
                         },
                         "required": ["id"],
                     },
@@ -2606,7 +2561,6 @@ def snapshot_json(snapshot):
             },
             id="response-schema-boolean-properties",
         ),
-        # Multiple request body FK fields requiring nested body merge
         pytest.param(
             {
                 **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
@@ -2647,7 +2601,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-multiple-fk-fields-merge",
         ),
-        # Request body with array items containing multiple FK fields (tests list merging)
         pytest.param(
             {
                 **operation("get", "/products", "200", {"type": "array", "items": component_ref("Product")}),
@@ -2691,7 +2644,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-array-multiple-fk-fields-merge",
         ),
-        # Deeply nested schema with $ref that triggers extract_nested_fk_fields resolution
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -2725,7 +2677,6 @@ def snapshot_json(snapshot):
             },
             id="nested-refs-extract-fk-fields",
         ),
-        # Nested FK extraction with max depth exceeded in response schema
         pytest.param(
             {
                 **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
@@ -2776,8 +2727,7 @@ def snapshot_json(snapshot):
             },
             id="nested-fk-max-depth-response",
         ),
-        # Multiple FK fields in request body pointing to the same resource (tests _merge_nested_body)
-        # account_id and account_uuid both parse to "Account" resource
+        # `account_id` and `account_uuid` both name the `Account` resource
         pytest.param(
             {
                 **operation("get", "/accounts", "200", {"type": "array", "items": component_ref("Account")}),
@@ -2791,7 +2741,7 @@ def snapshot_json(snapshot):
                                         "type": "object",
                                         "properties": {
                                             "account_id": {"type": "string"},
-                                            "account_uuid": {"type": "string"},  # Same resource, different field
+                                            "account_uuid": {"type": "string"},
                                             "amount": {"type": "number"},
                                         },
                                         "required": ["account_id", "account_uuid"],
@@ -2810,7 +2760,7 @@ def snapshot_json(snapshot):
                         "type": "object",
                         "properties": {
                             "id": {"type": "string"},
-                            "uuid": {"type": "string"},  # Both id and uuid fields
+                            "uuid": {"type": "string"},
                         },
                         "required": ["id", "uuid"],
                     },
@@ -2818,7 +2768,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-same-resource-multiple-fk-fields",
         ),
-        # Nested request body with multiple FK fields at same nested path (tests nested merge)
         pytest.param(
             {
                 **operation("get", "/accounts", "200", {"type": "array", "items": component_ref("Account")}),
@@ -2864,7 +2813,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-nested-same-resource-merge",
         ),
-        # Request body with array of FK fields pointing to same resource (tests list merge)
         pytest.param(
             {
                 **operation("get", "/products", "200", {"type": "array", "items": component_ref("Product")}),
@@ -2913,7 +2861,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-array-same-resource-list-merge",
         ),
-        # Request body schema is a $ref that gets resolved
         pytest.param(
             {
                 **operation("get", "/users", "200", component_ref("User")),
@@ -2944,7 +2891,6 @@ def snapshot_json(snapshot):
             },
             id="requestbody-schema-ref",
         ),
-        # Body is array with items $ref AND has properties with FK - triggers mixed request_body types
         pytest.param(
             {
                 **operation("get", "/products", "200", component_ref("Product")),
@@ -4181,8 +4127,7 @@ def test_nested_fk_under_digit_named_property_links_into_object_body(ctx):
 
 
 def test_path_param_named_after_collection_links_create_to_read(ctx):
-    # `/sessions/{session}` names its path param after the singular collection (route-model-binding
-    # style); the create operation must still link into read.
+    # `/sessions/{session}` names its parameter after the collection; the create must still link into the read.
     session_response = {
         "type": "object",
         "properties": {"id": {"type": "string"}},
@@ -5163,8 +5108,7 @@ def test_update_body_field_binds_to_updated_resource_when_parent_has_it_too(ctx,
 
 
 def test_nested_fk_inference_independent_of_path_order(ctx):
-    # Inference must register a nested-body FK input slot regardless of whether the consumer
-    # appears before or after its producer in the spec's `paths` order.
+    # Inference registers a nested-body FK input slot whatever the order of consumer and producer in `paths`.
     location_response = {
         "type": "object",
         "properties": {"id": {"type": "integer"}},
@@ -5217,8 +5161,7 @@ def test_nested_fk_inference_independent_of_path_order(ctx):
 
 
 def test_nested_fk_inference_array_items_consumer_first(ctx):
-    # Consumer references the producer through an array of nested objects (`items: [{location_id}]`),
-    # not a sibling object. The replay path must land the array-branch FK regardless of declaration order.
+    # The consumer references the producer through an array of nested objects; the FK lands whatever the order.
     bulk_body = {
         "type": "object",
         "properties": {
@@ -7262,8 +7205,7 @@ def test_fk_body_field_holding_an_array_takes_the_same_array_field(ctx, customer
 
 
 def test_nested_fk_inference_drops_slot_when_target_never_registered(ctx):
-    # A nested FK whose target resource is never declared anywhere stays dropped:
-    # the replay loop sees `resources.get(target) is None` and skips it.
+    # A nested FK whose target resource is never declared stays dropped.
     consumer_only = {
         "/orders": {
             "post": {
@@ -8070,7 +8012,7 @@ def test_body_name_suffix_with_matching_path_keeps_slot(ctx):
 
 
 def test_body_id_suffix_without_backing_still_creates_slot(ctx):
-    # The gate is `_name`-only — strong FK suffixes like `_id` keep current behavior.
+    # The gate covers `_name` only; strong FK suffixes like `_id` keep their behavior.
     _, graph = analyze_dependencies(
         ctx,
         {
@@ -8103,8 +8045,7 @@ def test_body_id_suffix_without_backing_still_creates_slot(ctx):
 
 
 def test_body_self_fk_rebinds_to_path_parent_when_parent_has_field(ctx):
-    # `spouse_id` references another Contact, not a Spouse resource — when the path-derived
-    # parent (Contact) has the same field, the slot rebinds and the ghost Spouse is dropped.
+    # `spouse_id` references another Contact; the slot rebinds to the parent Contact and the ghost Spouse is dropped.
     _, graph = analyze_dependencies(
         ctx,
         {
@@ -8287,7 +8228,7 @@ def test_path_consumer_picks_same_module_resource_variant(ctx):
 
 
 def test_body_fk_picks_same_module_resource_variant(ctx):
-    # Body FK fields prefer the same-module variant — `group_id` here picks Group1, not Group.
+    # Body FK fields prefer the same-module variant: `group_id` here picks Group1, not Group.
     paths = _module_disambiguation_paths()
     paths["/smallgroups/members"] = {
         "post": {
@@ -8333,8 +8274,7 @@ def test_body_fk_picks_same_module_resource_variant(ctx):
 
 
 def test_path_consumer_picks_same_module_suffix_match(ctx):
-    # `/bookings/resources/{id}` infers `Resource`; both `KeyDateResource` (addressbook)
-    # and `ResourceItem` (bookings) are suffix-affine, so the same-module one wins.
+    # `/bookings/resources/{id}` infers `Resource`; of `KeyDateResource` and `ResourceItem`, the same-module one wins.
     _, graph = analyze_dependencies(
         ctx,
         {
@@ -8544,8 +8484,7 @@ def test_body_fk_inside_all_of_with_one_of_branches(ctx):
 
 
 def test_list_items_behind_nested_all_of_keep_their_fields(ctx):
-    # A list response whose array items are an `allOf` composition must still expose the item's
-    # fields, otherwise the resource degrades to a bare path-parameter stub.
+    # List items composed with `allOf` must expose their fields, or the resource degrades to a path-parameter stub.
     _, graph = analyze_dependencies(
         ctx,
         {
@@ -8604,8 +8543,7 @@ def test_list_items_behind_nested_all_of_keep_their_fields(ctx):
 
 
 def test_externally_tagged_items_behind_one_of_keep_their_fields(ctx):
-    # A paginated list whose items tag their payload with a `oneOf` must still expose that payload's
-    # fields, otherwise the resource degrades to a fieldless stub.
+    # List items that tag their payload with `oneOf` must expose its fields, or the resource degrades to a stub.
     _, graph = analyze_dependencies(
         ctx,
         {
@@ -8828,8 +8766,7 @@ def test_nested_list_wrapper_without_resource_items_is_not_descended_into(ctx):
 
 
 def test_all_of_branches_merge_same_named_object_property(ctx):
-    # When `allOf` branches each define the same object property, the merged property must union
-    # both branches' sub-fields so a FK hidden in the overriding branch is still discovered.
+    # `allOf` branches defining one object property merge its sub-fields, so an FK in the overriding branch is found.
     _, graph = analyze_dependencies(
         ctx,
         {
@@ -8877,8 +8814,7 @@ def test_all_of_branches_merge_same_named_object_property(ctx):
 
 
 def test_all_of_base_branch_does_not_shadow_specialized_property(ctx):
-    # A base branch declaring a bare `{"type": "object"}` placeholder must not hide the specialized
-    # branch's fields for the same property, even when the item is reached through a list wrapper.
+    # A bare `{"type": "object"}` base branch must not hide the specialized branch's fields, even behind a list.
     _, graph = analyze_dependencies(
         ctx,
         {
@@ -8946,8 +8882,7 @@ def test_all_of_base_branch_does_not_shadow_specialized_property(ctx):
 
 
 def test_all_of_base_branch_does_not_shadow_specialized_array_items(ctx):
-    # A base branch declaring `items` as an array of bare objects must not hide the element schema
-    # the specialized branch supplies.
+    # A base branch with `items` of bare objects must not hide the element schema of the specialized branch.
     _, graph = analyze_dependencies(
         ctx,
         {
@@ -9269,8 +9204,7 @@ def test_nested_body_fk_on_update_keeps_its_target(ctx):
 
 
 def test_body_plural_id_array_field_produces_input_slot(ctx):
-    # Plural FK array fields like `site_ids` are FKs to Site.id; the analyzer used
-    # to recognize only singular `_id` body fields.
+    # Plural FK array fields like `site_ids` are FKs to Site.id.
     _, graph = analyze_dependencies(
         ctx,
         {
@@ -10794,7 +10728,6 @@ def test_stateful_bug_when_link_always_used(cli, snapshot_cli, ctx):
 
 
 def customer_post(*, operation_id="createCustomer", response_schema=None, links=None):
-    """Build /customers POST endpoint."""
     endpoint = {
         "post": {
             "operationId": operation_id,
@@ -10814,7 +10747,6 @@ def customer_post(*, operation_id="createCustomer", response_schema=None, links=
 def order_post(
     *, operation_id="createOrder", parameter_name="customer_id", parameter_in="path", use_request_body=False
 ):
-    """Build /orders POST endpoint."""
     endpoint = {
         "post": {
             "operationId": operation_id,
@@ -10841,7 +10773,6 @@ def order_post(
 
 
 def customer_get(*, operation_id="getCustomer", parameter_name="customer_id"):
-    """Build /customers/{customer_id} GET endpoint."""
     return {
         f"/customers/{{{parameter_name}}}": {
             "get": {
@@ -10859,7 +10790,6 @@ def customer_get(*, operation_id="getCustomer", parameter_name="customer_id"):
 
 
 def link(target_operation, parameters=None, request_body=None, use_ref=False):
-    """Build a link definition."""
     if use_ref:
         link_def = {"operationRef": target_operation}
     else:
@@ -10981,7 +10911,6 @@ def link(target_operation, parameters=None, request_body=None, use_ref=False):
                             "createOrder",
                             request_body={
                                 "customer_id": "$response.body#/id",
-                                # Additional literal field
                                 "order_type": "standard",
                             },
                         )
@@ -11000,7 +10929,6 @@ def link(target_operation, parameters=None, request_body=None, use_ref=False):
                             "createOrder",
                             parameters={
                                 "customer_id": "$response.body#/id",
-                                # Additional parameter
                                 "priority": "high",
                             },
                         )
@@ -11024,7 +10952,6 @@ def link(target_operation, parameters=None, request_body=None, use_ref=False):
                 ),
                 **order_post(parameter_name="customer_id", parameter_in="query"),
             },
-            # Would infer the same, exact match
             0,
             id="inferred-equals-explicit-parameters",
         ),
@@ -11039,7 +10966,6 @@ def link(target_operation, parameters=None, request_body=None, use_ref=False):
                         )
                     }
                 ),
-                # No body inferred
                 **order_post(parameter_name="customer_id", parameter_in="query"),
             },
             0,
@@ -11067,13 +10993,11 @@ def link(target_operation, parameters=None, request_body=None, use_ref=False):
                         "CreateOrder": link(
                             "createOrder",
                             parameters={"customer_id": "$response.body#/id"},
-                            # No request_body specified
                         )
                     }
                 ),
                 **order_post(use_request_body=True),
             },
-            # Inferred link NOT a subset (has body, existing doesn't)
             1,
             id="inferred-body-not-subset-of-empty",
         ),
@@ -11083,14 +11007,12 @@ def link(target_operation, parameters=None, request_body=None, use_ref=False):
                     links={
                         "CreateOrder": link(
                             "createOrder",
-                            # Different source field
                             request_body={"customer_id": "$response.body#/name"},
                         )
                     }
                 ),
                 **order_post(use_request_body=True),
             },
-            # Inferred link NOT a subset (same key, different value)
             1,
             id="body-field-value-mismatch",
         ),
@@ -11268,8 +11190,7 @@ def test_paginated_list_links_to_detail_through_identifier(ctx):
 
 
 def test_iter_links_with_nested_refs(ctx):
-    # GH-3394: Links with nested $refs should be fully resolved
-    # Schema with link chain: Top -> Middle -> Bottom
+    # See GH-3394
     schema_dict = {
         "/foo": {
             "get": {
@@ -11314,20 +11235,17 @@ def test_iter_links_with_nested_refs(ctx):
         },
     )
 
-    # Verify that recursive $refs are fully resolved when iterating links
     for result in schema.get_all_operations():
         if isinstance(result, schemathesis.core.result.Ok):
             operation = result.ok()
             for _, response in operation.responses.items():
                 for name, link in response.iter_links():
-                    # Link should have operationId after resolving all $ref levels
                     assert "operationId" in link or "operationRef" in link, (
                         f"Link '{name}' was not fully resolved: {link}"
                     )
 
 
 def test_iter_links_with_circular_refs(ctx):
-    # Circular $refs in links should not cause infinite recursion
     schema_dict = {
         "/foo": {
             "get": {
@@ -11354,13 +11272,12 @@ def test_iter_links_with_circular_refs(ctx):
         },
     )
 
-    # Should not hang or crash - circular refs are gracefully handled
     for result in schema.get_all_operations():
         if isinstance(result, schemathesis.core.result.Ok):
             operation = result.ok()
             for _, response in operation.responses.items():
                 for _, link in response.iter_links():
-                    # Circular ref will not be fully resolved, but shouldn't crash
+                    # A circular ref stays unresolved.
                     assert "$ref" in link
 
 
@@ -11512,7 +11429,7 @@ def test_stateful_discovers_bug_with_custom_deserializer(cli, snapshot_cli, ctx)
 
         user = users[user_id]
 
-        # PATCH with empty body corrupts internal state (bug!)
+        # Planted bug: a PATCH with an empty body corrupts internal state.
         if not data.get("first_name") and not data.get("last_name"):
             user["corrupted"] = True
         else:
@@ -11629,8 +11546,7 @@ def test_merged_returning_none_with_anyof_schema(ctx):
 
 
 def test_content_wrapper_unwrapped_around_single_object(ctx):
-    # Single-property `content` wrapper around a resource object should be unwrapped so the link
-    # extractor points at `/content/id`, not the unresolvable `/id`.
+    # A single-property `content` wrapper unwraps, so the link reads `/content/id` instead of the unresolvable `/id`.
     _, graph = analyze_dependencies(
         ctx,
         {
@@ -11663,7 +11579,7 @@ def test_content_wrapper_unwrapped_around_single_object(ctx):
 
 
 def envelope(result):
-    # Qdrant-style envelope: the resource sits under `result`, next to scalar request metadata.
+    # An envelope holding the resource under `result`, next to scalar request metadata.
     return {
         "type": "object",
         "properties": {"result": result, "status": {"type": "string"}, "time": {"type": "number"}},
@@ -11817,8 +11733,7 @@ def test_resource_named_after_path_segment_is_an_envelope(ctx, tag):
 
 
 def test_fk_link_requires_field_in_producer_response(ctx):
-    # The full order has `customer_id`, but the create response only returns `id`:
-    # a link reading `customer_id` from it would always resolve to nothing.
+    # The create response returns only `id`, so a link reading `customer_id` from it would resolve to nothing.
     order = {
         "type": "object",
         "properties": {"id": {"type": "string"}, "customer_id": {"type": "string"}},
@@ -12036,8 +11951,7 @@ def test_self_referencing_component_terminates(ctx):
 
 
 def test_scalar_body_field_named_after_collection_links_to_its_producer(ctx):
-    # `country` carries no identifier suffix, but it names a collection whose 200 is the list of
-    # values the field accepts.
+    # `country` has no identifier suffix, but its collection's 200 lists the values the field accepts.
     paths = {
         "/countries": {
             "get": {

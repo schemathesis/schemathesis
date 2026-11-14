@@ -74,7 +74,6 @@ def translate_iteration_exception(
     state: TestingState,
     non_fatal_error: NonFatalErrorFactory,
 ) -> events.NonFatalError:
-    """Translate an iteration-time exception into a `NonFatalError`."""
     if isinstance(exc, hypothesis.errors.Unsatisfiable):
         return _unsatisfiable_error(operation, non_fatal_error)
     if isinstance(exc, hypothesis.errors.InvalidArgument):
@@ -121,7 +120,6 @@ def classify_test_exception(
     if isinstance(exc, hypothesis.errors.FailedHealthCheck):
         return Status.ERROR, [non_fatal_error(build_health_check_error(operation, exc, with_tip=False))]
     if isinstance(exc, hypothesis.errors.Unsatisfiable):
-        # We need more clear error message here
         return Status.ERROR, [_unsatisfiable_error(operation, non_fatal_error)]
     if isinstance(exc, AuthenticationError):
         return Status.ERROR, [non_fatal_error(exc)]
@@ -192,14 +190,13 @@ def _classify_flaky(
             return Status.ERROR, [non_fatal_error(DeadlineExceeded.from_exc(sub)) for sub in deadlines]
     if errors:
         return Status.ERROR, []
-    # Unrecoverable network errors (e.g. timeouts) are not appended to `errors`
-    # and are re-raised so Hypothesis sees the original exception; surface them
-    # here so a replay-induced `Flaky` is not misclassified as a check failure.
+    # Unrecoverable network errors, e.g. timeouts, skip `errors` and reach Hypothesis as raised;
+    # report them here so a replay-induced `Flaky` does not read as a check failure.
     unrecoverable = state.unrecoverable_network_error
     if unrecoverable is not None:
         return Status.ERROR, [non_fatal_error(unrecoverable.error, code_sample=unrecoverable.code_sample)]
-    # Hypothesis could not reproduce the result on replay. Real check failures are recorded when they happen,
-    # so an unreproducible result with no observed failure is generation noise, not a failure.
+    # Hypothesis could not reproduce the result on replay. Check failures are recorded when they happen,
+    # so an unreproducible result with no observed failure is generation noise.
     return Status.SUCCESS, []
 
 

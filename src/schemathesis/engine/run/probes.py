@@ -1,10 +1,4 @@
-"""Detecting capabilities of the application under test.
-
-Schemathesis sends specially crafted requests to the application before running tests in order to detect whether
-the application supports certain inputs. This is done to avoid false positives in the tests.
-For example, certail web servers do not support NULL bytes in headers, in such cases, the generated test case
-will not reach the tested application at all.
-"""
+"""Detect inputs, e.g. NULL bytes in headers, the server rejects before the app sees them, to avoid false positives."""
 
 from __future__ import annotations
 
@@ -38,7 +32,6 @@ def probe(ctx: EngineContext) -> list[ProbeRun]:
 
 
 def run(ctx: EngineContext) -> list[ProbeRun]:
-    """Run all probes against the given schema."""
     if not ctx.schema.specification.supports_feature(SpecificationFeature.HTTP_PROBES):
         return []
     return [send(probe(), ctx) for probe in PROBES]
@@ -49,8 +42,6 @@ HEADER_NAME = "X-Schemathesis-Probe"
 
 @dataclass(slots=True)
 class Probe:
-    """A request to determine the capabilities of the application under test."""
-
     name: str
 
     def prepare_request(
@@ -121,9 +112,8 @@ class NullByteInHeader(Probe):
         return ProbeOutcome.SUCCESS
 
 
-# Mix of chars that strict URL decoders (Tomcat, common WAFs) reject in the path component
-# before routing: backslash, ESC, control chars from both ranges. If any of these come back
-# as 400 with an empty body, the app never sees the request anyway.
+# Backslash, ESC and control characters that strict URL decoders (Tomcat, common WAFs) reject before routing.
+# A 400 with an empty body means the app never saw the request.
 _UNSAFE_PATH_PROBE_SUFFIX = "schemathesis-probe%5C%1B%01"
 
 
@@ -151,8 +141,7 @@ class UnsafePathDecoder(Probe):
         return ProbeOutcome.SUCCESS
 
 
-# Tomcat ships a default HTML error page (rather than an empty body) when its URI parser
-# rejects unsafe percent-encodings before routing — match its distinctive title.
+# Tomcat's URI parser rejects unsafe percent-encodings with a default HTML error page; match its title.
 _TOMCAT_400_TITLE = b"<title>HTTP Status 400 \xe2\x80\x93 Bad Request</title>"
 
 
@@ -164,7 +153,6 @@ PROBES = (NullByteInHeader, UnsafePathDecoder)
 
 
 def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
-    """Send the probe to the application."""
     from requests import PreparedRequest, Request, RequestException
     from requests.exceptions import MissingSchema
     from urllib3.exceptions import InsecureRequestWarning
@@ -182,8 +170,7 @@ def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
             warnings.simplefilter("ignore", InsecureRequestWarning)
             response = session.send(request, timeout=ctx.config.request_timeout or DEFAULT_RESPONSE_TIMEOUT)
     except MissingSchema:
-        # In-process ASGI/WSGI testing will have local URLs and requires extra handling
-        # which is not currently implemented
+        # In-process ASGI/WSGI apps have local URLs, which probes do not support
         return ProbeRun(probe, ProbeOutcome.SKIP, None, None, None)
     except RequestException as exc:
         req = exc.request if isinstance(exc.request, PreparedRequest) else None

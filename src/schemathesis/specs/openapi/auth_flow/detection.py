@@ -44,7 +44,7 @@ def _credential_body(operation: APIOperation) -> _Body | None:
 
 
 def _last_segment(path: str) -> str:
-    # What the operation does is named by its final literal segment: `/auth/register` registers.
+    # The final literal segment names the action: `/auth/register` registers.
     segments = [segment for segment in path.split("/") if segment and not segment.startswith("{")]
     return segments[-1] if segments else ""
 

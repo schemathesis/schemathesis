@@ -1,7 +1,6 @@
 from flask import Flask, abort, jsonify, request
 
-# High-entropy literal no random string strategy will realistically produce on its own.
-# Reaching the bug below requires this exact value, so the feature must harvest it from source.
+# No string strategy produces this high-entropy value; reaching the bug requires harvesting it from source.
 UNLOCK_CODE = "a3f9c1e7b5d24680"
 LINKED_CODE = "linked_override_value"
 

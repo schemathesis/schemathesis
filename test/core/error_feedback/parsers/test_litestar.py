@@ -15,8 +15,7 @@ from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
 
 
-# Wire envelope captured against a running Litestar app: `key` is a dotted/indexed path,
-# `source` is the request location.
+# Envelope captured from a running Litestar app: `key` is a dotted/indexed path, `source` the request location.
 def _litestar(*issues: dict[str, str], path: str = "/users", method: str = "POST") -> dict:
     return {
         "status_code": 400,
@@ -112,23 +111,16 @@ def test_litestar_parser_can_parse_recognises_envelope(body):
         None,
         "",
         [],
-        # Right top-level shape but no `extra`.
         {"status_code": 400, "detail": "Validation failed"},
-        # `extra` is a list but items aren't issue dicts.
         {"status_code": 400, "detail": "Validation failed", "extra": ["just a string"]},
-        # Wrong `status_code` (not a 4xx-style integer).
         {"status_code": "400", "detail": "x", "extra": [{"message": "y", "key": "z", "source": "body"}]},
-        # Recognised structure but no recognised message.
         {
             "status_code": 400,
             "detail": "Validation failed",
             "extra": [{"message": "something custom", "key": "x", "source": "body"}],
         },
-        # Spring shape.
         {"messages": ["x - y"]},
-        # Marshmallow shape.
         {"username": ["Missing data for required field."]},
-        # AJV shape.
         {"errors": [{"keyword": "format", "instancePath": "/x", "params": {}}]},
     ],
     ids=[
@@ -337,8 +329,7 @@ def test_litestar_parser_null_value_emits_must_not_be_blank(make_operation, case
 @pytest.mark.parametrize(
     "body",
     [
-        # `int | str` accepted server-side: narrowing to one arm would reject inputs
-        # the server actually takes. Drop the type-mismatch observation entirely.
+        # The server accepts `int | str`, so narrowing to one arm would reject valid inputs; no mismatch is emitted.
         _litestar(_issue("score", "Expected `int | str`, got `array`")),
         _litestar(_issue("ratio", "Expected `int | float | str`, got `bool`")),
     ],
@@ -361,7 +352,7 @@ def test_litestar_parser_strips_null_arm_from_optional_union(make_operation, cas
 
 
 def test_litestar_parser_null_on_multi_arm_union_emits_must_not_be_blank(make_operation, case_factory):
-    # Nullability is independent of type — drop applies only when narrowing the type would be wrong.
+    # Nullability is independent of type; only a wrong type narrowing gets dropped.
     assert tuple(
         (o.parameter_path, o.kind, o.payload)
         for o in parse_observations(

@@ -226,7 +226,6 @@ def test_attach_filter_chain():
 
     filter_set = filters.FilterSet()
     filters.attach_filter_chain(auth, "apply_to", filter_set.include)
-    # Returns the same object
     assert auth.apply_to(method="GET", path="/users/") is auth
     assert not filter_set.is_empty()
     assert len(filter_set._includes) == 1
@@ -244,7 +243,6 @@ def test_attach_filter_chain():
     ],
 )
 def test_repeating_filter(method, kwargs):
-    # Adding the same filter twice is an error
     filter_set = filters.FilterSet()
     filter_set.include(**kwargs)
     with pytest.raises(IncorrectUsage, match=filters.ERROR_FILTER_EXISTS):

@@ -268,7 +268,7 @@ def test_init_raises_NoProducers_when_no_rules(ctx):
     ids=["single", "bulk"],
 )
 def test_routing_override_present(method_name):
-    # Regression: rule-declared target= must populate its bundle (overrides the parent's filter).
+    # A rule-declared `target=` populates its bundle, overriding the parent's filter.
     assert method_name in BundleStateMachine.__dict__
 
 

@@ -14,8 +14,6 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class CurlCommand:
-    """Result of generating a curl command."""
-
     command: str
     """The curl command string."""
 
@@ -24,7 +22,6 @@ class CurlCommand:
 
 
 def _escape_and_quote(value: str, warnings: list[str], ctx: str) -> str:
-    """Escape value for shell, adding warnings if needed."""
     if has_non_printable(value):
         escape_result = escape_for_shell(value)
         if escape_result.original_bytes is not None:
@@ -45,14 +42,12 @@ def generate(
     headers: dict[str, Any],
     known_generated_headers: dict[str, Any] | None,
 ) -> CurlCommand:
-    """Generate a code snippet for making HTTP requests."""
     _filter_headers(headers, known_generated_headers or {})
     warnings: list[str] = []
     command = f"curl -X {method}"
 
-    # Process headers with shell-aware escaping
     for key, value in headers.items():
-        # To send an empty header with cURL we need to use `;`, otherwise empty header is ignored
+        # curl drops an empty header unless it ends with `;`
         if not value:
             header = f"{key};"
         else:
@@ -61,7 +56,6 @@ def generate(
         escaped_header = _escape_and_quote(header, warnings, f"Header '{key}'")
         command += f" -H {escaped_header}"
 
-    # Process body with shell-aware escaping
     if body is not None:
         if isinstance(body, bytes):
             body = body.decode("utf-8", errors="replace")
@@ -90,8 +84,7 @@ def get_excluded_headers() -> CaseInsensitiveDict:
     from requests.structures import CaseInsensitiveDict
     from requests.utils import default_headers
 
-    # These headers are added automatically by Schemathesis or `requests`.
-    # Do not show them in code samples to make them more readable
+    # Schemathesis or `requests` add these headers; hiding them keeps code samples readable
 
     return CaseInsensitiveDict(
         {

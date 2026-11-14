@@ -82,16 +82,13 @@ def test_compute_does_not_mutate_input():
 
 
 def test_external_ref_yields_no_descriptor():
-    # External `$ref` wrappers have no mutable content — operators can't negate
-    # `$ref` itself, so emitting a descriptor here would waste a primary slot.
+    # Operators cannot negate an external `$ref`, so a descriptor there would waste a primary slot.
     schema = {"$ref": "https://example.com/Schema.json"}
     assert compute_mutation_targets(schema) == ()
 
 
 def test_ref_with_sibling_constraints_yields_wrapper_descriptor():
-    # OpenAPI 3.1 / JSON Schema 2019-09+ allow `$ref` with sibling keywords; the
-    # wrapper's own constraints must be mutable, otherwise schemas like
-    # `{"$ref": ..., "minLength": 3}` regress to ignoring the sibling.
+    # OpenAPI 3.1 allows keywords beside `$ref`; constraints like `minLength` there must stay mutable.
     schema = {
         "$ref": "#/x-bundled/inner",
         "minLength": 3,
@@ -103,9 +100,7 @@ def test_ref_with_sibling_constraints_yields_wrapper_descriptor():
 
 
 def test_cycle_protection_via_ancestor_stack():
-    # Cycle terminates the walk; the wrapper at the cycle point yields no
-    # descriptor (only `$ref`, nothing mutable). The reachable target above the
-    # cycle still yields its own descriptors.
+    # The cycle ends the walk: its `$ref`-only wrapper yields no descriptor, while the target above it does.
     schema = {
         "$ref": "#/x-bundled/node",
         BUNDLE_STORAGE_KEY: {
@@ -115,13 +110,11 @@ def test_cycle_protection_via_ancestor_stack():
     descriptors = compute_mutation_targets(schema)
     walks = {d.walk for d in descriptors}
     assert (WalkStep("$ref", "node"),) in walks
-    # The cyclic descent does NOT emit a descriptor at the wrapper.
     assert (WalkStep("$ref", "node"), WalkStep("properties", "child")) not in walks
 
 
 def test_walk_terminates_at_max_depth():
-    # Adversarial input: a chain longer than MAX_WALK_DEPTH must terminate cleanly without
-    # RecursionError, and walks must never reach a depth exceeding the cap.
+    # A chain longer than MAX_WALK_DEPTH must stop at the cap without a RecursionError.
     schema: dict = {"type": "object"}
     leaf = schema
     chain_length = MAX_WALK_DEPTH + 5

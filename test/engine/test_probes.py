@@ -31,7 +31,7 @@ def _make_strict_server(app_runner, reject: Callable[[], object]) -> str:
 
 @pytest.fixture
 def null_byte_strict_url(app_runner):
-    # NullByteInHeader probe expects 400 when the server rejects the byte; Flask/Werkzeug accept it by default.
+    # The null-byte probe expects 400 when the server rejects the byte; Flask/Werkzeug accept it by default.
     def reject():
         for value in request.headers.values():
             if "\x00" in value:
@@ -65,8 +65,7 @@ _TOMCAT_400_HTML = (
 
 @pytest.fixture
 def path_decoder_strict_tomcat_html_url(app_runner):
-    # Tomcat ships a default HTML error page; the strict URL decoder still rejects before routing,
-    # but the body is non-empty.
+    # Tomcat's default HTML error page: the strict URL decoder still rejects before routing, with a non-empty body.
     def reject():
         if _unsafe_path():
             return (_TOMCAT_400_HTML, 400, {"Content-Type": "text/html;charset=utf-8"})

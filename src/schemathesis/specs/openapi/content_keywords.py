@@ -14,12 +14,7 @@ if TYPE_CHECKING:
 
 
 class ContentSchemaViolation(Exception):
-    """Raised when a contentSchema validation fails.
-
-    Carried as `__cause__` on the outer `jsonschema_rs.ValidationError` so the
-    call site can distinguish content-schema failures from structural event failures
-    and report them with the correct title and root schema.
-    """
+    """A `contentSchema` failure, carried as `__cause__` so callers report it apart from event structure failures."""
 
     def __init__(self, exc: jsonschema_rs.ValidationError, content_schema: dict[str, Any] | bool) -> None:
         self.original = exc
@@ -28,12 +23,7 @@ class ContentSchemaViolation(Exception):
 
 
 class SseValidator:
-    """Cached SSE event validator that accepts a per-call payload deserializer.
-
-    The validator is built once from the schema. Before each validation loop,
-    callers inject the per-call `deserialize_payload` via `with_deserializer()`;
-    the keyword instances read it via the back-reference to this object.
-    """
+    """SSE event validator built once per schema; `with_deserializer` sets the payload deserializer per call."""
 
     def __init__(self, schema: dict[str, Any] | bool, validator_cls: type[jsonschema_rs.Validator]) -> None:
         self._deserialize_payload: Callable[[str, str], Any] | None = None

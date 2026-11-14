@@ -78,7 +78,6 @@ def initialize_report_handlers(
     args: list[str],
     params: dict[str, Any],
 ) -> list[EventHandler]:
-    """Initialize built-in report handlers and custom handlers."""
     handlers: list[EventHandler] = []
     # Checked before any report file is created.
     if config.reports.allure.enabled and importlib.util.find_spec("allure_commons") is None:
@@ -133,7 +132,6 @@ def initialize_report_handlers(
 
 
 def display_handler_error(handler: EventHandler, exc: Exception, config: ProjectConfig) -> None:
-    """Display an error that occurred within an event handler."""
     report_format = _REPORT_HANDLER_FORMATS.get(type(handler))
     if report_format is not None and isinstance(exc, OSError):
         path = config.reports.get_path(report_format)
@@ -186,8 +184,7 @@ def execute_event_loop(
             if abnormal_exit_code is not None:
                 ctx.exit_code = abnormal_exit_code
             for h in handlers:
-                # The exit code is the API's verdict; a reporter failing at shutdown must not mask it,
-                # unlike a mid-run handler error, which aborts.
+                # A reporter failing at shutdown must not mask the exit code; mid-run handler errors abort instead.
                 try:
                     h.shutdown(ctx)
                 except Exception as exc:

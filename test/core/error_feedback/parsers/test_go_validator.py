@@ -658,8 +658,7 @@ def test_go_validator_parser_parse(make_operation, body, expected, case_factory)
 
 
 def test_go_validator_parser_default_multi_field(make_operation, case_factory):
-    # Default form lacks `param` — only constraints that don't need it (required/email/url/uuid)
-    # survive. `min`/`max`/`gte`/`lte`/`oneof` clauses drop cleanly.
+    # The default form lacks `param`, so only required/email/url/uuid survive; `min`/`max`/`gte`/`lte`/`oneof` drop.
     observations = GoValidatorParser().parse(
         operation=make_operation(), body=_GO_DEFAULT_MULTI_FIELD, case=case_factory()
     )

@@ -15,7 +15,7 @@ from schemathesis.config._dictionaries import (
 from schemathesis.config._env import resolve
 from schemathesis.config._error import ConfigError
 
-# Define valid parameter locations from OpenAPI
+# OpenAPI parameter locations
 ParameterLocation = Literal["path", "query", "header", "cookie", "body"]
 
 

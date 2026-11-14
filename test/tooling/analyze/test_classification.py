@@ -48,23 +48,19 @@ def _call(*, status, mode="positive", components=None, matches_route=True):
 @pytest.mark.parametrize(
     ("call", "expected_bucket"),
     [
-        # Mode + status -> bucket
         (_call(status=200), CallBucket.POSITIVE_ACCEPTED),
         (_call(status=200, mode="negative"), CallBucket.NEGATIVE_DRIFT),
         (_call(status=400, mode="negative"), CallBucket.NEGATIVE_REJECTED),
-        # 5xx — split by mode so "crash on valid input" vs "crash on invalid input" remain distinct.
+        # 5xx splits by mode, keeping crashes on valid and invalid input apart.
         (_call(status=503, mode="positive"), CallBucket.POSITIVE_SERVER_ERROR),
         (_call(status=502, mode="negative"), CallBucket.NEGATIVE_SERVER_ERROR),
-        # Auth
         (_call(status=401), CallBucket.AUTH_REJECTED),
         (_call(status=403), CallBucket.AUTH_REJECTED),
-        # Route mismatch -> route_rejected only when method actually differs
         (_call(status=404, matches_route=False), CallBucket.ROUTE_REJECTED),
         (_call(status=405, matches_route=False), CallBucket.ROUTE_REJECTED),
-        # Matching route falls through to mode/status logic
+        # A matching route falls through to the mode and status rules.
         (_call(status=405, matches_route=True, mode="positive"), CallBucket.POSITIVE_DRIFT),
         (_call(status=404, matches_route=True, mode="negative"), CallBucket.NEGATIVE_REJECTED),
-        # Other
         (_call(status=302), CallBucket.OTHER),
         (_call(status="transport-error"), CallBucket.OTHER),
     ],

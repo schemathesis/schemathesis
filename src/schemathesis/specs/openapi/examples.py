@@ -64,8 +64,6 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class ParameterExample:
-    """A single example for a named parameter."""
-
     container: ContainerName
     name: str
     value: Any
@@ -75,8 +73,6 @@ class ParameterExample:
 
 @dataclass(slots=True)
 class BodyExample:
-    """A single example for a body."""
-
     value: Any
     media_type: str
 
@@ -122,7 +118,7 @@ def _get_pool_combos(
         )
         if variants:
             container = location.container_name
-            # Examples-phase combos don't carry pool_draws; that threading is a follow-up.
+            # Examples-phase combos carry no pool draws.
             per_location.append([{container: variant.overlay} for variant in variants])
 
     for body in operation.body:
@@ -181,27 +177,21 @@ def get_strategies_from_examples(
     optional_query = frozenset(parameter.name for parameter in operation.query if not parameter.is_required)
 
     def serialize_components(case: Case) -> Case:
-        """Applies special serialization rules for case components.
-
-        For example, here, query parameters will be rendered in the `deepObject` style if needed.
-        """
+        """Apply parameter styles, such as `deepObject` for query parameters."""
         for container, map_func in maps.items():
             value = getattr(case, container)
             setattr(case, container, map_func(value))
-        # A spec example carries Python values; the URL renders them as text, so booleans and nulls
-        # need the same JSON spelling every other phase sends.
+        # Spec examples hold Python values; booleans and nulls need the JSON spelling other phases send.
         case.query = jsonify_query_parameters(case.query, optional_query)
         case.path_parameters = jsonify_python_specific_types(case.path_parameters)
         if case._meta is not None:
-            # Rendering a value for the wire does not change the data that was generated, and
-            # re-checking the rendered form against the typed schema would call the example negative.
+            # Rendering keeps the generated data; re-checking the rendered form would call the example negative.
             for location in CONCRETE_LOCATIONS:
                 case._meta.clear_dirty(location)
         return case
 
-    # Extract all top-level examples from the `examples` & `example` fields (`x-` prefixed versions in Open API 2)
+    # Top-level `examples` and `example` fields, `x-` prefixed in Open API 2
     schema_examples = list(extract_top_level(operation))
-    # Add examples from parameter's schemas
     schema_examples.extend(extract_from_schemas(operation))
     schema_combos = list(produce_combinations(schema_examples))
 
@@ -362,11 +352,8 @@ def extract_top_level(
             if definition is parameter.definition:
                 validator = param_validator
             else:
-                # Expanded subschema (schema itself or an anyOf/oneOf branch).
-                # Validate against the subschema's own constraints so that:
-                # - A schema-level `example` that violates the schema's own pattern is rejected.
-                # - A oneOf/anyOf branch example is validated against the branch (not the full
-                #   combined schema, which would reject strings valid for multiple branches).
+                # Check against this subschema: it rejects an `example` breaking its own `pattern`, and the full
+                # combined schema would reject strings several branches accept.
                 validator = _make_example_validator(definition)
             # Both keywords are accepted in every version, like body examples
             for example_keyword in dict.fromkeys((parameter.adapter.example_keyword, "example", "x-example")):
@@ -410,8 +397,7 @@ def extract_top_level(
     for alternative in operation.body:
         body = cast(OpenApiBody, alternative)
         body_validator: jsonschema_rs.Validator | None = _make_example_validator(body.validation_schema)
-        # A value declared deeper in the schema still goes on the wire as the whole body, so it is
-        # checked against what the body declares; float32 narrowing stays the separate question below.
+        # A deeper value still goes on the wire as the whole body, so the body schema checks it; float32 is separate.
         declared_validator: jsonschema_rs.Validator | None = _make_example_validator(
             body.validation_schema, snap_float32=False
         )
@@ -495,9 +481,7 @@ def _resolve_bundled(
     if isinstance(schema, dict):
         reference = schema.get("$ref")
         if isinstance(reference, str):
-            # This walk explores everything, so a cycle would take it around forever. Whatever the
-            # pointer names has already been looked at once, and an empty schema carries no example
-            # and nothing further to explore.
+            # Cut cycles: the target was walked once already, and an empty schema has no example.
             if reference in reference_path:
                 return {}, reference_path, resolver
 
@@ -508,9 +492,7 @@ def _resolve_bundled(
             except RefResolutionError as exc:
                 raise UnresolvableReference(reference) from exc
 
-            # In OAS 3.1 (JSON Schema draft 2020-12), sibling keywords alongside $ref
-            # are valid and apply independently. Merge them into the resolved schema so
-            # constraints like minLength or explicit examples are not silently dropped.
+            # OAS 3.1 applies `$ref` siblings, so merge them in to keep constraints like `minLength` and examples.
             if merge_ref_siblings and isinstance(resolved_schema, dict):
                 siblings = {k: v for k, v in schema.items() if k != "$ref"}
                 if siblings:
@@ -616,7 +598,7 @@ def _merge_all_of(
         reference_path,
         merge_ref_siblings=merge_ref_siblings,
     )
-    # Clone after resolving to avoid mutating the original schema when merging
+    # Clone so merging leaves the original schema intact
     merged: dict[str, Any] = cast("dict[str, Any]", deepclone(first)) if isinstance(first, dict) else {}
 
     for sub in schema["allOf"][1:]:
@@ -639,30 +621,22 @@ def _merge_all_of(
                 else:
                     merged[key] = value
 
-    # Merge parent schema's fields with the merged allOf result
-    # Parent's fields take precedence as they are more specific
     parent_has_example = "example" in schema or "examples" in schema
 
-    # If parent has examples, remove examples from merged allOf to avoid duplicates
-    # The parent's examples were already yielded from the parent schema itself
+    # The parent's examples were yielded already, so the merged ones would duplicate them
     if parent_has_example:
         merged.pop("example", None)
         merged.pop("examples", None)
 
     for key, value in schema.items():
         if key in ("allOf", "example", "examples", BUNDLE_STORAGE_KEY):
-            # Skip the allOf itself, we already processed it
-            # Skip parent's examples - they were already yielded
-            # Skip bundled schemas too to avoid infinite recursion
+            # `allOf` is merged, parent examples were yielded, and bundled schemas would recurse forever
             continue
         elif key == "properties":
-            # Merge parent properties (parent overrides allOf)
             _update_dict_keyword(merged, "properties", value)
         elif key == "required":
-            # Extend required list
             _extend_list_keyword(merged, "required", value)
         else:
-            # For other fields, parent value overrides
             merged[key] = value
 
     if merged.get("allOf"):
@@ -726,8 +700,7 @@ def extract_inner_examples(
 
 def _iter_schema_examples(container: object, resolver: Resolver) -> Generator[Any, None, None]:
     """Example values held by an `examples` container that sits inside a schema."""
-    # A list is the JSON Schema spelling, where every item is a raw value, while a mapping can only be
-    # the Open API one, where every entry is an Example Object keyed by its name.
+    # A list is the JSON Schema form of raw values; a mapping is the Open API form of named Example Objects.
     if isinstance(container, dict):
         yield from extract_inner_examples(container, resolver)
     elif isinstance(container, list):
@@ -754,7 +727,7 @@ def extract_named_inner_examples(
 
 @lru_cache
 def load_external_example(url: str) -> bytes:
-    """Load examples the `externalValue` keyword."""
+    """Fetch the example an `externalValue` points to."""
     response = requests.get(url, timeout=DEFAULT_RESPONSE_TIMEOUT)
     response.raise_for_status()
     return response.content
@@ -769,8 +742,7 @@ def extract_from_schemas(
         schema = parameter.validation_schema
         if isinstance(schema, bool):
             continue
-        # A value assembled from examples declared deeper in the schema still goes on the wire as the whole
-        # parameter, so it is checked against what the parameter declares.
+        # A value built from deeper examples goes on the wire as the whole parameter, so its schema checks it.
         parameter_validator: jsonschema_rs.Validator | None = _make_example_validator(schema, snap_float32=False)
         resolver = make_root_resolver(schema)
         bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
@@ -832,8 +804,7 @@ def _extract_body_examples_from_schemas(
 
 
 def _mentions_any_key(schema: dict[str, Any], keys: tuple[str, ...]) -> bool:
-    # The walk follows every path through shared references, which can be exponentially many. The bundled
-    # representation stores each shared subschema once, so a schema without these keys is skipped after one pass.
+    # The walk may take exponentially many paths; one pass over the bundle, which holds each subschema once, skips it.
     stack: list[object] = [schema]
     while stack:
         node = stack.pop()
@@ -851,8 +822,7 @@ def _make_example_validator(schema: Any, *, snap_float32: bool = True) -> jsonsc
     # Float32-snap so spec examples that collapse once narrowed (e.g. `5e-324` under `exclusiveMinimum: 0`) are evicted.
     if not isinstance(schema, dict):
         return None
-    # The sample values a schema carries constrain nothing, and a YAML tag can put something in them
-    # that no validator can be built over (`!!binary` -> bytes).
+    # Sample values constrain nothing, and a YAML tag like `!!binary` can put a value there no validator accepts.
     if "example" in schema or "examples" in schema:
         schema = {key: value for key, value in schema.items() if key not in ("example", "examples")}
     try:
@@ -862,7 +832,7 @@ def _make_example_validator(schema: Any, *, snap_float32: bool = True) -> jsonsc
 
 
 def _example_survives_float32(value: object, schema: Any) -> bool:
-    """Drop a value only when float32 narrowing is what invalidates it; otherwise keep emitting as before."""
+    """False only when float32 narrowing alone invalidates `value`."""
     snapped = snapped_float32_clone(schema)
     if snapped is schema:
         return True
@@ -924,10 +894,7 @@ def _with_bundle_storage(schema: dict[str, Any], bundle_storage: dict[str, Any] 
 
 @dataclass(slots=True)
 class ExampleWalk:
-    """What stays the same while one schema is walked for examples.
-
-    Only the schema, its resolver and the references already followed change as the walk descends.
-    """
+    """State that stays fixed while one schema is walked for examples."""
 
     operation: OpenApiOperation
     example_keyword: str
@@ -976,8 +943,7 @@ def _yield_examples_from_properties(
 
     for name, subschema in properties.items():
         if isinstance(subschema, dict) and subschema.get("$ref") in current_path:
-            # The cycle is cut here, so there is no example to take. Only a required property is filled in,
-            # and from its own schema - an empty one would draw `null` and invalidate the whole body.
+            # A cut cycle has no example; a required property draws from its own schema, as an empty one gives `null`.
             if name in required:
                 to_generate[name] = subschema
             continue
@@ -1108,12 +1074,10 @@ def extract_from_schema(
         )
         if isinstance(merged.get("properties"), dict):
             properties_to_process = merged["properties"]
-            # Keep the references consumed by the merge on the path, otherwise a cycle running only
-            # through `allOf` members is never recognized.
+            # Keep the merged references on the path, or a cycle through `allOf` members alone goes unnoticed.
             current_path, current_resolver = merged_path, merged_resolver
 
-    # Required fields absent from `properties` have no annotated example; add them
-    # with a non-null schema so that a value is generated for each.
+    # Required fields missing from `properties` get a non-null schema, so a value is generated for each.
     required = set(schema.get("required", []))
     required_missing = [f for f in required if f not in properties_to_process]
     if required_missing:

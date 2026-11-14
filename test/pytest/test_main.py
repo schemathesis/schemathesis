@@ -28,15 +28,15 @@ def test_b(case):
     )
     result = testdir.runpytest("-v", "-s")
     assert "The `base_url` argument is required when specifying a schema via a file" in result.stdout.str()
-    # The server the spec declares is the value the user most likely wants, so spare them the manual lookup
+    # The message suggests the server the spec declares, the value the user most likely wants.
     assert "https://api.example.com/v1" in result.stdout.str()
-    # But it should NOT include reproduction code since this is a configuration error, not an API failure
+    # A configuration error has no request to reproduce.
     assert "Reproduce with:" not in result.stdout.str()
 
 
 def test_pytest_collection_regression(testdir):
     # See #429.
-    # When in a module scope there is an object that has custom `__getattr__` (a mock for example)
+    # A module-level object with a custom `__getattr__`, such as a mock.
     testdir.make_test(
         """
 from unittest.mock import call
@@ -46,7 +46,6 @@ def test_schemathesis():
 """,
     )
     result = testdir.runpytest()
-    # It shouldn't be collected as a test
     result.assert_outcomes(passed=1)
 
 
@@ -63,7 +62,7 @@ def test_b(case, a):
     assert True
 """,
     )
-    # Ignore filters must come AFTER -Werror so they take priority (filters are a stack).
+    # Ignore filters go after -Werror to take priority: warning filters form a stack.
     result = testdir.runpytest(
         "-Werror",
         "-W",
@@ -80,7 +79,7 @@ def test_b(case, a):
         "ignore:Exception ignored in.*BaseEventLoop:pytest.PytestUnraisableExceptionWarning",
         "--asyncio-mode=strict",
     )
-    # There should be no errors. There are no warnings from Schemathesis pytest plugin.
+    # The Schemathesis pytest plugin emits no warnings.
     result.assert_outcomes(passed=3)
 
 
@@ -165,14 +164,12 @@ def test_d():
         assert deadline.microseconds == 200 * 1000
 """,
     )
-    # When there is a test with Pytest
     result = testdir.runpytest()
-    # Then it should use the global Schemathesis deadline for Hypothesis (None)
+    # Tests use the global Schemathesis deadline for Hypothesis (None).
     result.assert_outcomes(passed=4)
 
 
 def test_schema_given(testdir):
-    # When the test uses `schema.given`
     testdir.make_test(
         """
 from hypothesis.strategies._internal.core import DataObject
@@ -196,14 +193,11 @@ def teardown_module(module):
             }
         },
     )
-    # Then its arguments should be proxied to the `hypothesis.given`
-    # And be available in the test
     result = testdir.runpytest()
     result.assert_outcomes(passed=2)
 
 
 def test_given_no_arguments(testdir):
-    # When `schema.given` is used without arguments
     testdir.make_test(
         """
 @schema.parametrize()
@@ -212,14 +206,12 @@ def test(case):
     pass
         """,
     )
-    # Then the wrapped test should fail with an error
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines([".+given must be called with at least one argument"])
 
 
 def test_given_with_explicit_examples(testdir):
-    # When `schema.given` is used for a schema with explicit examples
     testdir.make_test(
         """
 @schema.include(method="GET").parametrize()
@@ -245,7 +237,6 @@ def test(case, data):
         },
         schema_name="simple_openapi.yaml",
     )
-    # Then collection should fail with a clear error
     result = testdir.runpytest("-v")
     result.assert_outcomes(errors=1)
     stdout = result.stdout.str()
@@ -296,7 +287,6 @@ def test_dangling_example_reference_fails_only_its_operation(testdir, test_sourc
 
 
 def test_given_with_explicit_hypothesis_example(testdir):
-    # When user explicitly adds @hypothesis.example() decorator with @schema.given()
     testdir.make_test(
         """
 from hypothesis import example
@@ -308,19 +298,16 @@ def test(case, user_id):
     pass
         """,
     )
-    # Then collection should fail with an error (actually caught at collection now by builder.py)
-    # because we're detecting missing strategies for user_id in the @example
+    # The @example lacks a value for `user_id`, so collection fails.
     result = testdir.runpytest("-v")
-    # Could be errors=1 (collection error) or failed=1 (runtime error from plugin.py)
+    # Either a collection error or a runtime failure.
     assert result.ret != 0
     stdout = result.stdout.str()
-    # Should show error about inconsistent args
     assert "Inconsistent" in stdout or "example" in stdout.lower()
 
 
 def test_given_with_schema_examples_in_request_body(testdir):
     # See GH-3328
-    # When @schema.given() is combined with schema examples in request body
     testdir.makepyfile(
         """
 import schemathesis
@@ -378,7 +365,6 @@ def test_user_endpoints(case, user_id):
     case.call_and_validate()
         """
     )
-    # Then the test should fail with a clear, actionable error message
     result = testdir.runpytest("-v")
     result.assert_outcomes(failed=1)
     stdout = result.stdout.str()
@@ -389,7 +375,6 @@ def test_user_endpoints(case, user_id):
 
 
 def test_given_no_override(testdir):
-    # When `schema.given` is used multiple times on the same test
     testdir.make_test(
         """
 @schema.parametrize()
@@ -399,14 +384,12 @@ def test(case):
     pass
         """,
     )
-    # Then the wrapped test should fail with an error
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines([".+You have applied `given` to the `test` test more than"])
 
 
 def test_parametrize_no_override(testdir):
-    # When `schema.parametrize` is used multiple times on the same test
     testdir.make_test(
         """
 @schema.parametrize()
@@ -415,14 +398,13 @@ def test(case):
     pass
         """,
     )
-    # Then the wrapped test should fail with an error
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines([".+You have applied `parametrize` to the `test` test more than"])
 
 
 def test_invalid_test(testdir):
-    # When the test doesn't use the strategy provided in `schema.given`
+    # The test does not accept the `data` argument that `schema.given` provides.
     testdir.make_test(
         """
 @schema.parametrize()
@@ -431,14 +413,12 @@ def test(case):
     pass
     """,
     )
-    # Then the test should fail instead of error
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_fail_on_operations_with_infinite_recursive_references(testdir, schema_with_recursive_references):
-    # When the test schema contains infinite recursive references
     testdir.make_test(
         """
 @schema.parametrize()
@@ -448,13 +428,12 @@ def test(case):
         generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-rs")
-    # Then this test should be failed with a proper error message
     result.assert_outcomes(failed=1)
     assert "Cannot generate test data for request body" in result.stdout.str()
 
 
 def test_checks_as_a_list(testdir, ctx):
-    # When the user passes a list of checks instead of a tuple
+    # `additional_checks` given as a list.
     api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
@@ -470,13 +449,11 @@ def test(case):
 """,
     )
     result = testdir.runpytest("-s")
-    # Then it should work
     result.assert_outcomes(passed=1)
     assert "CHECKING!" in result.stdout.str()
 
 
 def test_excluded_checks(testdir, ctx):
-    # When the user would like to exclude a check
     api = ctx.openapi.apps.failure()
     testdir.make_test(
         f"""
@@ -493,7 +470,6 @@ def test(case):
         paths={"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}},
     )
     result = testdir.runpytest()
-    # We should skip checking for a server error
     result.assert_outcomes(passed=1)
 
 
@@ -505,7 +481,6 @@ def test(case):
     ],
 )
 def test_failing_custom_check(testdir, ctx, body, expected):
-    # When the user passes a custom check that fails
     api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
@@ -525,10 +500,8 @@ def test(case):
     )
     result = testdir.runpytest("-s")
     result.assert_outcomes(failed=1)
-    # Then the failure message should be displayed
     stdout = result.stdout.str()
     assert expected in stdout
-    # And other failing checks are not ignored
     assert "Another check" in stdout
 
 
@@ -559,7 +532,6 @@ def test_plugin_load_does_not_import_heavy_modules():
 
 def test_skip_negative_without_parameters(testdir):
     # See GH-1463
-    # When an endpoint has no parameters to negate
     testdir.make_test(
         """
 schema = schemathesis.openapi.from_dict(raw_schema)
@@ -570,7 +542,6 @@ def test_(case):
     pass
 """,
     )
-    # Then it should be skipped
     result = testdir.runpytest("-v", "-rs", "-s")
     result.assert_outcomes(skipped=1)
     result.stdout.re_match_lines([r".*Impossible to generate negative test cases.*"])
@@ -587,7 +558,6 @@ def test_(case):
 )
 def test_skip_impossible_to_negate(testdir, content):
     # See GH-1463
-    # When endpoint's body schema can't be negated
     testdir.make_test(
         """
 schema = schemathesis.openapi.from_dict(
@@ -610,15 +580,13 @@ def test_(case):
         },
         schema_name="simple_openapi.yaml",
     )
-    # Then it should be skipped
     result = testdir.runpytest("-v", "-rs", "-s")
     result.assert_outcomes(skipped=1)
     result.stdout.re_match_lines([r".*Impossible to generate negative test cases.*"])
 
 
 def test_do_not_skip_partially_negated(testdir):
-    # When endpoint's body schema can't be negated
-    # And there is another parameter that can be negated
+    # The body schema can't be negated, but the query parameter can.
     testdir.make_test(
         """
 schema = schemathesis.openapi.from_dict(
@@ -649,7 +617,6 @@ def test_(request, case):
         },
         schema_name="simple_openapi.yaml",
     )
-    # Then it should NOT be skipped
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 1"])
@@ -657,7 +624,6 @@ def test_(request, case):
 
 @pytest.mark.parametrize("location", ["header", "cookie", "query"])
 def test_path_parameters_allow_partial_negation(testdir, location):
-    # If path parameters can not be negated and other parameters can be negated
     testdir.make_test(
         """
 schema = schemathesis.openapi.from_dict(
@@ -683,15 +649,13 @@ def test_(request, case):
         },
         schema_name="simple_openapi.yaml",
     )
-    # Then non-negated should be generated as positive
-    # And the ones that can be negated should be negated
+    # The path parameter stays positive while the other one is negated.
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 1"])
 
 
 def test_many_path_parameters_allow_partial_negation(testdir):
-    # If just one path parameter can not be negated and other parameters can be negated
     testdir.make_test(
         """
 schema = schemathesis.openapi.from_dict(
@@ -721,8 +685,7 @@ def test_(request, case):
         },
         schema_name="simple_openapi.yaml",
     )
-    # Then non-negated should be generated as positive
-    # And the ones that can be negated should be negated
+    # The path parameter `key` stays positive while the others are negated.
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 20$"])
@@ -746,11 +709,9 @@ def test_b(v):
     result = testdir.runpytest()
     result.assert_outcomes(failed=2)
     stdout = result.stdout.str()
-    # Internal Schemathesis' frames should not appear in the output
+    # No internal Schemathesis frames.
     assert "def validate_response(" not in stdout
-    # And the Hypothesis failing-example block is not in the output of Schemathesis' tests
     assert not has_hypothesis_failure_header(stdout, "test_a(")
-    # And regular Hypothesis tests have it
     assert has_hypothesis_failure_header(stdout, "test_b(")
 
 
@@ -818,14 +779,13 @@ def test_statefully(state_machine):
 
 
 def test_invalid_schema_reraising(testdir):
-    # When there is a non-Schemathesis test failing because of Hypothesis' `InvalidArgument` error
+    # A plain Hypothesis test failing with `InvalidArgument`.
     testdir.make_test(
         """
 @given(st.integers(min_value=5, max_value=4))
 def test(value):
     pass""",
     )
-    # Then it should not be re-raised as `InvalidSchema`
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     assert "InvalidSchema: Cannot have" not in result.stdout.str()
@@ -848,7 +808,6 @@ def test(case):
         sanitize_output=value,
     )
     result = testdir.runpytest()
-    # We should skip checking for a server error
     result.assert_outcomes(failed=1)
     if value:
         expected = rf"curl -X GET -H 'Authorization: [Filtered]' {base_url}/failure"
@@ -1056,7 +1015,6 @@ def test(case):
             "/success": {
                 "post": {
                     "parameters": [
-                        # This parameter is not satisfiable
                         {
                             "name": "key",
                             "in": "query",
@@ -1083,7 +1041,6 @@ def test(case):
         schema_name="simple_openapi.yaml",
     )
     result = testdir.runpytest()
-    # We should skip checking for a server error
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines(
         [
@@ -1095,7 +1052,6 @@ def test(case):
 
 
 def test_unsupported_regex_pattern_removed(testdir, ctx):
-    # When a schema contains an unsupported regex pattern, it is removed and tests can proceed
     api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
@@ -1138,7 +1094,6 @@ def test(case):
         generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest()
-    # Test passes because the unsupported pattern is removed during schema conversion
     result.assert_outcomes(passed=1)
 
 
@@ -1657,7 +1612,6 @@ def test(case):
 
 
 def test_distinct_exceptions_not_deduplicated(testdir):
-    # When different errors occur, they should not be deduplicated
     testdir.make_test(
         """
 from hypothesis import Phase, settings
@@ -1683,7 +1637,6 @@ def test(case):
     )
     result = testdir.runpytest("-v")
     result.assert_outcomes(failed=3)
-    # Should show multiple distinct failures
     output = result.stdout.str()
     assert "test[GET /users] FAILED" in output
     assert "test[POST /users] FAILED" in output
@@ -1695,7 +1648,7 @@ def test(case):
 
 
 def test_curl_generation_does_not_hide_main_error(testdir):
-    # When curl generation fails, main error should still be shown (not replaced by curl error)
+    # A malformed path template makes curl generation fail.
     testdir.makefile(
         ".yaml",
         schema="""
@@ -1729,10 +1682,8 @@ def test(case):
     result = testdir.runpytest("-v")
     result.assert_outcomes(failed=1)
     output = result.stdout.str()
-    # Should show the main error (malformed path template)
     assert "InvalidSchema" in output
     assert "Malformed path template" in output
-    # Should NOT show "Reproduce with:" since curl generation failed
     assert "Reproduce with:" not in output
 
 
@@ -1843,7 +1794,6 @@ def test_(case):
 
 
 def test_reuse_test_function_across_schemas(testdir):
-    # The same base function should be reusable with multiple schemas
     testdir.make_test(
         """
 def _test_body(case):
@@ -1860,7 +1810,6 @@ test_b = schema2.parametrize()(_test_body)
 
 
 def test_pytest_parametrize_multiple_schemas(testdir):
-    # When `schemathesis.pytest.parametrize` is called with named schemas (sync and async)
     testdir.make_test(
         """
 import asyncio
@@ -1892,7 +1841,6 @@ async def test_async(case):
     await asyncio.sleep(0)
 """,
     )
-    # Then each schema contributes its own test items delimited by square brackets
     result = testdir.runpytest("-v", "-p", "no:randomly", "--asyncio-mode=auto")
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(

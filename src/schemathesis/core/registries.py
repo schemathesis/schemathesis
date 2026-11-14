@@ -7,7 +7,7 @@ T = TypeVar("T", bound=Callable | type)
 
 
 class Registry(Generic[T]):
-    """Container for Schemathesis extensions."""
+    """Extensions keyed by `__name__`."""
 
     __slots__ = ("_items",)
 
@@ -31,5 +31,4 @@ class Registry(Generic[T]):
         return self._items[name]
 
     def get_by_names(self, names: Sequence[str]) -> list[T]:
-        """Get items by their names."""
         return [self._items[name] for name in names]

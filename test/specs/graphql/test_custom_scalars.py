@@ -22,7 +22,6 @@ type Query {
 
 
 def test_custom_scalar_graphql(ctx):
-    # When a custom scalar strategy is registered
     expected = "2022-04-27"
     schemathesis.graphql.scalar("Date", st.just(expected).map(nodes.String))
     raw_schema = """
@@ -36,7 +35,6 @@ type Query {
 
     @run_given(schema["Query"]["getByDate"].as_strategy(), max_examples=100)
     def test(case):
-        # Then scalars should be properly generated
         assert f'getByDate(value: "{expected}")' in case.body
 
 

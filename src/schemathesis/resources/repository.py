@@ -16,12 +16,9 @@ from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor, 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
-# Maximum number of resource instances cached per unique context within a resource type.
-# This ensures diversity across parent resources (e.g., pets from different owners).
-# Set high enough to retain most resources created during typical test runs.
+# Instances kept per context (e.g. per owner of pets) within a resource type, so parent resources stay diverse.
 PER_CONTEXT_CAPACITY = 500
 
-# Maximum number of unique contexts to track per resource type.
 MAX_CONTEXTS_PER_TYPE = 20
 
 # Once real values exist, one draw in this many still offers the spec's example values.
@@ -47,11 +44,9 @@ class ResourceInstance:
 
 
 class ResourceRepository:
-    """Thread-safe cache storing resources from API responses for test generation.
+    """Thread-safe cache of resources from API responses.
 
-    Uses context-aware eviction to maintain diversity across parent resources.
-    For example, pets from different owners are preserved rather than being
-    dominated by pets from a single owner.
+    Eviction per context keeps parent resources diverse, e.g. pets of many owners rather than one.
     """
 
     __slots__ = (
@@ -64,10 +59,10 @@ class ResourceRepository:
 
     def __init__(self, descriptors: Sequence[ResourceDescriptor]) -> None:
         self._descriptors_by_operation: dict[str, list[ResourceDescriptor]] = defaultdict(list)
-        # Nested structure: resource_name -> context_key -> deque of instances
+        # resource_name -> context_key -> instances
         self._resource_buckets: dict[str, dict[str, deque[ResourceInstance]]] = {}
         self._example_turns: dict[str, int] = {}
-        # Track context insertion order for FIFO eviction of contexts
+        # Context insertion order, for FIFO eviction
         self._context_order: dict[str, deque[str]] = {}
         self._lock = threading.Lock()
 
@@ -81,16 +76,12 @@ class ResourceRepository:
         return self._descriptors_by_operation.get(operation_label, ())
 
     def iter_instances(self, resource_name: str) -> tuple[ResourceInstance, ...]:
-        """Iterate over cached instances of a resource type.
-
-        Returns instances from all contexts, providing diversity across parent resources.
-        """
+        """Cached instances of a resource type across all contexts."""
         # Under the lock: workers record responses into these buckets while others draw from them.
         with self._lock:
             context_buckets = self._resource_buckets.get(resource_name)
             if not context_buckets:
                 return ()
-            # Collect instances from all context buckets
             instances: list[ResourceInstance] = []
             for bucket in context_buckets.values():
                 instances.extend(bucket)
@@ -106,10 +97,7 @@ class ResourceRepository:
             return live
 
     def remove_by_value(self, resource_name: str, resource_field: str, value: object) -> int:
-        """Drop instances whose `resource_field` holds the given value; returns the number removed.
-
-        Called after a successful DELETE so subsequent draws don't re-feed a server-side gone id.
-        """
+        """Drop instances whose `resource_field` equals `value`, e.g. after a DELETE; returns the number removed."""
         context_buckets = self._resource_buckets.get(resource_name)
         if not context_buckets:
             return 0
@@ -138,7 +126,7 @@ class ResourceRepository:
         referenced: frozenset[str] = frozenset(),
         documented_status: str | None = None,
     ) -> None:
-        """Capture resources from an API response based on configured descriptors.
+        """Capture resources from a response with the operation's descriptors.
 
         `documented_status` is the schema's response key for `status_code`; without it, or with no descriptor for it,
         any 2xx descriptor matches.
@@ -155,8 +143,7 @@ class ResourceRepository:
                 # Another documented 2xx response may describe a different resource.
                 if descriptor.status_code != documented_status:
                     continue
-            # Match if exact status code matches OR both are 2xx
-            # This handles cases where schema says "200" but server returns "201"
+            # Any 2xx matches a 2xx descriptor: a schema may say "200" while the server returns "201"
             elif not status_code_matches(descriptor.status_code, status_code) and not (
                 str(descriptor.status_code).startswith("2") and str(status_code).startswith("2")
             ):
@@ -175,11 +162,7 @@ class ResourceRepository:
                 )
 
     def seed_input_values(self, by_resource: dict[str, dict[str, Any]], *, source: str) -> None:
-        """Store externally-provided identifier values under specific resource buckets.
-
-        Caller decides which buckets each value belongs to (typically by intersecting claim
-        fields with each resource's queried fields) so unrelated buckets aren't contaminated.
-        """
+        """Store external identifier values in the buckets the caller picks, so unrelated buckets stay clean."""
         for resource_name, data in by_resource.items():
             if data:
                 self._store(
@@ -203,11 +186,9 @@ class ResourceRepository:
         query: dict[str, Any] | None = None,
         referenced: frozenset[str] = frozenset(),
     ) -> None:
-        """Capture identifier values from a successful request.
+        """Capture identifier values from the path parameters and JSON body of a 2xx request.
 
-        Mirrors `record_response` but reads from the case (path parameters and
-        JSON body fields) instead of the response payload. Only fires on 2xx.
-        `path_parameters` are the case's path parameters in their declared types, when the caller knows them.
+        `path_parameters` holds the case's path parameters in their declared types, when the caller knows them.
         """
         if not (200 <= status_code < 300):
             return
@@ -238,8 +219,7 @@ class ResourceRepository:
             result = resolve_pointer_all(payload, pointer)
             if isinstance(result, Unresolvable):
                 return ()
-            # MANY descriptors yield one list per wildcard branch; flatten so each
-            # resource instance becomes a single pool entry.
+            # MANY yields a list per wildcard branch; flatten so each instance is one pool entry
             if descriptor.cardinality == Cardinality.MANY:
                 values: list[Any] = []
                 for item in result:
@@ -256,8 +236,7 @@ class ResourceRepository:
                 return ()
 
         if descriptor.extract_object_keys and descriptor.identifier_field is not None and isinstance(target, dict):
-            # Map-by-id payload: keys ARE the identifier values.
-            # Example: GET /teams/statuses -> {"frc1": {...}, "frc2": {...}}
+            # A map keyed by identifier, e.g. `{"a1": {...}, "b2": {...}}`
             return [{descriptor.identifier_field: key} for key in target]
 
         if descriptor.cardinality == Cardinality.MANY and isinstance(target, list):
@@ -280,15 +259,10 @@ class ResourceRepository:
         query: dict[str, Any] | None = None,
         referenced: frozenset[str] = frozenset(),
     ) -> None:
-        """Store a resource instance with context-aware eviction.
-
-        Maintains diversity by limiting instances per context and evicting
-        oldest contexts when capacity is reached.
-        """
+        """Store an instance, capping instances per context and evicting the oldest context when full."""
         # Delimited markers carry transport-only data; resource identifiers use the plain form.
         data = plain_str_values(data)
         context = plain_str_values(context) if context else context
-        # Create a stable key for the context
         context_key = jsonschema_rs.canonical.json.to_string(context) if context else ""
 
         instance = ResourceInstance(
@@ -305,21 +279,16 @@ class ResourceRepository:
         with self._lock:
             context_buckets = self._resource_buckets.get(resource_name)
             if context_buckets is None:
-                # Resource was not registered via descriptors (e.g. a request-only resource
-                # captured from path/body slots whose response side has no extractable shape).
+                # A resource without descriptors, e.g. one captured only from request slots
                 context_buckets = {}
                 self._resource_buckets[resource_name] = context_buckets
                 self._context_order[resource_name] = deque()
             context_order = self._context_order[resource_name]
 
-            # Get or create bucket for this context
             if context_key not in context_buckets:
-                # Check if we need to evict an old context
                 if len(context_buckets) >= MAX_CONTEXTS_PER_TYPE:
-                    # Remove the oldest context
                     oldest_key = context_order.popleft()
                     del context_buckets[oldest_key]
-                # Create new bucket for this context
                 context_buckets[context_key] = deque(maxlen=PER_CONTEXT_CAPACITY)
                 context_order.append(context_key)
 
@@ -338,11 +307,7 @@ def _wrap_extracted_values(values: Iterable[Any], descriptor: ResourceDescriptor
 
 
 def _extract_request_value(slot: ResourceFieldRef, case: Case, path_parameters: Mapping[str, Any]) -> Any:
-    """Pull the value for a resource-field reference out of a generated Case.
-
-    Returns None when the slot's location isn't supported (query, header,
-    body-array-index) or when the named field is absent from the case.
-    """
+    """The slot's value from path parameters or a top-level body field; `None` for other locations or absent fields."""
     if slot.parameter_location == ParameterLocation.PATH:
         return path_parameters.get(slot.parameter_name) if isinstance(slot.parameter_name, str) else None
     if slot.parameter_location == ParameterLocation.BODY:

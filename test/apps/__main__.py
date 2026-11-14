@@ -1,16 +1,4 @@
-"""Local launcher for catalog test apps.
-
-Run a single catalog factory on a chosen port for manual debugging:
-
-    python -m test.apps 8080 success
-    python -m test.apps 8080 success_and_failure
-    python -m test.apps 8080 users.crud
-    python -m test.apps 8080 envelopes.ajv
-    python -m test.apps 8080 graphql.books
-
-The first positional argument is the port; the second is the factory name
-(defaults to ``success_and_failure``). Use ``--list`` to see all factories.
-"""
+"""Run one catalog factory for manual debugging, e.g. `python -m test.apps 8080 users.crud`; `--list` shows all."""
 
 from __future__ import annotations
 

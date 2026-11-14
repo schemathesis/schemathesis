@@ -321,8 +321,7 @@ class ChecksConfig(DiffBase):
     ) -> None:
         from schemathesis.checks import CHECKS
 
-        # Registered custom checks aren't dataclass fields; apply the same include/exclude rules to
-        # them so `included_check_names` disables unlisted custom checks too, not just built-in ones.
+        # Apply the include/exclude rules to registered custom checks too, so `included_check_names` disables them.
         all_names = (
             set(_BUILTIN_CHECK_NAMES)
             | set(CHECKS.get_all_names())
@@ -332,7 +331,6 @@ class ChecksConfig(DiffBase):
         all_names.discard("all")
 
         for name in all_names:
-            # Check in explicitly excluded or not in explicitly included
             if name in (excluded_check_names or []) or (
                 included_check_names is not None
                 and "all" not in included_check_names

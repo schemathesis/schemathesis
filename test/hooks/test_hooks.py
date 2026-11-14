@@ -239,16 +239,14 @@ def test_local_dispatcher(ctx, apply_first):
     schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
     assert schema.hooks.scope == HookScope.SCHEMA
 
-    # When there are schema-level hooks
     @schema.hook("map_query")
     def schema_hook(context, query):
         return query
 
-    # And per-test hooks are applied
     def local_hook(context, cookies):
         return cookies
 
-    # And order of decorators is any
+    # Decorator order must not matter.
     apply = schema.hooks.apply(local_hook, name="map_cookies")
     parametrize = schema.parametrize()
     if apply_first:
@@ -265,14 +263,11 @@ def test_local_dispatcher(ctx, apply_first):
     def test(case):
         pass
 
-    # Then a hook dispatcher instance is attached to the test function
     hook_dispatcher = HookDispatcherMark.get(test)
     assert isinstance(hook_dispatcher, HookDispatcher)
     assert hook_dispatcher.scope == HookScope.TEST
-    # And this dispatcher contains only local hooks
     assert hook_dispatcher.get_all_by_name("map_cookies") == [local_hook]
     assert hook_dispatcher.get_all_by_name("map_query") == []
-    # And the schema-level dispatcher still contains only schema-level hooks
     handle = SchemaHandleMark.get(test)
     assert handle is not None
     assert handle.hooks.get_all_by_name("map_query") == [schema_hook]
@@ -428,7 +423,7 @@ def test_graphql_body(ctx):
 
     @run_given(case=strategy, max_examples=3, phases=[Phase.generate])
     def test(case):
-        # Not necessarily valid GraphQL, but it is simpler to check the hook this way
+        # The body need not be valid GraphQL; this shape makes the hook easy to check.
         assert case.body == "mutation {\n  addedViaHook\n}"
 
 

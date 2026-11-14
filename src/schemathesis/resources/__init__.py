@@ -46,11 +46,9 @@ class SemanticDraw:
 
 @dataclass(slots=True, frozen=True)
 class PoolPick:
-    """Bundle of correlated values + their provenance returned from `pick_correlated_values`.
+    """Correlated values and their provenance from `pick_correlated_values`.
 
-    `misses` records resource-bound (location, parameter_name) slots that the engine wanted to
-    fill from the pool but couldn't (no captured instance available). Useful for the analyzer
-    to compute "chain rate" — successful draws over (draws + misses).
+    `misses` lists resource-bound `(location, parameter_name)` slots with no captured value, for the chain rate.
     """
 
     values: dict[tuple[ParameterLocation, str], Any] = field(default_factory=dict)
@@ -66,20 +64,16 @@ class ResourcePool(Protocol):
         *,
         operation: APIOperation,
     ) -> PoolPick:
-        """Return correlated pool values for all resource-bound slots in one operation, with provenance."""
+        """Correlated pool values for every resource-bound slot of `operation`, with provenance."""
         ...  # pragma: no cover
 
 
 class ResourceRecorder(Protocol):
     """Record side: captures values from responses and requests as they happen."""
 
-    def should_record(self, *, operation: str) -> bool:
-        """Check if responses should be recorded for this operation."""
-        ...  # pragma: no cover
+    def should_record(self, *, operation: str) -> bool: ...  # pragma: no cover
 
-    def should_record_request(self, *, operation: str) -> bool:
-        """Check if request inputs should be captured for this operation."""
-        ...  # pragma: no cover
+    def should_record_request(self, *, operation: str) -> bool: ...  # pragma: no cover
 
     def record_response(
         self,
@@ -87,9 +81,7 @@ class ResourceRecorder(Protocol):
         operation: APIOperation,
         response: Response,
         case: Case,
-    ) -> None:
-        """Record a response for later use in test generation."""
-        ...  # pragma: no cover
+    ) -> None: ...  # pragma: no cover
 
     def record_request(
         self,
@@ -106,9 +98,7 @@ class ResourceRecorder(Protocol):
         *,
         operation: APIOperation,
         case: Case,
-    ) -> None:
-        """Record that a resource was successfully deleted."""
-        ...  # pragma: no cover
+    ) -> None: ...  # pragma: no cover
 
 
 class ExtraDataSource(ResourcePool, ResourceRecorder, Protocol):

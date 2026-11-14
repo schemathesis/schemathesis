@@ -352,8 +352,7 @@ def test_api(case):
 
 
 def test_xdist_no_report_configured(testdir, ctx):
-    # workers always send data via workeroutput even with no reports configured;
-    # the controller must silently skip processing when no writers are opened
+    # Workers send data even with no reports configured; the controller skips it when no writers are open.
     api = ctx.openapi.apps.success()
     _make_xdist_test(
         ctx,
@@ -467,9 +466,7 @@ def test_api(case):
 
 
 def test_two_schemas_same_vcr_path_via_xdist(testdir, ctx):
-    # Two schemas both enabling VCR without an explicit path share the same
-    # default filename; the controller adds a schema-id suffix so they don't
-    # overwrite each other.
+    # Two schemas with VCR and no explicit path share a default filename; a schema-id suffix keeps them apart.
     api = ctx.openapi.apps.success()
     report_dir = str(testdir.tmpdir.mkdir("reports"))
     schema_a = ctx.openapi.build_schema(
@@ -518,8 +515,7 @@ def test_schema_b(case):
 
 
 def test_xdist_writer_open_failure(testdir, ctx):
-    # VCR opens successfully, then HAR fails (path is a directory);
-    # the except block must close the already-opened VCR writer before re-raising
+    # HAR fails to open after VCR (its path is a directory), so the VCR writer must close before re-raising.
     api = ctx.openapi.apps.success()
     vcr_path = str(testdir.tmpdir.join("cassette.yaml"))
     har_path = str(testdir.tmpdir.join("cassette.har"))
@@ -538,9 +534,9 @@ def test_api(case):
         base_url=f"{api.base_url}/api",
     )
     result = testdir.runpytest("-n", "2")
-    # the writer open failure propagates from pytest_testnodedown as a session error
+    # The writer open failure surfaces as a session error.
     assert result.ret != 0
-    # VCR writer was opened before HAR failed — file exists with the cassette header
+    # The VCR writer opened before HAR failed, so its file has the cassette header.
     with open(vcr_path) as f:
         content = f.read()
     assert "recorded_with" in content

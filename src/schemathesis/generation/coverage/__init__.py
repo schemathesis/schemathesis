@@ -8,8 +8,7 @@ import jsonschema_rs
 
 from schemathesis.core.cache import BoundedCache
 
-# Distinct format/pattern registries alive per session; churn past this is registry-heavy enough
-# that cached values carry little worth.
+# Format/pattern registries pinned per session; churn past this makes cached values worth little.
 MAX_PINNED_REGISTRIES = 64
 
 

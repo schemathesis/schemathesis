@@ -117,7 +117,6 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, sn
 
     def create_item(data, items):
         post_count[0] += 1
-        # First few requests succeed, then fail with 500
         if post_count[0] <= 3:
             return _store_item(data, items)
         abort(500)
@@ -337,7 +336,6 @@ def test_extra_data_sources_with_response_examples_prepopulation(cli, snapshot_c
             },
         }
     )
-    # Simulating a pre-seeded database with a known user
     seeded_users = {known_user_id: {"id": known_user_id, "name": "Seeded User"}}
 
     @app.route("/users", methods=["POST"])
@@ -352,8 +350,7 @@ def test_extra_data_sources_with_response_examples_prepopulation(cli, snapshot_c
         # Bug: response violates schema - missing required 'name' field
         return jsonify({"id": seeded_users[user_id]["id"]}), 200
 
-    # With extra_data_enabled=True, response examples are pre-populated and
-    # the bug in GET /users/{user_id} is discovered. With False, only 404s occur.
+    # With extra data on, response examples reach the GET bug; with it off, only 404s occur.
     assert (
         cli.run_openapi_app(
             app,
@@ -415,14 +412,13 @@ def _make_items_app(ctx, get_params):
     def get_item(item_id):
         if item_id not in items:
             return "", 404
-        abort(500)  # reachable only with a real UUID from POST
+        abort(500)
 
     return app
 
 
 def test_examples_phase_merges_pool_with_schema_examples(cli, snapshot_cli, ctx):
-    # `filter` has a schema example (keeps the phase active), `id` has none.
-    # Pool supplies the real `id` from POST, exposing the bug.
+    # `filter` has an example that keeps the phase active; only the pool supplies the real `id`.
     get_params = [
         _path_param("id"),
         {"name": "filter", "in": "query", "schema": {"type": "string", "example": "active"}},
@@ -440,8 +436,7 @@ def test_examples_phase_merges_pool_with_schema_examples(cli, snapshot_cli, ctx)
 
 
 def test_examples_phase_uses_pool_as_fill_missing_source(cli, snapshot_cli, ctx):
-    # No schema examples - GET would be skipped without fill-missing.
-    # With fill-missing=true, pool supplies the real `id` and exposes the bug.
+    # Without examples, GET runs only through fill-missing, which takes the real `id` from the pool.
     get_params = [_path_param("id")]
 
     assert (
@@ -695,8 +690,7 @@ def test_pool_records_responses_with_unbundlable_schema(cli, snapshot_cli, ctx):
 
 
 def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, snapshot_cli, ctx):
-    # Docker Engine /volumes shape: `{Volumes: [...], Warnings: [...]}`. Server-seeded names;
-    # no POST creator. UUIDs make blind generation practically incapable of guessing.
+    # Server-seeded UUID names in `{Volumes: [...], Warnings: [...]}` and no creator; generation cannot guess them.
     seeded_names = [
         "550e8400-e29b-41d4-a716-446655440000",
         "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
@@ -763,8 +757,7 @@ def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, snapshot
 
 
 def test_parent_aware_pool_correlates_path_params(cli, snapshot_cli, ctx):
-    # Deep path planted bug fires only when (productName, itemName) co-refer.
-    # Without parent-aware draws, pool feeds independent values and the bug stays unreached.
+    # The deep-path bug needs (productName, itemName) to co-refer, which independent pool draws never achieve.
     products: set[str] = set()
     items: set[tuple[str, str]] = set()
     spec = {
@@ -996,8 +989,7 @@ def test_pool_skips_ids_that_cannot_fill_a_path_segment(cli, snapshot_cli, ctx):
 
 
 def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, ctx):
-    # After a successful DELETE, the pool no longer feeds the deleted id to GET/PUT/PATCH
-    # consumers. Verified by counting per-id calls server-side, not by snapshotting CLI output.
+    # After a DELETE the pool stops feeding the deleted id; server-side per-id counts verify it.
     items: dict[str, dict] = {}
     deleted_ids: set[str] = set()
     stale_get_calls = 0
@@ -1060,7 +1052,6 @@ def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, ctx):
         "--mode=positive",
     )
 
-    # Tombstone+eviction must keep stale-id GETs near zero
     assert stale_get_calls <= 5, f"pool kept feeding deleted ids: {stale_get_calls} stale GETs"
 
 
@@ -1073,8 +1064,7 @@ def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, ctx):
     ids=["top-level-array", "wrapped-array"],
 )
 def test_stateful_reaches_every_list_producer_element(cli, snapshot_cli, ctx, producer_shape, wrap_response):
-    # The planted bug at the last seeded id is only reachable if the inferred link
-    # samples across every element of the producer's list, not just the first one.
+    # The bug sits at the last seeded id, so the inferred link must sample every list element.
     seeded = [
         {"id": "w-1", "label": "alpha"},
         {"id": "w-2", "label": "beta"},
@@ -1335,8 +1325,7 @@ def test_pool_reuses_created_identifiers(cli, ctx, booking_properties, parameter
 
 
 def test_extra_data_sources_overlays_nested_body_foreign_key(cli, snapshot_cli, ctx):
-    # Server returns 500 only when shipping.location_id matches a real Location id;
-    # without the nested overlay random ints never hit a real id and the bug stays hidden.
+    # Only a real Location id in `shipping.location_id` triggers the 500; random ints never hit one.
     location_schema = _object_schema({"id": {"type": "integer"}}, required=["id"], example={"id": 11})
     app, _ = ctx.openapi.make_flask_app(
         {

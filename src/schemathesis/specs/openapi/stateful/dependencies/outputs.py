@@ -22,9 +22,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import APIOperation, OpenApiSchema
 
 
-# HTTP methods whose 2xx response confirms a newly-created resource keyed by
-# the trailing path parameter (e.g. `POST /products/{productName}`). PUT is
-# usually an updater, so it only counts when nothing POSTs to the parent collection.
+# A 2xx confirms a resource keyed by the trailing path parameter; PUT counts only without a POST on the collection
 _PATH_KEYED_PRODUCER_METHODS = frozenset({"post"})
 
 
@@ -35,7 +33,6 @@ def extract_outputs(
     state: InferenceState,
     post_collections: frozenset[str],
 ) -> Iterator[OutputSlot]:
-    """Extract resources from API operation's responses."""
     extracted_resource_names: set[str] = set()
     for response, extracted in cached_resources_from_responses(operation=operation, state=state):
         extracted_resource_names.add(extracted.resource.name)
@@ -74,12 +71,9 @@ def _path_keyed_outputs(
     already_extracted: set[str],
     post_collections: frozenset[str],
 ) -> Iterator[OutputSlot]:
-    """Emit a synthetic output for path-keyed creators with no body schema.
+    """Confirm the `{name}` resource on a 2xx `POST` or `PUT` to a path ending in `{name}`.
 
-    A 2xx `POST` or `PUT` to a path ending in `{name}` confirms that the
-    resource bound to `name` exists. Without this, an empty-response creator
-    contributes no producer edges and downstream operations on the same
-    resource never get linked.
+    Empty-response creators otherwise produce no edges, and operations on the resource stay unlinked.
     """
     trailing = naming.trailing_path_parameter(operation.path)
     if trailing is None:
@@ -136,18 +130,13 @@ def _body_keyed_outputs(
     inputs: list[InputSlot],
     already_extracted: set[str],
 ) -> Iterator[OutputSlot]:
-    """Emit a synthetic output for body-keyed creators with no response body.
+    """Confirm the path resource on a 2xx `POST /sessions` whose body carries an identifier like `sessionId`.
 
-    A 2xx `POST` to `/collection` whose request body carries an identifier-
-    shaped field for the path-derived resource (e.g. `POST /sessions` with
-    body `{sessionId: ...}`) confirms the resource exists once the request
-    succeeds. Without this, the dependency graph has no producer edge for
-    the resource and consumer operations get layered before the creator.
+    Without it, the graph has no producer edge and consumers get layered before the creator.
     """
     if operation.method.lower() not in _PATH_KEYED_PRODUCER_METHODS:
         return
-    # Skip operations that already have a path-keyed identifier; those are
-    # handled by `_path_keyed_outputs` and don't need a body-keyed echo.
+    # Path-keyed creators get their output from the trailing path parameter
     if naming.trailing_path_parameter(operation.path) is not None:
         return
 

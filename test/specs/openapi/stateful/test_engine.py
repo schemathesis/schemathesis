@@ -85,15 +85,12 @@ def collect_result(events) -> EngineResult:
 
 @pytest.mark.parametrize("max_failures", [1, 2])
 def test_find_independent_5xx(engine_factory, max_failures):
-    # When the app contains multiple endpoints with 5xx responses
     engine = engine_factory(IndependentInternalError(), checks=[not_a_server_error], max_failures=max_failures)
     result = collect_result(engine)
     assert result.events[-1].status == Status.FAILURE, result.errors
     if max_failures == 1:
-        # Then only the first one should be found
         assert len(result.failures) == 1
     elif max_failures == 2:
-        # Else, all of them should be found
         assert len(result.failures) == 2
 
 
@@ -222,7 +219,6 @@ def test_custom_assertion_with_random_message(engine_factory):
 def test_distinct_assertions(engine_factory):
     counter = 0
 
-    # When a check contains different failing assertions
     @schemathesis.check
     def custom_check(ctx, response, case):
         nonlocal counter
@@ -232,15 +228,12 @@ def test_distinct_assertions(engine_factory):
         if counter == 2:
             raise AssertionError("Second")
         if counter == 3:
-            # No message
             assert case.headers == 43
         elif counter == 4:
-            # With message
             assert case.headers == 43, "Fourth"
 
     engine = engine_factory(checks=[custom_check], max_examples=1)
     result = collect_result(engine)
-    # Then all of them should be reported
     assert len(result.failures) == 4
     messages = {check.failure_info.failure.message for check in result.failures}
     assert "First" in messages
@@ -254,7 +247,6 @@ def test_distinct_assertions(engine_factory):
 def test_flaky_assertions(engine_factory, kwargs):
     counter = 0
 
-    # When a check contains different failing assertions and one of them is considered flaky by Hypothesis
     @schemathesis.check
     def custom_check(ctx, response, case):
         nonlocal counter
@@ -267,7 +259,6 @@ def test_flaky_assertions(engine_factory, kwargs):
 
     engine = engine_factory(checks=[custom_check], max_examples=1, **kwargs)
     result = collect_result(engine)
-    # Then all of them should be reported
     if "max_failures" in kwargs:
         assert len(result.failures) == 1
         assert {check.failure_info.failure.message for check in result.failures} == {"First"}
@@ -280,8 +271,7 @@ def test_flaky_assertions(engine_factory, kwargs):
 
 
 def test_failure_hidden_behind_another_failure(engine_factory):
-    # The same API operation fails in two ways, and the second one is checked only after the first is found,
-    # so it surfaces in a later test suite
+    # The second failure of the operation is checked only after the first is found, so it surfaces in a later suite.
 
     first_failure_found = False
 
@@ -357,9 +347,7 @@ def _use_after_free_state_machine(ctx):
 
     class StateMachine(schema.as_state_machine()):
         def setup(self):
-            # Which bundle a step feeds depends on the status the server answers with, so a scenario
-            # replayed while shrinking against a server the earlier scenarios have moved on can enable
-            # a different set of rules, and Hypothesis reports that as inconsistent data generation.
+            # Answers pick each step's bundle; replays against a changed server would look like inconsistent generation.
             store.reset()
 
     return StateMachine
@@ -382,14 +370,7 @@ def test_find_use_after_free_via_state_machine_with_overridden_validate_response
 
 
 def test_no_false_positive_use_after_free_when_id_reused(engine_factory):
-    # When a server reuses resource IDs after deletion, the stateful engine can produce a scenario tree like:
-    #
-    #   POST /users -> id=1 (root)
-    #   └── DELETE /users/1 -> 204
-    #       └── POST /users -> id=1 again  (circular link: DELETE -> POST)
-    #           └── GET /users/1 -> 200   <-- current case being checked
-    #
-    # The resource was re-created with the same id between the DELETE and the GET; this is NOT a use-after-free.
+    # A server that reuses ids lets POST recreate id 1 between DELETE and GET, so that GET is no use-after-free.
     engine = engine_factory(
         CircularLinks(),
         ReuseDeletedIds(),
@@ -403,15 +384,7 @@ def test_no_false_positive_use_after_free_when_id_reused(engine_factory):
 
 
 def test_no_false_positive_ensure_resource_availability_when_id_reused(engine_factory):
-    # When a server reuses resource IDs after deletion, the stateful engine can produce a scenario tree like:
-    #
-    #   POST /users -> id=1 (root)
-    #   DELETE /users/1 -> 204
-    #   POST /users -> id=1 again  (circular link: DELETE -> POST)
-    #   DELETE /users/1 -> 204 (resource deleted again)
-    #   GET /users/1 -> 404  <-- current case being checked
-    #
-    # The resource was re-created and then re-deleted; this is NOT a resource-not-available issue.
+    # A server that reuses ids lets POST recreate id 1 and DELETE remove it again, so the GET 404 is expected.
     engine = engine_factory(
         CircularLinks(),
         ReuseDeletedIds(),
@@ -630,8 +603,7 @@ def test_custom_headers(engine_factory):
 
 
 def test_multiple_source_links(engine_factory):
-    # When there are multiple links coming to the same operation from different operations
-    # Then there should be no error during getting the previous step results
+    # Collecting previous step results must not fail when several operations link to one.
     engine = engine_factory(MultipleSourceLinks(), max_examples=10)
     result = collect_result(engine)
     assert not result.errors, result.errors
@@ -728,13 +700,11 @@ def test_external_link(ctx):
 
 
 def test_new_resource_is_not_available(engine_factory):
-    # When a resource is not available after creation
     engine = engine_factory(
         EnsureResourceAvailability(),
         max_examples=50,
     )
     result = collect_result(engine)
-    # Then it is a failure
     assert result.events[-1].status == Status.FAILURE
     assert result.failures[0].failure_info.failure.title == "Created resource not found"
 
@@ -748,8 +718,7 @@ def test_new_resource_is_not_available_behind_cache(engine_factory):
 
 
 def test_resource_availability(engine_factory):
-    # By default it is available unless was explicitly deleted
-    # Ensure the check properly finds such DELETE calls
+    # A resource is available unless explicitly deleted; the check must find those DELETE calls.
     engine = engine_factory(max_examples=50)
     result = collect_result(engine)
     event = result.events[-1]
@@ -990,7 +959,6 @@ def test_stateful_harvest_flows_into_pool(ctx):
 
 
 def test_ignored_auth_valid(engine_factory):
-    # When auth works properly
     token = "Test"
     engine = engine_factory(
         BearerAuth(token=token),
@@ -998,14 +966,12 @@ def test_ignored_auth_valid(engine_factory):
         headers={"Authorization": f"Bearer {token}"},
     )
     result = collect_result(engine)
-    # Then no failures are reported
     event = result.events[-1]
     if event.status != Status.SUCCESS:
         pytest.fail(str(result.events))
 
 
 def test_ignored_auth_invalid(engine_factory):
-    # When auth is ignored
     token = "Test"
     engine = engine_factory(
         IgnoredAuth(token=token),
@@ -1013,7 +979,6 @@ def test_ignored_auth_invalid(engine_factory):
         headers={"Authorization": "Bearer UNKNOWN"},
     )
     result = collect_result(engine)
-    # Then it should be reported
     assert result.events[-1].status == Status.FAILURE
     assert result.failures[0].failure_info.failure.title == "API accepts requests without authentication"
 
@@ -1213,14 +1178,7 @@ def test_no_reliable_transitions(engine_factory):
 
 
 def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx, response_factory):
-    # When a DELETE in one root's subtree deletes a resource that was re-created by a different
-    # root, ensure_resource_availability must not be triggered for operations from that second root.
-    #
-    # Recorder state:
-    #   Root A  POST /users -> 201         [parent=None]
-    #     DELETE /users/1 -> 204           [parent=A]   <- in A's subtree
-    #   Root B  POST /users -> 201         [parent=None, separate root, same id reused]
-    #     GET /users/1 -> 404              [parent=B]   <- 404 because the DELETE above ran after B created id=1
+    # Root A's DELETE runs after root B recreated the same id, so B's GET 404 must not trigger the check.
     schema = ctx.openapi.load_schema(
         {
             "/users": {
@@ -1272,7 +1230,6 @@ def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx, respo
     recorder.record_case(parent_id=None, case=root_b, transition=None, is_transition_applied=False)
     recorder.record_response(case_id=root_b.id, response=make_http_response("POST", "http://localhost/users", 201))
 
-    # GET /users/1 from root B — returns 404 because the DELETE in A's subtree ran after B was created
     get_b = Case(get_op, "GET", "/users/{userId}", path_parameters={"userId": 1})
     recorder.record_case(parent_id=root_b.id, case=get_b, transition=None, is_transition_applied=False)
     response_404 = make_http_response("GET", "http://localhost/users/1", 404)
@@ -1280,7 +1237,6 @@ def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx, respo
 
     check_ctx = check_context(recorder=recorder)
 
-    # Should not raise — the DELETE that explains the 404 is in A's subtree.
     assert ensure_resource_availability(check_ctx, response_404, get_b) is None
 
 

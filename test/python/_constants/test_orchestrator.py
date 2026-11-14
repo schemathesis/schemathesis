@@ -31,8 +31,7 @@ def _on_path():
 
 
 def test_orchestrator_survives_module_that_exits_on_import():
-    # A scanned module calling sys.exit() (or pytest.skip) at import raises BaseException,
-    # which must not abort extraction or propagate out to kill the engine run.
+    # `sys.exit()` or `pytest.skip` at import raises BaseException, which must not abort extraction or the run.
     registry = SourceRegistry()
 
     @registry.register
@@ -117,7 +116,7 @@ def test_registered_source_resolving_to_no_modules_is_recorded():
 
 
 def test_registered_source_scanning_a_literal_free_module_is_not_recorded():
-    # Scanned fine, just no keepable literals: legitimately empty, not an error.
+    # A scanned module without keepable literals is empty, not a failure.
     registry = SourceRegistry()
 
     @registry.register
@@ -129,7 +128,7 @@ def test_registered_source_scanning_a_literal_free_module_is_not_recorded():
 
 
 def test_app_source_failure_is_not_recorded():
-    # Auto-extraction from an app is best-effort; even a raising app source stays silent.
+    # Auto-extraction from an app is best-effort, so a raising app source stays silent.
     def failing_app():
         raise RuntimeError("boom")
 
@@ -162,7 +161,7 @@ def test_constants_extraction_warning_is_not_grouped():
 
 
 def test_orchestrator_falls_back_to_app_module():
-    # Niche framework: no adapter matches. The module defining the app still gets harvested.
+    # No adapter matches a niche framework, yet the module defining the app still gets harvested.
     class NicheApp:
         pass
 
@@ -203,8 +202,7 @@ def test_orchestrator_fallback_does_not_walk_the_apps_package():
 
 
 def test_orchestrator_isolates_generator_iteration_error():
-    # A generator can raise mid-iteration, after the source callable already returned; that
-    # failure must not escape and abort extraction - later sources still contribute.
+    # A generator raising mid-iteration, after its source returned, must not stop later sources from contributing.
     registry = SourceRegistry()
 
     def faulty_iterator():
@@ -264,8 +262,7 @@ def test_module_object_source_is_harvested():
     ids=["stdlib", "dunder-main", "absent", "third-party", "empty-top-level"],
 )
 def test_app_from_non_user_package_yields_no_constants(app_module):
-    # No adapter matches, and the fallback rejects stdlib/dunder/absent/installed/malformed
-    # module names, so nothing is harvested from a niche framework's own internals.
+    # The fallback rejects stdlib, dunder, absent, installed and malformed module names, so nothing is harvested.
     class App:
         pass
 
@@ -307,8 +304,7 @@ def test_orchestrator_reraises_keyboard_interrupt_from_source():
 
 
 def test_orchestrator_keeps_partial_results_when_source_raises_base_exception():
-    # A source raising a non-Exception (e.g. SystemExit) must not abort the engine; constants
-    # extracted by earlier sources survive.
+    # A source raising a non-Exception like SystemExit must not abort the run; earlier sources' constants survive.
     registry = SourceRegistry()
 
     @registry.register
@@ -325,8 +321,7 @@ def test_orchestrator_keeps_partial_results_when_source_raises_base_exception():
 
 
 def test_orchestrator_follows_handler_module_local_imports():
-    # The handler's magic constant lives in a module it imports, not inline; extraction
-    # must follow that import so the constant still lands in the pool.
+    # The handler's constant lives in a module it imports, so extraction must follow that import.
     registry = SourceRegistry()
 
     @registry.register

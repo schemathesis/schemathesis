@@ -13,17 +13,9 @@ __all__ = [
 
 
 def is_valid_path(parameters: dict[str, object], allow_encoded_slash_for: Collection[str] | None = None) -> bool:
-    """Empty strings ("") are excluded from path by urllib3.
+    """Reject path parameters that `urllib3` drops (`""`) or that make routing ambiguous (`/`, `%2F`).
 
-    A path containing to "/" or "%2F" will lead to ambiguous path resolution in
-    many frameworks and libraries, such behaviour have been observed in both
-    WSGI and ASGI applications.
-
-    In this case one variable in the path template will be empty, which will lead to 404 in most cases.
-    Because of it this case doesn't bring much value and might lead to false positive Schemathesis results.
-
-    `allow_encoded_slash_for` lets callers allow `%2F` for selected parameter names while
-    preserving strict defaults for all other path parameters.
+    Either empties a template variable, mostly a 404 and a false positive; `allow_encoded_slash_for` permits `%2F`.
     """
     allow = allow_encoded_slash_for or ()
     return not any(
@@ -32,19 +24,16 @@ def is_valid_path(parameters: dict[str, object], allow_encoded_slash_for: Collec
 
 
 def is_invalid_path_parameter(value: object, *, allow_encoded_slash: bool = False) -> bool:
-    # `.` and `..` collapse during URL normalization the same way `/` does,
-    # routing the request to a different operation than the one declared.
+    # `.` and `..` collapse during URL normalization like `/`, routing to a different operation.
     if value in ("/", "", ".", ".."):
         return True
-    # An array renders as its comma-joined items; when that rendering is empty the path
-    # segment disappears and the request lands on a different operation.
+    # An empty comma-joined array drops its path segment, so the request lands on a different operation.
     if isinstance(value, list) and (not value or value == [""]):
         return True
     if contains_unicode_surrogate_pair(value):
         return True
 
-    # Get string representation for checking problematic characters.
-    # For non-strings (dicts, lists), their str() is what appears in the URL
+    # Non-strings such as dicts and lists appear in the URL as their `str()`
     str_value = value if isinstance(value, str) else str(value)
 
     if "/" in str_value or "}" in str_value or "{" in str_value:
@@ -52,21 +41,17 @@ def is_invalid_path_parameter(value: object, *, allow_encoded_slash: bool = Fals
 
     if isinstance(value, str):
         decoded_value = unquote(str_value)
-        # `%2F` is decoded by many HTTP stacks before routing, effectively turning it into `/`.
-        # Allow it only when the caller explicitly opts in for this parameter.
+        # Many HTTP stacks decode `%2F` to `/` before routing; allow it only on opt-in for this parameter.
         if not allow_encoded_slash and "/" in decoded_value:
             return True
-        # Curly braces are structural characters in path templates.
-        # Reject their quoted forms (e.g. `%7B` / `%7D`) as well.
+        # Curly braces are structural in path templates; reject quoted forms like `%7B` too.
         if "}" in decoded_value or "{" in decoded_value:
             return True
         # `%2E` / `%2E%2E` decode to `.` / `..` and collapse during URL normalization.
         if decoded_value in (".", ".."):
             return True
 
-        # Avoid NULL bytes in path parameters — many webservers strip or reject them,
-        # which can silently redirect the test to a different API operation.
-        # Check decoded values as well to catch quoted forms like `%00`.
+        # Many servers strip or reject NULL bytes, which can redirect the test to another operation; check `%00` too.
         if "\x00" in decoded_value:
             return True
 

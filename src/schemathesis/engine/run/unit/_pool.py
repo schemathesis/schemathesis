@@ -20,14 +20,14 @@ if TYPE_CHECKING:
 
 
 class DefaultScheduler:
-    """Default scheduler that processes operations in schema iteration order."""
+    """Hands out operations in schema order."""
 
     def __init__(self, operations: list[Result[APIOperation, InvalidSchema]]) -> None:
         self.operations = iter(operations)
         self.lock = threading.Lock()
 
     def next_operation(self) -> Result[APIOperation, InvalidSchema] | None:
-        """Get next API operation in a thread-safe manner."""
+        """Thread-safe; `None` once all operations are handed out."""
         with self.lock:
             return next(self.operations, None)
 
@@ -38,7 +38,6 @@ class DefaultScheduler:
 def split_results(
     operations: list[Result[APIOperation, InvalidSchema]],
 ) -> tuple[list[APIOperation], list[InvalidSchema]]:
-    """Partition a result list into successful operations and schema errors."""
     successes: list[APIOperation] = []
     errors: list[InvalidSchema] = []
     for result in operations:
@@ -54,8 +53,6 @@ WORKER_FINISHED = object()
 
 
 class WorkerPool:
-    """Manages a pool of worker threads."""
-
     def __init__(
         self,
         workers_num: int,
@@ -83,7 +80,6 @@ class WorkerPool:
             self.events_queue.put(WORKER_FINISHED)
 
     def start(self) -> None:
-        """Start all worker threads."""
         for i in range(self.workers_num):
             worker = threading.Thread(
                 target=self._run_worker,
@@ -101,7 +97,7 @@ class WorkerPool:
             worker.start()
 
     def stop(self) -> None:
-        """Stop all workers gracefully."""
+        """Wait for every worker to finish."""
         for worker in self.workers:
             worker.join()
 

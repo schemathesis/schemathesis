@@ -19,11 +19,9 @@ class Alphabet:
     codec: str | None = "utf-8"
     max_codepoint: int | None = None
     exclude_characters: str = ""
-    # Whether a drawn string may open or close with whitespace. Header values cannot, and that is a property
-    # of the value rather than of its characters, so it rides along here as a filter on each leaf.
+    # Whether a drawn string may open or close with whitespace; header values cannot. Applied as a filter on each leaf.
     allow_surrounding_whitespace: bool = True
-    # Shortest name a drawn key may carry. Header names cannot be empty, and that is a property of
-    # the key rather than of its characters, so it rides along here too.
+    # Shortest name a drawn key may carry; header names cannot be empty.
     min_name_length: int = 0
     # Characters a drawn key may carry, where a key answers to a narrower grammar than a value.
     name_characters: str | None = None
@@ -81,16 +79,15 @@ class StrategyContext:
     # What each generator above reaches, where the caller knows it.
     format_lengths: dict[str, FormatLengths] = field(default_factory=dict)
     cache: dict[jsonschema_rs.CanonicalSchema, SearchStrategy] = field(default_factory=dict)
-    # Placeholders for the pointer targets currently being built, by URI.
+    # Placeholders for the pointer targets being built, by URI.
     pending: dict[str, SearchStrategy] = field(default_factory=dict)
     # Whether a pointer led back into a value still being built.
     cyclic: bool = False
-    # Pointer targets already followed while folding an `allOf`, which stops a cyclic one from
-    # unrolling forever.
+    # Pointer targets followed while folding an `allOf`, so a cyclic one stops unrolling.
     following: set[str] = field(default_factory=set)
-    # Placeholders for the `allOf` intersections currently being built, so one met again stops there.
+    # Placeholders for the `allOf` intersections being built, so one met again stops there.
     folding: dict[jsonschema_rs.CanonicalSchema, SearchStrategy] = field(default_factory=dict)
-    # Schemas whose complement is currently being built, so a bar reaching back is spotted.
+    # Schemas whose complement is being built, so a bar reaching back is spotted.
     complementing: set[jsonschema_rs.CanonicalSchema] = field(default_factory=set)
     # Whether an integer may be drawn spelled as a float, which only a JSON carrier keeps apart.
     whole_floats: bool = False

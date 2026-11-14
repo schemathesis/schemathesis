@@ -15,8 +15,7 @@ _DRAFT: int = jsonschema_rs.Draft202012
 
 def can_negate(schema: Schema) -> bool:
     """Whether the schema rejects anything at all, so that a value violating it exists."""
-    # A rejection-filter retry re-draws the same mutated schema many times; this cache is shared
-    # with strategy building, so a schema canonicalized there is free here too (and vice versa).
+    # Retries re-draw the same mutated schema; the cache is shared with strategy building
     try:
         schema_key = schema_cache_key(schema)
     except (TypeError, ValueError):
@@ -34,8 +33,7 @@ def can_negate(schema: Schema) -> bool:
             validate_formats=True,
         )
     except (jsonschema_rs.ValidationError, jsonschema_rs.canonical.CanonicalizationError):
-        # Refusing here would drop the parameter from negative testing; a mutation that turns out
-        # valid is discarded downstream anyway.
+        # Refusing would drop the parameter from negative testing; valid mutations get discarded downstream
         return True
     if key is not None:
         canonical_form_cache[key] = canonical_schema
@@ -43,7 +41,7 @@ def can_negate(schema: Schema) -> bool:
 
 
 def is_binary_format(schema: object) -> TypeGuard[Mapping[str, Any]]:
-    """Check if schema is a permissive binary format that accepts any bytes."""
+    """Whether the schema is a binary format that accepts any bytes."""
     if not isinstance(schema, Mapping):
         return False
     return schema.get("type") == "string" and schema.get("format") in ("binary", "byte")

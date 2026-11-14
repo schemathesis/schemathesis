@@ -18,7 +18,6 @@ __version__ = SCHEMATHESIS_VERSION
 
 __all__ = [
     "__version__",
-    # Core data structures
     "Case",
     "Response",
     "APIOperation",
@@ -26,34 +25,26 @@ __all__ = [
     "Config",
     "GenerationMode",
     "stateful",
-    # Public errors
     "errors",
-    # Spec or usage specific namespaces
     "openapi",
     "graphql",
     "grpc",
     "pytest",
     "python",
-    # Hooks
     "hook",
     "HookContext",
-    # Checks
     "check",
     "CheckContext",
     "CheckFunction",
     "CheckResult",
-    # Auth
     "auth",
     "AuthContext",
     "AuthProvider",
-    # Targeted Property-based Testing
     "metric",
     "MetricContext",
     "MetricFunction",
-    # Response deserialization
     "deserializer",
     "DeserializationContext",
-    # Serialization
     "serializer",
     "SerializationContext",
 ]

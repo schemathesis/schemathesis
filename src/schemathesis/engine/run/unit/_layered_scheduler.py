@@ -1,5 +1,3 @@
-"""Layered task scheduler for dependency-aware operation ordering."""
-
 from __future__ import annotations
 
 import threading
@@ -20,14 +18,9 @@ class _Dispatched(threading.local):
 
 
 class LayeredScheduler:
-    """Schedules operations in dependency layers.
+    """Dispatches layer N + 1 only after every layer N operation finishes, so consumers see what producers created.
 
-    Operations are grouped into layers and dispatched sequentially by layer.
-    Layer N + 1 is not dispatched until every Layer N operation has finished, so
-    dependent operations observe the resources their producers created.
-
-    A worker signals completion by asking for its next operation; `release` covers
-    workers that stop without asking again.
+    A worker signals completion by asking for its next operation; `release` covers workers that stop asking.
     """
 
     def __init__(
@@ -35,13 +28,6 @@ class LayeredScheduler:
         layers: list[list[APIOperation]],
         errors: list[InvalidSchema] | None = None,
     ) -> None:
-        """Initialize the scheduler with pre-computed layers.
-
-        Args:
-            layers: List of layers, each containing operations that can execute in parallel
-            errors: Optional list of error results from schema parsing to be returned after all layers are exhausted
-
-        """
         assert layers
         self.layers = layers
         self.current_layer_index = 0
@@ -53,26 +39,17 @@ class LayeredScheduler:
         self.errors = errors or []
         self.error_iterator: Iterator[InvalidSchema] | None = None
 
-        # Initialize first layer
         if self.layers:
             self.current_layer_iterator = iter(self.layers[0])
 
     def next_operation(self) -> Result[APIOperation, InvalidSchema] | None:
-        """Get next API operation in a thread-safe manner.
+        """Thread-safe; at a layer's end, blocks until its operations finish.
 
-        Advances through layers sequentially. When a layer is exhausted, blocks until
-        its operations finish, then moves to the next layer. After all layers are
-        exhausted, returns schema errors.
-
-        Returns:
-            Ok(operation) if operation available, Err() for schema errors,
-            None if all layers and errors exhausted
-
+        After the last layer, returns schema errors, then `None`.
         """
         with self.lock:
             # Asking for more work means the previously dispatched operation is done
             self._release()
-            # Try to get operation from current layer
             while self.current_layer_iterator is not None:
                 try:
                     operation = next(self.current_layer_iterator)
@@ -88,7 +65,6 @@ class LayeredScheduler:
         # Called with the lock held, once the current layer has nothing left to dispatch
         layer_index = self.current_layer_index
         if layer_index + 1 >= len(self.layers):
-            # No more layers
             self.current_layer_iterator = None
             return
         # Wait for the layer to drain, unless another worker already advanced it

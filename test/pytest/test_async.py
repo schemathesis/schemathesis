@@ -21,7 +21,6 @@ def plugin(request):
 
 
 def test_simple(testdir, plugin):
-    # When the wrapped test is a coroutine function and the asyncio/trio plugin is used
     marker = ALL_PLUGINS[plugin]
     testdir.make_test(
         f"""
@@ -45,12 +44,10 @@ async def test_(request, case):
     args = build_pytest_args(plugin)
     result = testdir.runpytest(*args)
     result.assert_outcomes(passed=1)
-    # Then it should be executed as any other test
     result.stdout.re_match_lines([r"test_simple.py::test_\[GET /users\] PASSED", r"Hypothesis calls: 2"])
 
 
 def test_settings_first(testdir, plugin):
-    # When `hypothesis.settings` decorator is applied to a coroutine-based test before `parametrize`
     parameters = {"parameters": [integer(name="id", required=True)]}
     marker = ALL_PLUGINS[plugin]
     testdir.make_test(
@@ -69,5 +66,4 @@ async def test_(request, case):
     args = build_pytest_args(plugin)
     result = testdir.runpytest(*args)
     result.assert_outcomes(passed=2)
-    # Then it should be executed as any other test
     result.stdout.re_match_lines([r"Hypothesis calls: 14$"])

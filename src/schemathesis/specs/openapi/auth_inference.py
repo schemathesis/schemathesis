@@ -1,4 +1,4 @@
-"""Helpers for inferring missing OpenAPI security from runtime 401/403 responses."""
+"""Infer missing security requirements from 401/403 responses."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 def _intersect_configured_schemes(schema: OpenApiSchema) -> list[str]:
-    """Return scheme names declared in the spec that also have configured credentials."""
+    """Scheme names the schema declares and the user configured credentials for."""
     configured = schema.auth_schemes
     if not configured:
         return []
@@ -36,7 +36,7 @@ def _intersect_configured_schemes(schema: OpenApiSchema) -> list[str]:
 
 
 def _already_inferred(store: ErrorFeedbackStore, operation_label: str) -> bool:
-    """Return True iff a `REQUIRES_AUTHENTICATION` observation already exists for this operation."""
+    """Whether the operation already has a `REQUIRES_AUTHENTICATION` observation."""
     observations = store.observations(
         operation_label=operation_label,
         location=ParameterLocation.PATH,
@@ -50,8 +50,7 @@ def _is_auth_success(operation: APIOperation, retry_status: int) -> bool:
         return True
     if retry_status in AUTH_REJECTION_STATUSES or retry_status >= 500:
         return False
-    # 4xx outside the auth band confirms only when the spec actually documents that status —
-    # otherwise an undocumented 404/405 (route mismatch) would falsely look like inference success.
+    # Other 4xx confirm only when documented; an undocumented 404/405 is a route mismatch.
     return operation.responses.find_by_status_code(retry_status) is not None
 
 
@@ -62,11 +61,7 @@ def _send_with_scheme(
     transport_kwargs: dict[str, Any],
     recorder: ScenarioRecorder,
 ) -> Response | None:
-    """Retry `case` with the named scheme's configured credentials applied; record the retry.
-
-    Returns `None` if the probe could not run end-to-end — provider failures, transport errors,
-    or any other unexpected exception. The caller treats `None` as "skip this scheme".
-    """
+    """Retry `case` with the scheme's configured credentials and record it; `None` when the probe fails to run."""
     schema = case.operation.schema
     config = schema.auth_schemes[scheme_name]
 
@@ -101,14 +96,9 @@ def record_auth_inference(
     transport_kwargs: dict[str, Any],
     cache_writer: CacheWriter | None = None,
 ) -> None:
-    """Infer a missing security requirement when the server enforces auth on a publicly-declared operation.
+    """On a 401/403 from an operation declaring no security, retry with each configured scheme the schema declares.
 
-    Fires only on 401/403 responses to operations with no declared security. For each
-    configured scheme that the spec also declares, retries the case with that scheme's
-    credentials; the first retry that confirms auth recovery wins and the scheme is recorded
-    on the operation as a runtime overlay so future generations attach the same credentials.
-    Each operation is inferred at most once. Probe failures (provider errors, network errors,
-    5xx, undocumented 4xx) skip the current scheme.
+    The first scheme that gets past auth is attached to later cases; each operation is inferred at most once.
     """
     if response.status_code not in AUTH_REJECTION_STATUSES:
         return
@@ -144,8 +134,7 @@ def record_auth_inference(
                 payload=RequiresAuthPayload(scheme_name=scheme_name),
             )
         )
-        # Stored on the schema (not the operation) because operation instances aren't shared
-        # across phases — the engine reparses operations per phase.
+        # The engine reparses operations per phase, so the inferred requirement lives on the schema.
         operation.schema._inferred_security[operation.label] = [{scheme_name: []}]
         if cache_writer is not None:
             cache_writer.record(Kind.AUTH_REQUIRED, operation.label, request_from_case(case))

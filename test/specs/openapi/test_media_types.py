@@ -140,10 +140,10 @@ def test_explicit_example_with_custom_media_type(ctx, cli, snapshot_cli):
 
 
 def test_malformed_registered_media_type_is_skipped(ctx):
-    # Register a malformed media type (no slash, so it can't be parsed)
+    # A media type without a slash cannot be parsed
     MEDIA_TYPE_STRATEGIES["invalid"] = st.binary()
 
-    # Create schema with valid content type that would trigger wildcard search
+    # A valid content type triggers the wildcard search over registered media types
     schema = ctx.openapi.load_schema(
         {
             "/data": {
@@ -160,7 +160,6 @@ def test_malformed_registered_media_type_is_skipped(ctx):
         }
     )
 
-    # Should not crash when encountering the malformed registered type
     strategy = schema["/data"]["post"].as_strategy()
 
     @run_given(strategy, max_examples=100)
@@ -371,7 +370,6 @@ def test_multipart_encoding_array_content_type_with_custom_strategy(ctx):
     def test(case):
         assert isinstance(case.body, dict)
         assert case.body["attachment"] == pdf_data
-        # Content type should match the value from the encoding array, not be omitted
         assert case.multipart_content_types["attachment"] == "application/pdf"
 
 

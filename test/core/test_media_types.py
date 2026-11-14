@@ -24,9 +24,9 @@ def test_parse_content_type(value, expected):
 @pytest.mark.parametrize(
     "value",
     [
-        "invalid",  # No slash
-        "justtext",  # No slash
-        "",  # Empty string
+        "invalid",
+        "justtext",
+        "",
     ],
 )
 def test_parse_content_type_malformed(value):
@@ -106,24 +106,19 @@ def test_is_xml_media_type(value, expected):
 @pytest.mark.parametrize(
     ("expected", "actual", "should_match"),
     [
-        # Exact matches
         (("application", "json"), ("application", "json"), True),
         (("text", "plain"), ("text", "plain"), True),
-        # Different media types
         (("application", "json"), ("application", "xml"), False),
         (("text", "plain"), ("application", "json"), False),
-        # Wildcard main type
         (("*", "json"), ("application", "json"), True),
         (("*", "json"), ("text", "json"), True),
         (("*", "xml"), ("application", "json"), False),
-        # Wildcard subtype
         (("application", "*"), ("application", "json"), True),
         (("application", "*"), ("application", "xml"), True),
         (("application", "*"), ("text", "plain"), False),
-        # Full wildcard
         (("*", "*"), ("application", "json"), True),
         (("*", "*"), ("text", "plain"), True),
-        # Asymmetry: wildcard only in expected
+        # Asymmetry: a wildcard counts only in `expected`.
         (("application", "json"), ("application", "*"), False),
     ],
 )

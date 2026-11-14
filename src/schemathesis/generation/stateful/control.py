@@ -83,9 +83,9 @@ class UnbuildableOperationFound(KeyboardInterrupt):
     """Ends the suite once an operation whose data cannot be generated is left out, so later suites never draw it."""
 
 
-# It is enough to be able to catch double-click type of issues
+# Enough to catch double-click issues
 MAX_OPERATIONS_PER_SOURCE_CAP = 2
-# Maximum number of concurrent root sources (e.g., active users in the system)
+# Concurrent root sources, e.g. active users in the system
 MAX_ROOT_SOURCES = 2
 
 
@@ -101,20 +101,17 @@ def _scenario_step_count() -> int:
 
 
 def _get_max_operations_per_source(transitions: Transitions) -> int:
-    """Calculate global limit based on number of sources to maximize diversity of used API calls."""
+    """Global per-source call limit, sized to diversify the API calls a scenario makes."""
     sources = len(transitions.operations)
 
     if sources == 0:
         return MAX_OPERATIONS_PER_SOURCE_CAP
 
-    # Total steps divided by number of sources, but never below the cap
     return max(MAX_OPERATIONS_PER_SOURCE_CAP, _scenario_step_count() // sources)
 
 
 @dataclass
 class TransitionController:
-    """Controls which transitions can be executed in a state machine."""
-
     __slots__ = (
         "transitions",
         "roots",
@@ -126,7 +123,6 @@ class TransitionController:
     )
 
     def __init__(self, transitions: Transitions, roots: Collection[str]) -> None:
-        # Incoming & outgoing transitions available in the state machine
         self.transitions = transitions
         # Labels of operations that can start a chain without data from earlier steps
         self.roots = roots
@@ -135,8 +131,7 @@ class TransitionController:
         self.statistic: dict[str, dict[str, Counter[str]]] = {}
         # Roots whose responses gave later steps a value to use in this scenario
         self.productive_roots: set[str] = set()
-        # Optional engine-side supervisor; the engine sets this on the per-scenario
-        # state machine so transitions targeting SKIP-verdict operations are filtered out.
+        # Set by the engine so transitions to operations with a SKIP verdict are filtered out.
         self.supervisor: Supervisor | None = None
         # Optional engine-side record of operations whose data cannot be generated, by label; they are never scheduled.
         self.unbuildable: dict[str, tuple[APIOperation, Exception]] | None = None
@@ -154,19 +149,17 @@ class TransitionController:
         return True
 
     def record_step(self, input: StepInput, recorder: ScenarioRecorder) -> None:
-        """Record API call input."""
         case = input.case
 
         if (
             case.operation.label in self.transitions.operations
             and self.transitions.operations[case.operation.label].outgoing
         ):
-            # This API operation has outgoing transitions, hence record it as a source
+            # Operations with outgoing transitions count as sources
             entry = self.statistic.setdefault(input.case.operation.label, {})
             entry[input.case.id] = Counter()
 
         if input.transition is not None:
-            # Find immediate parent and record as derived operation
             parent = recorder.cases[input.transition.parent_id]
             source = parent.value.operation.label
             case_id = parent.value.id
@@ -182,7 +175,6 @@ class TransitionController:
         return len(self.statistic.get(label, {}))
 
     def allow_root_transition(self, source: str, bundles: dict[str, CaseInsensitiveDict]) -> bool:
-        """Decide if this root transition should be allowed now."""
         if self._is_skipped(source):
             return False
         if self._root_calls(source) < MAX_ROOT_SOURCES:
@@ -211,7 +203,6 @@ class TransitionController:
         return self._root_calls(source) == min(self._root_calls(root) for root in available)
 
     def allow_transition(self, source: str, target: str) -> bool:
-        """Decide if this transition should be allowed now."""
         if self._is_skipped(target):
             return False
         existing = self.statistic.get(source, {})

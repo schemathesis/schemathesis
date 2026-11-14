@@ -34,17 +34,16 @@ _NUMERIC_KINDS: frozenset[str] = frozenset(
 )
 _SIZE_KINDS: frozenset[str] = frozenset({"string", "slice", "array", "map"})
 
-# Each entry of the default-form `error` string. `Body.Tags[0]` permitted in the
-# namespace; the tag name is captured separately.
+# One clause of the default-form `error` string; the namespace may hold indices like `Body.Tags[0]`.
 _DEFAULT_CLAUSE = re.compile(
     r"Key: '(?P<namespace>[^']+)' Error:Field validation for '[^']+' failed on the '(?P<tag>[^']+)' tag"
 )
-# Splits a namespace segment into (name, optional index): `Tags[0]` → ('Tags', '0').
+# Namespace segment with an optional index: `Tags[0]` -> ('Tags', '0').
 _SEGMENT = re.compile(r"^([^[]+)(?:\[(\d+)\])?$")
 
 
 def _split_namespace(namespace: str) -> ParameterPath:
-    """`Body.Email` → ('email',); `Body.Tags[0]` → ('tags', 0); `Body.NestedUser.Email` → ('nestedUser', 'email')."""
+    """`Body.Email` -> ('email',); `Body.Tags[0]` -> ('tags', 0); `Body.NestedUser.Email` -> ('nestedUser', 'email')."""
     if not namespace or "." not in namespace:
         return ()
     segments: list[str | int] = []
@@ -59,8 +58,7 @@ def _split_namespace(namespace: str) -> ParameterPath:
 
 
 def _datetime_handler(issue: dict) -> tuple[ClassificationResult, ...]:
-    # The `param` is a Go time layout (`2006-01-02`, `time.RFC3339`, ...). A `:`
-    # appears only when the layout includes a time component.
+    # `param` is a Go time layout (`2006-01-02`, `time.RFC3339`); only layouts with a time part contain `:`.
     param = issue.get("param")
     if not isinstance(param, str) or not param:
         return ()
@@ -90,7 +88,7 @@ def _len_handler(issue: dict) -> tuple[ClassificationResult, ...]:
 
 
 def _bound_handler(direction: BoundDirection, exclusive: bool) -> DictHandler:
-    """`gte`/`lte`/`gt`/`lt` — always numeric per validator/v10 semantics."""
+    """`gte`/`lte`/`gt`/`lt`, numeric in validator/v10."""
 
     def handler(issue: dict) -> tuple[ClassificationResult, ...]:
         bound = number_or_none(issue.get("param"))
@@ -107,7 +105,7 @@ def _bound_handler(direction: BoundDirection, exclusive: bool) -> DictHandler:
 
 
 def _polymorphic_bound_handler(direction: BoundDirection) -> DictHandler:
-    """`min`/`max` — payload depends on field kind: SIZE_BOUND for string/slice/array/map, NUMERIC_BOUND for numbers."""
+    """`min`/`max`: a size bound for strings and collections, a numeric bound for numbers."""
 
     def handler(issue: dict) -> tuple[ClassificationResult, ...]:
         param = issue.get("param")
@@ -231,7 +229,7 @@ def _default_observations(body: dict, operation: APIOperation, case: Case) -> tu
 
 @PARSERS.register
 class GoValidatorParser:
-    """Parser for `go-playground/validator` envelopes — Gin/Echo/Fiber default and structured forms."""
+    """Parser for `go-playground/validator` envelopes in Gin/Echo/Fiber default and structured forms."""
 
     priority = 11
 

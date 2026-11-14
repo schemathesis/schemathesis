@@ -184,7 +184,7 @@ def test_(case):
     )
     result = testdir.runpytest("-v")
     result.assert_outcomes(errors=1)
-    # Should show hook error message, not schema error
+    # A hook error, not a schema error.
     result.stdout.re_match_lines([r".*Error in.*before_init_operation.*hook.*AttributeError.*test hook error.*"])
 
 

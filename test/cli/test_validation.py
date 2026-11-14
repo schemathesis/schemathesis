@@ -26,7 +26,6 @@ def test_validate_auth(value):
 
 def is_invalid_header(header):
     try:
-        # We need to avoid generating known valid headers
         key, _ = header.split(":", maxsplit=1)
         return not (key.strip() and is_latin_1_encodable(key))
     except ValueError:

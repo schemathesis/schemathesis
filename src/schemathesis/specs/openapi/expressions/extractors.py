@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 @dataclass(slots=True)
 class RegexExtractor:
-    """Extract value via a regex."""
+    """Extracts the first capture group of a regex match."""
 
     value: re.Pattern
 

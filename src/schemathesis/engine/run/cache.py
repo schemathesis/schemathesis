@@ -99,21 +99,17 @@ def _run(ctx: EngineContext) -> CacheReport | None:
     try:
         manifest_present = manifest_path.is_file()
     except OSError:
-        # Permission denied or other filesystem error -- surface as unavailable rather than crashing.
         return CacheReport(available=False)
     if not manifest_present:
-        # No cache yet — nothing to render and nothing to do.
         return None
     loaded = load(directory)
     if loaded is None:
-        # Cache file is present but unreadable — surface this so the user notices.
+        # Present but unreadable; report it so the user notices.
         return CacheReport(available=False)
     manifest, entries = loaded
     restore_identity_assignments(ctx.schema, manifest.auth_identities)
 
-    # Sort entries so the least-recently-replayed come first; newly-written
-    # entries (`last_replayed_run == 0`) are picked up before anything that
-    # has been validated in a previous run. Ties broken by id for stability.
+    # Least recently replayed first, so new entries (`last_replayed_run == 0`) go before validated ones; ids break ties.
     entries.sort(key=lambda entry: (entry.last_replayed_run, entry.id))
     current_run_id = manifest.next_run_id
     manifest.next_run_id += 1
@@ -132,9 +128,7 @@ def _run(ctx: EngineContext) -> CacheReport | None:
             report.skipped += 1
         else:
             report.dropped += 1
-    # Entries past the budget keep their old `last_replayed_run`; next run's
-    # sort puts them ahead of the entries we just validated, rotating coverage
-    # across the whole file.
+    # Entries past the budget keep their `last_replayed_run`, so the next run replays them first.
     survivors.extend(entries[_BUDGET:])
 
     if ctx.error_feedback is not None and report.replayed:
@@ -173,8 +167,7 @@ def _flush(ctx: EngineContext, writer: CacheWriter) -> None:
         manifest, entries = loaded
     manifest.auth_identities.update(identities)
 
-    # Track which observation keys each (kind, operation) bucket already covers, plus which
-    # (kind, operation) buckets already have the singleton entry (for auth_required / 405).
+    # Observation keys per `(kind, operation)` bucket, and buckets that hold their singleton entry (auth_required, 405).
     claimed_observations: dict[tuple[Kind, str], set[str]] = {}
     claimed_singletons: set[tuple[Kind, str]] = set()
     for entry in entries:
@@ -324,7 +317,7 @@ def _build_case(operation: APIOperation, request: Request) -> Case | None:
     body = request.body if request.body is not None else NOT_SET
     try:
         return operation.Case(
-            # Persisted methods originate from `case.method` (already `HttpMethod`); on load we trust the file.
+            # Persisted methods come from `case.method`, so the loaded value is an `HttpMethod`.
             method=cast("HttpMethod", request.method),
             path_parameters=request.path_parameters,
             query=request.query,

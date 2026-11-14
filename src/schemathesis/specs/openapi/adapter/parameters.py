@@ -94,8 +94,7 @@ INVALID_SCHEMA_MESSAGE = (
     "Can not generate data for {location} parameter `{name}`! Its schema should be an object or boolean, got {schema}"
 )
 
-# `parameter["in"]` value -> `ParameterLocation`. `querystring` is a known alias for
-# `query` that some specs use; everything else falls back to UNKNOWN at the call site.
+# Some specs spell `query` as `querystring`; other values map to UNKNOWN at the call site.
 _IN_TO_LOCATION: dict[str | None, ParameterLocation] = {
     "query": ParameterLocation.QUERY,
     "querystring": ParameterLocation.QUERY,
@@ -106,29 +105,23 @@ _IN_TO_LOCATION: dict[str | None, ParameterLocation] = {
     None: ParameterLocation.UNKNOWN,
 }
 
-# Reused for the common case where no parameters are excluded — avoids
-# allocating a fresh empty frozenset on every cache lookup.
+# Shared key when no parameters are excluded, so cache lookups don't allocate.
 _EMPTY_EXCLUDE_KEY: frozenset[str] = frozenset()
 
-# Probability of using captured resource values vs generated values in hybrid strategy.
+# Chance to draw a captured resource value instead of generating one.
 CAPTURED_VALUES_PROBABILITY = 0.8
 
-# Probability of using negative strategy when captured values are available.
-# We want to mostly use captured values to test deeper application logic.
+# Chance of negative data when captured values exist; low, so most cases reach deeper application logic.
 NEGATIVE_STRATEGY_PROBABILITY = 0.03
 # Generation settings a built strategy depends on: codec, `\x00`, header characters, extra parameters, dictionaries.
 GenerationCacheKey = tuple[str | None, bool, str | None, bool, frozenset[tuple[str, "DictionaryBinding"]]]
 # Feedback generation, semantic index and constants source identities, and the generation settings a strategy uses.
 StrategyCacheKey = tuple[int | None, int | None, int | None, GenerationCacheKey]
 
-# Probability of biasing path parameter integers toward positive values.
-# Most REST APIs use positive integers for resource IDs, so this improves
-# the chance of hitting existing resources while still allowing edge cases.
+# Chance to bias path integers positive: most REST APIs use positive resource IDs.
 PATH_INTEGER_POSITIVE_BIAS = 0.8
 
-# Probability of using schema examples instead of generated values.
-# 20% example usage provides good coverage of domain-specific values
-# while still allowing hypothesis-generated exploration.
+# Chance to use a schema example; the rest stays generated for exploration.
 EXAMPLE_USAGE_PROBABILITY = 0.20
 
 # Low so injected constants seed exploration without crowding out hypothesis-generated values.
@@ -146,13 +139,7 @@ def build_semantic_overlay(
     container_schema: JsonSchema | None = None,
     name_only: bool = False,
 ) -> st.SearchStrategy:
-    """Replace generated leaf values with semantic-pool draws that pass leaf and container validation.
-
-    ``container_schema`` is the consumer object schema (body or parameter set). Container-level
-    constraints (``not``, ``if`` / ``then``, ``dependentSchemas``, top-level ``oneOf``) can fail
-    after a leaf is substituted even when the leaf itself validates; the overlay re-checks the
-    full container after every substitution and reverts when the result is invalid.
-    """
+    """Replace generated leaf values with semantic-pool draws; a draw that breaks ``container_schema`` is reverted."""
     from hypothesis import strategies as st
 
     from schemathesis.specs.openapi.semantic_pool import SEMANTIC_OVERLAY_PROBABILITY
@@ -171,8 +158,7 @@ def build_semantic_overlay(
     @st.composite
     def overlaid(draw: st.DrawFn) -> JsonValue | GeneratedValue:
         base = draw(inner_strategy)
-        # Inner may already be a GeneratedValue carrying pool_draws / meta; unwrap once and re-wrap
-        # at the end so we propagate that provenance alongside any new semantic draws.
+        # Unwrap an inner `GeneratedValue` and re-wrap at the end, keeping its provenance next to new draws
         if isinstance(base, GeneratedValue):
             inner_meta = base.meta
             inner_pool_draws = base.pool_draws
@@ -191,9 +177,7 @@ def build_semantic_overlay(
             return base
         # `st.floats` shrinks toward 0, biasing substitution well above the configured probability.
         random = draw(st.randoms())
-        # `inner_strategy` may be `build_example_aware_strategy`, which returns a shared
-        # example dict by reference. Defer the deepclone until a substitution actually fires
-        # so non-substituting draws keep the zero-copy fast path.
+        # The inner strategy may return a shared example dict; copy only when a substitution fires
         copied = False
         new_draws: list[SemanticDraw] | None = None
         for descriptor, validator in paired:
@@ -288,10 +272,9 @@ def _is_generatable_constant(value: ConstantValue, generation_config: Generation
 
 
 def collect_object_properties(schema: JsonSchemaObject) -> tuple[dict[str, JsonSchema], list[str]]:
-    """Properties and required names an object schema declares, including those in its `allOf` branches.
+    """Properties and required names an object schema declares, including referenced `allOf` branches.
 
-    Branches that reference the schema's bundle are followed; the first declaration of a property wins.
-    Without branches, the schema's own containers are returned, so the result must not be modified.
+    The first declaration wins. Without branches, the result is the schema's own containers; do not modify it.
     """
     if "allOf" not in schema:
         declared, names = schema.get("properties"), schema.get("required")
@@ -334,18 +317,16 @@ def build_constants_overlay_strategy(
 ) -> st.SearchStrategy:
     """Substitute object properties with schema-valid constants from the SUT at `probability`.
 
-    Skips properties with no schema-valid pool value; discards a substitution that breaks
-    `container_schema`'s cross-field constraints.
+    A substitution that breaks `container_schema` is discarded.
     """
     from hypothesis import strategies as st
 
     from schemathesis.openapi.generation.filters import is_valid_header
 
-    # Header and cookie values funnel through `is_valid_header`; a constant it would reject makes the
-    # location filter discard the whole case, so screen those out here instead of paying that cost.
+    # A header or cookie constant the header filter rejects would discard the whole case; screen it out here
     header_like = location in HEADER_LOCATIONS
 
-    # Resolve once: property path -> tuple of (schema-valid pool value, its origin) for that property.
+    # Property path -> schema-valid pool values with their origins
     candidates: dict[tuple[str, ...], list[tuple[ConstantValue, Origin | None]]] = {}
     if location == "body":
         root_schema = container_schema or {"type": "object", "properties": schema_properties}
@@ -355,8 +336,7 @@ def build_constants_overlay_strategy(
     for path, schema in leaves:
         keys = _constant_types_for(schema, validator_cls)
         if location != "body":
-            # `bytes`/`binary` constants only belong in a request body; other locations serialize
-            # scalars and cannot carry a `Binary` object.
+            # Only a request body can carry a `Binary` constant
             keys = tuple(key for key in keys if key != "bytes")
         pool_values: list[tuple[ConstantValue, Origin | None]] = []
         for key in keys:
@@ -368,8 +348,7 @@ def build_constants_overlay_strategy(
                     pool_values.append((value, entry.origins[0] if entry.origins else None))
         if not pool_values:
             continue
-        # Property schemas keep bundled `$ref`s pointing at the container's `x-bundled` store;
-        # splice it back in so the leaf validator can resolve them instead of erroring out.
+        # Property schemas keep bundled `$ref`s into the container; splice the bundle in so the validator resolves them
         leaf_schema = schema_with_bundle(schema, container_schema) if isinstance(container_schema, dict) else schema
         try:
             validator = make_validator(leaf_schema, validator_cls)
@@ -378,8 +357,7 @@ def build_constants_overlay_strategy(
         valid = tuple(
             (value, origin)
             for value, origin in pool_values
-            # `Binary` renders as an empty `str`, so `jsonschema_rs` rejects its type and
-            # `example_is_valid` swallows that error into `True`; length-check the raw bytes instead.
+            # Validation passes any `Binary` value, so check the length of its raw bytes instead
             if (
                 _binary_length_fits(value.data, schema)
                 if isinstance(value, Binary)
@@ -413,8 +391,7 @@ def build_constants_overlay_strategy(
         if not isinstance(value, dict):
             return produced
 
-        # Defer the copy until a substitution actually fires so non-substituting draws
-        # (the common case at this probability) keep the zero-copy fast path.
+        # Copy only when a substitution fires, which is rare at this probability
         new_value: dict[str, Any] | None = None
         new_draws: list[ConstantDraw] = []
         for path, valid_values in candidates.items():
@@ -439,7 +416,7 @@ def build_constants_overlay_strategy(
         if new_value is None:
             return produced
 
-        # Guard against cross-field constraints that leaf-level validation can't catch.
+        # Leaf validation misses cross-field constraints
         if not example_is_valid(new_value, container_validator):
             return produced
 
@@ -519,16 +496,13 @@ def _binary_length_fits(data: bytes, schema: JsonSchemaObject) -> bool:
 
 
 def _constant_types_for(schema: JsonSchemaObject, validator_cls: type) -> tuple[ConstantType, ...]:
-    # Object/array-structured schemas are never scalar substitution targets, even without an
-    # explicit `type` - a typeless schema's `get_type` otherwise reports every type.
+    # Object and array schemas take no scalar constants; without `type` they would report every type
     if schema.keys() & {"properties", "items", "additionalProperties"}:
         return ()
     fmt = schema.get("format")
     if fmt == "binary" and schema.keys() & {"enum", "const", "pattern"}:
         return ()
-    # A `format` the validator does not enforce is annotation-only: it cannot filter a type-valid
-    # literal that violates the format, so a harvested constant would clobber the format-aware value
-    # with data the SUT rejects (the `phone`/`int32` cases). `binary` is length-checked separately.
+    # An unenforced `format` lets through constants the SUT rejects (`phone`); `binary` gets a length check
     if fmt is not None and fmt != "binary" and fmt not in VALIDATED_FORMATS_BY_DRAFT.get(validator_cls, frozenset()):
         return ()
     result: list[ConstantType] = []
@@ -543,19 +517,13 @@ def _constant_types_for(schema: JsonSchemaObject, validator_cls: type) -> tuple[
         elif json_type == "integer":
             add("integer")
         elif json_type == "number":
-            # `number` accepts both integers and floats per JSON Schema.
             add("float")
             add("integer")
     return tuple(result)
 
 
 def _captured_variants_active(extra_data_source: ExtraDataSource | None, operation: APIOperation) -> bool:
-    """True when the captured-variant overlay would bind stale resource values for this operation.
-
-    Resource-bound variants are baked into the strategy at build time, so caching freezes them
-    against later updates. Semantic-only data sources read the live index per draw, so caching
-    them is safe.
-    """
+    """Whether caching would freeze captured resource values; semantic-only sources read live data."""
     if extra_data_source is None:
         return False
     from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
@@ -566,11 +534,7 @@ def _captured_variants_active(extra_data_source: ExtraDataSource | None, operati
 
 
 def _semantic_cache_key(extra_data_source: ExtraDataSource | None) -> int | None:
-    """Identity of the semantic index that the overlay would close over, or None when no overlay applies.
-
-    The overlay binds at build time, so a strategy cached for one source must not be reused for
-    a different one (or for a call where the overlay is absent entirely).
-    """
+    """Identity of the semantic index the overlay binds at build time, or `None` without an overlay."""
     semantic_index = _semantic_index(extra_data_source)
     return id(semantic_index) if semantic_index is not None else None
 
@@ -665,8 +629,7 @@ def _mix_negative_into_positive(
 ) -> st.SearchStrategy:
     from hypothesis import strategies as st
 
-    # The hybrid strategy already wraps in `GeneratedValue` when it picks a captured pool
-    # variant (so pool-draw provenance survives). Wrap only the un-wrapped values here.
+    # Values from a captured variant arrive wrapped already; wrap the rest
     positive_strategy = positive_strategy.map(_as_generated_value)
 
     @st.composite
@@ -694,8 +657,7 @@ def _collect_parameter_examples(
         # A parameter the API rejected as unknown is gone from the adjusted schema; so are its examples.
         if isinstance(adjusted_properties, dict) and param.name not in adjusted_properties:
             continue
-        # Splice inferred constraints (format / min / max etc.) onto each parameter's
-        # validation schema so examples the API has demonstrated to be invalid get evicted.
+        # Inferred constraints evict examples the API has shown to be invalid
         validation_schema = param.validation_schema
         if isinstance(adjusted_properties, dict) and isinstance(validation_schema, dict):
             inferred = adjusted_properties.get(param.name)
@@ -804,8 +766,7 @@ def _serialize_for_location(
     match location:
         case ParameterLocation.PATH:
             if is_negative:
-                # Keep strict anti-misrouting defaults for negative generation.
-                # Explicit %2F allowances apply only to positive data.
+                # Negative data keeps strict misrouting checks; `%2F` allowances apply to positive data only
                 strategy = strategy.map(
                     wrap_map_hook_for_generated_value(
                         lambda value: _quote_all_safe(jsonify_python_specific_types(value)), prune_constants=False
@@ -845,7 +806,7 @@ def _serialize_for_location(
 
 
 def _set_at_path(target: dict[str, Any], path: tuple[str, ...], value: object) -> bool:
-    """Set value at path in target. Returns False when the path is missing from target."""
+    """Return `False` when `path` is missing from `target`."""
     if not path:
         return False
     cursor: object = target
@@ -880,20 +841,9 @@ def build_hybrid_strategy(
     container_schema: JsonSchema | None = None,
     validator_cls: type[jsonschema_rs.Validator] | None = None,
 ) -> st.SearchStrategy:
-    """Combine original strategy with captured variants using weighted sampling.
+    """Overlay partial captured variants on generated values, preferring variants drawn least recently.
 
-    Weights selection to prefer variants that haven't been drawn recently,
-    reducing wasted test budget from repeated operations on the same resources.
-
-    Captured variants may be partial (only containing parameters with resource
-    requirements). We merge them with generated values to ensure all required
-    parameters are present. When a variant is selected, the strategy returns a
-    `GeneratedValue` carrying the pool-draw provenance; otherwise it returns the
-    raw generated value (a dict or scalar).
-
-    ``container_schema`` is the consumer object schema. An overlay adds keys, which container-level
-    constraints (``maxProperties``, ``additionalProperties``, ``not``) can rule out even when every
-    injected value fits its own slot; the merge is reverted when the result is invalid.
+    A chosen variant yields a `GeneratedValue` with its provenance; a merge breaking ``container_schema`` is reverted.
     """
     from hypothesis import strategies as st
 
@@ -903,7 +853,6 @@ def build_hybrid_strategy(
         else None
     )
 
-    # Pre-compute keys for all variants
     variant_keys = [jsonschema_rs.canonical.json.to_string(v.overlay) for v in captured_variants]
     n_variants = len(captured_variants)
 
@@ -911,18 +860,12 @@ def build_hybrid_strategy(
     def hybrid(draw: st.DrawFn) -> Any:
         random = draw(st.randoms())
 
-        # Decide: use captured variant or generate fresh?
         if random.random() >= CAPTURED_VALUES_PROBABILITY:
             return draw(original_strategy)
 
-        # Always generate base values first, then overlay captured values.
-        # This ensures parameters without resource requirements (like `file_name`)
-        # still get generated values while resource-linked params use captured data.
         drawn = draw(original_strategy)
 
-        # An upstream overlay (e.g. the constants overlay) may wrap the dict in
-        # `GeneratedValue`. Unwrap so we can deep-merge captured values into the body,
-        # and combine provenance below.
+        # Upstream overlays may wrap the value in `GeneratedValue`; unwrap to merge and combine provenance
         base_meta = None
         base_pool_draws: tuple = ()
         base_semantic_draws: tuple = ()
@@ -941,12 +884,10 @@ def build_hybrid_strategy(
         if not isinstance(base, (dict, list)):
             return base
 
-        # Single variant: no selection needed
         if n_variants == 1:
             idx = 0
         else:
-            # Shuffle indices before weighted selection to avoid Hypothesis's bias
-            # toward early indices when using cumulative probability selection.
+            # Selection shuffles indices first: Hypothesis biases cumulative selection toward early ones
             idx = usage_tracker.weighted_select(variant_keys, random)
         chosen = captured_variants[idx]
         overlay = chosen.overlay
@@ -988,7 +929,7 @@ def _apply_overlay(target: dict[str, Any] | list[Any], overlay: dict[str, Any] |
 
 
 def _deep_merge_overlay(target: dict[str, Any], overlay: dict[str, Any]) -> None:
-    """Apply `overlay` onto `target` in place, recursing into nested dicts so leaf overlays don't drop generated siblings."""
+    """Merge `overlay` into `target` in place; nested dicts merge so generated siblings survive."""
     for key, value in overlay.items():
         current = target.get(key)
         if isinstance(value, dict) and isinstance(current, dict):
@@ -1028,7 +969,7 @@ def _has_explicit_slash_example(examples: Sequence[object]) -> bool:
 
 
 def _get_explicit_intent_path_names(*, parameters: Sequence[OpenApiParameter]) -> frozenset[str]:
-    """Collect path parameter names where encoded slash is explicitly allowed."""
+    """Path parameter names whose examples, listed values or `format` allow an encoded slash."""
     explicit: set[str] = set()
     for parameter in parameters:
         if _has_explicit_slash_example(parameter.examples):
@@ -1045,13 +986,6 @@ def _get_explicit_intent_path_names(*, parameters: Sequence[OpenApiParameter]) -
 def _bias_path_integers_to_positive(
     params: dict[str, Any], random: Random, validators: dict[str, jsonschema_rs.Validator]
 ) -> dict[str, Any]:
-    """Bias integer path parameters toward positive values.
-
-    Most REST APIs use positive integers for resource IDs (1, 2, 3, ...),
-    so biasing toward positive values increases the chance of hitting
-    existing resources while still occasionally testing edge cases like 0
-    and negative numbers.
-    """
     result = {}
     for key, value in params.items():
         # `bool` is a subclass of `int`; without excluding it `False` would be rewritten to `1`.
@@ -1062,10 +996,8 @@ def _bias_path_integers_to_positive(
             and key in validators
             and random.random() < PATH_INTEGER_POSITIVE_BIAS
         ):
-            # Convert to positive: 0 -> 1, negative -> abs(value) or 1
             candidate = max(1, abs(value))
-            # The candidate may break the schema (range, `enum`, `multipleOf`, ...);
-            # keep the already-valid original value rather than emit invalid data.
+            # Keep the valid original when the candidate breaks the schema (range, `enum`, `multipleOf`)
             if validators[key].is_valid(candidate):
                 result[key] = candidate
             else:
@@ -1078,7 +1010,6 @@ def _bias_path_integers_to_positive(
 def build_positive_biased_path_strategy(
     strategy: st.SearchStrategy, validators: dict[str, jsonschema_rs.Validator]
 ) -> st.SearchStrategy:
-    """Wrap a path parameter strategy to bias integers toward positive values."""
     from hypothesis import strategies as st
 
     @st.composite
@@ -1110,22 +1041,14 @@ def build_example_aware_strategy(
     original_strategy: st.SearchStrategy,
     examples: list[JsonValue],
 ) -> st.SearchStrategy:
-    """Combine original strategy with schema examples.
-
-    Uses examples approximately 20% of the time to provide coverage of domain-specific
-    values while still allowing hypothesis-generated exploration (~80%).
-
-    Uses true randomness (not Hypothesis's reproducible random) to ensure the
-    probability distribution is uniform and not affected by shrinking behavior.
-    """
+    """Mix schema examples into `original_strategy` at about 20% of draws."""
     from hypothesis import strategies as st
 
     @st.composite
     def with_examples(draw: st.DrawFn) -> Any:
-        # Use true random for uniform distribution (like stateful phase)
+        # True randomness keeps the example rate uniform under shrinking
         random = draw(st.randoms(use_true_random=True))
 
-        # 20% use example, 80% generate fresh
         if random.random() >= EXAMPLE_USAGE_PROBABILITY:
             return draw(original_strategy)
 
@@ -1164,13 +1087,9 @@ def build_parameter_example_aware_strategy(
     parameter_examples: dict[str, list[JsonValue]],
     correlated_examples: list[dict[str, JsonValue]] | None = None,
 ) -> st.SearchStrategy:
-    """Combine original parameter strategy with per-parameter schema examples.
+    """Replace each parameter's generated value with one of its examples about 20% of the time.
 
-    For each parameter with examples, approximately 20% chance to replace its
-    generated value with one of the examples. Parameters without examples keep
-    their generated values. Equally-named examples are applied as a whole.
-
-    Uses true randomness for uniform probability distribution.
+    Examples sharing a name across parameters apply together.
     """
     from hypothesis import strategies as st
 
@@ -1182,7 +1101,7 @@ def build_parameter_example_aware_strategy(
         if result is None:
             return result
 
-        # Use true random for uniform distribution
+        # True randomness keeps the example rate uniform under shrinking
         random = draw(st.randoms(use_true_random=True))
 
         chosen: dict[str, JsonValue] = {}
@@ -1190,11 +1109,9 @@ def build_parameter_example_aware_strategy(
             chosen = random.choice(correlated)
             result.update(chosen)
 
-        # For each remaining parameter with examples, potentially replace with example
         for param_name, examples in parameter_examples.items():
             if not examples or param_name in chosen:
                 continue
-            # 20% chance to use example for this parameter
             if random.random() < EXAMPLE_USAGE_PROBABILITY:
                 result[param_name] = random.choice(examples)
 
@@ -1258,10 +1175,7 @@ class OpenApiComponent(ABC):
 
     @property
     def permissive_schema(self) -> JsonSchema:
-        """`optimized_schema` with properties nothing can satisfy accepting any value.
-
-        Returns `optimized_schema` itself when no property was forbidden.
-        """
+        """`optimized_schema` with unsatisfiable properties accepting any value; `optimized_schema` itself if none."""
         if self._permissive_schema is NOT_SET:
             schema = self.optimized_schema
             permissive = deepclone(schema) if isinstance(schema, dict) else schema
@@ -1279,9 +1193,9 @@ class OpenApiComponent(ABC):
 
     @property
     def validation_schema(self) -> JsonSchema:
-        """JSON schema for conformance validation — resolved but without generation-specific type injection.
+        """Schema for conformance validation, without generation-specific type injection.
 
-        Keeps `prefixItems` intact so `Draft202012Validator` accepts the schema during construction.
+        Keeps `prefixItems` so a Draft 2020-12 validator accepts it.
         """
         if self._validation_schema is NOT_SET:
             self._validation_schema = self._build_validation_schema()
@@ -1307,41 +1221,22 @@ class OpenApiComponent(ABC):
         return self._validator
 
     def validate(self, value: Any) -> None:
-        """Validate a value against this parameter's schema.
-
-        Args:
-            value: Value to check, in its parsed form.
-
-        Raises:
-            jsonschema_rs.ValidationError: If the value does not conform to the schema.
-
-        """
+        """Raise `jsonschema_rs.ValidationError` if `value`, in its parsed form, breaks the schema."""
         self.get_validator().validate(value)
 
     def is_valid(self, value: Any) -> bool:
-        """Check whether a value conforms to this parameter's schema.
-
-        Args:
-            value: Value to check, in its parsed form.
-
-        Returns:
-            `True` if the value is valid, `False` otherwise.
-
-        """
+        """Whether `value`, in its parsed form, conforms to the schema."""
         return self.get_validator().is_valid(value)
 
     @abstractmethod
     def _get_raw_schema(self) -> JsonSchema:
-        """Get the raw schema for this component."""
         raise NotImplementedError
 
     @abstractmethod
     def _get_default_type(self) -> str | None:
-        """Get default type for this parameter."""
         raise NotImplementedError
 
     def _build_schema(self, *, optimize: bool) -> JsonSchema:
-        """Build JSON schema with optional optimizations for data generation."""
         is_2020_12 = is_draft_2020_12(self.adapter)
         schema = to_json_schema(
             self.raw_schema,
@@ -1355,25 +1250,20 @@ class OpenApiComponent(ABC):
             merge_ref_siblings=self.adapter.ref_siblings,
         )
 
-        # Missing the `type` keyword may significantly slowdown data generation, ensure it is set
+        # A missing `type` slows down data generation
         default_type = self._get_default_type()
         if isinstance(schema, dict):
-            # Beside a combinator or a reference the default would narrow what they admit (a `null` branch
-            # of a header is still a header), so only a schema that says nothing about its type gets one.
+            # Next to a combinator or `$ref`, a default `type` would narrow what they admit (a `null` branch)
             if default_type is not None and not any(key in schema for key in _TYPE_DECIDING_KEYWORDS):
                 schema.setdefault("type", default_type)
         elif schema is True and default_type is not None:
-            # Restrict such cases too
             schema = {"type": default_type}
 
         return schema
 
     @property
     def examples(self) -> list:
-        """All examples extracted from definition.
-
-        Combines both single 'example' and 'examples' container values.
-        """
+        """Examples from the definition's `examples` and `example`, then from its schema."""
         if self._examples is NOT_SET:
             self._examples = self._extract_examples()
         assert not isinstance(self._examples, NotSet)
@@ -1393,13 +1283,9 @@ class OpenApiComponent(ABC):
 
     @property
     def mutation_targets(self) -> tuple[MutationTargetDescriptor, ...]:
-        """Pre-computed walk recipes for every mutation target reachable from `optimized_schema`.
+        """Walk recipes for every mutation target in `optimized_schema`, cached for the component's lifetime.
 
-        Cached for the component's lifetime so strategy rebuilds against the unmodified
-        `optimized_schema` skip the walk. Callers must NOT pass these descriptors when
-        the schema reaching the strategy has been transformed (e.g. by error-feedback
-        adjustments) — those calls fall through to a fresh `compute_mutation_targets` against
-        the transformed schema so newly-synthesized targets are picked up.
+        Valid only for the unmodified `optimized_schema`; a transformed schema needs its own walk.
         """
         from schemathesis.specs.openapi.negative.mutations import compute_mutation_targets
 
@@ -1409,26 +1295,14 @@ class OpenApiComponent(ABC):
         return self._mutation_targets
 
     def _extract_examples(self) -> list[object]:
-        """Extract examples from definition and schema.
-
-        Looks for examples in:
-        - Top-level 'example' and 'examples' keywords in the definition
-        - 'example' and 'examples' keywords in the nested schema (for parameters with schema)
-        """
         examples: list[object] = []
 
-        # Extract from top-level definition
         examples.extend(iter_example_values(self.definition.get(self.adapter.examples_container_keyword)))
         examples.extend(self._iter_single_and_schema_examples())
         return examples
 
     def _get_strategy_examples(self, operation: OpenApiOperation) -> list[JsonValue]:
-        """Extract examples using proper OAS3 Example Object unpacking for the definition container.
-
-        Unlike `_extract_examples`, uses `extract_inner_examples` which correctly handles
-        both dict and list containers — extracting inner `value`/`externalValue` fields
-        and resolving `$ref`s via the operation schema.
-        """
+        """Like `examples`, with Example Objects in the container unpacked and their `$ref`s resolved."""
         from schemathesis.specs.openapi.examples import extract_inner_examples
 
         examples: list[JsonValue] = []
@@ -1453,7 +1327,6 @@ class OpenApiComponent(ABC):
             schema_example = node.get(self.adapter.example_keyword, NOT_SET)
             if schema_example is not NOT_SET:
                 yield schema_example
-            # JSON Schema supports 'examples' as an array
             schema_examples = node.get("examples")
             if isinstance(schema_examples, list):
                 yield from schema_examples
@@ -1470,8 +1343,6 @@ def _admits_raising_minimum(schema: JsonSchemaObject, minimum_keyword: str, maxi
 
 @dataclass
 class OpenApiParameter(OpenApiComponent):
-    """OpenAPI operation parameter."""
-
     @classmethod
     def from_definition(
         cls, *, definition: JsonSchemaObject, name_to_uri: dict[str, str], adapter: ParameterAdapter
@@ -1481,7 +1352,6 @@ class OpenApiParameter(OpenApiComponent):
 
     @property
     def media_type(self) -> None:
-        """Non-body parameters have no media type."""
         return None
 
     @property
@@ -1491,28 +1361,22 @@ class OpenApiParameter(OpenApiComponent):
 
     @property
     def name(self) -> str:
-        """Parameter name."""
         name = self.definition["name"]
-        # A name is text on the wire, but a document converted from YAML 1.1 spells `on` as the
-        # boolean `true`, and a numeric one arrives as a number. Spelled as JSON writes it, so the
-        # name reads the same as in the document.
+        # YAML 1.1 turns `on` into `true` and numeric names into numbers; JSON spelling matches the document
         if not isinstance(name, str):
             return jsonschema_rs.canonical.json.to_string(name)
         return name
 
     @property
     def location(self) -> ParameterLocation:
-        """Where this parameter is located."""
-        # Direct dict lookup beats `ParameterLocation(value)` — the enum dispatch
-        # (`EnumType.__call__` → `Enum.__new__`) is the slow path here.
+        # A dict lookup is faster than `ParameterLocation(value)`
         return _IN_TO_LOCATION.get(self.definition.get("in"), ParameterLocation.UNKNOWN)
 
     @property
     def wire_bounds(self) -> dict[str, int]:
-        """Lower bounds that serialization implies but the document does not declare.
+        """Lower bounds serialization implies but the document does not declare.
 
-        Generation honors them so an empty value never leaves the parameter off the wire; whatever
-        judges a value against the API contract must not, because the document admits that value.
+        Generation honors them so empty values still reach the wire; contract checks must ignore them.
         """
         allow_empty_value = self.definition.get("allowEmptyValue")
         if not self.is_required and allow_empty_value is not False:
@@ -1522,17 +1386,14 @@ class OpenApiParameter(OpenApiComponent):
         if not isinstance(schema, dict):
             return {}
         bounds: dict[str, int] = {}
-        # A required parameter with an empty array value serializes to nothing (form/simple styles
-        # drop empty arrays), leaving the parameter absent from the request and violating `required`.
+        # Form and simple styles drop empty arrays, so a required array parameter would vanish from the request
         if (
             self.is_required
             and schema.get("type") == "array"
             and _admits_raising_minimum(schema, "minItems", "maxItems")
         ):
             bounds["minItems"] = 1
-        # An explicit `allowEmptyValue: false` forbids sending the parameter with an empty value.
-        # The default is not applied — it would strip empty strings from every query parameter,
-        # and most schemas that omit the keyword do accept them.
+        # Only an explicit `allowEmptyValue: false` counts: most schemas that omit it accept empty strings
         if (
             allow_empty_value is False
             and self.location is ParameterLocation.QUERY
@@ -1576,14 +1437,10 @@ class OpenApiParameter(OpenApiComponent):
         return schema
 
     def _get_raw_schema(self) -> JsonSchema:
-        """Get raw parameter schema."""
         return self.adapter.extract_parameter_schema(self.definition)
 
     def _get_default_type(self) -> str | None:
-        """Return default type if parameter is in string-type location."""
-        # Content-encoded parameters (`content:` instead of `schema:`) carry a
-        # pre-serialization schema (e.g. object) — not the wire type.  Don't
-        # inject `type: string` for them; their schema already describes the value.
+        # A `content` parameter's schema describes the value before serialization, not the wire string
         if "schema" not in self.definition:
             return None
         return "string" if self.location.is_in_header else None
@@ -1616,8 +1473,6 @@ def _resolve_form_part(schema: dict[str, Any], root_schema: dict[str, Any]) -> d
 
 @dataclass
 class OpenApiBody(OpenApiComponent):
-    """OpenAPI request body."""
-
     media_type: str
     resource_name: str | None
     name_to_uri: dict[str, str]
@@ -1692,7 +1547,6 @@ class OpenApiBody(OpenApiComponent):
 
     @property
     def is_negatable(self) -> bool:
-        """Whether this body schema can be negated for negative test generation."""
         if self._is_negatable is NOT_SET:
             from schemathesis.specs.openapi.negative.utils import can_negate, is_binary_format
 
@@ -1713,11 +1567,10 @@ class OpenApiBody(OpenApiComponent):
 
     @property
     def name(self) -> str:
-        # The name doesn't matter but is here for the interface completeness.
+        # Only here to satisfy the interface
         return "body"
 
     def _get_raw_schema(self) -> JsonSchema:
-        """Get raw body schema."""
         return self.definition.get("schema", {})
 
     def _build_schema(self, *, optimize: bool) -> JsonSchema:
@@ -1754,7 +1607,6 @@ class OpenApiBody(OpenApiComponent):
         return self.schema_cache.get_or_build(key, build)
 
     def _get_default_type(self) -> str | None:
-        """Return default type if body is a form type."""
         return "object" if self.media_type in FORM_MEDIA_TYPES else None
 
     @property
@@ -1805,7 +1657,7 @@ class OpenApiBody(OpenApiComponent):
         return collect_object_properties(schema)[1] if schema is not None else []
 
     def get_property_content_types(self, property_name: str) -> list[str]:
-        """Get media types a form property declares via `encoding.contentType`."""
+        """Media types a form property declares via `encoding.contentType`."""
         encoding = self.definition.get("encoding", {})
         return media_types.parse_list(encoding.get(property_name, {}).get("contentType"))
 
@@ -1816,7 +1668,7 @@ class OpenApiBody(OpenApiComponent):
             yield from iter_media_type_file_samples(media_type)
 
     def get_property_filename(self, property_name: str) -> str | None:
-        """Get filename from encoding.headers.Content-Disposition for a form property."""
+        """Filename from the form property's `encoding.headers.Content-Disposition`."""
         encoding = self.definition.get("encoding", {})
         headers = encoding.get(property_name, {}).get("headers", {})
         cd = headers.get("Content-Disposition", {})
@@ -1834,11 +1686,8 @@ class OpenApiBody(OpenApiComponent):
         feedback: FeedbackSources = NO_FEEDBACK,
         mix_examples: bool = True,
     ) -> st.SearchStrategy:
-        """Get a Hypothesis strategy for this body parameter."""
         strategy_key = _strategy_cache_key(generation_config, feedback, mix_examples)
-        # The captured-variant overlay binds resource values at build time, so caching it would freeze
-        # stale variants; only the strategy beneath it is cached. The semantic overlay closes over the
-        # live index and remains correct under caching, so semantic-only data sources stay cache-eligible.
+        # Caching the captured-variant overlay would freeze stale values; only the strategy beneath it is cached
         consumes_captured = _captured_variants_active(feedback.extra_data_source, operation)
         overlay_key = None if consumes_captured else strategy_key
         # Only the latest strategy per mode is kept; a new feedback generation replaces it.
@@ -1870,8 +1719,7 @@ class OpenApiBody(OpenApiComponent):
                 mix_examples=mix_examples,
             )
         if strategy is EMPTY_STRATEGY:
-            # Every overlay below decorates a drawn value, so there is nothing for them to act on.
-            # Returning as-is keeps the schema recognizable as unsatisfiable to whoever draws from it.
+            # Returned as is, so callers still recognize the schema as unsatisfiable
             return strategy
         strategy = self._with_configured_values(strategy, operation, schema, generation_config, generation_mode)
 
@@ -1925,11 +1773,9 @@ class OpenApiBody(OpenApiComponent):
         feedback: FeedbackSources,
         mix_examples: bool,
     ) -> st.SearchStrategy:
-        """Generate body values, then substitute values from sources other than captured ones into positive ones.
+        """Generate body values, then substitute values from every non-captured source into positive ones.
 
-        The order is load-bearing: examples are mixed before any substitution; constants run before
-        semantic and captured values so live, response-derived values win over a random pool literal.
-        Later overlays re-wrap `GeneratedValue` with combined provenance, so surviving constants keep their attribution.
+        Examples mix in first; constants run before semantic and captured values, so response-derived values win.
         """
         from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
 
@@ -1945,8 +1791,6 @@ class OpenApiBody(OpenApiComponent):
             self.name_to_uri,
             # Negative filter needs `prefixItems` intact so `Draft202012Validator` can be constructed.
             validation_schema=self.validation_schema if is_negative else None,
-            # Reuse the precomputed target walk recipes when the strategy is generating against
-            # `optimized_schema` directly (no error-feedback adjustment fired).
             target_descriptors=self.mutation_targets if is_negative and schema is self.optimized_schema else None,
         )
         if strategy is EMPTY_STRATEGY or is_negative:
@@ -2069,8 +1913,7 @@ OPENAPI_20_EXCLUDE_KEYS = frozenset(["required", "name", "in", "title", "descrip
 def extract_parameter_schema_v2(parameter: Mapping[str, Any]) -> JsonSchemaObject:
     # In Open API 2.0, schema for non-body parameters lives directly in the parameter definition
     schema = {key: value for key, value in parameter.items() if key not in OPENAPI_20_EXCLUDE_KEYS}
-    # Swagger 2.0 idiom: `type: array` + scalar `enum` constrains item values, not the whole array.
-    # Move the enum onto `items` (intersecting with any existing `items.enum`).
+    # Swagger 2.0 `type: array` with a scalar `enum` constrains items; move it onto `items`, intersecting enums
     if (
         schema.get("type") == "array"
         and isinstance(schema.get("enum"), list)
@@ -2146,8 +1989,7 @@ def _bundle_parameter(
 ) -> tuple[dict[str, Any], dict[str, str]] | None:
     """Bundle a parameter definition to make it self-contained.
 
-    Returns `None` when an optional parameter names a reference that does not resolve; such a
-    parameter can be left out of the request instead of failing the whole operation.
+    `None` for an optional parameter whose reference does not resolve; the request leaves it out.
     """
     param_id = id(parameter)
     cached = bundle_cache.get(param_id)
@@ -2215,8 +2057,7 @@ def _bundle_parameter(
 
     definition_ = cast(dict, definition)
     result = definition_, name_to_uri
-    # Keeping `parameter` alive reserves its address, so no later parameter can be allocated onto it
-    # and pick up this entry.
+    # A live `parameter` keeps its `id`, so no later parameter can reuse it and hit this entry
     bundle_cache[param_id] = (parameter, deepclone(definition_), dict(name_to_uri))
     return result
 
@@ -2232,9 +2073,7 @@ def _skipped_body(error: RefResolutionError, *, required: bool) -> SkippedParame
 def _is_recoverable_body_reference(reference: str) -> bool:
     """Whether a required body can be dropped over this reference.
 
-    A same-document reference that does not resolve means the document is incomplete, which the
-    absent body already covers. A reference into another document may have failed because that
-    document could not be read - an operational error to surface rather than work around.
+    Only a same-document one: a reference into another document may have failed to load, an error to surface.
     """
     return reference.startswith("#")
 
@@ -2242,8 +2081,7 @@ def _is_recoverable_body_reference(reference: str) -> bool:
 def _is_skippable(definition: Mapping, error: RefResolutionError) -> bool:
     """Whether the operation stays testable without this parameter.
 
-    A required body can be left out and tested as a known-invalid request; every other required
-    parameter has no meaningful absent state, so the operation cannot be tested without it.
+    A missing required body makes a known-invalid request; other required parameters have no absent state.
     """
     if not definition.get("required", False):
         return True
@@ -2288,16 +2126,13 @@ def iter_parameters_v2(
 ) -> Iterator[OperationParameter]:
     ensure_object(definition, "Operation definition")
     media_types = definition.get("consumes", default_media_types)
-    # Wildcard `*/*` is valid Swagger but no real client sends it as Content-Type. Drop it when concrete
-    # entries exist; otherwise fall through to the JSON default so downstream dispatch can route bodies.
+    # Clients never send `*/*` as Content-Type; drop it, falling back to the defaults when nothing remains
     if media_types and any(m == "*/*" for m in media_types):
         concrete = [m for m in media_types if m != "*/*"]
         media_types = concrete or []
-    # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
+    # `application/json` is the most common body media type
     body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)
-    # If an API operation has parameters with `in=formData`, Schemathesis should know how to serialize it.
-    # We can't be 100% sure what media type is expected by the server and chose `multipart/form-data` as
-    # the default because it is broader since it allows us to upload files.
+    # `multipart/form-data` is the broadest form media type: it can carry files
     form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
 
     operation_parameters = _validated_parameters(definition.get("parameters", []), "'parameters'")
@@ -2317,11 +2152,10 @@ def iter_parameters_v2(
             check_header_name(parameter["name"])
 
         if location == "formData":
-            # We need to gather form parameters first before creating a composite parameter for them
             form_parameters.append(parameter)
             form_name_to_uri.update(name_to_uri)
         elif location == ParameterLocation.BODY:
-            # Take the original definition & extract the resource_name from there
+            # The original definition's `$ref` names the resource
             resource_name = None
             for param in chain(operation_parameters, shared_parameters):
                 _, param = maybe_resolve_with_resolver(param, resolver)
@@ -2346,7 +2180,7 @@ def iter_parameters_v2(
 
     if form_parameters:
         form_data = form_data_to_json_schema(form_parameters)
-        # `in: formData` requires a form MIME in `consumes`; if none present, pick multipart when a file param exists, else urlencoded.
+        # Without a form media type in `consumes`, use multipart for file parameters, else urlencoded
         form_media_types = [m for m in form_data_media_types if m in FORM_MEDIA_TYPES]
         if not form_media_types:
             has_file = any(parameter.get("type") == "file" for parameter in form_parameters)
@@ -2371,7 +2205,6 @@ def iter_parameters_v3(
     bundle_cache: BundleCache,
     skipped: list[SkippedParameter],
 ) -> Iterator[OperationParameter]:
-    # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
     # TODO: Typing
     ensure_object(definition, "Operation definition")
     operation = definition
@@ -2589,7 +2422,7 @@ class OpenApiParameterSet(ParameterSet):
 
     @property
     def validation_schema(self) -> dict[str, Any]:
-        # Suitable for Draft 2020-12 validators — keeps `prefixItems` intact.
+        # Keeps `prefixItems` for Draft 2020-12 validators
         if self._validation_schema is NOT_SET:
             self._validation_schema = parameters_to_validation_schema(self.items, self.location)
         assert not isinstance(self._validation_schema, NotSet)
@@ -2597,18 +2430,13 @@ class OpenApiParameterSet(ParameterSet):
 
     @property
     def name_to_uri(self) -> dict[str, str]:
-        """Combine name_to_uri from all parameters in this set.
-
-        Merging is safe because a single Bundler instance is used for all parameters,
-        so bundled schema names are globally unique with no overlap between parameters.
-        """
+        """`name_to_uri` of every parameter; one shared bundler keeps names unique, so merging is safe."""
         result: dict[str, str] = {}
         for item in self.items:
             result.update(item.name_to_uri)
         return result
 
     def get_schema_with_exclusions(self, exclude: Iterable[str]) -> dict[str, Any]:
-        """Get cached schema with specified parameters excluded."""
         exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
 
         if exclude_key in self._schema_cache:
@@ -2621,10 +2449,10 @@ class OpenApiParameterSet(ParameterSet):
     def _apply_exclusions(self, base: dict[str, Any], exclude_key: frozenset[str]) -> dict[str, Any]:
         if not exclude_key:
             return base
-        # Need to exclude some parameters - create a shallow copy to avoid mutating cached schema
+        # Copy, so the cached schema stays intact
         schema = dict(base)
         if self.location == ParameterLocation.HEADER:
-            # Remove excluded headers case-insensitively
+            # Header names are case-insensitive
             exclude_lower = {name.lower() for name in exclude_key}
             schema["properties"] = {
                 key: value for key, value in schema["properties"].items() if key.lower() not in exclude_lower
@@ -2637,7 +2465,6 @@ class OpenApiParameterSet(ParameterSet):
                     # `required` must contain at least one item per JSON Schema; drop the key.
                     del schema["required"]
         else:
-            # Non-header locations: remove by exact name
             schema["properties"] = {key: value for key, value in schema["properties"].items() if key not in exclude_key}
             if "required" in schema:
                 kept = [key for key in schema["required"] if key not in exclude_key]
@@ -2656,7 +2483,6 @@ class OpenApiParameterSet(ParameterSet):
         feedback: FeedbackSources = NO_FEEDBACK,
         mix_examples: bool = True,
     ) -> st.SearchStrategy:
-        """Get a Hypothesis strategy for this parameter set with specified exclusions."""
         exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
         strategy_key = _strategy_cache_key(generation_config, feedback, mix_examples)
         cache_key = (exclude_key, generation_mode, strategy_key) if strategy_key is not None else None
@@ -2728,7 +2554,7 @@ class OpenApiParameterSet(ParameterSet):
         from hypothesis import strategies as st
 
         if generation_mode.is_negative and not schema.get("properties"):
-            # Nothing to negate - all properties were excluded
+            # All properties were excluded, so nothing is left to negate
             return st.none()
         strategy = self._base_strategy_cache.get(base_key) if base_key is not None else None
         if strategy is None:
@@ -2744,8 +2570,7 @@ class OpenApiParameterSet(ParameterSet):
             if base_key is not None:
                 self._base_strategy_cache[base_key] = strategy
         if strategy is EMPTY_STRATEGY:
-            # Every overlay below decorates a drawn value, so there is nothing for them to act on.
-            # Returning as-is keeps the schema recognizable as unsatisfiable to whoever draws from it.
+            # Returned as is, so callers still recognize the schema as unsatisfiable
             return strategy
         if captured is not None:
             strategy = build_hybrid_strategy(strategy, *captured)
@@ -2813,11 +2638,10 @@ class OpenApiParameterSet(ParameterSet):
         feedback: FeedbackSources,
         mix_examples: bool,
     ) -> st.SearchStrategy:
-        """Substitute values from sources other than captured ones into generated ones.
+        """Substitute values from every non-captured source into generated ones.
 
-        The order is load-bearing: examples are mixed before any substitution so they go through the same
-        transformations; path integers are biased before constants so a substituted literal is final;
-        constants run before semantic values so live, response-derived values win over a random pool literal.
+        Examples go first to share later transformations; path integers precede constants so a literal stays final;
+        constants precede semantic values so response-derived ones win.
         """
         validator_cls = operation.schema.adapter.jsonschema_validator_cls
         properties = schema.get("properties", {})
@@ -2859,11 +2683,7 @@ class OpenApiParameterSet(ParameterSet):
         feedback: FeedbackSources,
         mix_examples: bool = True,
     ) -> st.SearchStrategy:
-        """Build strategy for negative mode when captured values are available.
-
-        Mostly uses positive strategy with captured values (97%) to test deeper
-        application logic, with occasional negative tests (3%).
-        """
+        """Negative-mode strategy with captured values: 97% positive with captured values, 3% negative."""
         # Without captured values, so building the negative strategy does not recurse back here
         negative_strategy = self.get_strategy(
             operation,
@@ -2873,7 +2693,6 @@ class OpenApiParameterSet(ParameterSet):
             feedback=feedback.for_negative(),
             mix_examples=mix_examples,
         )
-        # Get positive strategy with hybrid approach
         positive_strategy = self.get_strategy(
             operation,
             generation_config,
@@ -2889,7 +2708,6 @@ COMBINED_FORM_DATA_MARKER = "x-schemathesis-form-parameter"
 
 
 def form_data_to_json_schema(parameters: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """Convert raw form parameter definitions to a JSON Schema."""
     parameter_data = (
         (param["name"], extract_parameter_schema_v2(param), param.get("required", False)) for param in parameters
     )
@@ -2900,7 +2718,6 @@ def form_data_to_json_schema(parameters: Sequence[Mapping[str, Any]]) -> dict[st
 
 
 def parameters_to_json_schema(parameters: Iterable[OpenApiParameter], location: ParameterLocation) -> dict[str, Any]:
-    """Convert multiple Open API parameters to a JSON Schema."""
     parameter_data = ((param.name, param.optimized_schema, param.is_required) for param in parameters)
 
     return _merge_parameters_to_object_schema(parameter_data, location)
@@ -2909,7 +2726,7 @@ def parameters_to_json_schema(parameters: Iterable[OpenApiParameter], location: 
 def parameters_to_validation_schema(
     parameters: Iterable[OpenApiParameter], location: ParameterLocation
 ) -> dict[str, Any]:
-    """Merge parameters' validation schemas — `prefixItems` intact, suitable for Draft 2020-12 validators."""
+    """Merged validation schemas, with `prefixItems` kept for Draft 2020-12 validators."""
     parameter_data = ((param.name, param.validation_schema, param.is_required) for param in parameters)
 
     return _merge_parameters_to_object_schema(parameter_data, location)
@@ -2918,30 +2735,24 @@ def parameters_to_validation_schema(
 def _merge_parameters_to_object_schema(
     parameters: Iterable[tuple[str, Any, bool]], location: ParameterLocation
 ) -> dict[str, Any]:
-    """Merge parameter data into a JSON Schema object."""
     properties: dict[str, Any] = {}
     required: list[str] = []
     bundled: dict[str, Any] = {}
-    # HTTP header names are case-insensitive — collapse duplicates onto the first-seen casing.
+    # Header names are case-insensitive; duplicates collapse onto the first-seen casing.
     canonical_by_lower: dict[str, str] = {}
 
     for name, subschema, is_required in parameters:
-        # Extract bundled data if present
         if isinstance(subschema, dict) and BUNDLE_STORAGE_KEY in subschema:
             subschema = dict(subschema)
             subschema_bundle = subschema.pop(BUNDLE_STORAGE_KEY)
-            # NOTE: Bundled schema names are not overlapping as they were bundled via the same `Bundler` that
-            # ensures unique names
+            # One shared bundler keeps bundled names unique
             bundled.update(subschema_bundle)
 
-        # Apply location-specific adjustments to individual parameter schemas
         if isinstance(subschema, dict):
-            # Headers: add format key for plain string types (structured for known headers)
+            # Plain string headers get a header format, a structured one for known headers
             if location.is_in_header and list(subschema) == ["type"] and subschema["type"] == "string":
                 format_key = KNOWN_HEADER_FORMATS.get(name.lower(), HEADER_FORMAT)
                 subschema = {**subschema, "format": format_key}
-
-            # Path parameters: ensure string types have minLength >= 1
             elif (
                 location == ParameterLocation.PATH
                 and subschema.get("type") == "string"
@@ -2952,7 +2763,7 @@ def _merge_parameters_to_object_schema(
         if location == ParameterLocation.HEADER:
             canonical = canonical_by_lower.setdefault(name.lower(), name)
             if canonical != name:
-                # Same header under different case — first definition wins.
+                # Same header in another case; the first definition wins
                 if is_required and canonical not in required:
                     required.append(canonical)
                 continue

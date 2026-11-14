@@ -51,8 +51,6 @@ def find_link_target(
 
 @dataclass(slots=True)
 class NormalizedParameter:
-    """Processed link parameter with resolved container information."""
-
     location: ParameterLocation | None
     name: str
     expression: str
@@ -62,8 +60,6 @@ class NormalizedParameter:
 
 @dataclass(repr=False)
 class OpenApiLink:
-    """Represents an OpenAPI link between operations."""
-
     name: str
     status_code: str
     source: APIOperation
@@ -143,15 +139,11 @@ class OpenApiLink:
         errors: list[TransitionValidationError],
         target_operation: APIOperation | None,
     ) -> list[NormalizedParameter]:
-        """Process link parameters and resolve their container locations.
-
-        Handles both explicit locations (e.g., "path.id") and implicit ones resolved from target operation.
-        """
+        """Resolve containers from a location prefix (`path.id`) or the target operation; problems go to `errors`."""
         result = []
         for parameter, expression in parameters.items():
             location: ParameterLocation | None
             try:
-                # The parameter name is prefixed with its location. Example: `path.id`
                 _location, name = tuple(parameter.split("."))
                 location = ParameterLocation(_location)
             except ValueError:
@@ -161,13 +153,11 @@ class OpenApiLink:
             if isinstance(expression, str):
                 try:
                     parsed = expressions.parser.parse(expression)
-                    # Find NonBodyRequest nodes that reference source parameters
                     for node in parsed:
                         if isinstance(node, expressions.nodes.NonBodyRequest) and not any(
                             p.name == node.parameter and p.location == node.location
                             for p in self.source.iter_parameters()
                         ):
-                            # Check if parameter exists in source operation
                             errors.append(
                                 TransitionValidationError(
                                     f"Expression `{expression}` references non-existent {node.location} parameter "
@@ -196,7 +186,6 @@ class OpenApiLink:
     def _get_parameter_container(
         self, location: ParameterLocation | None, name: str, target: APIOperation
     ) -> ContainerName:
-        """Resolve parameter container either from explicit location or by looking up in target operation."""
         if location:
             return location.container_name
 
@@ -219,10 +208,6 @@ class OpenApiLink:
         )
 
     def extract_parameters(self, output: StepOutput) -> dict[ContainerName, dict[str, ExtractedParam]]:
-        """Extract parameters using runtime expressions.
-
-        Returns a two-level dictionary: container -> parameter name -> extracted value
-        """
         eval_fn = expressions.evaluate_wildcard if self.is_inferred else expressions.evaluate
         extracted: dict[ContainerName, dict[str, ExtractedParam]] = {}
         for parameter in self.parameters:
@@ -253,7 +238,7 @@ class OpenApiLink:
 
 @dataclass(slots=True)
 class StepOutputWrapper:
-    """Wrapper for StepOutput that uses only case_id for hash-based caching."""
+    """Hashes and compares by case id only, for caching."""
 
     output: StepOutput
 

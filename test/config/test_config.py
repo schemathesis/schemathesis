@@ -751,9 +751,7 @@ def test_project_config_path_none_without_parent():
 
 
 def test_filter_set_with_returns_copy_when_no_operations():
-    # See GH-3572.
-    # filter_set_with() must return a copy when there are no `[[operations]]` configured.
-    # This avoids mutations that can corrupt the execution flow on subsequent runs
+    # See GH-3572: mutating a shared filter set corrupts later runs.
     ops = OperationsConfig()
     original = FilterSet()
     original.exclude(path="/admin")

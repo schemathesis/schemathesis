@@ -19,10 +19,7 @@ TEMPLATE_PLACEHOLDER = re.compile(r"\{([^{}]+)\}")
 
 @lru_cache
 def get_template_fields(template: str) -> tuple[str, ...]:
-    """Extract named placeholders from a string template, in the order they appear.
-
-    "/users/{userId}/posts/{postId}" -> ("userId", "postId")
-    """
+    """Unique placeholder names in order, "/users/{userId}/posts/{postId}" -> ("userId", "postId")."""
     remainder = TEMPLATE_PLACEHOLDER.sub("", template)
     # Malformed templates have no reliable placeholders to inject
     if "{" in remainder or "}" in remainder:
@@ -65,8 +62,7 @@ def to_wire_text(value: object) -> str:
 def stringify_keys(document: object) -> None:
     """Spell every non-string mapping key in place as the wire does, e.g. a YAML 1.1 `on:` read as `True`."""
     try:
-        # Serializing rejects non-string keys and is several times faster than the walk below.
-        # Any object is accepted; one that is not JSON raises, which is the check here.
+        # Serialization raises on non-string keys and non-JSON objects, and is faster than the walk below.
         jsonschema_rs.canonical.json.to_string(document)
         return
     except ValueError:
@@ -93,7 +89,7 @@ def stringify_keys(document: object) -> None:
 
 
 def diff(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[str, Any]:
-    """Calculate the difference between two dictionaries."""
+    """Entries of `right` that are missing from `left` or differ there."""
     diff = {}
     for key, value in right.items():
         if key not in left or left[key] != value:
@@ -129,7 +125,6 @@ def transform(schema: JsonValue, callback: Callable, *args: Any, **kwargs: Any) 
 
 
 def transform(schema: JsonValue, callback: Callable[..., dict[str, Any]], *args: Any, **kwargs: Any) -> JsonValue:
-    """Apply callback recursively to the given schema."""
     if isinstance(schema, dict):
         schema = callback(schema, *args, **kwargs)
         for key, sub_item in schema.items():
@@ -188,10 +183,7 @@ def iter_decoded_pointer_segments(pointer: str) -> Iterator[str]:
 
 
 def resolve_pointer(document: object, pointer: str) -> object | Unresolvable:
-    """Implementation is adapted from Rust's `serde-json` crate.
-
-    Ref: https://github.com/serde-rs/json/blob/master/src/value/mod.rs#L751
-    """
+    """Adapted from `serde_json` (https://github.com/serde-rs/json/blob/master/src/value/mod.rs#L751)."""
     if not pointer:
         return document
     if not pointer.startswith("/"):
@@ -218,11 +210,9 @@ def resolve_path(document: object, path: Iterable[str | int]) -> object | Unreso
 
 
 def resolve_pointer_all(document: object, pointer: str) -> list[object] | Unresolvable:
-    """Resolve a JSON Pointer that may contain `*` wildcard segments, fanning out at each `*`.
+    """Every match of a JSON Pointer whose `*` segments fan out over arrays.
 
-    Returns a flat list of every match. Returns UNRESOLVABLE only if the
-    pointer is malformed or fails before any `*`; failures past a `*` drop
-    silently so partial coverage is preserved.
+    `UNRESOLVABLE` only when the pointer is malformed or fails before any `*`; later failures drop that branch.
     """
     if not pointer:
         return [document]

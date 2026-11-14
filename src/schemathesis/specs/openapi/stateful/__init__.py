@@ -62,7 +62,7 @@ class OpenAPIStateMachine(RecordingStateMachine):
         return matcher(result)
 
     def _feeds_later_steps(self, output: StepOutput) -> bool:
-        """Whether a link that can follow this response extracts at least one value from it."""
+        """True if a link that can follow this response extracts a value from it."""
         bundle_name = self._get_target_for_result(output)
         if bundle_name is None:
             return False
@@ -82,14 +82,12 @@ def _extracts_value(transition: Transition) -> bool:
     return not values or any(isinstance(value, Ok) and value.ok() not in (None, UNRESOLVABLE) for value in values)
 
 
-# The proportion of negative tests generated for each step
+# Percentage of negative cases per step
 NEGATIVE_TEST_CASES_THRESHOLD = 10
 
 
 @dataclass
 class OperationTransitions:
-    """Transitions for a single operation."""
-
     __slots__ = ("incoming", "outgoing")
 
     def __init__(self) -> None:
@@ -99,8 +97,6 @@ class OperationTransitions:
 
 @dataclass
 class ApiTransitions:
-    """Stores all transitions grouped by operation."""
-
     __slots__ = ("operations",)
 
     def __init__(self) -> None:
@@ -108,12 +104,11 @@ class ApiTransitions:
         self.operations: dict[str, OperationTransitions] = {}
 
     def add_outgoing(self, source: str, link: OpenApiLink) -> None:
-        """Record an outgoing transition from source operation."""
         self.operations.setdefault(source, OperationTransitions()).outgoing.append(link)
         self.operations.setdefault(link.target.label, OperationTransitions()).incoming.append(link)
 
     def producer_labels_for_bundle(self, bundle_name: str) -> Iterator[str]:
-        # Bundles are named "<source label> -> <status code>" by `create_state_machine`.
+        # Bundle names are "<source label> -> <status code>"
         source, separator, _ = bundle_name.partition(" -> ")
         if separator:
             yield source
@@ -121,19 +116,18 @@ class ApiTransitions:
 
 @dataclass
 class RootTransitions:
-    """Classification of API operations that can serve as entry points."""
+    """Operations that can start a scenario."""
 
     __slots__ = ("reliable", "fallback")
 
     def __init__(self) -> None:
         # Operations likely to succeed and provide data for other transitions
         self.reliable: set[str] = set()
-        # Operations that might work but are less reliable
+        # Less likely to succeed; roots only when there are no reliable ones
         self.fallback: set[str] = set()
 
 
 def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
-    """Collect all transitions between operations."""
     transitions = ApiTransitions()
 
     selected_labels = {operation.label for operation in operations}
@@ -225,14 +219,10 @@ def create_state_machine(
     transitions = collect_transitions(operations)
     _response_matchers: dict[str, Callable[[StepOutput], str | None]] = {}
 
-    # Detect warnings once for all operations tested in stateful phase
-    # Store them as a class attribute to avoid re-detection for each scenario
-    # Create bundles and matchers
     for operation in operations:
         bundle_names = set()
 
         if operation.label in transitions.operations:
-            # Use outgoing transitions
             for link in transitions.operations[operation.label].outgoing:
                 bundle_name = f"{operation.label} -> {link.status_code}"
                 bundles[bundle_name] = Bundle(bundle_name)
@@ -245,25 +235,7 @@ def create_state_machine(
     root_rules: set[str] = set()
     catch_all = Bundle("catch_all")
 
-    # We want stateful testing to be effective and focus on meaningful transitions.
-    # An operation is considered as a "root" transition (entry point) if it satisfies certain criteria
-    # that indicate it's likely to succeed and provide data for other transitions.
-    # For example:
-    #   - POST operations that create resources
-    #   - GET operations without path parameters (e.g., GET /users/ to list all users)
-    #
-    # We avoid adding operations as roots if they:
-    #   1. Have incoming transitions that will provide proper data
-    #      Example: If POST /users/ -> GET /users/{id} exists, we don't need
-    #      to generate random user IDs for GET /users/{id}
-    #   2. Are unlikely to succeed with random data
-    #      Example: GET /users/{id} with random ID is likely to return 404
-    #
-    # This way we:
-    #   1. Maximize the chance of successful transitions
-    #   2. Don't waste the test budget (limited number of steps) on likely-to-fail operations
-    #   3. Focus on transitions that are designed to work together via links
-
+    # Roots run on random data, so only operations likely to succeed start scenarios; the rest get data from links
     roots = classify_root_transitions(operations, transitions, schema.analysis.dependency_graph)
     root_labels: set[str] = set()
 
@@ -328,7 +300,7 @@ def create_state_machine(
 def classify_root_transitions(
     operations: list[APIOperation], transitions: ApiTransitions, graph: DependencyGraph
 ) -> RootTransitions:
-    """Find operations that can serve as root transitions."""
+    """Split operations with outgoing links into reliable and fallback roots."""
     roots = RootTransitions()
     produced_anywhere = {output.resource.name for op_node in graph.operations.values() for output in op_node.outputs}
 
@@ -346,9 +318,7 @@ def classify_root_transitions(
 
 
 def is_likely_root_transition(operation: APIOperation, node: OperationNode | None, produced_anywhere: set[str]) -> bool:
-    """Check if operation is likely to succeed as a root transition."""
-    # FK consumers whose target resource has no producer anywhere are guaranteed to fail
-    # with random data; chains depending on a producer can still be reached via Links.
+    # Consumers of a resource no operation produces fail on random data; links can still reach them
     if node is not None and any(
         slot.resource_field is not None and slot.resource.name not in produced_anywhere for slot in node.inputs
     ):
@@ -370,14 +340,11 @@ def into_step_input(
     feedback: FeedbackSources = NO_FEEDBACK,
     link_calibration: LinkCalibrationState | None = None,
 ) -> Callable[[StepOutput], st.SearchStrategy[StepInput]]:
-    """A single transition between API operations."""
-
     def builder(_output: StepOutput) -> st.SearchStrategy[StepInput]:
         @st.composite
         def inner(draw: st.DrawFn, output: StepOutput) -> StepInput:
             random = draw(st.randoms(use_true_random=True))
 
-            # Extract transition data from previous operation's output
             transition = link.extract(output)
 
             if link_calibration is not None:
@@ -479,9 +446,7 @@ def transition(
 
     step_function.__name__ = name
     step_function.__qualname__ = name
-    # Hypothesis' `@rule` / `@precondition` each build their proxy by exec'ing generated source,
-    # and every one leaves a module behind for the lifetime of the process. Link-heavy schemas
-    # define rules by the thousands, so attach the rule directly instead.
+    # Hypothesis' `@rule` and `@precondition` leak one exec'd module per rule; link-heavy schemas define thousands
     rule = Rule(
         targets=(target.name,),
         function=step_function,

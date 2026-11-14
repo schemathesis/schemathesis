@@ -16,11 +16,8 @@ from schemathesis.core.error_feedback.parsers.flask_rest import FlaskRestParser
 from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
 
-# Flask-RESTful (`reqparse`): top-level `message` is the issues map.
-# Flask-RESTX (`reqparse` and `@api.expect(model, validate=True)`): `errors` is the issues map
-# and top-level `message` is the constant string `"Input payload validation failed"`.
-# Flask-RESTX model mode embeds Python `jsonschema` messages; jsonschema_rs ports use
-# double-quoted values and length/items/properties messages that carry the threshold.
+# Flask-RESTful puts the issues map in `message`; Flask-RESTX puts it in `errors`, with `message` set to this string.
+# RESTX model mode embeds Python `jsonschema` messages; jsonschema_rs ports double-quote values and state size bounds.
 _RESTX_MESSAGE = "Input payload validation failed"
 
 
@@ -269,18 +266,16 @@ def test_flask_rest_parser_parse(make_operation, case_factory, body, expected):
 @pytest.mark.parametrize(
     "body",
     [
-        # Python jsonschema's bare `is too short`/`is too long` lacks the threshold, so we
-        # can't pin a SIZE_BOUND. Drop silently rather than emit a wrong constraint.
+        # Bare `is too short`/`is too long` from Python `jsonschema` lacks the threshold, so no size bound is emitted.
         _restx({"username": "'a' is too short"}),
         _restx({"username": "'abc' is too long"}),
         _restful({"role": "superuser is not a valid choice"}),
         _restx({"value": "'hello' was expected"}),
-        # Numeric enum in jsonschema renders bare `1, 2, 3` (no surrounding quotes),
-        # which `EnumPayload` (string-only) can't represent.
+        # Numeric enums render bare (`1, 2, 3`), which the string-only enum payload cannot represent.
         _restx({"rank": "5 is not one of [1, 2, 3]"}),
-        # jsonschema_rs collapses 4+ choices to "X, Y or N other candidates" — drop.
+        # jsonschema_rs collapses 4+ choices to "X, Y or N other candidates".
         _restx({"flag": '"x" is not one of "a", "b" or 3 other candidates'}),
-        # Either implementation emitting a malformed enum payload — drop.
+        # A malformed enum payload from either implementation.
         _restx({"role": "'x' is not one of [admin, user]"}),
         _restx({"role": '"x" is not one of "admin", bb or "user"'}),
     ],

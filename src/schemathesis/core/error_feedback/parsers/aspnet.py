@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 WalkPair = tuple[ParameterPath, str]
 AspNetShape = Mapping[str, Sequence[str]]
 
-# Vocabulary discriminator — substrings that lock detection to ASP.NET / FluentValidation.
+# Substrings that identify ASP.NET / FluentValidation messages.
 _ASPNET_VOCABULARY: frozenset[str] = frozenset(
     {
         " field is required.",
@@ -160,7 +160,7 @@ def _classify(message: str) -> tuple[ClassificationResult, ...]:
 
 
 def _extract_errors(body: object) -> AspNetShape | None:
-    """Return the validated `errors` dict if `body` matches an ASP.NET ProblemDetails envelope; otherwise None."""
+    """The `errors` dict of an ASP.NET ProblemDetails envelope, or `None` for other bodies."""
     if not isinstance(body, dict):
         return None
     # RFC 7807 ProblemDetails markers.
@@ -185,7 +185,7 @@ def _has_aspnet_vocabulary(errors: AspNetShape) -> bool:
 
 @PARSERS.register
 class AspNetParser:
-    """Parser for ASP.NET ModelValidation envelopes — RFC 7807 ProblemDetails wrapping per-field errors."""
+    """Parser for ASP.NET ModelValidation envelopes (RFC 7807 ProblemDetails with per-field errors)."""
 
     priority = 6
 

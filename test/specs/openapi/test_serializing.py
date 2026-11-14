@@ -508,7 +508,7 @@ def test_swagger2_parameter_serialization(definitions, item, expected):
         ("csv", "pipes", {"connections": "30000142|30000144,50000001|50000002"}),
         ("pipes", "csv", {"connections": "30000142,30000144|50000001,50000002"}),
         ("ssv", "tsv", {"connections": "30000142\t30000144 50000001\t50000002"}),
-        # Inner `collectionFormat` omitted — defaults to csv
+        # Inner `collectionFormat` omitted, so it defaults to csv
         ("pipes", None, {"connections": "30000142,30000144|50000001,50000002"}),
     ],
     ids=["csv-of-pipes", "pipes-of-csv", "ssv-of-tsv", "pipes-of-default-csv"],
@@ -543,16 +543,12 @@ def test_query_serialization_nested_swagger2(ctx, outer_format, inner_format, ex
 
 @pytest.mark.parametrize(("item", "expected"), [({}, {}), ({"key": 1}, {"key": "TEST"})])
 def test_item_is_missing(item, expected):
-    # When there is no key in the data
-
     @conversion
     def convert_func(data, name):
         data[name] = "TEST"
 
     convert_func("key")(item)
 
-    # Then the data should not be affected
-    # And should be otherwise
     assert item == expected
 
 
@@ -732,7 +728,7 @@ def test_querystring_json_serialization_is_sent_as_raw_query(ctx, media_type):
         assert json.loads(unquote(kwargs["params"])) == {"numbers": [1, 2], "flag": None}
 
 
-# A `querystring` parameter may legitimately generate no query pairs at all (e.g. an empty string payload).
+# A `querystring` parameter may generate no query pairs at all (e.g. an empty string payload).
 _EMPTY_QUERYSTRING_CONTENTS = (
     {"text/plain": {"schema": {"type": "string", "enum": [""]}}},
     {
@@ -1290,7 +1286,6 @@ def test_nullable_parameters(
     func,
     kwargs,
 ):
-    # Nullable parameters are converted to an empty string
     assert func("foo", **kwargs)({"foo": None}) == {"foo": ""}
 
 
@@ -1377,7 +1372,6 @@ def test_style_serializers_use_json_scalar_spelling(func, kwargs, value, expecte
 
 
 def test_security_definition_parameter(ctx, testdir):
-    # When the API contains an example for one of its parameters
     schema = ctx.openapi.build_schema(
         {
             "/test": {
@@ -1410,21 +1404,16 @@ def test_(case):
         schema=schema,
     )
     result = testdir.runpytest("-v")
-    # Then it should work as expected
-    # And existing Open API serialization styles should not affect it
     result.assert_outcomes(passed=1)
 
 
 @pytest.mark.parametrize(
     "type_name",
-    # `null` is not a valid Open API type, but it is possible to have `None` with custom hooks, therefore it is here
-    # for simplicity
+    # `null` is no Open API type, but custom hooks can produce `None`.
     ["null", "string", "boolean", "array", "integer", "number"],
 )
 def test_unusual_form_schema(ctx, type_name):
-    # See GH-1152
-    # When API schema defines multipart media type
-    # And its schema is not an object or bytes (string + format=byte)
+    # GH-1152: a multipart schema that is neither an object nor bytes.
     operation = ctx.openapi.load_operation(
         "POST /multipart",
         {
@@ -1438,27 +1427,19 @@ def test_unusual_form_schema(ctx, type_name):
 
     @run_given(case=operation.as_strategy(), max_examples=5)
     def test(case):
-        # Then it should lead to a valid network request
         assert_requests_call(case)
-        # And should contain the proper content type
         kwargs = case.as_transport_kwargs()
         content_type = kwargs["headers"]["Content-Type"]
         assert content_type.startswith("multipart/form-data; boundary=")
-        # And data is a valid multipart
         message = EmailMessage()
         message.attach(kwargs["data"])
         assert message.is_multipart()
-        # When custom headers are passed
         headers = case.as_transport_kwargs(headers={"Authorization": "Bearer FOO"})["headers"]
-        # Then content type should be valid
         assert headers["Content-Type"].startswith("multipart/form-data; boundary=")
-        # And the original headers are preserved
         assert headers["Authorization"] == "Bearer FOO"
-        # When the Content-Type header is passed explicitly
+        # An explicit Content-Type wins, case-insensitively.
         headers = case.as_transport_kwargs(headers={"Content-Type": "text/plain"})["headers"]
-        # Then it should be preferred
         assert headers["Content-Type"] == "text/plain"
-        # And it should be case-insensitive
         headers = case.as_transport_kwargs(headers={"content-type": "text/plain"})["headers"]
         assert headers["content-type"] == "text/plain"
         assert list(headers) == [*list(get_default_headers()), SCHEMATHESIS_TEST_CASE_HEADER, "content-type"]

@@ -21,12 +21,10 @@ def ndjson_path(tmp_path):
 
 
 def get_event_type(event):
-    """Get the event type from externally tagged format."""
     return next(iter(event.keys()))
 
 
 def get_event_data(event):
-    """Get the event data from externally tagged format."""
     return next(iter(event.values()))
 
 
@@ -122,25 +120,21 @@ def test_store_ndjson(ctx, cli, ndjson_path, hypothesis_max_examples):
     )
     events = load_ndjson(ndjson_path)
 
-    # First event should be Initialize
     assert get_event_type(events[0]) == "Initialize"
     init_data = get_event_data(events[0])
     assert "schemathesis_version" in init_data
     assert init_data["seed"] == 1
 
-    # Should have EngineStarted
     engine_started = [e for e in events if get_event_type(e) == "EngineStarted"]
     assert len(engine_started) == 1
 
-    # Should have PhaseStarted events
     phase_started = [e for e in events if get_event_type(e) == "PhaseStarted"]
     assert len(phase_started) >= 1
     assert any(get_event_type(e) == "PhaseFinished" for e in events)
 
-    # Should have ScenarioFinished events with recorder data
     scenario_finished = [e for e in events if get_event_type(e) == "ScenarioFinished"]
     assert len(scenario_finished) >= 1
-    # At least one scenario should have cases/checks/interactions (empty ones are omitted)
+    # The recorder omits empty `cases`, `checks` and `interactions`.
     has_data = False
     for event in scenario_finished:
         data = get_event_data(event)
@@ -150,7 +144,6 @@ def test_store_ndjson(ctx, cli, ndjson_path, hypothesis_max_examples):
             has_data = True
     assert has_data, "Expected at least one scenario with test data"
 
-    # Last event should be EngineFinished
     assert get_event_type(events[-1]) == "EngineFinished"
     assert "running_time" in get_event_data(events[-1])
 
@@ -279,7 +272,6 @@ def test_enum_serialization_without_sanitization(cli, ctx, ndjson_path):
     assert get_event_type(events[0]) == "Initialize"
     assert get_event_type(events[-1]) == "EngineFinished"
 
-    # PhaseName enum should be serialized as string value
     phase_started = [e for e in events if get_event_type(e) == "PhaseStarted"]
     assert len(phase_started) >= 1
     for event in phase_started:
@@ -294,7 +286,6 @@ def test_enum_serialization_without_sanitization(cli, ctx, ndjson_path):
             "stateful",
         )
 
-    # Status enum should be serialized as string value
     phase_finished = [e for e in events if get_event_type(e) == "PhaseFinished"]
     assert len(phase_finished) >= 1
     for event in phase_finished:
@@ -341,7 +332,6 @@ def test_form_data_string_body(cli, ctx, ndjson_path):
     scenario_finished = [e for e in events if get_event_type(e) == "ScenarioFinished"]
     assert len(scenario_finished) >= 1
 
-    # Form data body should be base64 encoded
     found_form_request = False
     for event in scenario_finished:
         data = get_event_data(event)
@@ -427,7 +417,7 @@ def test_credentials_sanitized_in_command(ctx, testdir, ndjson_path):
 
 
 def test_stateful_with_extraction_failure(cli, ctx, ndjson_path):
-    # Link expression references non-existent field to trigger Err serialization
+    # The link references a missing field to produce an extraction error.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/users": {
@@ -488,13 +478,12 @@ def test_stateful_with_extraction_failure(cli, ctx, ndjson_path):
     assert get_event_type(events[0]) == "Initialize"
     assert get_event_type(events[-1]) == "EngineFinished"
 
-    # Stateful phase should run
     phase_started = [e for e in events if get_event_type(e) == "PhaseStarted"]
     assert any(get_event_data(e)["phase"]["name"] == "stateful" for e in phase_started)
 
 
 def test_unresolvable_extraction_serialized(cli, ctx, ndjson_path):
-    # Link references an array index that will be empty, triggering $unresolvable
+    # The link points at an index of an empty array, so extraction yields `$unresolvable`.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/tags": {
@@ -533,7 +522,6 @@ def test_unresolvable_extraction_serialized(cli, ctx, ndjson_path):
 
     @app.route("/tags")
     def list_tags():
-        # Return empty array - extraction of /data/0/id will be unresolvable
         return jsonify({"data": []})
 
     @app.route("/tags/<int:tag_id>")
@@ -549,7 +537,6 @@ def test_unresolvable_extraction_serialized(cli, ctx, ndjson_path):
     )
     events = load_ndjson(ndjson_path)
 
-    # Find ScenarioFinished events with transitions
     scenario_finished = [e for e in events if get_event_type(e) == "ScenarioFinished"]
     found_unresolvable = False
 
@@ -563,7 +550,6 @@ def test_unresolvable_extraction_serialized(cli, ctx, ndjson_path):
                     for param in location_params.values():
                         if param.get("value") == {"$unresolvable": True}:
                             found_unresolvable = True
-                            # Verify the structure
                             assert "definition" in param
                             assert "is_required" in param
 

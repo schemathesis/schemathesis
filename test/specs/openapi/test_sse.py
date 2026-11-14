@@ -841,7 +841,7 @@ def test_sse_retry_field_validates_as_integer():
         "required": ["data"],
     }
     case, response = _call_sse(_sse_schema(item_schema), "retry: 3000\ndata: hello\n\n")
-    # Should not raise — retry:3000 is a valid integer
+    # `retry:3000` is a valid integer
     case.operation.schema.validate_response(case.operation, response, case=case)
 
 

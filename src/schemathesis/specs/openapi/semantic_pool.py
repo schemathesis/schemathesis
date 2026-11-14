@@ -1,10 +1,4 @@
-"""Cross-operation semantic value pool.
-
-Index 2xx response leaves by ``(type, format)``, with pattern-hash and normalized-name
-fallbacks, so values harvested from one operation feed slots on any other operation with
-a matching shape. Inspired by the dynamic-dictionary mechanism in RESTler
-[Godefroid et al., FSE 2020, "Intelligent REST API Data Fuzzing"].
-"""
+"""Pool of 2xx response values keyed by `(type, format)`, pattern and name, feeding same-shaped slots elsewhere."""
 
 from __future__ import annotations
 
@@ -21,8 +15,7 @@ from schemathesis.specs.openapi.formats import HEADER_FORMAT
 from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS
 from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching, to_singular
 
-# Format tokens injected by the parameter adapter rather than declared by users. Slots tagged with these bypass
-# wire-level filters, so the consumer walker drops them and the ingestion walker treats them as "no format".
+# Formats Schemathesis injects for headers: consumer slots with them are dropped, ingested values count as unformatted.
 _INTERNAL_FORMATS: frozenset[str] = frozenset({HEADER_FORMAT, *KNOWN_HEADER_FORMATS.values()})
 
 MAX_VALUES_PER_KEY = 100
@@ -30,9 +23,7 @@ MAX_VALUES_PER_KEY = 100
 # Per-leaf substitution probability; balances pool reuse against Hypothesis exploration.
 SEMANTIC_OVERLAY_PROBABILITY = 0.5
 
-# `(type, format)` pairs eligible for ingestion. Identity-shaped formats (`uuid`, opaque tokens) are excluded
-# to keep one resource's identifiers from leaking into another's slots. Numeric pooling additionally requires
-# explicit `minimum`/`maximum` bounds (see ``_is_numeric_bounded``).
+# Pool-eligible `(type, format)` pairs; identity formats (`uuid`, tokens) stay out so ids never cross resources.
 ALLOWED_FORMATS: dict[str, frozenset[str]] = {
     "string": frozenset(
         {
@@ -65,11 +56,7 @@ class SemanticCandidate(NamedTuple):
 
 @dataclass(slots=True)
 class BoundedValues:
-    """Dedup-on-insert ordered set of (value, producing-op) pairs, bounded by ``max_size``.
-
-    First add wins: if the same value is later observed from a different operation, the
-    original ``source_operation`` is preserved.
-    """
+    """Ordered set of values with their source operation, capped at `max_size`; a value keeps its first source."""
 
     max_size: int = MAX_VALUES_PER_KEY
     _values: dict[PoolValue, str] = field(default_factory=dict)
@@ -135,8 +122,7 @@ class SemanticValueIndex:
         normalized_name: str | None,
         name_only: bool = False,
     ) -> tuple[SemanticCandidate, ...]:
-        # Short-circuit excluded formats so pattern/name fallbacks can't smuggle in an identity-shaped value
-        # (e.g. a UUID stored under a name bucket because the producer omitted `format`).
+        # Stops name and pattern fallbacks from returning identity values, e.g. a UUID pooled without `format`.
         if format_token is not None and not is_pool_eligible(type_token=type_token, format_token=format_token):
             return ()
         with self._lock:
@@ -301,7 +287,7 @@ def resolve_combinator(
 
 
 def _normalize_type(schema: JsonSchemaObject) -> str | None:
-    # Walker uses None for "no declaration" / "malformed `type`" to fall through; `get_type` assumes str|list.
+    # `None` covers a missing or malformed `type`; `get_type` accepts only a string or a list.
     if not isinstance(schema.get("type"), (str, list)):
         return None
     return next((t for t in get_type(schema) if t != "null"), None)
@@ -332,11 +318,9 @@ def iter_ingestion_leaves(
     max_depth: int = DEFAULT_MAX_DEPTH,
     max_nodes: int = DEFAULT_MAX_NODES,
 ) -> Iterator[IngestionLeaf]:
-    """Yield pool-eligible leaves from a 2xx response body, optionally guided by its schema.
+    """Yield pool-eligible leaves of a 2xx body; without `schema`, only strings classify, by shape.
 
-    Without ``schema``, only string leaves classify (by shape inference). ``excluded_names`` blocks named
-    properties (caller passes the path-parameter set to prevent identity-shaped cross-pooling). Arrays are
-    not recursed.
+    Properties named in `excluded_names` (path parameters) are skipped so identifiers do not cross resources.
     """
     budget = _WalkBudget(nodes_left=max_nodes)
     if isinstance(schema, dict):
@@ -427,7 +411,7 @@ def _walk_ingestion(
                 return
             if type_token in ("integer", "number") and not _is_numeric_bounded(schema):
                 return
-            # Don't pool fixed-domain values (`const`/`enum`) — they're not reusable resource refs.
+            # `const` and `enum` values are not reusable resource references.
             if "const" in schema or "enum" in schema:
                 return
             format_token = schema.get("format") if isinstance(schema.get("format"), str) else None
@@ -438,7 +422,7 @@ def _walk_ingestion(
             pattern = schema.get("pattern") if isinstance(schema.get("pattern"), str) else None
             pattern_key = pattern_hash(pattern) if pattern else None
             normalized = normalize_for_matching(name) if name else None
-            # `body` is `object`; `_is_primitive_value` above narrows it but mypy can't track the bridge.
+            # mypy cannot see the primitive check above narrowing `body`.
             yield IngestionLeaf(type_token, format_token, pattern_key, normalized, body)  # type: ignore[arg-type]
             return
         return
@@ -499,7 +483,7 @@ def iter_consumer_leaves(
     max_depth: int = DEFAULT_MAX_DEPTH,
     max_nodes: int = DEFAULT_MAX_NODES,
 ) -> list[LeafDescriptor]:
-    """Return one ``LeafDescriptor`` per substitutable slot. Format-allowlist gating happens at lookup, not here."""
+    """One descriptor per substitutable slot; the format allowlist applies at lookup."""
     budget = _WalkBudget(nodes_left=max_nodes)
     descriptors: list[LeafDescriptor] = []
     _walk_consumer(
@@ -555,8 +539,7 @@ def _walk_consumer(
     if type_token in ("string", "integer", "number") and name is not None:
         if type_token in ("integer", "number") and not _is_numeric_bounded(schema):
             return
-        # Fixed-domain leaves (`const`, `enum`) aren't free slots — substituting a pool value
-        # would violate the constraint (e.g. a `type` discriminator), so skip them.
+        # A pool value would break a `const` or `enum`, such as a `type` discriminator.
         if "const" in schema or "enum" in schema:
             return
         format_token = schema.get("format") if isinstance(schema.get("format"), str) else None

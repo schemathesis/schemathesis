@@ -1,8 +1,4 @@
-"""Automatic schema loading.
-
-This module handles the automatic detection and loading of API schemas,
-supporting OpenAPI, GraphQL, and gRPC services.
-"""
+"""Automatic detection and loading of OpenAPI, GraphQL and gRPC schemas."""
 
 from __future__ import annotations
 
@@ -85,8 +81,7 @@ def _event_stream(
     filter_set: dict[str, Any],
     engine_callback: Callable[[BaseSchema], Iterable[events.EngineEvent]],
 ) -> EventGenerator:
-    # The whole engine idea is that it communicates with the outside via events, so handlers can react to them.
-    # For this reason, even schema loading is done via a separate set of events.
+    # The engine talks to handlers through events, so schema loading emits its own events too.
     loading_started = LoadingStarted(location=location)
     yield loading_started
 
@@ -97,8 +92,7 @@ def _event_stream(
         # An explicitly configured base URL carries its own path, so the origin only applies without one.
         if schema.config.origin is not None and schema.config.base_url is None:
             schema.config.base_url = schema.config.origin.rstrip("/") + schema.base_path.rstrip("/")
-        # Schemas don't (yet?) use configs for deciding what operations should be tested, so
-        # a separate FilterSet is passed there. It combines both config file filters + CLI options.
+        # Schemas select operations through a `FilterSet` combining config file filters and CLI options, not the config.
         schema.filter_set = schema.config.operations.create_filter_set(**filter_set)
         if file_exists(location) and schema.config.base_url is None:
             message = MISSING_BASE_URL_MESSAGE
@@ -161,7 +155,7 @@ def should_try_more(exc: LoaderError) -> bool:
     ):
         return False
 
-    # We should not try other loaders for cases when we can't even establish connection
+    # A connection failure would fail other loaders too
     return not isinstance(exc.__cause__, requests.exceptions.ConnectionError) and exc.kind not in (
         LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
         LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION,
@@ -170,7 +164,6 @@ def should_try_more(exc: LoaderError) -> bool:
 
 
 def detect_loader(location: str, module: Any) -> Callable:
-    """Detect API schema loader."""
     if file_exists(location):
         return module.from_path
     return module.from_url
@@ -193,7 +186,6 @@ def _try_load_schema(location: str, config: ProjectConfig, modules: tuple[Module
                     except Exception as other_exc:
                         if is_specific_exception(other_exc):
                             raise other_exc
-            # Re-raise the original error
             raise exc
 
 
@@ -211,7 +203,7 @@ def _load_schema(location: str, config: ProjectConfig, module: Any) -> BaseSchem
 
 
 def is_specific_exception(exc: Exception) -> bool:
-    """Determine if alternative schema loading should be attempted."""
+    """Whether a fallback loader's error is specific enough to report instead of the original one."""
     return (
         isinstance(exc, LoaderError)
         and exc.kind == LoaderErrorKind.GRAPHQL_INVALID_SCHEMA

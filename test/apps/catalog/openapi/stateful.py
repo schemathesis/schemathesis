@@ -315,7 +315,7 @@ def _register_handlers(app: Flask, store: UserStore) -> None:
     last_modified = "2021-01-01T00:00:00Z"
     config = store.config
 
-    # Counts user-detail hits so tests can prove the link target was actually exercised.
+    # Counts user-detail hits so tests can prove the link target was exercised.
     target_request_count = {"count": 0}
     app.config["target_request_count"] = target_request_count
 
@@ -422,7 +422,6 @@ def _register_handlers(app: Flask, store: UserStore) -> None:
             if config.plain_text_rejection and len(user["name"]) % 2 == 1:
                 # Both branches are common, so the link collects successes and rejections regardless of the seed
                 return "Name is too long", 400, {"Content-Type": "text/plain"}
-            # Only delete users with short names when use_after_free is on
             if config.use_after_free:
                 if len(user["name"]) < 10:
                     del store.users[user_id]

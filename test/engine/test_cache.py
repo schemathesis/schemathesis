@@ -772,7 +772,7 @@ def test_flush_does_not_duplicate_known_observations(ctx, tmp_path):
 
 
 def test_error_feedback_dedups_by_observation_not_by_request(ctx, tmp_path):
-    # Identical observation set with per-variant unique request bytes — dedup must collapse on observations.
+    # Variants share one observation set but differ in request bytes; dedup must collapse on observations.
     api = ctx.openapi.apps.rails_planted_bug(envelope="modern")
     schema = schemathesis.openapi.from_url(api.schema_url)
     _point_cache_at(schema, tmp_path)
@@ -803,8 +803,7 @@ def test_error_feedback_dedups_by_observation_not_by_request(ctx, tmp_path):
     engine.cache.flush()
     _, entries = load(tmp_path)
     feedback_entries = [e for e in entries if e.kind is Kind.ERROR_FEEDBACK]
-    # Rails planted_bug exposes 3 bounded fields (username/title/description); all 20 variants
-    # produce the same 3 observations, so a single entry must absorb the full covering set.
+    # The Rails app bounds 3 fields (username, title, description); all 20 variants produce the same 3 observations.
     assert len(feedback_entries) == 1
     assert len(feedback_entries[0].observation_keys) == 3
 

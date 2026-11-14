@@ -1,10 +1,3 @@
-"""Layered operation ordering for GraphQL fuzzing.
-
-Returns a list of layers, where every operation in layer N must dispatch
-before any operation in layer N+1. Within a layer, ordering is alphabetical
-by `operation.label` for determinism.
-"""
-
 from __future__ import annotations
 
 from collections import defaultdict
@@ -19,11 +12,9 @@ if TYPE_CHECKING:
 
 
 def compute_graphql_layers(operations: Iterable[APIOperation]) -> list[list[APIOperation]]:
-    """Partition GraphQL root-field operations into role-ordered layers.
+    """Partition root-field operations into layers in execution order: producers, readers, mutators, cleanup.
 
-    Layers are returned in execution order: producers, readers, mutators,
-    cleanup. Empty layers are omitted. Within each layer, operations are
-    sorted alphabetically by `label` so dispatch order is reproducible.
+    Empty layers are omitted; each layer is sorted by `label` for reproducible dispatch.
     """
     by_role: dict[OperationRole, list[APIOperation]] = defaultdict(list)
     for op in operations:

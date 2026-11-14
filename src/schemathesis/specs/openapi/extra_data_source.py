@@ -45,23 +45,16 @@ if TYPE_CHECKING:
 RequirementKey = tuple[str, ParameterLocation, str]
 DedupKey: TypeAlias = tuple[type, str | int | float | bool | None]
 
-# Decay factor for recency weighting. Higher = faster recovery of weight.
+# A variant drawn `age` steps ago weighs `age / (age + RECENCY_DECAY_FACTOR)`.
 RECENCY_DECAY_FACTOR = 3.0
-# Maximum number of variants to track. Oldest entries are evicted when exceeded.
+# Variants tracked before the oldest are evicted.
 MAX_TRACKED_VARIANTS = 10000
-# Decay factor for delete attempts. Weight = decay ^ attempts.
-# 0.3 gives: 0 attempts = 1.0, 1 = 0.3, 2 = 0.09, 3 = 0.027
+# A variant deleted N times weighs `DELETE_ATTEMPT_DECAY ** N`.
 DELETE_ATTEMPT_DECAY = 0.3
 
 
 class VariantUsageTracker:
-    """Tracks variant usage for weighted sampling.
-
-    Maintains a global step counter and records when each variant was last drawn.
-    Recently drawn variants get lower weights to encourage diversity.
-    Also tracks DELETE attempts per variant to spread deletions across resources.
-    Uses LRU eviction to bound memory usage.
-    """
+    """Weights variants for sampling: recent draws lower a weight until it recovers, deletions lower it for good."""
 
     __slots__ = ("_step", "_last_drawn", "_delete_attempts", "_maxlen", "_lock")
 
@@ -73,38 +66,21 @@ class VariantUsageTracker:
         self._lock = threading.Lock()
 
     def weighted_select(self, variant_keys: list[str], random: Random) -> int:
-        """Select a variant index using weights while avoiding Hypothesis bias.
-
-        Shuffles indices before weighted selection to ensure fair distribution.
-        The shuffle uses the random source but decouples the selection from
-        index ordering, so Hypothesis's bias toward small values doesn't
-        cause preference for early indices.
-
-        Weights combine:
-        - Recency: recently drawn variants get lower weight (recovers over time)
-        - Delete attempts: variants targeted for deletion get permanently lower weight
-        """
+        """Pick a variant index by weight, shuffling first so Hypothesis' bias toward small values favors no index."""
         n = len(variant_keys)
         with self._lock:
             weights = [self._get_weight_unlocked(k) for k in variant_keys]
 
-        # Shuffle indices to decouple selection from original ordering.
-        # Even if Hypothesis biases toward selecting index 0 after shuffle,
-        # the shuffled order is different each draw, preventing systematic bias.
         indices = list(range(n))
         random.shuffle(indices)
 
-        # Build shuffled weights
         shuffled_weights = [weights[i] for i in indices]
         total = sum(shuffled_weights)
 
         if total == 0:
-            # All weights zero (all recently used), pick first shuffled
+            # Every variant was just drawn
             return indices[0]
 
-        # Weighted selection from shuffled indices
-        # Even with Hypothesis's bias toward small cumulative values,
-        # the shuffled order ensures different variants get picked
         r = random.random() * total
         cumulative = 0.0
         for i, w in enumerate(shuffled_weights):
@@ -115,13 +91,7 @@ class VariantUsageTracker:
         return indices[-1]
 
     def _get_weight_unlocked(self, variant_key: str) -> float:
-        """Get weight without acquiring lock (caller must hold lock).
-
-        Combines recency weighting with delete attempt decay:
-        - Recency: recently drawn variants get lower weight (recovers over time)
-        - Delete attempts: variants targeted for deletion get exponentially lower weight (permanent)
-        """
-        # Recency-based weight (recovers over time)
+        """The caller must hold the lock."""
         last_step = self._last_drawn.get(variant_key)
         if last_step is None:
             recency_weight = 1.0
@@ -129,7 +99,6 @@ class VariantUsageTracker:
             age = self._step - last_step
             recency_weight = age / (age + RECENCY_DECAY_FACTOR)
 
-        # Delete attempt decay (permanent, doesn't recover)
         delete_attempts = self._delete_attempts.get(variant_key, 0)
         delete_weight = DELETE_ATTEMPT_DECAY**delete_attempts
 
@@ -151,20 +120,15 @@ class VariantUsageTracker:
         """Record that a variant was drawn, advancing the global step."""
         with self._lock:
             self._step += 1
-            # Delete first to move to end (maintains LRU order)
+            # Re-insert to move it to the end, keeping LRU order
             if variant_key in self._last_drawn:
                 del self._last_drawn[variant_key]
             self._last_drawn[variant_key] = self._step
-            # Evict oldest if over limit
             while len(self._last_drawn) > self._maxlen:
                 del self._last_drawn[next(iter(self._last_drawn))]
 
     def record_successful_delete(self, variant_key: str) -> None:
-        """Record that a resource was successfully deleted.
-
-        Increments a permanent counter that reduces the variant's selection weight.
-        Unlike recency, this doesn't recover over time - deleted resources stay deprioritized.
-        """
+        """Lower the variant's weight for good; unlike recency, deletions never recover."""
         with self._lock:
             self._delete_attempts[variant_key] = self._delete_attempts.get(variant_key, 0) + 1
 
@@ -177,12 +141,7 @@ class ParameterRequirement:
 
 @dataclass(slots=True, frozen=True)
 class CapturedVariant:
-    """A captured pool overlay together with the provenance of every slot it fills.
-
-    `overlay` is the dict that gets deep-merged into the generated case body; `draws`
-    records which captured `ResourceInstance` supplied each slot value, so the analyzer
-    can attribute the case to its semantic predecessor(s).
-    """
+    """A pool overlay deep-merged into the case body, with the captured instance behind each slot value."""
 
     overlay: dict[str, Any] | list[Any]
     draws: tuple[PoolDraw, ...]
@@ -257,11 +216,7 @@ def build_parameter_requirements(graph: DependencyGraph) -> dict[RequirementKey,
 
 
 def build_inputs_by_label(graph: DependencyGraph) -> dict[str, list[InputSlot]]:
-    """Index input slots by operation label for runtime lookup.
-
-    Only operations with at least one resource-bound slot are recorded; this
-    keeps the dict small and lets `should_record_request` short-circuit cheaply.
-    """
+    """Input slots by operation label, only for operations with a resource-bound slot."""
     inputs_by_label: dict[str, list[InputSlot]] = {}
     for label, operation in graph.operations.items():
         slots = [slot for slot in operation.inputs if slot.resource_field is not None]
@@ -306,8 +261,7 @@ def _build_property_validator(
 
 @dataclass(slots=True, frozen=True)
 class _VariantSlot:
-    # `path` is where the value lands in the variant, integers marking array items; `lookup_key` is
-    # the slash-joined form used as the requirements-dict key and `instance.context` lookup.
+    # `path` locates the value in the variant, integers for array items; `lookup_key` is its slash-joined form.
     path: tuple[str | int, ...]
     leaf_schema: JsonSchema
     requirement: ParameterRequirement
@@ -346,8 +300,7 @@ def _variant_satisfies_paths(
 def _path_parameters_as_read(operation: APIOperation, case: Case) -> dict[str, Any]:
     """The path parameters the request carried, in their declared types.
 
-    The coverage phase sends path parameters as text, so `"2"` for an integer `parent_pk`. Captured as is, it
-    would never pair with or lead a schema that declares an integer.
+    Coverage sends them as text, e.g. `"2"`, which would never pair with a schema declaring an integer.
     """
     return read_from_wire(operation, ParameterLocation.PATH, case.path_parameters or {})
 
@@ -425,11 +378,9 @@ class OpenApiExtraDataSource(ExtraDataSource):
         location: ParameterLocation,
         schema: JsonSchema,
     ) -> list[CapturedVariant] | None:
-        """Get captured variants for hybrid strategy, each carrying its own provenance.
+        """Captured variants for the hybrid strategy, each with its provenance.
 
-        For single requirements, each variant has a single-property overlay.
-        For multiple requirements, each variant has a complete value set preserving relationships.
-        For BODY location, also reaches nested foreign-key fields through objects, array items and `$ref`.
+        Several requirements yield related value sets; bodies also reach nested foreign keys.
         """
         if not isinstance(schema, dict):
             return None
@@ -495,8 +446,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         for resource_name in resource_names:
             for instance in self.repository.iter_instances(resource_name):
                 filled: dict[str, Any] = {}
-                # Same-resource slots get attribution to `instance`; context-only slots also do,
-                # because `instance.context` is captured when this instance was created.
+                # Context-only slots attribute to `instance` too, as its context was captured with it.
                 draws: list[PoolDraw] = []
                 for slot in slots:
                     req = slot.requirement
@@ -525,8 +475,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         if variants:
             return variants
 
-        # No instance covered every slot; chain picks across resources, each constrained
-        # by the context of slots already chosen.
+        # No instance covers every slot: chain picks across resources, each constrained by earlier ones.
         chosen: dict[str, Any] = {}
         constraints: list[tuple[str, ParameterRequirement, Any]] = []
         chained_draws: list[PoolDraw] = []
@@ -560,7 +509,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         return variants
 
     def _collect_values(self, requirement: ParameterRequirement) -> list[tuple[Any, ResourceInstance]]:
-        """Collect unique non-tombstoned values + their source instances from captured responses."""
+        """Unique non-tombstoned values with their source instances."""
         instances = self.repository.iter_instances(requirement.resource_name)
         values: list[tuple[Any, ResourceInstance]] = []
         seen: set[DedupKey] = set()
@@ -597,10 +546,9 @@ class OpenApiExtraDataSource(ExtraDataSource):
         name: str,
         context_constraints: list[tuple[str, ParameterRequirement, Any]] | None = None,
     ) -> tuple[Any, ResourceInstance] | None:
-        """Return one weighted-selected pool value plus the `ResourceInstance` whose draw won.
+        """One weighted pick from the pool and its instance.
 
-        `context_constraints` keeps draws on the same parent chain; missing context keys
-        match anything, and the filter falls through when no constrained instance exists.
+        `context_constraints` keep draws on one parent chain; missing keys match anything, no match lifts the filter.
         """
         requirement = self.requirements.get((operation.label, location, name))
         if requirement is None:
@@ -631,11 +579,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         *,
         operation: APIOperation,
     ) -> PoolPick:
-        """Return one (location, name) -> value map keeping all resource-bound slots correlated.
-
-        The returned `PoolPick.draws` carries one `PoolDraw` per slot that was filled from the pool,
-        recording which captured `ResourceInstance` supplied the value.
-        """
+        """Values for all resource-bound slots picked together, with a draw per pool-filled slot."""
         slots: list[InputSlot] = []
         for slot in self.inputs_by_label.get(operation.label, ()):
             if slot.resource_field is None or not isinstance(slot.parameter_name, str):
@@ -645,8 +589,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             return PoolPick()
 
         resource_names = dict.fromkeys(slot.resource.name for slot in slots)
-        # Each "satisfying" entry records the seed instance and per-slot (instance, value) so
-        # provenance stays attached even when context-only fields come from a different parent.
+        # Entries keep per-slot (instance, value), so context fields from another parent keep their provenance.
         satisfying: list[
             tuple[ResourceInstance, dict[tuple[ParameterLocation, str], tuple[ResourceInstance, Any]]]
         ] = []
@@ -667,9 +610,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                         )
                     if value is None:
                         break
-                    # Same-resource slots and context-only slots both attribute to `instance`:
-                    # parent ids are stored on the child's context when the instance was captured,
-                    # so a single instance accounts for the whole correlated pick.
+                    # Parent ids live on the child's captured context, so one instance accounts for the whole pick.
                     filled[(slot.parameter_location, param_name)] = (instance, value)
                 else:
                     satisfying.append((instance, filled))
@@ -714,13 +655,11 @@ class OpenApiExtraDataSource(ExtraDataSource):
         return PoolPick(values=values_result, draws=tuple(draws_result), misses=tuple(misses_result))
 
     def should_record(self, *, operation: str) -> bool:
-        """Check if responses should be recorded for this operation."""
         if self.repository.descriptors_for_operation(operation):
             return True
         return self.semantic_index is not None and operation in self.semantic_eligible_operations
 
     def should_record_request(self, *, operation: str) -> bool:
-        """Check if request inputs should be captured for this operation."""
         return operation in self.inputs_by_label or operation in self.created_keys_by_label
 
     def record_request(
@@ -759,16 +698,11 @@ class OpenApiExtraDataSource(ExtraDataSource):
         response: Response,
         case: Case,
     ) -> None:
-        """Record a response for later use in test generation.
-
-        Handles deserialization and extraction of response data internally.
-        """
+        """Deserialize a response and record its values for later generation."""
         # An echoed oversized string would reach later requests as an identifier.
         if coverage_scenario(case) == CoverageScenario.OVERSIZED_STRING:
             return
-        # Decide eligibility before deserializing so semantic-only operations don't pay the
-        # deserialization cost (or risk a custom-deserializer exception) for non-2xx responses
-        # that the pool would discard anyway.
+        # Check eligibility first, so responses the pool discards never reach a custom deserializer.
         has_descriptors = bool(self.repository.descriptors_for_operation(operation.label))
         semantic_active = (
             self.semantic_index is not None
@@ -827,36 +761,27 @@ class OpenApiExtraDataSource(ExtraDataSource):
         operation: APIOperation,
         case: Case,
     ) -> None:
-        """Record that a resource was successfully deleted.
-
-        This helps spread DELETE operations across different resources
-        by reducing the selection weight of deleted resources.
-        """
+        """Lower the weight of a deleted resource so DELETE spreads across resources."""
         if operation.method.lower() != "delete":
             return
 
         if not case.path_parameters:
             return
 
-        # Build variant key from resource-linked path parameters.
-        # This matches how variant keys are built in build_hybrid_strategy,
-        # where captured variants contain only resource-linked parameters.
+        # Variant keys hold only resource-linked path parameters, as captured variants do.
         resource_params = {}
         for param_name, param_value in case.path_parameters.items():
             if (operation.label, ParameterLocation.PATH, param_name) in self.requirements:
                 resource_params[param_name] = param_value
 
-        # Fall back to all path parameters for DELETE when no resource-linked params found.
-        # This ensures we track successful deletes even when the dependency graph
-        # doesn't link the DELETE operation's parameters to resources.
+        # Track deletes even when the dependency graph links no DELETE parameter to a resource.
         if not resource_params:
             resource_params = dict(case.path_parameters)
 
         variant_key = jsonschema_rs.canonical.json.to_string(plain_str_values(resource_params))
         self.usage_tracker.record_successful_delete(variant_key)
 
-        # Tombstone + evict the resource named by the trailing path parameter, also before a format suffix like `.json`:
-        # later pool draws skip it and the repository drops it, while its parents outlive the deletion.
+        # Tombstone and evict the resource the trailing path parameter names, even before `.json`; parents stay.
         name = trailing_path_parameter(re.sub(r"\.\w+$", "", operation.path.rstrip("/")))
         if name is None or name not in case.path_parameters:
             return

@@ -172,8 +172,7 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
     if isinstance(view, canonical.MultiTypeView):
         return st.one_of([_bare_type(name, ctx) for name in view.types])
     if isinstance(view, canonical.TypedGroupView):
-        # The node means "type is `type_name` *and* body"; canonicalization folds the type in first,
-        # so this is a net, not the filter doing the work.
+        # The node means "type is `type_name` *and* body"; canonicalization folds the type in, so the filter is a net.
         return from_schema(view.body, ctx).filter(_TYPE_CHECKS[view.type_name])
     if isinstance(view, canonical.AnyOfView):
         return _any_of(view, ctx)
@@ -242,9 +241,8 @@ def _reference(
     target = _target(schema, view.uri, ctx)
     pending = ctx.pending.get(view.uri)
     if pending is not None:
-        # A pointer back into what is still being built. Spelling the rest of the value lazily lets
-        # a draw stop descending, where unrolling it here never would, and every pointer to this
-        # target gets that same strategy - so a cycle in the schema becomes one Hypothesis can see.
+        # A pointer back into what is still being built: a lazy placeholder lets a draw stop descending,
+        # and every pointer to this target shares it, so Hypothesis sees the schema's cycle.
         ctx.cyclic = True
         return pending
     ctx.pending[view.uri] = st.deferred(lambda: from_schema(target, ctx))
@@ -265,9 +263,8 @@ def _not(
         barred = _target(barred, barred_view.uri, ctx)
     complement = _negated(barred)
     if complement is None or _bars_its_input(complement, barred):
-        # Nothing to draw from where no complement is spelled, or where negation hands the bar back
-        # unchanged, so the bar judges the draw itself. Only the document can be judged that way:
-        # below it, a pointer to `#` names something else.
+        # With no spelled complement, or the bar handed back unchanged, the bar judges the draw itself.
+        # Only the document can be judged that way: below it, a pointer to `#` names something else.
         if schema != ctx.root:
             raise UnsupportedSchema.from_reason("a `not` whose complement is not spelled out, below the document root")
         return _anything(ctx).filter(_validator(schema))
@@ -323,9 +320,8 @@ def _names_document(schema: object) -> bool:
 def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
     """Values every branch admits.
 
-    What reaches here is an `allOf` canonicalization left standing, which happens where a branch is
-    a pointer: folding one would mean unrolling whatever it names. Following the pointers gives the
-    intersection back, one branch at a time, until only pointers leading back into the value remain.
+    Canonicalization leaves an `allOf` standing where a branch is a pointer, since folding would unroll its target.
+    Following the pointers rebuilds the intersection branch by branch, until only pointers back into the value remain.
     """
     followed = []
     opened = []
@@ -344,9 +340,8 @@ def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> Se
         for index, branch in enumerate(followed):
             branch_view = branch.view()
             if isinstance(branch_view, canonical.OneOfView):
-                # `allOf[X, oneOf[A, B]]` admits what `oneOf[allOf[X, A], allOf[X, B]]` admits, and
-                # carrying the rest into every branch lets each one draw what it needs - where the
-                # loose half driving alone would have to land inside a branch by chance.
+                # `allOf[X, oneOf[A, B]]` admits what `oneOf[allOf[X, A], allOf[X, B]]` admits; with X carried
+                # into each branch, a draw need not land inside a branch by chance.
                 rest = followed[:index] + followed[index + 1 :]
                 return _exclusive(
                     branch,
@@ -475,9 +470,8 @@ def _array(
     max_items = _countable(view.max_items)
     if max_items is not None:
         kwargs["max_size"] = max_items
-    # `st.lists` refuses either bound over an element strategy drawing nothing, so the bounds are
-    # answered here instead. Skipped while a pointer target is still being built, where `is_empty`
-    # would force a strategy that is not there yet.
+    # `st.lists` refuses either bound over an element strategy drawing nothing, so the bounds are answered here;
+    # skipped while a pointer target is still being built, where `is_empty` would force a strategy not there yet.
     if kwargs and not ctx.building_cycle and element.is_empty:
         # No position can be filled, so the empty array is the only value the bounds may allow.
         return st.nothing() if kwargs.get("min_size") else st.builds(list)
@@ -537,8 +531,8 @@ def _with_fixed_elements(
     if len(layouts) == 2 and _carried(layouts[0]) == _carried(layouts[1]):
         # Nothing was carried that would otherwise have been appended, so the two coincide.
         layouts.pop()
-    # Arrays shorter than the prefix are instances too, whenever the truncation still carries every
-    # demand — and when a position admits nothing, the only ones.
+    # Arrays shorter than the prefix are instances too whenever the truncation still carries every demand,
+    # and the only ones when a position admits nothing.
     shorter = [
         layout
         for length in range(view.min_items or 0, len(entries))
@@ -856,7 +850,7 @@ def _covers(demand: jsonschema_rs.CanonicalSchema, items: jsonschema_rs.Canonica
 def _narrowed(
     left: jsonschema_rs.CanonicalSchema, right: jsonschema_rs.CanonicalSchema, *, negate: bool = False
 ) -> jsonschema_rs.CanonicalSchema | None:
-    """`left` narrowed to — or away from — `right`, or `None` when nothing usable is left of it."""
+    """`left` narrowed to `right`, or away from it with `negate`; `None` when nothing usable is left."""
     schema = _subtracted(left, right) if negate else _intersected(left, right)
     if schema is None or schema.satisfiability() is canonical.Satisfiability.NO:
         return None
@@ -869,7 +863,7 @@ def _repeated(placement: _Placement, ctx: StrategyContext, *, unique: bool) -> S
     # A placement only ever takes positions the demand can fill; `_laid_out` gives up otherwise.
     assert element is not None
     count = placement.placed
-    # Skipped while a pointer target is still being built, where `is_empty` would force a strategy that is not there yet.
+    # Skipped while a pointer target is still being built, where `is_empty` would force a strategy not there yet.
     if not ctx.building_cycle and element.is_empty:
         # A contradiction canonicalization could not see: nothing meets the demand, so no array clears
         # the schema this way. Other layouts, and the schema's other branches, may still.
@@ -890,8 +884,8 @@ def _element(items: jsonschema_rs.CanonicalSchema | None, ctx: StrategyContext) 
     return _anything(ctx) if items is None else from_schema(items, ctx)
 
 
-# The shared factory applies the project-wide kwargs — format assertions and the fancy-regex
-# engine — so the filter judges a value exactly the way conformance checks do.
+# The shared factory applies project-wide format assertions and the fancy-regex engine,
+# so the filter judges a value the way conformance checks do.
 @lru_cache(maxsize=4096)
 def _validator(schema: jsonschema_rs.CanonicalSchema) -> Callable[[JsonValue], bool]:
     return build_validator_for(cast("JsonSchema", schema.to_json_schema())).is_valid
@@ -1090,10 +1084,8 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
         if max_properties is not None:
             max_properties -= len(view.violations)
             if max_properties < len(required):
-                # A fresh violation key can never coincide with a required one, so the ceiling has to fit
-                # both. The canonicalizer does not yet fold that need into `maxProperties` satisfiability
-                # the way `contains` demands are folded into a length floor, so this combo can still
-                # reach here despite satisfiability saying otherwise.
+                # A fresh violation key never coincides with a required one, so the ceiling has to fit both;
+                # canonical `maxProperties` satisfiability does not account for that.
                 return st.nothing()
     # Sorted: set iteration order is not stable across processes, and draw order decides replays.
     keys = sorted(optional)
@@ -1169,8 +1161,7 @@ def _violation_entry(
         # with the negated schema filtered out.
         return key.flatmap(lambda name: st.tuples(st.just(name), _rejected_by(value_for(name), violation.schema)))
     names = frozenset(violation.names)
-    # The exact per-key validator judges pattern membership, like `_PatternProperty.claims` - no
-    # Python-re/ECMA divergence, since nothing here drives generation from the pattern's source.
+    # The per-key validator judges pattern membership, so Python `re` and the validator's regex cannot diverge here.
     claims = [_facet_check("pattern", pattern) for pattern in (*violation.patterns, *view.pattern_properties)]
     # The key still lands in this object, so the names it admits bound the undeclared one too.
     drawn = _text(ctx) if view.property_names is None else from_schema(view.property_names, ctx).map(_key)
@@ -1248,12 +1239,12 @@ def _free_names(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) 
     """Names for keys the schema does not spell out."""
     minimum = ctx.alphabet.min_name_length
     if view.property_names is not None:
-        # Python `re` and the validator's engine disagree on several constructs — `\d` is Unicode here
-        # and ASCII there — so a drawn name is checked before it becomes a key.
+        # Python `re` and the validator's engine disagree on constructs like `\d` (Unicode here, ASCII there),
+        # so a drawn name is checked before it becomes a key.
         is_valid = _validator(view.property_names)
         named = from_schema(view.property_names, ctx).map(_key).filter(is_valid)
         return named if not minimum else named.filter(lambda name: len(name) >= minimum)
-    # Arbitrary text practically never matches a `patternProperties` regex, so the patterns name keys too.
+    # Arbitrary text almost never matches a `patternProperties` regex, so the patterns name keys too.
     sources = [_text(ctx, characters=ctx.alphabet.names_as_strategy(), min_size=minimum)]
     for pattern in view.pattern_properties:
         compiled = _compiled_pattern(pattern)
@@ -1267,9 +1258,8 @@ def _value_source(
     view: jsonschema_rs.canonical.ObjectView, unnamed: SearchStrategy[JsonValue], ctx: StrategyContext
 ) -> Callable[[str], SearchStrategy[JsonValue]]:
     """The value strategy a property name answers to under `patternProperties`."""
-    # The validator's regex engine decides what a pattern claims — Python `re` would hand the key
-    # the wrong schema. Values are built eagerly so a declined schema is refused while the caller
-    # can still fall back.
+    # The validator's regex engine decides what a pattern claims; Python `re` would hand the key the wrong schema.
+    # Values build eagerly, so a declined schema is refused while the caller can still fall back.
     patterns = [
         _PatternProperty(
             claims=make_validator_for({"type": "string", "pattern": pattern}).is_valid,
@@ -1338,8 +1328,7 @@ def _drawn_object(
     result = draw(st.fixed_dictionaries({**required, **{key: optional[key] for key in sorted(chosen)}}))
     if collect is None:
         return result
-    # The cap bounds the distance past the floor, not the total — capping the total would pin
-    # every object with a floor at or above it to exactly that floor.
+    # The cap bounds the distance past the floor: a capped total would pin any object whose floor reaches it there.
     extra_low = max(0, minimum - len(result))
     extra_high = extra_low + _EXTRA_KEYS if maximum is None else min(extra_low + _EXTRA_KEYS, maximum - len(result))
     extra = draw(collect(extra_low, extra_high))
@@ -1771,7 +1760,7 @@ def _pattern_driven(
     strategy = _from_pattern(compiled, ctx).filter(_facet_check("pattern", pattern))
     for other in others:
         strategy = strategy.filter(_facet_check("pattern", other))
-    # Length is normally folded into the pattern upstream; this filter is the soundness net.
+    # Upstream folds length into the pattern where it can; this filter is the soundness net.
     return _within_length(strategy, view)
 
 

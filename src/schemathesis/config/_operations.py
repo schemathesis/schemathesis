@@ -187,7 +187,6 @@ class OperationsConfig(DiffBase):
             operation_id_regex=exclude_operation_id_regex,
         )
 
-        # Add deprecated operations to exclude filters if requested
         if exclude_deprecated:
             exclude_set.include(is_deprecated)
 
@@ -219,7 +218,6 @@ class OperationsConfig(DiffBase):
 
             return True
 
-        # Add our priority function as the filter
         final.include(priority_filter)
         # Matching is collapsed into `priority_filter`, which erases what the user wrote; keep it for reporting.
         final._declared = [
@@ -371,8 +369,7 @@ class OperationConfig(DiffBase):
             raise ConfigError("Operation filters defined, but no settings are being overridden")
 
         warnings_value = data.get("warnings")
-        # If warnings is True or None, keep it as None to inherit from project level
-        # Only create a WarningsConfig if it's False or a specific list/dict
+        # `True` or `None` inherits the project-level warnings; only `False` or a list/dict builds a config
         if warnings_value is True or warnings_value is None:
             warnings = None
         else:

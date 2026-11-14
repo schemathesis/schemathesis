@@ -38,8 +38,7 @@ class ResolvedSchema:
     schema: JsonSchema | None
     media_type: str | None
     name_to_uri: dict[str, str]
-    # Set when the response documents a schema that names a component the document does not define.
-    # `schema` is `None` either way, but this tells "unvalidatable" apart from "nothing documented".
+    # Missing component the documented schema names; tells "unvalidatable" apart from "nothing documented"
     unresolvable_reference: str | None = None
     has_discriminator: bool = False
 
@@ -93,8 +92,7 @@ class ResponseSchemaCache:
         try:
             text = jsonschema_rs.canonical.json.to_string(schema)
         except ValueError:
-            # Schemas built in Python can hold values no JSON document can (e.g. a `datetime.date`);
-            # they are prepared as before, so the validator reports them where it always has.
+            # Python-built schemas can hold non-JSON values (`datetime.date`); build those uncached
             return _build_prepared_schema(
                 schema,
                 resolver,
@@ -142,8 +140,6 @@ class ResponseSchemaCache:
 
 @dataclass
 class OpenApiResponse:
-    """OpenAPI response definition."""
-
     status_code: str
     definition: Mapping[str, Any]
     # The response object in the loaded document. Inferred links go there, so operations rebuilt later keep them
@@ -179,7 +175,6 @@ class OpenApiResponse:
         self._headers: OpenApiResponseHeaders | NotSet = NOT_SET
 
     def _get_cache_key(self, media_type: str | None) -> str:
-        """Convert media type to cache key, using sentinel for None."""
         return media_type if media_type is not None else _NO_MEDIA_TYPE
 
     def _resolver_for(self, media_type: str | None) -> Resolver:
@@ -188,10 +183,7 @@ class OpenApiResponse:
         return self.media_type_resolvers.get(media_type, self.resolver)
 
     def get_schema(self, media_type: str | None = None) -> ResolvedSchema:
-        """Return the schema for the given media type (or the default one).
-
-        Schema may be None if the media type is undocumented or has no schema defined.
-        """
+        """Schema for `media_type`, or for the default one; its `schema` is `None` when nothing is documented."""
         resolved_media_type = self.adapter.resolve_response_media_type(self.definition, media_type)
         cache_key = self._get_cache_key(resolved_media_type)
 
@@ -206,13 +198,12 @@ class OpenApiResponse:
                     self.cache,
                 )
             except RefResolutionError as exc:
-                # A schema we cannot assemble leaves the response unvalidatable - the rest of the
-                # operation, including its other responses, is unaffected.
+                # An unassemblable schema leaves only this response unvalidatable
                 self._validation_cache[cache_key] = CachedValidation(
                     schema=None, validator=None, name_to_uri={}, unresolvable_reference=unresolvable_reference(exc)
                 )
             else:
-                # Create cache entry with schema but no validator yet (lazy validator creation)
+                # The validator is built on first use
                 if bundled is not None:
                     self._validation_cache[cache_key] = CachedValidation(
                         schema=bundled.schema,
@@ -269,7 +260,7 @@ class OpenApiResponse:
     def get_validator(
         self, resolved_media_type: str | None, schema: JsonSchema, *, validate_formats: bool = True
     ) -> jsonschema_rs.Validator | None:
-        """Get or build a cached JSON Schema validator for a non-SSE media type."""
+        """Cached validator for a non-SSE media type."""
         cache_key = self._get_cache_key(resolved_media_type)
 
         if cache_key not in self._validation_cache:
@@ -288,7 +279,7 @@ class OpenApiResponse:
         return cached.validator
 
     def get_sse_validator(self, resolved_media_type: str | None, schema: JsonSchema) -> SseValidator | None:
-        """Get or build a cached SSE validator. Returns None if not an SSE media type."""
+        """Cached SSE validator; `None` for a non-SSE media type."""
         if not media_types.is_sse(resolved_media_type):
             return None
         if not isinstance(self._sse_validator, NotSet):
@@ -299,7 +290,7 @@ class OpenApiResponse:
         return self._sse_validator
 
     def get_sse_stream_validator(self, schema: JsonSchema) -> SseValidator:
-        """Get or build a cached validator for the schema covering a whole event stream."""
+        """Cached validator for the schema covering a whole event stream."""
         if isinstance(self._sse_stream_validator, NotSet):
             from schemathesis.specs.openapi.content_keywords import SseValidator as _SseValidator
 
@@ -335,12 +326,9 @@ class OpenApiResponse:
             yield from ((resolver, schema) for schema in schemas if schema is not None)
 
     def get_raw_schema(self) -> tuple[Resolver, JsonSchema | None]:
-        """Raw and unresolved response schema, with the resolver for its references.
+        """Unresolved schema of a single media type, with the resolver for its references.
 
-        For OpenAPI 3.x with multiple content types, returns the schema for the first/default media type.
-        Used primarily for stateful testing where we analyze schema structure rather than validate responses.
-
-        TODO: Extend stateful testing to support multiple content types properly.
+        TODO: Support multiple media types in stateful testing.
         """
         media_type, schema = self.adapter.extract_raw_response_schema(self.definition)
         return self._resolver_for(media_type), schema
@@ -352,7 +340,6 @@ class OpenApiResponse:
 
     @property
     def headers(self) -> OpenApiResponseHeaders:
-        """A collection of header definitions for this response."""
         if self._headers is NOT_SET:
             headers = self.definition.get("headers", {})
             self._headers = OpenApiResponseHeaders(
@@ -362,7 +349,6 @@ class OpenApiResponse:
         return self._headers
 
     def iter_examples(self) -> Iterator[tuple[str, object]]:
-        """Iterate over examples of this response."""
         return self.adapter.iter_response_examples(self.definition, self.status_code)
 
     def iter_links(self) -> Iterator[tuple[str, Mapping[str, Any]]]:
@@ -381,8 +367,6 @@ class OpenApiResponse:
 
 @dataclass(slots=True)
 class OpenApiResponses:
-    """Collection of OpenAPI response definitions."""
-
     _inner: dict[str, OpenApiResponse]
     resolver: Resolver
     scope: str
@@ -398,7 +382,6 @@ class OpenApiResponses:
         adapter: ResponseAdapter,
         cache: ResponseSchemaCache,
     ) -> OpenApiResponses:
-        """Build new collection of responses from their raw definition."""
         return cls(
             dict(
                 _iter_resolved_responses(
@@ -433,18 +416,15 @@ class OpenApiResponses:
 
     @property
     def status_codes(self) -> tuple[str, ...]:
-        """All defined status codes."""
         # Defined as a tuple, so it can be used in a cache key
         return tuple(self._inner)
 
     def find_by_status_code(self, status_code: int) -> OpenApiResponse | None:
-        """Find the most specific response definition matching the given HTTP status code."""
+        """Most specific response for `status_code`: exact, then wildcards with the fewest `X`, then `default`."""
         responses = self._inner
-        # Full match has the highest priority
         full_match = responses.get(str(status_code))
         if full_match is not None:
             return full_match
-        # Then, ones with wildcards
         keys = sorted(responses, key=lambda k: k.count("X"))
         for key in keys:
             if key == "default":
@@ -452,11 +432,10 @@ class OpenApiResponses:
             status_codes = expand_status_code(key)
             if status_code in status_codes:
                 return responses[key]
-        # The default response has the lowest priority
         return responses.get("default")
 
     def iter_successful_responses(self) -> Iterator[OpenApiResponse]:
-        """Iterate over all response definitions for successful responses."""
+        """2xx responses, or `default` when none is declared."""
         has_explicit_success = False
         for response in self._inner.values():
             if response.status_code.startswith("2"):
@@ -471,7 +450,7 @@ class OpenApiResponses:
         return next((response.status_code for response in self.iter_successful_responses()), None)
 
     def iter_examples(self) -> Iterator[tuple[str, object]]:
-        """Iterate over all examples for all responses."""
+        """Examples of the successful responses."""
         for response in self.iter_successful_responses():
             yield from response.iter_examples()
 
@@ -483,7 +462,6 @@ def _iter_resolved_responses(
     adapter: ResponseAdapter,
     cache: ResponseSchemaCache,
 ) -> Iterator[tuple[str, OpenApiResponse]]:
-    """Iterate and resolve response definitions."""
     if not isinstance(definition, dict):
         raise InvalidSchema("`responses` must be an object")
     for key, response in definition.items():
@@ -539,7 +517,6 @@ def _resolve_media_type(entry: object, resolver: Resolver) -> tuple[Resolver, ob
 def extract_response_schema_v2(
     response: Mapping[str, Any], resolver: Resolver, scope: str, nullable_keyword: str, cache: ResponseSchemaCache
 ) -> Bundle | None:
-    """Extract and prepare response schema for Swagger 2.0."""
     _, schema = extract_raw_response_schema_v2(response)
     if schema is not None:
         return cache.prepared(
@@ -554,7 +531,6 @@ def extract_response_schema_v2(
 
 
 def extract_raw_response_schema_v2(response: Mapping[str, Any]) -> tuple[str | None, JsonSchema | None]:
-    """Extract raw schema from Swagger 2.0 response (schema is at top level)."""
     return None, response.get("schema")
 
 
@@ -583,7 +559,7 @@ def _build_prepared_schema(
 ) -> Bundle:
     # `RefResolutionError` propagates: callers decide what an unassemblable response schema means.
     bundled = bundle(schema, resolver, ref_siblings=merge_ref_siblings)
-    # Do not clone the schema, as bundling already does it
+    # Bundling already cloned the schema
     converted = to_json_schema(
         bundled.schema,
         nullable_keyword,
@@ -599,7 +575,7 @@ def _build_prepared_schema(
 
 
 def resolve_response_media_type_v2(response: Mapping[str, Any], media_type: str | None) -> str | None:
-    """Swagger 2.0 has no media type resolution - all handled via produces."""
+    """Always `None`: Swagger 2.0 lists response media types in `produces`."""
     return None
 
 
@@ -616,14 +592,9 @@ def extract_schema_for_media_type_v2(
 
 
 def resolve_response_media_type_v3(response: Mapping[str, Any], media_type: str | None) -> str | None:
-    """Resolve actual media type to schema definition for OpenAPI 3.x.
+    """Documented media type for `media_type`: exact match, then a documented wildcard (`application/*`), else `None`.
 
-    Resolution order:
-      1. None -> first/default media type
-      2. Exact match (e.g., "application/json")
-      3. Wildcard match (e.g., "application/*" matches "application/xml")
-      4. Malformed Content-Type -> first/default media type
-      5. Anything else -> None, as no documented schema describes the received payload
+    `None` or a malformed `media_type` gives the first documented media type.
     """
     content = response.get("content")
     if not isinstance(content, dict) or not content:
@@ -634,14 +605,11 @@ def resolve_response_media_type_v3(response: Mapping[str, Any], media_type: str 
     if media_type is None:
         return default
 
-    # Strip parameters (e.g., "; charset=utf-8")
     sanitized = media_type.split(";", 1)[0].strip()
 
-    # Exact match
     if sanitized in content:
         return sanitized
 
-    # Wildcard matching
     try:
         received = media_types.parse(sanitized)
     except MalformedMediaType:
@@ -743,7 +711,7 @@ def _media_type_object(response: Mapping[str, Any], media_type: str | None) -> M
 def _media_type_schema(
     media_type: str, media_type_object: Mapping[str, Any], *, schema_covers_stream: bool = False
 ) -> JsonSchema | None:
-    """The schema a media type entry documents for one value - a single event for event streams."""
+    """The schema a media type entry documents for one value; a single event for event streams."""
     schema = media_type_object.get("schema")
     if media_types.is_sse(media_type):
         item_schema = media_type_object.get("itemSchema")
@@ -768,8 +736,6 @@ def json_sequence_schema(item_schema: JsonSchema, schema: JsonSchema | None) -> 
 
 @dataclass(slots=True)
 class OpenApiResponseHeaders:
-    """Collection of OpenAPI response header definitions."""
-
     _inner: dict[str, OpenApiResponseHeader]
 
     def __bool__(self) -> bool:
@@ -781,8 +747,6 @@ class OpenApiResponseHeaders:
 
 @dataclass
 class OpenApiResponseHeader:
-    """OpenAPI response header definition."""
-
     name: str
     definition: Mapping[str, Any]
     resolver: Resolver
@@ -816,7 +780,6 @@ class OpenApiResponseHeader:
         return content is not None and media_types.is_json_lenient(content[0])
 
     def _get_bundle(self) -> Bundle:
-        """Get the bundled schema for this header."""
         if self._bundle is NOT_SET:
             try:
                 self._bundle = self.adapter.extract_header_schema(
@@ -830,7 +793,6 @@ class OpenApiResponseHeader:
 
     @property
     def schema(self) -> JsonSchema:
-        """The header schema extracted from its definition."""
         return self._get_bundle().schema
 
     @property
@@ -846,7 +808,6 @@ class OpenApiResponseHeader:
 
     @property
     def validator(self) -> jsonschema_rs.Validator:
-        """JSON Schema validator for this header."""
         if self._validator is NOT_SET:
             self._validator = self.adapter.jsonschema_validator_cls(
                 self.schema,
@@ -863,7 +824,6 @@ def _iter_resolved_headers(
     scope: str,
     adapter: ResponseAdapter,
 ) -> Iterator[tuple[str, OpenApiResponseHeader]]:
-    """Iterate and resolve header definitions."""
     for name, header in definition.items():
         try:
             header_resolver, resolved = maybe_resolve_with_resolver(header, resolver)
@@ -924,14 +884,13 @@ def extract_header_schema_v3(
 
 
 def iter_response_examples_v2(response: Mapping[str, Any], status_code: str) -> Iterator[tuple[str, object]]:
-    # In Swagger 2.0, examples are directly in the response under "examples"
     examples = response.get("examples", {})
     return iter(examples.items())
 
 
 def iter_response_examples_v3(response: Mapping[str, Any], status_code: str) -> Iterator[tuple[str, object]]:
     for media_type, definition in response.get("content", {}).items():
-        # Try to get a more descriptive example name from the `$ref` value
+        # Name examples after the referenced schema when there is one
         schema = definition.get("schema")
         schema_ref = schema.get("$ref") if isinstance(schema, dict) else None
         if schema_ref and isinstance(schema_ref, str):

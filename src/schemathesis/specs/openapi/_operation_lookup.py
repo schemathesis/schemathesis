@@ -33,7 +33,7 @@ class OperationLookupEntry:
 
 
 class OperationLookup:
-    """Caches OpenAPI operation lookups by id & reference for reuse."""
+    """Caches operation lookups by operationId and by reference."""
 
     __slots__ = (
         "schema",

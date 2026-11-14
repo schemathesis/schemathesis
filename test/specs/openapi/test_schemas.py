@@ -32,11 +32,8 @@ def test_get_operation_via_remote_reference(ctx):
 @pytest.mark.parametrize(
     ("method", "path", "expected_path", "expected_method", "expected_operation_id"),
     [
-        # Match with path parameters
         ("GET", "/users/42", "/users/{user_id}", "get", "get_user"),
-        # Match different method on same path
         ("PATCH", "/users/42", "/users/{user_id}", "patch", "update_user"),
-        # Match nested path with multiple parameters
         ("GET", "/users/42/posts/123", "/users/{user_id}/posts/{post_id}", "get", "get_post"),
     ],
 )
@@ -65,9 +62,7 @@ def test_find_operation_by_path_match(ctx, method, path, expected_path, expected
 @pytest.mark.parametrize(
     ("method", "path"),
     [
-        # Wrong method
         ("DELETE", "/users/42"),
-        # Wrong path
         ("GET", "/nonexistent"),
         # Repeated slashes
         ("GET", "/users//42"),
@@ -216,8 +211,6 @@ def test_external_file_ref_in_body_raises_invalid_schema(ctx):
 
 
 def test_non_string_parameter_location(ctx):
-    # When a parameter has an invalid non-string `in` value (e.g., empty dict),
-    # schema loading should skip the invalid parameter without crashing
     operation = ctx.openapi.load_operation(
         "PUT /test",
         {
@@ -225,11 +218,7 @@ def test_non_string_parameter_location(ctx):
             "responses": {"200": {"description": "OK"}},
         },
         version="3.0.0",
-        components={
-            "parameters": {
-                "idOrUUID": {"in": {}}  # Invalid: should be string like "path", "query", etc.
-            }
-        },
+        components={"parameters": {"idOrUUID": {"in": {}}}},
     )
     # Should not raise TypeError: unhashable type: 'dict'
     assert list(operation.iter_parameters()) == []

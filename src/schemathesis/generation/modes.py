@@ -6,9 +6,9 @@ from enum import StrEnum
 class GenerationMode(StrEnum):
     """Defines what data Schemathesis generates for tests."""
 
-    # Generate data, that fits the API schema
+    # Data that matches the API schema
     POSITIVE = "positive"
-    # Doesn't fit the API schema
+    # Data that violates the API schema
     NEGATIVE = "negative"
 
     @property

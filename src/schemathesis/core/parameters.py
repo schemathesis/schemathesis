@@ -37,22 +37,20 @@ class SkippedParameter:
 
 
 class RawQueryString(str):
-    """Internal wrapper for pre-serialized raw query string chunks."""
+    """Pre-serialized raw query string chunk."""
 
     __slots__ = ()
 
 
-# Internal key used to carry raw query string payloads for OpenAPI 3.2 `in: querystring`.
+# Carries raw query string payloads for OpenAPI 3.2 `in: querystring`.
 RAW_QUERY_STRING_KEY = "x-schemathesis-raw-query-string"
 
 
-# `DelimitedValue`/`EncodedPath` are `str` subclasses; flatten containers holding them with
-# `plain_str_values` before any jsonschema_rs call, which rejects `str` subclasses.
+# jsonschema_rs rejects `str` subclasses like these; pass containers through `plain_str_values` first.
 class DelimitedValue(str):
-    """A delimiter-joined array/object parameter.
+    """A delimiter-joined array/object parameter in logical form.
 
-    The string is the logical form; `encoded` is the wire form (each element percent-encoded,
-    delimiter left literal) so a server can split it unambiguously.
+    `encoded` is the wire form: elements percent-encoded, delimiters literal, so a server can split it.
     """
 
     encoded: str
@@ -96,8 +94,6 @@ def split_delimited_query(params: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 
 # `StrEnum` rejects the `None` value of `UNKNOWN`.
 class ParameterLocation(str, Enum):  # noqa: UP042
-    """API parameter location."""
-
     QUERY = "query"
     HEADER = "header"
     PATH = "path"
@@ -110,8 +106,7 @@ class ParameterLocation(str, Enum):  # noqa: UP042
         is_in_header: bool
 
 
-# Stored as direct instance attributes (faster than @property + descriptor dispatch
-# on every access — these are queried in hot strategy / check / examples paths).
+# Plain instance attributes: hot paths read them faster than through a property.
 ParameterLocation.QUERY.container_name = "query"
 ParameterLocation.HEADER.container_name = "headers"
 ParameterLocation.PATH.container_name = "path_parameters"

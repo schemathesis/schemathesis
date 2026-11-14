@@ -522,7 +522,6 @@ def test_null_byte_in_headers():
 
 def test_base_url(ctx):
     # See GH-1366
-    # When base URL has non-empty base path
     operation = ctx.openapi.load_operation(
         "GET /foo",
         {"responses": {"200": {"description": "OK"}}},
@@ -530,7 +529,6 @@ def test_base_url(ctx):
         servers=[{"url": "https://example.org/v1"}],
     )
 
-    # And is used for an ASGI app
     app = FastAPI()
 
     @app.get("/v1/foo")
@@ -542,7 +540,6 @@ def test_base_url(ctx):
     @run_given(case=strategy, max_examples=1)
     def test(case):
         response = case.call(app=app)
-        # Then the base path should be respected and calls should not lead to 404
         assert response.status_code == 200
 
 

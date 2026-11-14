@@ -5,9 +5,7 @@ from typing import Any
 
 from test.utils import allure_results
 
-# Hypothesis renamed this header in 6.159.0 ("Falsifying example" -> "Failing test case"). Tests that
-# assert the header is *present* fail loudly on a future rename, which is what keeps the tests asserting
-# its absence from silently passing against a string Hypothesis no longer emits.
+# Hypothesis 6.159.0+ prints the first, older versions the second; presence checks catch a rename absence checks miss.
 HYPOTHESIS_FAILURE_HEADERS = ("Failing test case", "Falsifying example")
 
 

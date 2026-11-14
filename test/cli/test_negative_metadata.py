@@ -13,13 +13,7 @@ UUID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-
 
 
 def test_format_password_false_positive(ctx, cli, snapshot_cli):
-    # GH-3480: Schemathesis incorrectly reports data as invalid for format: password
-    # In OpenAPI 3.0, `format` is an annotation and does NOT impose validation constraints by itself.
-    # With only `type: string, format: password`, any string is valid.
-    # Schemathesis incorrectly treats generated data as schema-violating and expects rejection.
-    #
-    # The coverage phase generates format-specific negative cases via _negative_format,
-    # which incorrectly claims values don't match the 'password' format.
+    # GH-3480: OpenAPI 3.0 `format: password` imposes no constraint, so any string is valid.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/": {
@@ -43,8 +37,6 @@ def test_format_password_false_positive(ctx, cli, snapshot_cli):
 
     @app.route("/", methods=["POST"])
     def root():
-        # Reject non-strings with 422 (proper validation behavior)
-        # Accept all strings (including empty) since format:password has no validation semantics
         data = request.get_data()
         try:
             body = json.loads(data)
@@ -54,7 +46,6 @@ def test_format_password_false_positive(ctx, cli, snapshot_cli):
             return jsonify({"error": "invalid json"}), 422
         return jsonify({"result": "ok"}), 200
 
-    # No failure should be reported since any string is valid for format: password in OpenAPI 3.0
     assert (
         cli.run_openapi_app(
             app,
@@ -164,8 +155,7 @@ def test_removed_auth_parameter_not_reapplied(ctx, credentials, max_examples):
 
 
 def test_hook_modified_path_parameter_no_false_positive(ctx, cli):
-    # GH-4277: a before_call hook clamps an out-of-range path param to a valid value;
-    # that valid value must not be reported as schema-violating.
+    # GH-4277: a before_call hook clamps an out-of-range path parameter; the clamped value must not be reported.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/{z}/{x}/{y}.png": {

@@ -6,11 +6,7 @@ Source = Callable[[], object]
 
 
 class SourceRegistry:
-    """Ordered, identity-keyed set of constant sources.
-
-    Keyed by function identity rather than name so two sources that happen to share a
-    ``__name__`` (a common case across modules) both survive instead of overwriting.
-    """
+    """Ordered set of constant sources keyed by identity, so sources sharing a `__name__` both survive."""
 
     __slots__ = ("_sources", "_version")
 
@@ -45,8 +41,7 @@ def constants(fn: Callable[[], object]) -> Callable[[], object]:
     """Register a source of constants for test generation.
 
     Decorate a zero-argument function that returns your app, module(s), or objects.
-    Schemathesis harvests the literal values defined in that code and reuses them when
-    generating test data.
+    Schemathesis reuses the literal values defined in that code when generating test data.
     """
     if not callable(fn):
         raise TypeError(f"@schemathesis.python.constants expects a callable, got {type(fn).__name__}")

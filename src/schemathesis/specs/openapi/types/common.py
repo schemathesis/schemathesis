@@ -1,5 +1,3 @@
-"""Common type definitions shared across OpenAPI versions."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping

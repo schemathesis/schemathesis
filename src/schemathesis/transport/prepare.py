@@ -101,9 +101,7 @@ def get_exclude_headers(case: Case) -> list[str]:
 
     phase_data = case.meta.phase.data
 
-    # Gate header exclusion on the current generation mode so that a `before_call`
-    # hook restoring the header (which flips the mode to positive via revalidation)
-    # stops the exclusion.
+    # A `before_call` hook that restores the header flips the mode to positive, which stops the exclusion.
     if not case.meta.generation.mode.is_negative or phase_data.parameter_location != ParameterLocation.HEADER:
         return []
 
@@ -111,17 +109,11 @@ def get_exclude_headers(case: Case) -> list[str]:
         return [phase_data.parameter] if phase_data.parameter is not None else []
 
     if isinstance(phase_data, (FuzzingPhaseData, StatefulPhaseData)):
-        # Only exclude when the mutation actually removed the parameter (or its
-        # required-list entry). Constraint-negation mutations leave the parameter
-        # present with a constraint-violating value — that value MUST reach the
-        # server for the negative case to be meaningful.
+        # Exclude only removed parameters; a constraint-violating value must reach the server.
         case_headers: Mapping[str, Any] = case.headers or {}
         excluded: list[str] = []
         for mutation in phase_data.mutations:
-            # Only top-level mutations on the HEADER parameter object map 1:1 to
-            # HTTP header names. A nested mutation's `parameter` is an inner
-            # property and may collide with an unrelated real header (e.g. a
-            # nested `Authorization` field inside a content-schema header).
+            # A nested mutation's `parameter` is an inner property that may share a real header's name.
             if mutation.path:
                 continue
             if mutation.operator == OperatorKind.REMOVE_REQUIRED_PROPERTY:
@@ -131,9 +123,7 @@ def get_exclude_headers(case: Case) -> list[str]:
                 if mutation.parameter is not None:
                     excluded.append(mutation.parameter)
                 elif isinstance(mutation.original_value, list):
-                    # Multi-required: the case may have omitted any subset of the
-                    # original list; exclude exactly those names so default/session
-                    # auth doesn't get re-applied for them.
+                    # Exclude exactly the omitted required names, so default or session auth does not re-add them.
                     excluded.extend(
                         name for name in mutation.original_value if isinstance(name, str) and name not in case_headers
                     )
@@ -143,7 +133,6 @@ def get_exclude_headers(case: Case) -> list[str]:
 
 
 def prepare_url(case: Case, base_url: str | None) -> str:
-    """Prepare URL via the schema's spec-aware override."""
     base_url = base_url or case.operation.base_url
     assert base_url is not None
     return case.operation.schema.build_request_url(case, base_url)
@@ -159,10 +148,7 @@ def base_url_from_request_url(case: Case, url: str) -> str:
 
 @lru_cache(maxsize=128)
 def normalize_base_url(base_url: str | None, host: str = "localhost") -> str | None:
-    """Normalize base URL by ensuring proper hostname for local URLs.
-
-    If URL has no hostname (typical for in-process apps), adds `host` as default hostname.
-    """
+    """`base_url` with `host` filled in when it has no hostname, as for in-process apps."""
     if base_url is None:
         return None
     parts = urlsplit(base_url)
@@ -243,10 +229,9 @@ _BOUNDARY_PARAMETER = re.compile(r'boundary=("[^"]*"|[^;\s]*)', re.IGNORECASE)
 
 
 def _normalize_multipart_boundary(request: PreparedRequest) -> None:
-    """Re-key a multipart payload to a boundary derived from its own content.
+    """Re-key a multipart payload to a boundary derived from its content.
 
-    Keeps the declared boundary and the one inside the body in step, so the rendered command is runnable and
-    comes out identical on every rendering of the same data.
+    The declared and in-body boundaries stay in step, so the rendered command runs and is stable across renders.
     """
     content_type = request.headers.get("Content-Type")
     body = request.body
@@ -261,7 +246,7 @@ def _normalize_multipart_boundary(request: PreparedRequest) -> None:
     existing = delimiter[2:].removesuffix(b"--")
     if not existing:
         return
-    # 32 hex characters - a valid boundary token, the same shape and length the multipart encoders produce.
+    # 32 hex characters, the boundary shape multipart encoders produce
     boundary = hashlib.sha256(body.replace(existing, b"")).hexdigest()[:32]
     request.body = body.replace(existing, boundary.encode())
     if _BOUNDARY_PARAMETER.search(content_type):

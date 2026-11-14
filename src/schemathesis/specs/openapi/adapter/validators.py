@@ -28,8 +28,7 @@ def _ignore_value_error() -> Generator:
     except ValidationError:
         raise
     except ValueError:
-        # `ValidationError` is a subclass of `ValueError`, but `ValueError` is possible when dict key is not a string
-        # In such a case we skip validation completely
+        # Non-string dict keys raise a plain `ValueError`; such schemas skip validation
         pass
 
 

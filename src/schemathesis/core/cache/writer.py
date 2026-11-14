@@ -28,9 +28,7 @@ class CacheWriter:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._pending: list[PendingEntry] = []
-        # Per-observation `(kind, operation, fingerprint)` keys for ERROR_FEEDBACK; singleton
-        # `(kind, operation, None)` keys for AUTH_REQUIRED / METHOD_NOT_ALLOWED where there is
-        # at most one entry per operation.
+        # One key per observation fingerprint; fingerprint `None` for kinds with one entry per operation (auth, 405).
         self._seen: set[tuple[Kind, str, str | None]] = set()
 
     def record(
@@ -43,7 +41,6 @@ class CacheWriter:
         observation_keys = list(observation_keys)
         with self._lock:
             if observation_keys:
-                # Keep only fingerprints not yet claimed by an earlier record call.
                 new_keys = [key for key in observation_keys if (kind, operation, key) not in self._seen]
                 if not new_keys:
                     return
@@ -53,7 +50,6 @@ class CacheWriter:
                     PendingEntry(kind=kind, operation=operation, request=request, observation_keys=new_keys)
                 )
             else:
-                # At most one entry per operation for auth_required / 405.
                 singleton_key: tuple[Kind, str, str | None] = (kind, operation, None)
                 if singleton_key in self._seen:
                     return
@@ -72,7 +68,6 @@ class CacheWriter:
 
 
 def request_from_case(case: Case) -> Request:
-    """Extract a cache `Request` from a `Case`; `Case` typed-only to avoid runtime `generation/` dep."""
     body = case.body if case.body is not NOT_SET else None
     return Request(
         method=case.method,

@@ -68,7 +68,6 @@ def test_(request, case):
     ],
 )
 def test_without_required(ctx, testdir, version, param):
-    # When "required" field is not present in the parameter
     if version == "2.0":
         schema = ctx.openapi.build_schema(
             {"/users": {"post": {"parameters": [param], "responses": {"200": {"description": "OK"}}}}}, version="2.0"
@@ -106,9 +105,7 @@ def test_has_not_only_none(request, case):
 """,
         schema=schema,
     )
-    # then the parameter is optional
-    # NOTE. could be flaky
+    # The parameter is optional. Could be flaky.
     result = testdir.runpytest("-v", "-s")
-    # First test should fail because it finds `None`
-    # Second one fails because it finds values other than `None`
+    # Both inner tests fail: one finds the parameter missing, the other finds a value.
     result.assert_outcomes(failed=2)

@@ -12,83 +12,52 @@ if TYPE_CHECKING:
 
 
 def _restful_order_key(label: str) -> tuple[int, str]:
-    """Sort by HTTP method priority, then alphabetically by full label."""
     method = label.split(maxsplit=1)[0]
     return restful_method_priority(method), label
 
 
 def compute_dependency_layers(graph: DependencyGraph) -> list[list[str]] | None:
-    """Compute operation layers based on resource dependencies.
+    """Group operations into layers that depend only on earlier layers (Kahn's algorithm).
 
-    Returns operations grouped into layers where each layer can execute in parallel,
-    but layers must execute sequentially. Operations in layer N depend only on
-    operations in layers < N. Operations within each layer are dispatched among
-    multiple workers for parallel execution.
-
-    Uses Kahn's algorithm for topological sort with level tracking.
-    https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm
-
-    Args:
-        graph: Dependency graph with operation nodes and their inputs/outputs
-
-    Returns:
-        List of layers (each layer is a list of operation labels), or None if
-        the graph is empty or has no useful ordering information.
-
-    Example:
-        Layer 0: [POST /users, POST /products]  # No dependencies
-        Layer 1: [GET /users/{id}, POST /orders]  # Depend on layer 0
-        Layer 2: [GET /orders/{id}]  # Depends on layer 1
-
+    None when no operation depends on another.
     """
-    # Build dependency mapping: operation -> set of operations it depends on
     dependencies: dict[str, set[str]] = defaultdict(set)
-    # Track which operations produce which resources
     producers: dict[int, set[str]] = defaultdict(set)
 
-    # Index producers by resource ID
     for label, node in graph.operations.items():
         for output_slot in node.outputs:
             resource_id = id(output_slot.resource)
             producers[resource_id].add(label)
 
-    # Build dependency edges
     for label, node in graph.operations.items():
         for input_slot in node.inputs:
             resource_id = id(input_slot.resource)
-            # This operation depends on all operations that produce this resource
             for producer_label in producers[resource_id]:
-                # Don't create self-dependencies
                 if producer_label != label:
                     dependencies[label].add(producer_label)
 
-    # If no dependencies exist, return None (no useful ordering)
     if not any(dependencies.values()):
         return None
 
-    # Reverse adjacency: operation -> operations that depend on it, so in-degree
-    # updates touch only actual dependents instead of scanning every operation
+    # Reverse edges, so in-degree updates visit only dependents instead of every operation
     dependents: dict[str, set[str]] = defaultdict(set)
     for label, deps in dependencies.items():
         for dependency in deps:
             dependents[dependency].add(label)
 
-    # Compute in-degree for each operation
     in_degree: dict[str, int] = dict.fromkeys(graph.operations, 0)
     for label, deps in dependencies.items():
         in_degree[label] = len(deps)
 
-    # Initialize queue with operations that have no dependencies
     queue: deque[str] = deque()
     for label, degree in in_degree.items():
         if degree == 0:
             queue.append(label)
 
-    # If no starting operations, we have cycles - use cycle-aware approach
+    # Every operation has a dependency, so the graph has cycles
     if not queue:
         return _compute_layers_with_cycles(graph, dependencies, dependents)
 
-    # Process operations layer by layer
     layers: list[list[str]] = []
     processed: set[str] = set()
 
@@ -102,7 +71,6 @@ def compute_dependency_layers(graph: DependencyGraph) -> list[list[str]] | None:
             current_layer.append(label)
             processed.add(label)
 
-            # Reduce in-degree for operations that depend on this one
             for other_label in dependents[label]:
                 in_degree[other_label] -= 1
                 if in_degree[other_label] == 0:
@@ -112,10 +80,8 @@ def compute_dependency_layers(graph: DependencyGraph) -> list[list[str]] | None:
             current_layer.sort(key=_restful_order_key)
             layers.append(current_layer)
 
-    # Check if all operations were processed (no cycles)
     if len(processed) < len(graph.operations):
-        # Some operations not processed due to cycles
-        # Add remaining operations to final layer
+        # Operations on cycles go to a final layer
         remaining = sorted(set(graph.operations.keys()) - processed, key=_restful_order_key)
         if remaining:
             layers.append(remaining)
@@ -128,51 +94,31 @@ def _compute_layers_with_cycles(
     dependencies: dict[str, set[str]],
     dependents: dict[str, set[str]],
 ) -> list[list[str]] | None:
-    """Compute layers when graph contains cycles.
-
-    Uses Tarjan's algorithm to find strongly connected components (SCCs),
-    then treats each SCC as a single unit for layering.
-    https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
-
-    Args:
-        graph: Dependency graph
-        dependencies: Mapping of operation to its dependencies
-        dependents: Mapping of operation to operations that depend on it
-
-    Returns:
-        List of layers with cycle-containing operations placed conservatively
-
-    """
-    # Find strongly connected components (cycles)
+    """Layer strongly connected components as single units, so cycles do not block layering."""
     sccs = _find_sccs(graph, dependents)
 
-    # Map each operation to its SCC index
     op_to_scc: dict[str, int] = {}
     for scc_idx, scc_ops in enumerate(sccs):
         for op_label in scc_ops:
             op_to_scc[op_label] = scc_idx
 
-    # Build SCC-level dependencies
     scc_dependencies: dict[int, set[int]] = defaultdict(set)
     for op_label, op_deps in dependencies.items():
         scc_idx = op_to_scc[op_label]
         for dep_label in op_deps:
             dep_scc_idx = op_to_scc[dep_label]
-            if scc_idx != dep_scc_idx:  # Only cross-SCC dependencies
+            if scc_idx != dep_scc_idx:
                 scc_dependencies[scc_idx].add(dep_scc_idx)
 
-    # Reverse adjacency at the SCC level, mirroring the operation-level map
     scc_dependents: dict[int, set[int]] = defaultdict(set)
     for scc_idx, deps in scc_dependencies.items():
         for dep_scc_idx in deps:
             scc_dependents[dep_scc_idx].add(scc_idx)
 
-    # Compute in-degree for each SCC
     scc_in_degree: dict[int, int] = dict.fromkeys(range(len(sccs)), 0)
     for scc_idx, deps in scc_dependencies.items():
         scc_in_degree[scc_idx] = len(deps)
 
-    # Topological sort of SCCs
     queue: deque[int] = deque()
     for scc_idx, degree in scc_in_degree.items():
         if degree == 0:
@@ -187,11 +133,9 @@ def _compute_layers_with_cycles(
 
         for _ in range(layer_size):
             scc_idx = queue.popleft()
-            # Add all operations from this SCC to the current layer
             current_layer.extend(sccs[scc_idx])
             processed_sccs.add(scc_idx)
 
-            # Reduce in-degree for dependent SCCs
             for other_scc_idx in scc_dependents[scc_idx]:
                 scc_in_degree[other_scc_idx] -= 1
                 if scc_in_degree[other_scc_idx] == 0:
@@ -209,17 +153,7 @@ def _find_sccs(
     graph: DependencyGraph,
     dependents: dict[str, set[str]],
 ) -> list[list[str]]:
-    """Find strongly connected components using Tarjan's algorithm.
-
-    Args:
-        graph: Dependency graph
-        dependents: Mapping of operation to operations that depend on it
-
-    Returns:
-        List of SCCs, where each SCC is a list of operation labels
-
-    """
-    # Tarjan's algorithm state
+    """Find strongly connected components using Tarjan's algorithm."""
     index_counter = [0]
     stack: list[str] = []
     lowlinks: dict[str, int] = {}
@@ -228,24 +162,21 @@ def _find_sccs(
     sccs: list[list[str]] = []
 
     def strongconnect(op_label: str) -> None:
-        # Set the depth index for this operation
         index[op_label] = index_counter[0]
         lowlinks[op_label] = index_counter[0]
         index_counter[0] += 1
         stack.append(op_label)
         on_stack.add(op_label)
 
-        # Consider successors (operations that depend on this one)
         for other_label in dependents[op_label]:
             if other_label not in index:
-                # Successor not yet visited
                 strongconnect(other_label)
                 lowlinks[op_label] = min(lowlinks[op_label], lowlinks[other_label])
             elif other_label in on_stack:
-                # Successor is in stack and hence in current SCC
+                # On the stack, so part of the current SCC
                 lowlinks[op_label] = min(lowlinks[op_label], index[other_label])
 
-        # If this is a root node, pop the stack to get SCC
+        # Root of an SCC: pop its members off the stack
         if lowlinks[op_label] == index[op_label]:
             scc: list[str] = []
             while True:
@@ -256,7 +187,6 @@ def _find_sccs(
                     break
             sccs.append(scc)
 
-    # Process all operations
     for op_label in graph.operations:
         if op_label not in index:
             strongconnect(op_label)

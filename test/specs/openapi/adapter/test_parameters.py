@@ -24,7 +24,7 @@ def make_user_schema(is_loose=False, **properties):
     return schema
 
 
-# JSON Schema for a User, which is common for all spec versions.
+# The User JSON Schema shared by all spec versions.
 USER_JSONSCHEMA = make_user_schema(middle_name={"anyOf": [{"type": "string"}, {"type": "null"}]})
 USER_JSONSCHEMA_WITH_FILE = make_user_schema(
     middle_name={"anyOf": [{"type": "string"}, {"type": "null"}]}, scan={"type": "string", "format": "binary"}
@@ -127,7 +127,7 @@ def test_forms_open_api_2(consumes, make_openapi_2_schema):
         schema,
         PayloadAlternatives(
             [
-                # They are represented as a single "composite" body for each media type
+                # One composite body per media type
                 OpenApiBody.from_form_parameters(
                     definition=form_data_to_json_schema(OPEN_API_2_USER_FORM_PARAMETERS),
                     media_type=value,
@@ -137,7 +137,6 @@ def test_forms_open_api_2(consumes, make_openapi_2_schema):
                 for value in consumes
             ]
         ),
-        # Each converted schema should correspond to the default User schema.
         [USER_JSONSCHEMA] * len(consumes),
     )
 
@@ -146,7 +145,7 @@ def test_forms_open_api_2(consumes, make_openapi_2_schema):
     "consumes",
     [
         ["multipart/form-data"],
-        # When "consumes" is not defined, then multipart is the default media type for "formData" parameters
+        # Without `consumes`, `formData` defaults to multipart
         [],
     ],
 )
@@ -154,13 +153,11 @@ def test_multipart_form_open_api_2(
     consumes,
     make_openapi_2_schema,
 ):
-    # Multipart forms are represented as a list of "formData" parameters
     schema = make_openapi_2_schema(consumes, OPEN_API_2_USER_FORM_WITH_FILE_PARAMETERS)
     assert_parameters(
         schema,
         PayloadAlternatives(
             [
-                # Is represented with a "composite" body
                 OpenApiBody.from_form_parameters(
                     definition=form_data_to_json_schema(OPEN_API_2_USER_FORM_WITH_FILE_PARAMETERS),
                     media_type="multipart/form-data",
@@ -174,7 +171,6 @@ def test_multipart_form_open_api_2(
 
 
 def test_urlencoded_form_open_api_3(make_openapi_3_schema):
-    # A regular urlencoded form in Open API 3
     schema = make_openapi_3_schema(
         {
             "required": True,
@@ -195,7 +191,6 @@ def test_urlencoded_form_open_api_3(make_openapi_3_schema):
                 )
             ]
         ),
-        # It should correspond to the default User schema
         [USER_JSONSCHEMA],
     )
 
@@ -223,14 +218,12 @@ def test_loose_urlencoded_form_open_api_3(make_openapi_3_schema):
                 )
             ]
         ),
-        # But when it is converted to JSON Schema, Schemathesis sets `type` to `object`
-        # Therefore it corresponds to the default JSON Schema defined for a User
+        # Conversion sets `type: object`, so it matches the default User schema
         [USER_JSONSCHEMA],
     )
 
 
 def test_multipart_form_open_api_3(make_openapi_3_schema):
-    # A regular multipart for with a file upload in Open API 3
     schema = make_openapi_3_schema(
         {
             "required": True,
@@ -251,7 +244,6 @@ def test_multipart_form_open_api_3(make_openapi_3_schema):
                 )
             ]
         ),
-        # When converted, the schema corresponds the default schema defined for a User object with a file
         [USER_JSONSCHEMA_WITH_FILE],
     )
 
@@ -311,7 +303,6 @@ def test_payload_open_api_2(
                 for value in consumes
             ]
         ),
-        # For each one the schema is extracted from the parameter definition and transformed to the proper JSON Schema
         [USER_JSONSCHEMA] * len(consumes),
     )
 
@@ -320,7 +311,6 @@ def test_payload_open_api_2(
     "media_types",
     [
         ["application/json"],
-        # Each media type corresponds to a payload variant
         ["application/json", "application/xml"],
         # Forms can be also combined
         ["application/x-www-form-urlencoded", "multipart/form-data"],
@@ -348,8 +338,6 @@ def test_payload_open_api_3(media_types, make_openapi_3_schema):
                 for media_type in media_types
             ]
         ),
-        # The converted schema should correspond the schema in the relevant "requestBody" part
-        # In this case they are the same
         [USER_JSONSCHEMA] * len(media_types),
     )
 

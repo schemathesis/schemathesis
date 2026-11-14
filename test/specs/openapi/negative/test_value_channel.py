@@ -32,8 +32,7 @@ def test_violate_max_length_skips_huge_max_length():
 
 
 def test_collect_value_targets_handles_boolean_property_schema():
-    # OpenAPI 3.1 / JSON Schema allow boolean property schemas (`{"x": true}`);
-    # recursing into them and calling `.get` on `True` raises AttributeError.
+    # OpenAPI 3.1 allows boolean property schemas like `{"x": true}`, which have no `.get`.
     schema = {"type": "object", "properties": {"x": True, "y": False}}
     body = {"x": "hello", "y": 42}
 
@@ -41,15 +40,12 @@ def test_collect_value_targets_handles_boolean_property_schema():
 
 
 def test_collect_value_targets_returns_empty_for_missing_bundled_ref():
-    # Schemas adjusted by error-feedback can leave `$ref` pointing into a stripped
-    # bundle; a missing target yields no constraint-bearing leaves rather than crashing.
+    # Error feedback can leave `$ref` pointing into a stripped bundle; a missing target yields no leaves.
     schema = {"$ref": "#/x-bundled/missing", BUNDLE_STORAGE_KEY: {}}
     assert collect_value_targets({"x": "hello"}, schema) == []
 
 
 def test_collect_value_targets_walks_additional_properties_only_for_uncovered_keys():
-    # Each body key picks a target schema from `properties` first, falling back
-    # to `additionalProperties` only for keys not declared upfront.
     schema = {
         "type": "object",
         "properties": {"declared": {"type": "string", "pattern": "^a$"}},
@@ -177,9 +173,7 @@ def test_strip_binary_replaces_nested_binary_values():
 
 
 def test_apply_value_channel_required_with_empty_list_is_noop():
-    # An object whose `required` is present but empty has nothing to drop —
-    # the call returns the body unchanged so the dispatcher's revalidation
-    # falls back to schema-channel.
+    # Empty `required` leaves nothing to drop, so the dispatcher falls back to the schema channel.
     schema = {"type": "object", "required": [], "properties": {"x": {"type": "string"}}}
     body = {"x": "hello"}
     assert apply_value_channel(body, (), "required", schema) == (body, body, body)
@@ -249,9 +243,7 @@ def test_apply_value_channel_drops_first_required_key_of_nested_object():
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=_SUPPRESSED, max_examples=10)
 def test_unsatisfiable_body_schema_does_not_abort_generation(data):
-    # `from_schema` raises `InvalidArgument` when drawn for unsatisfiable schemas;
-    # the schema-channel mutator can still produce invalid cases, so the value
-    # channel must not crash the whole strategy.
+    # `from_schema` raises on unsatisfiable schemas; the value channel must not crash the schema channel's cases.
     schema = {"type": "string", "minLength": 5, "maxLength": 3}
     result = data.draw(
         negative_schema(
@@ -306,8 +298,7 @@ def test_value_channel_does_not_emit_still_valid_bodies(data):
 # The violating draw is rare, so fewer examples would let a regression pass.
 @settings(deadline=None, suppress_health_check=_SUPPRESSED, max_examples=100)
 def test_value_channel_falls_back_when_violator_is_a_noop_with_binary_sibling(data):
-    # `contains_binary` must not skip no-op revalidation: a binary+permissive-sibling body
-    # would otherwise emit as still-valid negative data.
+    # Skipping no-op revalidation on `contains_binary` would emit a still-valid body with a binary sibling as negative.
     schema = {
         "type": "object",
         "properties": {
@@ -342,9 +333,7 @@ def test_value_channel_falls_back_when_violator_is_a_noop_with_binary_sibling(da
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=_SUPPRESSED, max_examples=30)
 def test_value_channel_handles_binary_bodies(data):
-    # `jsonschema_rs` raises `ValueError: Unsupported type: 'Binary'` on Schemathesis
-    # `Binary` wrappers; the value-channel revalidation must short-circuit on
-    # `contains_binary` before calling the validator.
+    # `jsonschema_rs` rejects `Binary` with a `ValueError`, so revalidation must check `contains_binary` first.
     schema = {
         "type": "object",
         "properties": {
@@ -370,9 +359,7 @@ def test_value_channel_handles_binary_bodies(data):
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=_SUPPRESSED, max_examples=30)
 def test_value_channel_falls_back_when_violator_is_a_noop(data):
-    # `violate_multiple_of` returns `original + 1`, which is still a multiple
-    # of 1; without revalidation the dispatcher would emit that as a negative
-    # case and a server returning 200 would surface as `negative_data_rejection`.
+    # `violate_multiple_of` adds 1, still a multiple of 1; unrevalidated, a 200 would fail `negative_data_rejection`.
     schema = {"type": "integer", "multipleOf": 1}
     validator = jsonschema_rs.Draft4Validator(schema)
     result = data.draw(
@@ -403,8 +390,7 @@ def _restore(body, path, original):
 
 
 def test_value_channel_base_body_is_valid():
-    # Undoing the reported mutation must leave a valid body — otherwise the case is invalid
-    # for a reason the report never mentions.
+    # Undoing the reported mutation must leave a valid body, or the case fails for a reason the report omits.
     schema = {
         "type": "object",
         "properties": {"a": {"type": "integer", "maximum": 100}, "b": {"type": "integer"}},
@@ -460,7 +446,7 @@ def test_value_channel_keeps_earlier_bodies_intact(ctx):
             "responses": {"200": {"description": "OK"}},
         },
     )
-    # The value channel fires on 15% of draws, so a smaller budget can miss it.
+    # The value channel fires on a minority of draws, so a smaller budget can miss it.
     drawn = [
         (case.body, deepclone(case.body))
         for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 100)

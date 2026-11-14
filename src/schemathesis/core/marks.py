@@ -1,4 +1,4 @@
-"""A lightweight mechanism to attach Schemathesis-specific metadata to test functions."""
+"""Schemathesis metadata attached to test functions."""
 
 from __future__ import annotations
 
@@ -13,15 +13,13 @@ METADATA_ATTR = "_schemathesis_metadata"
 
 @dataclass
 class SchemathesisMetadata:
-    """Container for all Schemathesis-specific data attached to test functions."""
+    """Schemathesis data attached to a test function."""
 
 
 T = TypeVar("T")
 
 
 class Mark(Generic[T]):
-    """Access to specific attributes in SchemathesisMetadata."""
-
     def __init__(
         self, *, attr_name: str, default: T | Callable[[], T] | None = None, check: Callable[[T], bool] | None = None
     ) -> None:
@@ -40,7 +38,7 @@ class Mark(Generic[T]):
         return True
 
     def get(self, func: Callable) -> T | None:
-        """Get marker value if it's set."""
+        """The value, or the default when it is unset or fails `check`."""
         metadata = getattr(func, METADATA_ATTR, None)
         if metadata is None:
             return self._get_default()
@@ -53,14 +51,12 @@ class Mark(Generic[T]):
         return self._get_default()
 
     def set(self, func: Callable, value: T) -> None:
-        """Set marker value, creating metadata if needed."""
         if not hasattr(func, METADATA_ATTR):
             setattr(func, METADATA_ATTR, SchemathesisMetadata())
         metadata = getattr(func, METADATA_ATTR)
         setattr(metadata, self.attr_name, value)
 
     def is_set(self, func: Callable) -> bool:
-        """Check if function has metadata with this marker set."""
         metadata = getattr(func, METADATA_ATTR, None)
         if metadata is None:
             return False

@@ -32,8 +32,7 @@ def test_mutation_targets_cache_across_calls(ctx):
 
 
 def test_error_feedback_adjustment_grows_descriptor_set(ctx):
-    # A 4xx-observed undeclared field gets synthesized into the schema; the adjusted
-    # schema must expose it as a mutation target, not the cached pre-adjustment one.
+    # A field seen in a 4xx response joins the schema; mutation targets must come from it, not the cached original.
     schema = ctx.openapi.load_schema(
         {
             "/items": {
@@ -76,6 +75,6 @@ def test_error_feedback_adjustment_grows_descriptor_set(ctx):
     )
     adjusted_descriptors = compute_mutation_targets(adjusted_schema)
 
-    assert adjusted_schema is not body.optimized_schema  # adjustment fired
+    assert adjusted_schema is not body.optimized_schema
     assert "y" in adjusted_schema.get("properties", {})
-    assert len(adjusted_descriptors) > len(original_descriptors)  # synthesized target is reachable
+    assert len(adjusted_descriptors) > len(original_descriptors)

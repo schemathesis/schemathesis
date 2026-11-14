@@ -1,5 +1,3 @@
-"""Swagger 2.0 type definitions."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -11,8 +9,6 @@ from schemathesis.specs.openapi.types.common import OperationSecurity, Reference
 
 
 class BodyParameter(TypedDict):
-    """Swagger 2.0 body parameter."""
-
     name: str
     description: NotRequired[str]
     required: NotRequired[bool]
@@ -23,13 +19,11 @@ _BodyParameterIn = TypedDict("_BodyParameterIn", {"in": Literal["body"]})
 
 
 class BodyParameterWithIn(BodyParameter, _BodyParameterIn):
-    """Body parameter with 'in' field."""
-
     pass
 
 
 class NonBodyParameter(TypedDict):
-    """Swagger 2.0 non-body parameter (path/query/header/formData)."""
+    """Path, query, header or formData parameter."""
 
     name: str
     description: NotRequired[str]
@@ -57,8 +51,6 @@ _NonBodyParameterIn = TypedDict("_NonBodyParameterIn", {"in": Literal["path", "q
 
 
 class NonBodyParameterWithIn(NonBodyParameter, _NonBodyParameterIn):
-    """Non-body parameter with 'in' field."""
-
     pass
 
 
@@ -67,7 +59,7 @@ Parameter: TypeAlias = BodyParameterWithIn | NonBodyParameterWithIn | Reference
 
 
 class Header(TypedDict):
-    """Swagger 2.0 response header."""
+    """Response header."""
 
     type: Literal["string", "number", "integer", "boolean", "array"]
     description: NotRequired[str]
@@ -97,8 +89,6 @@ Headers: TypeAlias = Mapping[str, HeaderOrRef]
 
 
 class Response(TypedDict):
-    """Swagger 2.0 response object."""
-
     description: str
     schema: NotRequired[SchemaOrRef]
     headers: NotRequired[dict[str, HeaderOrRef]]

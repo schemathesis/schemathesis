@@ -69,7 +69,6 @@ def test_resolve_pointer_all_returns_matches(doc, pointer, expected):
         # UNRESOLVABLE only when the pointer fails BEFORE any wildcard.
         ({"meta": {"page": 1}}, "/missing/*/id"),
         (DOC, "data/0"),
-        # Mid-walk target is a scalar (neither dict nor list); fall-through path.
         ({"data": "string"}, "/data/sub"),
     ],
     ids=[

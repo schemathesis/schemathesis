@@ -14,10 +14,9 @@ if TYPE_CHECKING:
 
 
 def _is_admitted(status_code: int) -> bool:
-    """Whether the response proves the request got past authorization.
+    """Whether the response proves the request got past authorization; only a served response does.
 
-    Only a served response does. A rejected payload or a missing resource is decided before the
-    role is looked at, so it says nothing about the identity and must not settle the assignment.
+    A rejected payload or a missing resource is decided before the role check and must not settle the assignment.
     """
     return 200 <= status_code < 400
 
@@ -65,9 +64,8 @@ class EscalatingAuthProvider:
         peers: tuple[str, ...] = (),
         pinned: str | None = None,
     ) -> None:
-        # Credentials an operation rejects are worse than none: a stack that refuses a bad
-        # `Authorization` header serves the same request once it is absent. Second in line, so a
-        # document whose credentials never work costs one request to find out rather than all of them.
+        # Some stacks refuse a bad `Authorization` header and serve the request without it. Anonymous goes second,
+        # so credentials that never work cost one request to find out.
         self.providers = [providers[0], _AnonymousAuthProvider(), *providers[1:]]
         self.names = [names[0], ANONYMOUS, *names[1:]]
         self._assigned: dict[str, int] = {}
@@ -116,8 +114,7 @@ class EscalatingAuthProvider:
         """Fold one response, sent as `identity`, into the assignment for `label`."""
         if self._pinned is not None:
             return
-        # Anonymous cases are never tagged, and neither are cases whose credentials were left out on purpose;
-        # both went out without credentials.
+        # Anonymous cases and cases with credentials left out on purpose are untagged; both went without credentials.
         sent = self.names.index(identity if identity is not None else ANONYMOUS)
         with self._lock:
             if status_code == 401:
@@ -136,8 +133,7 @@ class EscalatingAuthProvider:
             if _is_admitted(status_code):
                 self._settled.add(label)
                 return
-            # Both say the identity cannot do this operation. A 401 reaches this point only after
-            # `reauth_and_replay` has already refreshed the token and replayed, so a stale token is ruled out.
+            # Both say the identity cannot do this operation; a 401 here already survived a token refresh and replay.
             if status_code not in AUTH_REJECTION_STATUSES:
                 return
             current = self._assigned.get(label, 0)
@@ -148,12 +144,10 @@ class EscalatingAuthProvider:
                 self._refused_early.setdefault(label, sent)
             rank = _DENIAL_RANK[status_code]
             best = self._best.get(label)
-            # Ties go to the later rung: among identities that got equally far, it is the one with
-            # the most privilege, and so the one a later request has any chance with.
+            # Ties go to the later rung: equally far, it has the most privilege and the best chance with later requests.
             if best is None or rank >= best[0]:
                 self._best[label] = (rank, current)
-            # One denial is enough: an operation may only get a couple of requests, and a
-            # threshold above its budget could never flip.
+            # One denial is enough: an operation may get only a couple of requests, below any higher threshold.
             if current + 1 < len(self.providers):
                 self._assigned[label] = current + 1
                 return

@@ -4,7 +4,6 @@ from ..utils import integer
 
 
 def test_common_parameters(testdir):
-    # When common parameter is shared on an API operation level
     testdir.make_test(
         """
 @schema.parametrize()
@@ -32,15 +31,12 @@ def test_(request, case):
         generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
-    # Then this parameter should be used for all specified methods
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines([r"Hypothesis calls: 8$"])
 
 
 def test_common_parameters_with_references(testdir):
-    # When common parameter that is shared on an API operation level contains a reference
-    # And this parameter is in `body`
-    # And the schema is used for multiple test functions
+    # A shared `body` parameter behind a reference, used by several test functions.
     testdir.make_test(
         """
 def impl(request, case):
@@ -83,14 +79,11 @@ def test_b(request, case):
         generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
-    # Then this parameter should be used in all generated tests
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines([r"Hypothesis calls: 20$"])
 
 
 def test_common_parameters_with_references_stateful(ctx):
-    # When common parameter that is shared on an API operation level contains a reference
-    # And used in stateful tests
     responses = {"responses": {"200": {"description": "OK"}}}
     schema = ctx.openapi.load_schema(
         {
@@ -125,7 +118,6 @@ def test_common_parameters_with_references_stateful(ctx):
         basePath="/v1",
         version="2.0",
     )
-    # Then state machine should be successfully generated
     state_machine = schema.as_state_machine()
     assert len(state_machine.bundles) == 1
     assert "POST /bar -> 200" in state_machine.bundles
@@ -136,8 +128,6 @@ def test_common_parameters_with_references_stateful(ctx):
 
 
 def test_common_parameters_multiple_tests(testdir):
-    # When common parameters are specified on an API operation level
-    # And the same schema is used in multiple tests
     testdir.make_test(
         """
 def impl(request, case):
@@ -165,7 +155,5 @@ def test_b(request, case):
         generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
-    # Then this parameter should be used in all test functions
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines([r"Hypothesis calls: 12$"])
-    # NOTE: current implementation requires a deepcopy of the whole schema

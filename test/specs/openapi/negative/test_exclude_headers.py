@@ -140,7 +140,7 @@ def test_coverage_missing_parameter(case_factory, parameter, expected):
 
 
 def test_negate_constraints_without_required_keyword_excludes_nothing(case_factory):
-    # Pattern negation sends a violating value — the header must not be stripped.
+    # Pattern negation sends a violating value, so the header must stay.
     mutation = Mutation(
         path=(),
         parameter_location=ParameterLocation.HEADER,

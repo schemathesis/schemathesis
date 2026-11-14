@@ -14,8 +14,7 @@ from schemathesis.engine.run import PhaseName
 from test.apps.catalog.grpc.descriptors import load
 from test.utils import refusing_url
 
-# Connecting to an unused loopback port times out on Windows instead of being refused, so there is no
-# refusal for the monitor to classify either way.
+# An unused loopback port on Windows times out instead of refusing, leaving no refusal to classify.
 pytestmark = pytest.mark.skipif(platform.system() == "Windows", reason="Unused ports do not refuse connections")
 
 
@@ -48,8 +47,8 @@ def expected_message(operation, cases):
     return f"{operation.base_url} stopped responding. Last {noun} before it went away:\n\n{commands}"
 
 
+# Returns once the monitor tracks the request, which stays in flight until `release` is set.
 def hang(monitor, case, release):
-    """Start a request that stays in flight until `release` is set; returns once the monitor knows about it."""
     entered = threading.Event()
 
     def send():
@@ -259,8 +258,7 @@ def test_grpc_server_that_stops_is_an_outage(ctx, app_runner, tls, proxied):
 
     assert monitor.is_down(exc_info.value)
     info = monitor.take_report(PhaseName.FUZZING).info
-    # The cached channel may send the second call before it sees the closed connection, and a port proxy resets the
-    # call instead of refusing it; a call cut off or reset is listed as the culprit, so no tip about older requests.
+    # A cached channel or a port proxy can cut off or reset the call; that call is the culprit, so no tip follows.
     tip = (
         # HAR reports do not record gRPC calls.
         "If the server crashed, the request that caused it may be older than these."
@@ -279,7 +277,6 @@ def grpc_operation(server, **config):
 
 
 def answered_then_crash(ctx, how="exit"):
-    """A crashing server that answered one call, and the call that brings it down."""
     server = ctx.grpc.apps.crashing_users(how)
     operation = grpc_operation(server)
     answered = operation.Case(body={"userId": 7})

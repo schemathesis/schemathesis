@@ -7,8 +7,7 @@ from typing import TypeAlias
 
 from schemathesis.core.parameters import ParameterLocation
 
-# JSON-Pointer-style path through a request payload. String segments index objects;
-# integer segments index arrays.
+# Path into a request payload: strings index objects, integers index arrays.
 ParameterPath: TypeAlias = tuple[str | int, ...]
 
 # Bound per (operation, location) bucket; lowest-count entry is evicted at the cap.
@@ -32,13 +31,9 @@ class ObservationKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class SizeBoundPayload:
-    """Numeric size bounds extracted from a size-constraint validation error.
+    """Size bounds of a string, array or object (`minLength`, `minItems`, `minProperties` and their max pairs).
 
-    Either bound may be `None` when the source error reports only the violated
-    side; complementary observations are merged into a single canonical entry
-    by the store. Applies to whatever JSON-Schema container the field resolves
-    to: strings (`minLength`/`maxLength`), arrays (`minItems`/`maxItems`), or
-    objects (`minProperties`/`maxProperties`).
+    A bound is `None` when the error names only the violated side; the store merges complementary observations.
     """
 
     min: int | None
@@ -47,26 +42,19 @@ class SizeBoundPayload:
 
 @dataclass(frozen=True, slots=True)
 class FormatPayload:
-    """JSON-Schema `format` name inferred from a Bean-validation message.
-
-    The string is a JSON-Schema format name (`email`, `uri`, `uuid`, ...). The
-    consumer adjustment writes it as `format: <name>` on the resolved property,
-    only when no format is already declared.
-    """
+    """JSON Schema `format` name (`email`, `uri`, `uuid`, ...), applied only to properties that declare no format."""
 
     name: str
 
 
 class BoundDirection(StrEnum):
-    """Which side of a numeric range a `NumericBoundPayload` constrains."""
-
     MIN = "min"
     MAX = "max"
 
 
 @dataclass(frozen=True, slots=True)
 class NumericBoundPayload:
-    """One half of a numeric range — `direction` picks which side, `exclusive` whether the bound itself is excluded."""
+    """One side of a numeric range; `exclusive` excludes the bound itself."""
 
     bound: int | float
     direction: BoundDirection
@@ -75,10 +63,9 @@ class NumericBoundPayload:
 
 @dataclass(frozen=True, slots=True)
 class PatternPayload:
-    """Regex captured verbatim from a Bean-validation `@Pattern` message.
+    """Regex taken verbatim from an error message.
 
-    The consumer normalizes Java-only constructs (PCRE escapes, POSIX classes,
-    Python anchors) before writing it as `pattern: <regex>` onto the property.
+    The consumer rewrites Java-only constructs (PCRE escapes, POSIX classes, Python anchors) before writing `pattern`.
     """
 
     regex: str
@@ -86,10 +73,9 @@ class PatternPayload:
 
 @dataclass(frozen=True, slots=True)
 class TypeMismatchPayload:
-    """Framework-specific type identifier — Java FQN from Jackson/Spring, JSON-Schema type token from DRF.
+    """A JSON Schema type name, or a framework type such as a Java class name.
 
-    The consumer dispatches by inspecting the value: closed-set JSON-Schema types correct schema
-    `type`; anything else is treated as a Java FQN and mapped to JSON-Schema `format`.
+    The consumer fixes `type` for JSON Schema type names and maps anything else to a `format`.
     """
 
     type_name: str
@@ -97,21 +83,16 @@ class TypeMismatchPayload:
 
 @dataclass(frozen=True, slots=True)
 class EnumPayload:
-    """Enum value list extracted from a Jackson `not one of the values accepted for Enum class: [...]` message.
-
-    The consumer writes it as `enum: [...]` onto the property.
-    """
+    """Allowed values from an error message, written as the property's `enum`."""
 
     values: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class RequiresAuthPayload:
-    """Operation-level signal: the named scheme is required to reach the operation.
+    """The operation requires the named security scheme; consumers add it to the operation's security requirements.
 
-    Recorded after an auth-failure response is followed by a confirmation retry that
-    attached the scheme's configured credentials and succeeded. Consumers attach the
-    scheme to the operation's effective security requirements.
+    Recorded when a retry with the scheme's configured credentials succeeds after an auth failure.
     """
 
     scheme_name: str
@@ -146,9 +127,7 @@ _BucketKey = tuple[str, ParameterLocation]
 
 
 def _entry_key(observation: Observation) -> _EntryKey:
-    # Payload variants on the same (path, kind) carry independent signals — discriminate so each
-    # variant gets its own slot. SizeBoundPayload is the exception: it intentionally collapses so
-    # complementary min/max observations can merge in-place (see `record` below).
+    # Each payload variant on one (path, kind) gets its own slot, except size bounds, whose min and max merge.
     payload = observation.payload
     discriminator: BoundDirection | str | tuple[str, ...] | None
     if isinstance(payload, NumericBoundPayload):
@@ -191,11 +170,9 @@ class _Bucket:
 
 
 class ErrorFeedbackStore:
-    """Thread-safe accumulator of parser observations + monotonic generation counter.
+    """Thread-safe store of parser observations with a `generation` counter that strategy caches key on.
 
-    `generation` advances at engine `checkpoint()` calls that follow new feedback; strategy caches
-    key on it and rebuild only when it bumps. Within one suite the value is fixed —
-    safe to consult from inside Hypothesis-driven generation.
+    `generation` changes only at `checkpoint()` after new feedback, so it stays fixed during a Hypothesis suite.
     """
 
     __slots__ = ("_buckets", "_lock", "_generation", "_changed")
@@ -219,7 +196,7 @@ class ErrorFeedbackStore:
                 self._changed = False
 
     def observation_counts(self) -> dict[str, int]:
-        """How much each operation has taught the parsers, by distinct observation."""
+        """Distinct observations ever recorded per operation, evicted ones included."""
         counts: dict[str, int] = {}
         with self._lock:
             for (label, _), bucket in self._buckets.items():
@@ -227,7 +204,6 @@ class ErrorFeedbackStore:
         return counts
 
     def distinct_observations(self) -> int:
-        """Total distinct observations recorded across every bucket."""
         with self._lock:
             return sum(len(bucket.entries) for bucket in self._buckets.values())
 
@@ -251,9 +227,7 @@ class ErrorFeedbackStore:
                 self._changed = True
             else:
                 entry.count += 1
-                # Some validators report only the violated side of a size bound;
-                # fold complementary observations together so the canonical payload
-                # carries both edges once they have both been seen.
+                # Validators may report one side of a size bound; merge both sides into the canonical payload.
                 if isinstance(observation.payload, SizeBoundPayload) and isinstance(
                     entry.canonical.payload, SizeBoundPayload
                 ):
@@ -275,12 +249,9 @@ class ErrorFeedbackStore:
         operation_label: str,
         location: ParameterLocation,
     ) -> tuple[Observation, ...]:
-        """Immutable snapshot of every observation recorded for one (op, location).
+        """Snapshot of every observation for one (operation, location).
 
-        Parsers only emit observations when their framework-specific regex matches
-        an error envelope, so a single occurrence is conclusive enough to act on —
-        delaying propagation until a second occurrence pushes the wrong spec
-        example through the next phase before the constraint can land.
+        One occurrence suffices: parsers emit only on framework-specific matches; waiting lets wrong examples through.
         """
         with self._lock:
             bucket = self._buckets.get((operation_label, location))

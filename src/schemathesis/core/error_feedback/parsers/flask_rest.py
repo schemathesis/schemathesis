@@ -28,26 +28,21 @@ if TYPE_CHECKING:
 # Flask-RESTX wraps every validation envelope under this fixed top-level message.
 _RESTX_TOP_MESSAGE = "Input payload validation failed"
 
-# `reqparse` family — Flask-RESTful's argument validator and Flask-RESTX's
-# `api.parser()`. Single-string-per-field with a small set of pinned messages.
+# `reqparse` (Flask-RESTful, Flask-RESTX `api.parser()`): one message string per field.
 _REQPARSE_MISSING = re.compile(r"^Missing required parameter\b")
 _REQPARSE_PATTERN = re.compile(r'^Value does not match pattern: "(?P<regex>[^"]+)"$')
 _REQPARSE_INT_COERCION = re.compile(r"^invalid literal for int\(\) with base 10:")
 _REQPARSE_FLOAT_COERCION = re.compile(r"^could not convert string to float:")
 
-# `jsonschema` / `jsonschema_rs` family — used by Flask-RESTX's
-# `@api.expect(model, validate=True)` and any other Python validator built on
-# either implementation. Both quote styles (`'X'` and `"X"`) are accepted to
-# cover the rs port's deliberate divergence from Python's single-quote default.
+# `jsonschema` (single quotes) and `jsonschema_rs` (double quotes) messages, as Flask-RESTX `@api.expect` emits.
 _QUOTE = r"['\"]"
 _JSONSCHEMA_REQUIRED = re.compile(rf"^{_QUOTE}(?P<key>[^'\"]+){_QUOTE} is a required property$")
 _JSONSCHEMA_TYPE = re.compile(rf"^.+ is not of type {_QUOTE}(?P<type>[^'\"]+){_QUOTE}$")
 _JSONSCHEMA_PATTERN = re.compile(rf"^{_QUOTE}[^'\"]*{_QUOTE} does not match {_QUOTE}(?P<regex>[^'\"]+){_QUOTE}$")
 _JSONSCHEMA_FORMAT = re.compile(rf"^{_QUOTE}[^'\"]*{_QUOTE} is not a {_QUOTE}(?P<format>[^'\"]+){_QUOTE}$")
-# Bracketed enum form (`['a', 'b']`) — always carries the full choice list.
+# Bracketed enum form (`['a', 'b']`) lists every choice.
 _JSONSCHEMA_ENUM_PY = re.compile(rf"^{_QUOTE}[^'\"]*{_QUOTE} is not one of \[(?P<choices>.+)\]$")
-# Prose enum form (`"a", "b" or "c"`) — full list only when 1-3 choices;
-# 4+ collapse to `X, Y or N other candidates`, which we deliberately drop.
+# Prose enum form (`"a", "b" or "c"`); 4+ choices collapse to `X, Y or N other candidates`, which is dropped.
 _JSONSCHEMA_ENUM_RS = re.compile(rf"^{_QUOTE}[^'\"]*{_QUOTE} is not one of (?P<choices>{_QUOTE}.+)$")
 _RS_ENUM_TRUNCATED = re.compile(r"\bor \d+ other candidates?$")
 
@@ -101,7 +96,7 @@ def _parse_py_enum_choices(raw: str) -> tuple[str, ...] | None:
 
 
 def _parse_rs_enum_choices(raw: str) -> tuple[str, ...] | None:
-    """Parse jsonschema_rs's `"a", "b" or "c"` form; bail out on the 4+ truncation."""
+    """Parse jsonschema_rs's `"a", "b" or "c"` form; `None` for the truncated 4+ form."""
     if _RS_ENUM_TRUNCATED.search(raw) is not None:
         return None
     head, _, tail = raw.rpartition(" or ")
@@ -162,7 +157,7 @@ def _is_str_to_str(value: object) -> TypeGuard[dict[str, str]]:
 
 
 def _extract_issues(body: object) -> dict[str, str] | None:
-    """Locate the issues map — Flask-RESTX (`errors`) takes precedence over Flask-RESTful (`message`)."""
+    """The field -> message map; Flask-RESTX `errors` wins over Flask-RESTful `message`."""
     if not isinstance(body, dict):
         return None
     errors = body.get("errors")
@@ -175,7 +170,6 @@ def _extract_issues(body: object) -> dict[str, str] | None:
 
 
 def _has_restx_marker(body: object) -> bool:
-    """Flask-RESTX wraps every validation envelope under this fixed top-level message."""
     return isinstance(body, dict) and body.get("message") == _RESTX_TOP_MESSAGE and _is_str_to_str(body.get("errors"))
 
 

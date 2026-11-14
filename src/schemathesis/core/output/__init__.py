@@ -17,8 +17,7 @@ def pluralize(count: int, word: str) -> str:
 
 
 def escape_surrogates(text: str) -> str:
-    # Lone surrogates (e.g. echoed back by a server) are valid `str` but cannot be UTF-8 encoded
-    # for terminal or report output; escape them instead of letting the write crash.
+    # Lone surrogates (e.g. echoed by a server) cannot be UTF-8 encoded for output; escape them instead of crashing.
     return text.encode("utf-8", "backslashreplace").decode("utf-8")
 
 
@@ -28,15 +27,13 @@ def escape_nonprintable(text: str) -> str:
 
 
 def truncate_json(data: Any, *, config: OutputConfig, max_lines: int | None = None) -> str:
-    # Convert JSON to string with indentation
     indent = 4
     if not config.truncation.enabled:
         return json.dumps(data, indent=indent)
 
     max_lines = max_lines if max_lines is not None else config.truncation.max_lines
     max_width = config.truncation.max_width
-    # Encoded incrementally and abandoned once there are enough lines: a large API's schema
-    # serializes to megabytes, and all but the first few lines are thrown away.
+    # Encode incrementally and stop at enough lines: a large schema serializes to megabytes, almost all discarded.
     lines: list[str] = []
     pending = ""
     exhausted = True
@@ -72,11 +69,7 @@ def truncate_text(text: str, limit: int) -> str:
 
 
 def decode_response_text(response: Response) -> str | None:
-    """Decode a response body for display.
-
-    Returns `None` when the body is binary (undecodable under its own or the default encoding);
-    a response declaring an unknown or broken charset is decoded lossily instead of raising.
-    """
+    """Response body for display, or `None` when binary; an unknown or broken charset decodes lossily."""
     if response.render_content is not None:
         return response.render_content(response.content)
     try:
@@ -87,7 +80,7 @@ def decode_response_text(response: Response) -> str | None:
             return response.content[: exc.start].decode(exc.encoding)
         return None
     except (LookupError, ValueError):
-        # Unknown or broken codec names (including embedded NULs) — decode lossily instead of raising.
+        # Unknown or broken codec names (including embedded NULs) decode lossily
         return response.text_lossy()
 
 

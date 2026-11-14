@@ -5,15 +5,14 @@ import pkgutil
 from collections.abc import Iterable
 from types import ModuleType
 
-# bytes are iterable but yield ints, not modules - treat as scalars.
+# Bytes are iterable but yield ints, not modules, so they count as scalars.
 _NON_SEQUENCE_BYTES_TYPES = (bytes, bytearray, memoryview)
 
 
 def resolve_modules(inputs: Iterable[object], *, walk: bool = True) -> set[str]:
     """Module names from module objects, dotted-name strings, or iterables of either.
 
-    `walk` descends into packages. Only safe for names a source spells out - inferring one from an
-    app imports whatever else happens to live in that package, side effects included.
+    `walk` descends into packages; use it only for names a source spells out, as walking imports the whole package.
     """
     collected: set[str] = set()
     _resolve_into(inputs, collected, walk)
@@ -25,9 +24,7 @@ def _resolve_into(value: object, out: set[str], walk: bool) -> None:
         _add_module(value, out, walk)
         return
     if isinstance(value, str):
-        # Importing user code can raise anything, including BaseException (a module calling
-        # `sys.exit()` or `pytest.skip(allow_module_level=True)` at import). Extraction is
-        # optional, so swallow everything except a genuine interrupt.
+        # Importing user code can raise anything, even `sys.exit()` or module-level `pytest.skip`; only interrupts pass.
         try:
             module = importlib.import_module(value)
         except KeyboardInterrupt:  # pragma: no cover

@@ -6,8 +6,6 @@ MALFORMED_REGEX = "^[A-Za-z0-9 \\\\-.'À-ÿ]+$"
 
 
 def test_malformed_regex_removed_allows_body_generation(ctx):
-    # When a body schema contains a malformed regex pattern, it is removed during conversion
-    # allowing data generation to proceed
     operation = body_operation(
         ctx,
         {
@@ -40,35 +38,25 @@ def test_malformed_regex_removed_allows_body_generation(ctx):
         ],
     )
 
-    # Cases are generated because the malformed pattern is removed
     assert iter_cases(operation, GenerationMode.POSITIVE)
 
 
 def test_numeric_pattern_value(ctx):
-    # When a body schema contains a pattern with a numeric value instead of a string,
-    # it should be handled gracefully without raising a TypeError
+    # A non-string `pattern` must not raise a TypeError.
     operation = body_operation(
         ctx,
-        {
-            "properties": {
-                "key": {
-                    "pattern": 0.0  # Invalid: pattern should be a string
-                }
-            }
-        },
+        {"properties": {"key": {"pattern": 0.0}}},
         path="/test",
         method="patch",
         version="3.0.0",
         body_required=None,
     )
 
-    # Cases should be generated despite the invalid pattern value
     assert iter_cases(operation, GenerationMode.POSITIVE)
 
 
 def test_swagger2_array_query_param_with_top_level_enum(ctx):
-    # When a Swagger 2.0 array parameter has both top-level `enum` and `items` (a contradictory
-    # codegen artifact), coverage must still emit the required parameter with a valid array value.
+    # A top-level `enum` beside `items` is a codegen artifact; coverage must still emit a valid required array.
     operation = load_schema(
         ctx,
         parameters=[
@@ -78,7 +66,7 @@ def test_swagger2_array_query_param_with_top_level_enum(ctx):
                 "required": True,
                 "type": "array",
                 "collectionFormat": "multi",
-                # enum at array level is a Swagger 2.0 quirk — item-level constraint
+                # Swagger 2.0 quirk: an array-level `enum` constrains the items.
                 "enum": ["FEATURES", "LANDMARKS", "ATTRIBUTES"],
                 "items": {
                     "type": "string",
@@ -128,8 +116,7 @@ def test_swagger2_array_query_param_top_level_enum_constrains_items(ctx):
 
 
 def test_required_enforced_when_properties_at_threshold(ctx):
-    # When a schema has exactly 15 properties (at the jsonschema_rs SmallProperties threshold)
-    # and required lists exactly 2 of them, NEGATIVE cases must still be schema-invalid.
+    # 15 properties sit at a jsonschema_rs SmallProperties threshold; NEGATIVE cases must still be schema-invalid.
     properties = {f"field{i}": {"type": "string"} for i in range(15)}
     operation = body_operation(
         ctx,
@@ -144,8 +131,7 @@ def test_required_enforced_when_properties_at_threshold(ctx):
 
 
 def test_optional_unsatisfiable_property_does_not_block_siblings(ctx):
-    # One optional property with mutually-exclusive `type` + `enum` (a spec bug) must not
-    # suppress coverage for the sibling properties.
+    # An optional property with contradictory `type` and `enum` must not suppress coverage for its siblings.
     operation = body_operation(
         ctx,
         {
@@ -165,9 +151,7 @@ def test_optional_unsatisfiable_property_does_not_block_siblings(ctx):
 
 
 def test_optional_nullable_emits_null_when_template_omits_it(ctx):
-    # When the template omits an optional, the sweep used to dedup the legitimate null
-    # emission against an implicit `None`. `deprecated` is one of several root keywords
-    # (also `title`, `readOnly`, unknown extensions) that make the template skip optionals.
+    # `deprecated` at the root makes the template omit optionals; an explicit null must not dedupe against the omission.
     operation = body_operation(
         ctx,
         {
@@ -187,9 +171,7 @@ def test_optional_nullable_emits_null_when_template_omits_it(ctx):
 
 
 def test_enum_in_allof_base_with_sibling_ref_property_covers_every_value(ctx):
-    # `allOf:[base]` + sibling `properties` with a `$ref` (common in Azure specs).
-    # The bundled-ref short-circuit used to skip canonical allOf merging, dropping every
-    # enum value reachable only through the base.
+    # `allOf: [base]` with a sibling `$ref` property must still merge the base and cover its enum values.
     operation = body_operation(
         ctx,
         {"$ref": "#/components/schemas/Outer"},

@@ -265,14 +265,13 @@ def test_hook_modifies_query_with_prefix_items_revalidates(ctx):
         _meta=meta,
     )
 
-    # Hook-style reassignment marks the container dirty and triggers revalidation.
+    # Reassigning the container, as a hook does, triggers revalidation.
     case.query = {"box": [0, 0, 1, 1]}
     assert case.meta.generation.mode == GenerationMode.POSITIVE
 
 
 def test_hook_self_assigns_stringified_query_keeps_positive(ctx):
-    # See GH-4101 — stringified query containers must validate against the typed
-    # snapshot so a no-op hook reassignment doesn't flip the case to NEGATIVE.
+    # See GH-4101: stringified query values validate against the typed snapshot, so a no-op reassignment stays POSITIVE.
     schema = ctx.openapi.load_schema(
         {
             "/point": {
@@ -397,15 +396,11 @@ def test_before_call_hook_with_negative_cases(ctx):
     @run_given(case=strategy, max_examples=3, phases=[Phase.generate])
     def test_case(case):
         if case.meta and isinstance(case.body, dict):
-            # Initially negative (missing required id)
             initial_mode = case.meta.generation.mode
 
-            # Simulate hook adding the missing field
             case.body["id"] = "hook-added-id"
 
-            # After modification, metadata should reflect POSITIVE
             assert case.meta.generation.mode == GenerationMode.POSITIVE
-            # Verify transition happened
             if initial_mode == GenerationMode.NEGATIVE:
                 assert case.meta.components[ParameterLocation.BODY].mode == GenerationMode.POSITIVE
 
@@ -434,7 +429,6 @@ def test_map_case_hook_with_metadata(ctx):
     @schema.hook
     def map_case(ctx, case):
         if case.path_parameters.get("user_id"):
-            # Replace invalid value with valid one
             case.path_parameters["user_id"] = "999"
         return case
 
@@ -442,7 +436,6 @@ def test_map_case_hook_with_metadata(ctx):
 
     @run_given(case=strategy, max_examples=3, phases=[Phase.generate])
     def test_case(case):
-        # Verify path parameter is valid after hook fix
         assert case.meta.components[ParameterLocation.PATH].mode == GenerationMode.POSITIVE
 
 
@@ -534,9 +527,8 @@ def test_header_case_insensitive_dict_hash(ctx):
     )
 
     assert case.meta.generation.mode == GenerationMode.POSITIVE
-    # Modify headers
     case.headers["X-Custom"] = "value"
-    # Just verify that modification is detected (metadata access doesn't crash)
+    # Metadata access after the change must not crash.
     _ = case.meta.generation.mode
 
 
@@ -730,11 +722,9 @@ def test_multiple_components_modified_all_revalidate(ctx):
 
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
 
-    # Fix path but not body - should still be NEGATIVE
     case.path_parameters["user_id"] = "123"
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
 
-    # Fix body as well - should become POSITIVE
     case.body = {"email": "test@example.com", "name": "John"}
     assert case.meta.generation.mode == GenerationMode.POSITIVE
 
@@ -750,19 +740,16 @@ def test_chained_modifications_all_tracked(simple_operation):
 
     assert case.meta.generation.mode == GenerationMode.POSITIVE
 
-    # Add invalid field
     case.body["invalid"] = "field"
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
 
-    # Remove it
     del case.body["invalid"]
     assert case.meta.generation.mode == GenerationMode.POSITIVE
 
-    # Add valid optional field
     case.body["name"] = "Alice"
     assert case.meta.generation.mode == GenerationMode.POSITIVE
 
-    # Add extra property (additionalProperties: false)
+    # `additionalProperties: false` rejects the extra key.
     case.body["extra_field"] = "invalid"
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
 
@@ -790,9 +777,8 @@ type Query {
         assert case.meta is not None
         assert case.meta.generation.mode == GenerationMode.POSITIVE
 
-        # Modify body to something potentially invalid
         case.body = '{"query": "invalid syntax {{{"}'
-        # GraphQL schemas don't validate, so mode should remain POSITIVE
+        # GraphQL schemas skip validation, so the mode stays POSITIVE.
         assert case.meta.generation.mode == GenerationMode.POSITIVE
 
 
@@ -819,7 +805,7 @@ def test_case_without_metadata_no_crash(ctx):
         },
     )
 
-    # Create case without metadata (as users would do)
+    # Cases built by users carry no metadata.
     case = operation.Case(
         body={"id": "test"},
         media_type="application/json",
@@ -837,9 +823,7 @@ def test_case_without_metadata_no_crash(ctx):
 
 
 def test_revalidation_with_openapi_30_boolean_exclusive_minimum(ctx):
-    # OpenAPI 3.0 allows `exclusiveMinimum: true` (boolean form alongside `minimum`).
-    # Revalidation must accept such schemas using the OpenAPI-3.0 validator class
-    # rather than a newer JSON Schema draft that requires a numeric form.
+    # OpenAPI 3.0 allows a boolean `exclusiveMinimum`; revalidation must use the 3.0 validator, not a newer draft.
     operation = ctx.openapi.load_operation(
         "POST /items",
         {
@@ -878,8 +862,7 @@ def test_revalidation_with_openapi_30_boolean_exclusive_minimum(ctx):
 
 
 def test_case_metadata_round_trip_preserves_fuzzing_mutations():
-    # xdist controller-side recorders rebuild metadata via from_dict; without
-    # serializing `mutations`, structured mutation records are lost in parallel runs.
+    # xdist controller recorders rebuild metadata from dicts, so `mutations` must survive serialization.
     mutation = Mutation(
         path=("user", "email"),
         parameter_location=ParameterLocation.BODY,

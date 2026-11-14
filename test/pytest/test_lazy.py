@@ -32,7 +32,6 @@ def test_outer_settings(case):
 
 
 def test_with_settings(testdir):
-    # When hypothesis settings are applied to the test function
     testdir.make_test(
         """
 lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
@@ -44,15 +43,12 @@ def test_(request, case):
 """
     )
     result = testdir.runpytest("-v", "-s")
-    # Then settings should be applied to the test
     result.assert_outcomes(passed=1, skipped=1)
     result.stdout.re_match_lines([r"test_with_settings.py::test_ PASSED", r".*1 passed"])
     result.stdout.re_match_lines([r"Hypothesis calls: 0$"])
 
 
 def test_invalid_operation(testdir, hypothesis_max_examples):
-    # When the given schema is invalid
-    # And schema validation is disabled
     testdir.make_test(
         """
 lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
@@ -78,7 +74,6 @@ def test_(request, case):
         generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-rf")
-    # Then one test should be marked as failed (passed - /users, failed /)
     result.assert_outcomes(passed=1, failed=1)
     result.stdout.re_match_lines(
         [
@@ -125,7 +120,6 @@ def test_(case):
 
 
 def test_with_fixtures(testdir):
-    # When the test uses custom arguments for pytest fixtures
     testdir.make_test(
         """
 lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
@@ -141,14 +135,12 @@ def test_(request, case, another):
 """
     )
     result = testdir.runpytest("-v")
-    # Then the generated test should use these fixtures
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"test_with_fixtures.py::test_ PASSED", r".*1 passed"])
     result.stdout.re_match_lines([r"Hypothesis calls: 10$"])
 
 
 def test_with_parametrize_filters(testdir):
-    # When the test uses method / endpoint / tag / operation-id filter
     testdir.make_test(
         """
 lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
@@ -190,7 +182,6 @@ def test_d(request, case):
         generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v")
-    # Then the filters should be applied to the generated tests
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
@@ -205,7 +196,6 @@ def test_d(request, case):
 
 
 def test_with_schema_filters(testdir):
-    # When the test uses method / endpoint filter
     testdir.make_test(
         """
 lazy_schema = schemathesis.pytest.from_fixture("simple_schema").include(path_regex="/pets", method="POST")
@@ -220,14 +210,12 @@ def test_a(request, case):
         generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v")
-    # Then the filters should be applied to the generated tests
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"test_with_schema_filters.py::test_a PASSED"])
     result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_invalid_fixture(testdir):
-    # When the test uses a schema fixture that doesn't return a BaseSchema subtype
     testdir.make_test(
         """
 @pytest.fixture
@@ -242,7 +230,6 @@ def test_(request, case):
 """
     )
     result = testdir.runpytest("-v")
-    # Then the generated test should use these fixtures
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines(
         [
@@ -255,8 +242,6 @@ def test_(request, case):
 
 @pytest.mark.parametrize("given", ["data=st.data()", "st.data()"])
 def test_schema_given(testdir, given):
-    # When the schema is defined via a pytest fixture
-    # And `schema.given` is used
     testdir.make_test(
         f"""
 from hypothesis.strategies._internal.core import DataObject
@@ -280,16 +265,13 @@ def teardown_module(module):
             }
         },
     )
-    # Then its arguments should be proxied to the `hypothesis.given`
-    # And be available in the test
     result = testdir.runpytest()
-    # And the total number of passed tests is 1: one high-level test with multiple subtests
+    # One top-level test with subtests.
     result.assert_outcomes(passed=1)
 
 
 def test_schema_given_before_parametrize(testdir):
     # See GH-3320
-    # When `schema.given` is applied before `schema.parametrize`
     testdir.make_test(
         """
 lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
@@ -321,7 +303,6 @@ def test_user_id(case, user_id):
 
 
 def test_invalid_given_usage(testdir):
-    # When `schema.given` is used incorrectly (e.g. called without arguments)
     testdir.make_test(
         """
 lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
@@ -332,7 +313,6 @@ def test(case):
     pass
         """,
     )
-    # Then the wrapped test should fail with an error
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines([".+given must be called with at least one argument"])
@@ -341,7 +321,6 @@ def test(case):
 @pytest.mark.parametrize("settings", ["", "@settings(deadline=None)"])
 def test_parametrized_fixture(ctx, testdir, settings):
     api = ctx.openapi.apps.success()
-    # When the used pytest fixture is parametrized via `params`
     testdir.make_test(
         f"""
 schema.config.update(base_url="{api.base_url}/api")
@@ -359,7 +338,6 @@ def test_(case):
 """,
     )
     result = testdir.runpytest("-v")
-    # Then tests should be parametrized as usual
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines(
         [
@@ -370,7 +348,6 @@ def test_(case):
 
 
 def test_generation_modes(testdir):
-    # When data generation method config is specified on the schema which is wrapped by a lazy one
     testdir.make_test(
         """
 @pytest.fixture()
@@ -416,10 +393,8 @@ def pytest_terminal_summary(terminalreporter) -> None:
     yield
 """
     )
-    # Then it should be taken into account
     result = testdir.runpytest("-v")
-    # And it should be the same test in the end
-    # We do not assert the outcome here, because it is not reported.
+    # The outcome is not reported, so the test does not assert it.
     result.stdout.re_match_lines([r"test_generation_modes.py::test_\[GET /users\] SUBPASSED"])
 
 
@@ -459,7 +434,6 @@ def test_(case):
 
 
 def test_error_on_no_matches(testdir):
-    # When test filters don't match any operation
     testdir.make_test(
         """
 @pytest.fixture()
@@ -475,7 +449,7 @@ def test_(case):
 """,
     )
     result = testdir.runpytest("-v")
-    # Then it should be a failure (the collection phase is done, so it can't be an error)
+    # Collection is over by then, so this is a failure rather than an error.
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines(
         [
@@ -496,7 +470,6 @@ def test_(case):
 )
 def test_marks_transfer(testdir, decorators):
     # See GH-1378
-    # When a pytest mark decorator is applied
     testdir.make_test(
         f"""
 @pytest.fixture
@@ -511,13 +484,11 @@ def test_schema(case):
     """
     )
     result = testdir.runpytest("-m", "not acceptance")
-    # Then deselecting by a mark should work
     result.assert_outcomes()
 
 
 def test_skip_negative_without_parameters(testdir):
     # See GH-1463
-    # When an endpoint has no parameters to negate
     testdir.make_test(
         """
 @pytest.fixture()
@@ -533,14 +504,11 @@ def test_(case):
     pass
 """,
     )
-    # Then it should be skipped
     result = testdir.runpytest("-v", "-rs")
     result.stdout.re_match_lines([r".*Impossible to generate negative test cases.*"])
 
 
 def test_trimmed_output(testdir):
-    # When `from_fixture` is used
-    # And tests are failing
     testdir.make_test(
         """
 lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
@@ -552,13 +520,12 @@ def test_(case):
     result = testdir.runpytest()
     result.assert_outcomes(passed=1, failed=1)
     stdout = result.stdout.str()
-    # Internal Schemathesis' frames should not appear in the output
+    # No internal Schemathesis frames.
     assert "def run_subtest" not in stdout
 
 
 def test_multiple_failures(ctx, testdir):
     api = ctx.openapi.apps.multiple_failures()
-    # When multiple failures are discovered within the same test
     testdir.make_test(
         f"""
 @pytest.fixture
@@ -575,18 +542,16 @@ lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 def test_(case):
     case.call_and_validate()""",
     )
-    # Then all of them should be displayed
     result = testdir.runpytest()
     result.assert_outcomes(passed=1, failed=1)
     stdout = result.stdout.str()
     assert "[500] Internal Server Error" in stdout
-    # And internal frames should not be displayed
+    # No internal Schemathesis frames.
     assert "def run_subtest" not in stdout
 
 
 def test_flaky(ctx, testdir):
     api = ctx.openapi.apps.flaky()
-    # When failure is flaky
     testdir.make_test(
         f"""
 @pytest.fixture
@@ -599,12 +564,11 @@ lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 def test_(case):
     case.call_and_validate()""",
     )
-    # Then it should be properly displayed
     result = testdir.runpytest()
     result.assert_outcomes(passed=1, failed=1)
     stdout = result.stdout.str()
     assert "[500] Internal Server Error" in stdout
-    # And internal frames should not be displayed
+    # No internal Schemathesis frames.
     assert "def run_subtest" not in stdout
     assert "def collecting_wrapper" not in stdout
     assert "def __flaky" not in stdout
@@ -719,7 +683,6 @@ async def test_fail(case):
 
 
 def test_phases_from_config(testdir):
-    # When test phases are configured in schemathesis.toml
     testdir.makefile(
         ".toml",
         schemathesis="""
@@ -731,7 +694,6 @@ enabled = false
 """,
     )
 
-    # Then phases should be applied when using from_fixture
     testdir.make_test(
         """
 import pytest
@@ -762,7 +724,6 @@ def test_api(case):
 
 
 def test_hypothesis_settings_from_config(testdir):
-    # When hypothesis settings are configured in schemathesis.toml for a specific operation
     testdir.makefile(
         ".toml",
         schemathesis="""
@@ -780,7 +741,6 @@ enabled = false
 """,
     )
 
-    # Then operation-specific hypothesis settings should be applied when using from_fixture
     testdir.make_test(
         """
 import pytest
@@ -821,7 +781,6 @@ def test_api(case):
 
 
 def test_lazy_fixture_with_test_class(testdir):
-    # When using from_fixture with a test method inside a class
     testdir.make_test(
         """
 import pytest
@@ -848,14 +807,12 @@ class TestAPI:
         assert case.operation.path == "/users"
 """
     )
-    # Then it should work without crashes
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)
 
 
 def test_checks_available_with_from_fixture(tmp_path):
-    # When using from_fixture, checks should be accessible without AttributeError
-    # Run in subprocess to avoid test pre-loading modules
+    # A subprocess avoids modules this test session already loaded.
     test_file = tmp_path / "test_isolated.py"
     test_file.write_text("""
 import pytest
@@ -895,7 +852,6 @@ def test_checks_are_loaded(case):
 
 
 def test_operations_disabled_via_config_with_from_fixture(testdir):
-    # Given a schemathesis.toml that disables a specific operation
     testdir.makefile(
         ".toml",
         schemathesis="""
@@ -905,7 +861,6 @@ enabled = false
 """,
     )
 
-    # And a schema with multiple operations
     testdir.make_test(
         """
 import pytest
@@ -943,8 +898,7 @@ def test_api(case):
 
     result = testdir.runpytest("-v")
 
-    # Then `POST /users` should be excluded, only `GET /users` and `GET /products` should be tested
-    # With pytest subtests, the main test passes once, with 2 subtests (not 3)
+    # One passing test with two subtests.
     result.assert_outcomes(passed=1)
 
     assert "POST /users" not in result.stdout.str()
@@ -970,8 +924,7 @@ def api_schema():
 
 
 def test_no_false_no_matches_on_repeated_runs_with_config(testdir):
-    # When a schemathesis.toml disables one operation, repeated runs and every test function sharing the lazy
-    # schema must NOT fail with "does not match any API operations" for the remaining enabled operations.
+    # With one operation disabled, repeated runs and every test sharing the lazy schema still match the rest.
     testdir.makefile(
         ".toml",
         schemathesis="""
@@ -1004,8 +957,7 @@ def test_api_second(case):
 
 
 def test_no_false_no_matches_on_repeated_runs_with_exclude(testdir):
-    # See GH-3572: from_fixture().exclude() without [[operations]] config must not produce
-    # "does not match any API operations" on repeated runs.
+    # See GH-3572
     testdir.makepyfile(
         _NO_MATCHES_PREAMBLE
         + """
@@ -1025,8 +977,6 @@ def test_api(case):
 
 
 def test_config_disabled_all_operations_with_from_fixture(testdir):
-    # When a schemathesis.toml disables the ONLY available operation, from_fixture must
-    # correctly report "does not match any API operations".
     testdir.makefile(
         ".toml",
         schemathesis="""
@@ -1059,8 +1009,6 @@ def test_api(case):
 
 
 def test_hypothesis_settings_database_from_profile_lazy(testdir):
-    # When a hypothesis profile with a custom database is loaded
-    # And lazy schema parametrize is used
     testdir.make_test(
         """
 import os
@@ -1090,13 +1038,10 @@ def test_(case):
 """,
     )
     result = testdir.runpytest("-v", "-s")
-    # Then the custom database from the profile should be used
     result.assert_outcomes(passed=1)
 
 
 def test_hypothesis_settings_decorator_database_lazy(testdir):
-    # When @settings decorator with a custom database is applied to a test
-    # And lazy schema parametrize is used
     testdir.make_test(
         """
 import os
@@ -1121,7 +1066,6 @@ def test_(case):
 """,
     )
     result = testdir.runpytest("-v", "-s")
-    # Then the custom database from the decorator should be used
     result.assert_outcomes(passed=1)
 
 

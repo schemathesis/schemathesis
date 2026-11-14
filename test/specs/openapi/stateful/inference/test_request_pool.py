@@ -60,8 +60,7 @@ def test_request_pool_captures_path_parameters(cli, snapshot_cli, ctx):
 
 
 def test_coverage_phase_capture_feeds_fuzzing_pool(cli, snapshot_cli, ctx):
-    # Fuzzing GET can hit an existing productId only if coverage's POST captures
-    # the schema `examples` ids into the pool — the path schema has none of its own.
+    # Fuzzing GET hits an existing productId only through `examples` ids that coverage's POST put in the pool.
     paths = {
         "/products": {
             "post": {

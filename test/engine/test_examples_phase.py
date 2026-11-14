@@ -80,7 +80,7 @@ def _items_with_query_example(ctx, app_runner, *, status_code: int = 200):
 
 
 def _hooked_examples_stream(ctx, raise_naturally: Callable[[], None]) -> EventStream:
-    # `raise_naturally` must throw via real execution — never `raise SomeException(...)`.
+    # `raise_naturally` must throw through real execution, not `raise SomeException(...)`.
     schema = _example_schema(ctx)
 
     @schema.hook
@@ -260,7 +260,6 @@ def test_examples_phase_handles_keyboard_interrupt_during_iteration(ctx):
 
 
 def test_examples_phase_fill_missing_fallback_defers_unsatisfiable(ctx):
-    # Fill-missing fallback on an unsatisfiable schema surfaces as a deferred error, not a crash.
     schema = ctx.openapi.load_schema(
         {
             "/items": {

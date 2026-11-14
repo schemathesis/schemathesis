@@ -12,8 +12,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.extra_data_source import ParameterRequirement
 
 
-# Standard JWT claim -> pool field names. Conservative: only fields seen in real operation
-# parameters / body fields; off-table claims and synthetic field names are skipped.
+# JWT claim to pool field names, limited to fields seen in real parameters and body fields.
 IDENTIFIER_CLAIMS: dict[str, tuple[str, ...]] = {
     "sub": ("id", "user_id", "userId", "username"),
     "username": ("username",),
@@ -37,11 +36,7 @@ _BASIC_AUTH_FIELDS: tuple[str, ...] = ("id", "user_id", "userId", "username")
 
 
 def decode_jwt_payload(token: str) -> dict | None:
-    """Return the JWT payload dict, or None if the token isn't a parseable JWT.
-
-    No signature verification - the server already does that. Failure is silent
-    because Bearer tokens are commonly opaque/JWE/non-JWT.
-    """
+    """The JWT payload without signature verification, or `None` for opaque and other non-JWT tokens."""
     parts = token.split(".")
     if len(parts) != 3:
         return None
@@ -56,11 +51,7 @@ def decode_jwt_payload(token: str) -> dict | None:
 def seed_pool_from_headers(
     repository: ResourceRepository, headers: dict[str, str], requirements: Iterable[ParameterRequirement]
 ) -> None:
-    """If `headers` contains a Bearer JWT, seed identifier claims into compatible resource buckets.
-
-    A claim seeds a value under a resource only when one of its queried fields matches the
-    claim's target field, so unrelated buckets aren't contaminated.
-    """
+    """Seed identifier claims of a Bearer JWT into resources that query one of the claim's target fields."""
     token = next(
         (v[7:].strip() for k, v in headers.items() if k.lower() == "authorization" and v.startswith("Bearer ")),
         None,
@@ -93,10 +84,7 @@ def seed_pool_from_basic_auth(
     basic_auth: tuple[str, str] | None,
     requirements: Iterable[ParameterRequirement],
 ) -> None:
-    """Seed the configured Basic-auth username into compatible resource buckets.
-
-    Only the username is seeded; the password is never stored in the pool.
-    """
+    """Seed the configured Basic-auth username, never the password, into compatible resource buckets."""
     if basic_auth is None or not basic_auth[0]:
         return
     username = basic_auth[0]

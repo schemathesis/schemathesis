@@ -98,8 +98,7 @@ def test_propagation_synthesizes_property_for_additional_properties(materialize_
 
 
 def test_propagation_synthesizes_unique_property_when_default_taken(materialize_targets):
-    # Existing `k` and `k0` mean the synthesizer has to keep searching; the
-    # generated property must not clobber an existing slot.
+    # Existing `k` and `k0` force the synthesizer to keep searching without clobbering either slot.
     additional = {"type": "string", "pattern": "^a$"}
     schema = {
         "type": "object",
@@ -130,9 +129,7 @@ def test_propagation_synthesizes_pattern_property_for_simple_pattern(materialize
 
 
 def test_propagation_skips_pattern_property_when_no_matching_name_can_be_synthesized(materialize_targets):
-    # Anchored numeric-with-quantifier patterns can't be turned into a literal
-    # property name; the parent stays bare rather than receiving a placeholder
-    # that wouldn't match the pattern at runtime.
+    # No literal name fits an anchored numeric pattern with quantifiers, so the parent gets no placeholder.
     pattern_schema = {"type": "string", "pattern": "^a$"}
     schema = {"type": "object", "patternProperties": {r"^\d{4}-\d{2}-\d{2}$": pattern_schema}}
     descriptors = compute_mutation_targets(schema)
@@ -160,8 +157,7 @@ def test_propagation_skips_pattern_property_when_no_matching_name_can_be_synthes
     ],
 )
 def test_propagation_synthesizes_property_name_that_matches_pattern(pattern, materialize_targets):
-    # The synthesized property name must satisfy the patternProperties regex,
-    # otherwise the validator wouldn't apply the sub-schema to it at runtime.
+    # The validator applies the sub-schema only to names that match the patternProperties regex.
     pattern_schema = {"type": "string", "pattern": "^a$"}
     schema = {"type": "object", "patternProperties": {pattern: pattern_schema}}
     descriptors = compute_mutation_targets(schema)
@@ -178,9 +174,9 @@ def test_propagation_synthesizes_property_name_that_matches_pattern(pattern, mat
 @pytest.mark.parametrize(
     "pattern",
     [
-        # Five exact digits — no candidate is 5 digits long.
+        # No candidate name has five digits.
         r"^\d{5}$",
-        # Invalid regex — synthesizer must skip rather than crash.
+        # The synthesizer must skip an invalid regex without crashing.
         r"^[a-z",
     ],
 )
@@ -196,7 +192,7 @@ def test_propagation_skips_when_no_candidate_satisfies_pattern(pattern, material
 
 
 def test_propagation_allof_branch_keeps_siblings(materialize_targets):
-    # `allOf` branches stay conjoined — propagation must not collapse the list.
+    # `allOf` branches stay conjoined, so propagation must not collapse the list.
     schema = {"allOf": [{"type": "object", "properties": {"x": {"type": "string"}}}, {"type": "object"}]}
     descriptors = compute_mutation_targets(schema)
     targets = materialize_targets(schema, descriptors)

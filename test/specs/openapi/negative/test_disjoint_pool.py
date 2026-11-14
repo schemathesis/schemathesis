@@ -15,10 +15,10 @@ def _descriptor(*selectors, keyword="properties"):
 @pytest.mark.parametrize(
     ("primary_selectors", "candidate_selectors", "included"),
     [
-        (("a",), ("b",), True),  # siblings are disjoint
-        (("a",), ("a", "b"), False),  # descendant excluded
-        (("a", "b"), ("a",), False),  # ancestor excluded
-        (("a",), ("a",), False),  # self excluded
+        (("a",), ("b",), True),
+        (("a",), ("a", "b"), False),
+        (("a", "b"), ("a",), False),
+        (("a",), ("a",), False),
     ],
     ids=["siblings", "descendant", "ancestor", "self"],
 )

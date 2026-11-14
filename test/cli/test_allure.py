@@ -124,10 +124,7 @@ def test_allure_stateful_phase_produces_result(ctx, cli, tmp_path):
 
 
 def test_examples_phase_skip_cleared_when_coverage_runs(ctx, cli, tmp_path):
-    # When the Examples phase skips an operation (schema has no inline examples)
-    # but the Coverage phase subsequently runs and produces real results,
-    # the Allure report must NOT mark the result as skipped and must not
-    # populate statusDetails with the skip reason.
+    # `success` has no inline examples, so the Examples phase skips it while the Coverage phase runs.
     api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"
     cli.run_and_assert(
@@ -137,9 +134,7 @@ def test_examples_phase_skip_cleared_when_coverage_runs(ctx, cli, tmp_path):
         "--checks=all",
     )
     for data in allure_results(allure_dir):
-        # Coverage ran real requests — status must not be skipped
         assert data["status"] != "skipped"
-        # And the skip reason must not leak into statusDetails
         assert data.get("statusDetails", {}).get("message") != "No examples in schema"
 
 

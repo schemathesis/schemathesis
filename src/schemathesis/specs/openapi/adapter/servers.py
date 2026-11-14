@@ -14,12 +14,9 @@ SERVER_VARIABLE = re.compile(r"\{([^{}]*)\}")
 def format_server_url(
     server: object, *, scope_label: str = "servers[0]", variables: Mapping[str, str] | None = None
 ) -> str:
-    """Validate a Server Object and return its formatted ``url``.
+    """Validate a Server Object and return its ``url`` with variables substituted.
 
-    ``scope_label`` is the JSON-pointer-ish prefix used in error messages,
-    e.g. ``servers[0]`` (global) or ``operation.servers[0]`` (per-scope).
-
-    ``variables`` are user-supplied overrides that take precedence over spec defaults.
+    ``scope_label`` prefixes error messages (``operation.servers[0]``); ``variables`` override spec defaults.
     """
     if not isinstance(server, dict):
         raise InvalidSchema(f"'{scope_label}' must be a server object")
@@ -62,12 +59,9 @@ def resolve_operation_base_url(
     location: str | None,
     variables: Mapping[str, str] | None = None,
 ) -> str:
-    """Compute the effective base URL for one operation.
+    """Base URL from the operation's servers, else the path item's, else ``fallback_base_url``.
 
-    Walks operation -> path-item -> ``fallback_base_url``. Server variables are
-    substituted using each variable's spec ``default``, with ``variables``
-    (user-supplied overrides) taking precedence. Absolute URLs are returned
-    as-is; relative URLs are combined with ``location``'s scheme and host.
+    ``variables`` override spec defaults; a relative server URL takes the scheme and host of ``location``.
     """
     server, scope_label = _select_server(operation, path_item)
     if server is None:

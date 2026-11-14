@@ -12,7 +12,6 @@ from test.utils import allure_results
 
 def test_junitxml_option(ctx, cli, hypothesis_max_examples, tmp_path):
     api = ctx.openapi.apps.success()
-    # When option with a path to junit.xml is provided
     xml_path = tmp_path / "junit.xml"
     cli.run_and_assert(
         api.schema_url,
@@ -21,9 +20,7 @@ def test_junitxml_option(ctx, cli, hypothesis_max_examples, tmp_path):
         "--checks=not_a_server_error",
         "--seed=1",
     )
-    # File is created
     assert xml_path.exists()
-    # And contains valid xml
     ElementTree.parse(xml_path)
 
 
@@ -47,27 +44,22 @@ def test_junitxml_file(ctx, cli, hypothesis_max_examples, tmp_path, path, in_con
         args.append(f"--report-junit-path={xml_path}")
     cli.run_and_assert(api.schema_url, *args, exit_code=ExitCode.TESTS_FAILED, **kwargs)
     tree = ElementTree.parse(xml_path)
-    # Inspect root element `testsuites`
     root = tree.getroot()
     assert root.tag == "testsuites"
     assert root.attrib["errors"] == "1"
     assert root.attrib["failures"] == "2"
     assert root.attrib["tests"] == "4"
-    # Inspect the nested element `testsuite`
     testsuite = root[0]
     assert testsuite.tag == "testsuite"
     assert testsuite.attrib["name"] == "schemathesis"
     assert testsuite.attrib["errors"] == "1"
     assert testsuite.attrib["failures"] == "2"
     assert testsuite.attrib["tests"] == "4"
-    # Inspected nested `testcase`s
     testcases = list(testsuite)
     assert len(testcases) == 4
 
-    # Create a mapping from testcase name to element
     testcases_by_name = {tc.attrib["name"]: tc for tc in testcases}
 
-    # Inspected testcase with a failure
     failure = testcases_by_name["GET /api/failure"]
     assert failure.tag == "testcase"
     assert failure[0].tag == "failure"
@@ -77,11 +69,9 @@ def test_junitxml_file(ctx, cli, hypothesis_max_examples, tmp_path, path, in_con
     assert "[500] Internal Server Error" in message
     assert "curl -X GET http://localhost/api/failure" in message
 
-    # Inspect passed testcase
     success = testcases_by_name["GET /api/success"]
     assert success.tag == "testcase"
 
-    # Inspect testcase with an error
     error = testcases_by_name["POST /api/unsatisfiable"]
     assert error.tag == "testcase"
     assert error[0].tag == "error"
@@ -341,9 +331,7 @@ def test_skipped(ctx, cli, tmp_path):
 
 
 def test_examples_phase_skip_cleared_when_coverage_runs(ctx, cli, tmp_path):
-    # When the Examples phase skips an operation (schema has no inline examples)
-    # but the Coverage phase subsequently runs and produces real results,
-    # the JUnit report must NOT mark the test case as skipped.
+    # `success` has no inline examples, so the Examples phase skips it while the Coverage phase runs.
     api = ctx.openapi.apps.success()
     xml_path = tmp_path / "junit.xml"
     cli.run(
@@ -357,7 +345,6 @@ def test_examples_phase_skip_cleared_when_coverage_runs(ctx, cli, tmp_path):
     testcases = list(testsuite)
     assert testcases[0].tag == "testcase"
     assert testcases[0].attrib["name"] == "GET /api/success"
-    # Coverage ran real requests — the earlier skip must have been cleared
     assert not testcases[0].findall("skipped")
 
 

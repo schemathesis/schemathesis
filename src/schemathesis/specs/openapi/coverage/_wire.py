@@ -14,15 +14,14 @@ from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 
 def stringify_value(val: Any, container_name: str) -> Any:
     if isinstance(val, dict):
-        # String values, the usual case, stay as they are without a call each.
+        # Skip the recursive call for string values, the common case.
         return {key: sub if type(sub) is str else stringify_value(sub, container_name) for key, sub in val.items()}
     if val is None or isinstance(val, (int, float, bool)):
         return to_wire_string(val)
     if isinstance(val, list):
         if container_name == "query":
-            # Having a list here ensures there will be multiple query parameters with the same name
+            # A list repeats the query parameter once per item.
             return [stringify_value(item, container_name) for item in val]
-        # use comma-separated values style for arrays
         return ",".join(str(stringify_value(sub, container_name)) for sub in val)
     return val
 
@@ -34,14 +33,14 @@ def quote_path_parameter(value: Any) -> str:
         elif value == "..":
             return "%2E%2E"
         else:
-            # Percent-encode for path segments (space -> "%20"); "+" is literal in a path, not a space.
+            # Encode spaces as "%20": "+" is literal in a path.
             return quote(value, safe="")
     if isinstance(value, list):
         return ",".join(map(str, value))
     return str(value)
 
 
-# Characters `ensure_valid_headers_schema` keeps; a pattern requiring anything else is unsatisfiable for headers.
+# Characters header schemas allow; a pattern requiring anything else is unsatisfiable for headers.
 HEADER_ALLOWED_CHARS = string.ascii_letters + string.digits
 
 
@@ -53,8 +52,7 @@ def _not_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 def ensure_valid_path_parameter_schema(schema: dict[str, Any]) -> dict[str, Any]:
-    # Path parameters should have at least 1 character length and don't contain any characters with special treatment
-    # on the transport level.
+    # Non-empty, and free of characters the URL treats specially.
     not_ = _not_schema(schema)
     not_["pattern"] = r"[/{}]"
     min_length = max(schema.get("minLength", 0), 1)
@@ -62,7 +60,7 @@ def ensure_valid_path_parameter_schema(schema: dict[str, Any]) -> dict[str, Any]
 
 
 def ensure_valid_headers_schema(schema: dict[str, Any]) -> dict[str, Any]:
-    # Reject any character that is not A-Z, a-z, or 0-9 for simplicity
+    # Alphanumeric only, for simplicity.
     not_ = _not_schema(schema)
     not_["pattern"] = r"[^A-Za-z0-9]"
     return {**schema, "not": not_}
@@ -77,15 +75,14 @@ class WireSemantics:
     is_required: bool
 
     def representable(self, value: Any, *, declared: bool = False) -> bool:
-        """Whether this location can carry the value at all.
+        """Whether this location can carry the value.
 
-        `declared` marks a value the schema author wrote verbatim, where a `/` is intent to send `%2F`
-        rather than an artifact of generation, so the path filter judges its encoded form instead.
+        A `declared` value comes verbatim from the schema; its `/` means `%2F`, so paths judge its encoded form.
         """
         if self.location in HEADER_LOCATIONS:
             if isinstance(value, str):
                 return not value or (is_latin_1_encodable(value) and not has_invalid_characters("A", value))
-            # Containers travel as their joined keys and items, so each one must fit the header on its own.
+            # Containers travel as joined keys and items, so each must fit a header.
             if isinstance(value, list):
                 return all(self.representable(item) for item in value)
             if isinstance(value, dict):
@@ -99,8 +96,7 @@ class WireSemantics:
 
     def leads_to_negative_test_case(self, value: Any) -> bool:
         if self.location == "query" and isinstance(value, list) and not self.is_required:
-            # Some values will not be serialized into the query string
-            # Optional parameters should be present
+            # Empty `{}` / `[]` items vanish from the query string, and an absent optional parameter is valid.
             return any(item not in [{}, []] for item in value)
         return True
 
@@ -179,8 +175,7 @@ class WireSemantics:
         return False
 
     def can_be_negated(self, schema: dict[str, Any]) -> bool:
-        # Path, query, header, and cookie parameters will be stringified anyway
-        # If there are no constraints, then anything will match the original schema after serialization
+        # Any value matches an unconstrained schema once serialized to a string.
         if self.serializes_to_string():
             cleaned = {
                 k: v

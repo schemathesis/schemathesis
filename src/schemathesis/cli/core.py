@@ -7,7 +7,7 @@ import click
 
 
 def get_terminal_width() -> int:
-    # Some CI/CD providers (e.g. CircleCI) return a (0, 0) terminal size so provide a default
+    # Some CI providers, e.g. CircleCI, report a (0, 0) terminal size
     return shutil.get_terminal_size((80, 24)).columns
 
 

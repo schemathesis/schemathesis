@@ -36,8 +36,7 @@ def _walk(body: object, path: ParameterPath = ()) -> Iterator[WalkPair]:
         for key, value in body.items():
             if not isinstance(key, str):
                 continue
-            # `non_field_errors` carries object-level (cross-field) errors with no
-            # property to attribute — adjustments cannot act on them, skip.
+            # `non_field_errors` holds cross-field errors with no property to attribute.
             if key == "non_field_errors":
                 continue
             # DRF emits index-keyed errors as ASCII-digit strings ("0", "1", ...).
@@ -82,9 +81,7 @@ _LITERAL_MESSAGES: dict[str, ClassificationResult] = {
 }
 
 
-# Date/datetime/time and list/dict-type messages have variable suffixes (the
-# accepted format strings, the offending Python type), so prefix-match the
-# stable lead and ignore the rest.
+# These messages end with a variable suffix (accepted formats, the offending Python type), so match the prefix only.
 _PREFIX_MESSAGES: tuple[tuple[str, ClassificationResult], ...] = (
     ("Date has wrong format.", (ObservationKind.FORMAT, FormatPayload(name="date"))),
     ("Datetime has wrong format.", (ObservationKind.FORMAT, FormatPayload(name="date-time"))),
@@ -100,9 +97,7 @@ _PREFIX_MESSAGES: tuple[tuple[str, ClassificationResult], ...] = (
 )
 
 
-# Both DRF native ("field") and Django bridge ("value") wordings; Django's
-# `Min/MaxLengthValidator` appends `(it has N)` on either side, so make the
-# suffix optional on both min and max patterns.
+# DRF says "field" and Django validators say "value"; Django's length validators may append `(it has N)`.
 _REGEX_PATTERNS: tuple[tuple[re.Pattern[str], RegexHandler], ...] = (
     (
         re.compile(r"^Ensure this (?:field|value) has at least (\d+) characters?(?: \(it has \d+\))?\.$"),
@@ -149,7 +144,7 @@ def _classify(message: str) -> ClassificationResult | None:
 
 
 def _has_string_list_leaf(value: object, depth: int = 0) -> bool:
-    """Bounded scan for a `list[str]` leaf — the canonical DRF leaf shape."""
+    """Depth-bounded scan for a `list[str]` leaf, the usual DRF error shape."""
     if depth > 16:
         return False
     if isinstance(value, list):
@@ -184,14 +179,14 @@ def _locate_field(operation: APIOperation, path: ParameterPath, case: Case) -> t
 
 @PARSERS.register
 class DRFParser:
-    """Parser for Django REST Framework `ValidationError` envelopes — `{<field>: ["...message..."], ...}`."""
+    """Parser for Django REST Framework `ValidationError` envelopes: `{<field>: ["...message..."], ...}`."""
 
     priority = 3
 
     def can_parse(self, *, body: object) -> bool:
         if not isinstance(body, dict) or not body:
             return False
-        # `{"detail": "..."}` is too generic to claim — let other parsers try.
+        # `{"detail": "..."}` is too generic to claim; other parsers may handle it.
         if list(body.keys()) == ["detail"] and isinstance(body["detail"], str):
             return False
         if "non_field_errors" in body:

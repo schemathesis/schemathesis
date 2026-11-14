@@ -1,5 +1,3 @@
-"""Support for Targeted Property-Based Testing."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
@@ -14,9 +12,7 @@ from schemathesis.generation.case import Case
 class MetricContext:
     """Context for evaluating a metric on a single test execution.
 
-    This object bundles together the test `case` that was sent and
-    the corresponding HTTP `response`. Metric functions receive an
-    instance of `MetricContext` to compute a numeric score.
+    Holds the sent `case` and its HTTP `response`; metric functions receive it to compute a numeric score.
     """
 
     case: Case
@@ -58,8 +54,6 @@ def success_rate(ctx: MetricContext) -> float:
 
 
 class MetricCollector:
-    """Collect multiple observations for metrics."""
-
     __slots__ = ("metrics", "observations")
 
     def __init__(self, metrics: list[MetricFunction] | None = None) -> None:
@@ -67,22 +61,19 @@ class MetricCollector:
         self.observations: dict[str, list[float]] = {metric.__name__: [] for metric in self.metrics}
 
     def reset(self) -> None:
-        """Reset all collected observations."""
         for metric in self.metrics:
             self.observations[metric.__name__].clear()
 
     def store(self, case: Case, response: Response) -> None:
-        """Calculate metrics & store them."""
         ctx = MetricContext(case=case, response=response)
         for metric in self.metrics:
             self.observations[metric.__name__].append(metric(ctx))
 
     def maximize(self) -> None:
-        """Give feedback to the Hypothesis engine, so it maximizes the aggregated metrics."""
+        """Report each metric's summed observations to Hypothesis as a target to maximize."""
         import hypothesis
 
         for metric in self.metrics:
-            # Currently aggregation is just a sum
             value = sum(self.observations[metric.__name__])
             hypothesis.target(value, label=metric.__name__)
 
@@ -91,8 +82,7 @@ def maximize(metrics: Sequence[MetricFunction], case: Case, response: Response) 
     import hypothesis
     from hypothesis.control import currently_in_test_context
 
-    # Coverage runs outside Hypothesis; evaluate metrics for their side effects
-    # (e.g. raising on buggy metrics) but skip `target()` which is a no-op there.
+    # Coverage runs outside Hypothesis: metrics still run, so buggy ones raise, but `target()` is a no-op there.
     in_test_context = currently_in_test_context()
     ctx = MetricContext(case=case, response=response)
     # Fuzzing leans toward inputs an operation accepts; stateful testing does not, since its steps repeat such inputs.

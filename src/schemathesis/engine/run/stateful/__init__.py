@@ -61,7 +61,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
             _fold_event(engine, event, progress)
             yield event
     except KeyboardInterrupt:
-        # Immediately notify the engine thread to stop, even though that the event will be set below in `finally`
+        # Tell the engine thread to stop before `finally` joins it
         engine.stop()
         progress.status = Status.INTERRUPTED
         yield events.Interrupted(phase=PhaseName.STATEFUL_TESTING)
@@ -84,7 +84,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
 
 
 def _fold_event(engine: EngineContext, event: events.EngineEvent, progress: PhaseProgress) -> None:
-    # ERROR & INTERRUPTED statuses are terminal, therefore they should not be overridden
+    # ERROR and INTERRUPTED are terminal; later events must not override them
     if (
         isinstance(event, events.SuiteFinished)
         and event.status != Status.SKIP

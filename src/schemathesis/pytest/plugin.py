@@ -153,13 +153,9 @@ class SchemathesisCase(PyCollector):
     def _gen_items(
         self, result: Result[APIOperation, InvalidSchema], feedback: FeedbackSources
     ) -> Generator[SchemathesisFunction, None, None]:
-        """Generate all tests for the given API operation.
+        """Generate all tests for the API operation; `pytest.mark.parametrize` or `pytest_generate_tests` may add more.
 
-        Could produce more than one test item if
-        parametrization is applied via ``pytest.mark.parametrize`` or ``pytest_generate_tests``.
-
-        This implementation is based on the original one in pytest, but with slight adjustments
-        to produce tests out of hypothesis ones.
+        Adapted from pytest's own implementation to produce tests out of Hypothesis ones.
         """
         from schemathesis.checks import load_all_checks
         from schemathesis.pytest._test_builder import build_operation_test, schema_error_suffix
@@ -216,7 +212,7 @@ class SchemathesisCase(PyCollector):
         metafunc = self._parametrize(cls, definition, fixtureinfo)
 
         if isinstance(self.parent, Class):
-            # On pytest 7, Class collects the test methods directly, therefore
+            # On pytest 7, `Class` collects test methods directly, so bind the instance
             funcobj = partial(funcobj, self.parent.obj)
 
         if not metafunc._calls:
@@ -256,7 +252,7 @@ class SchemathesisCase(PyCollector):
     def _parametrize(self, cls: type | None, definition: FunctionDefinition, fixtureinfo: FuncFixtureInfo) -> Metafunc:
         parent = self.getparent(Module)
         module = parent.obj if parent is not None else parent
-        # Avoiding `Metafunc` is quite problematic for now, as there are quite a lot of internals we rely on
+        # Too many of the internals used here depend on `Metafunc` to avoid it
         metafunc = Metafunc(definition, fixtureinfo, self.config, cls=cls, module=module, _ispytest=True)
         methods = []
         if module is not None and hasattr(module, "pytest_generate_tests"):
@@ -268,7 +264,7 @@ class SchemathesisCase(PyCollector):
         return metafunc
 
     def collect(self) -> list[Function]:
-        """Generate different test items for all API operations available in the given schema."""
+        """Generate test items for all API operations in the schema."""
         try:
             emit_schema_warnings(self.schema)
             feedback = FeedbackSources(constants_value_source=make_constants_value_source(self.schema))
@@ -326,7 +322,7 @@ class SchemathesisMultiCase(PyCollector):
 
 @hookimpl(hookwrapper=True)
 def pytest_pycollect_makeitem(collector: Module | Class, name: str, obj: Any) -> Generator[None, Any, None]:
-    """Switch to a different collector if the test is parametrized marked by schemathesis."""
+    """Switch to a Schemathesis collector for tests that Schemathesis parametrizes."""
     outcome = yield
     # Respect pytest's naming rules, e.g. a marked test imported under a non-test name is not collected again
     if not collector.istestfunction(obj, name):
@@ -366,7 +362,7 @@ def pytest_report_teststatus(
 
 def _strip_hypothesis_notes(excinfo: pytest.ExceptionInfo[BaseException], report: pytest.TestReport) -> None:
     if issubclass(excinfo.type, SchemathesisError) and hasattr(excinfo.value, "__notes__"):
-        # Hypothesis adds quite a lot of additional debug information which is not that helpful in Schemathesis
+        # Hypothesis notes add debug details that do not help Schemathesis users
         excinfo.value.__notes__.clear()
         report.longrepr = "".join(format_exception(excinfo.value))
 
@@ -374,7 +370,7 @@ def _strip_hypothesis_notes(excinfo: pytest.ExceptionInfo[BaseException], report
 def _dedupe_exception_group(excinfo: pytest.ExceptionInfo[BaseException], report: pytest.TestReport) -> None:
     if not isinstance(excinfo.value, BaseExceptionGroup):
         return
-    # Use exception origin (type + traceback + context) as deduplication key
+    # Deduplicate by exception origin: type, traceback and context
     origins: dict[tuple, BaseException] = {}
     for exc in excinfo.value.exceptions:
         origin = get_origin(exc)
@@ -413,10 +409,7 @@ def pytest_exception_interact(node: Function, call: pytest.CallInfo, report: pyt
 
 @hookimpl(wrapper=True)
 def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> Generator[None, object, None]:
-    """It is possible to have a Hypothesis exception in runtime.
-
-    For example - kwargs validation is failed for some strategy.
-    """
+    """Translate exceptions Hypothesis raises at runtime, e.g. a failed kwargs validation for a strategy."""
     __tracebackhide__ = True
     if isinstance(pyfuncitem, SchemathesisFunction):
         try:
@@ -459,7 +452,7 @@ def _translate_skip(pyfuncitem: pytest.Function, exc: SkipTest | unittest.SkipTe
 
 def _raise_post_run_errors(pyfuncitem: pytest.Function) -> None:
     __tracebackhide__ = True
-    # The operation ran, but part of it was left untested - a warning keeps the surviving cases passing.
+    # The operation ran, but part of it was left untested; a warning keeps the surviving cases passing.
     unserializable_payload = UnserializablePayloadMark.get(pyfuncitem.obj)
     if unserializable_payload is not None:
         emit_unserializable_payload_warning(unserializable_payload)
@@ -516,8 +509,7 @@ def _open_writers(
 
 
 def _writers_key(schema: SchemaMetadata) -> int:
-    # Schemas cloned for each test share their report config, so it identifies whose reports a result belongs to.
-    # The registered entry keeps that config alive, so its id cannot be reused while the entry exists.
+    # Per-test clones share the report config, whose id names their reports; the entry keeps it alive and the id unique.
     return id(schema.config)
 
 
@@ -751,8 +743,7 @@ def _setup_operation_reporting(item: SchemathesisFunction, schema: BaseSchema, l
 
 def _setup_stateful_test(item: pytest.Item, item_cls: type, schema: BaseSchema) -> None:
     track_schema(item.config, schema)
-    # Attach a callback to the TestCase class so the state machine can hand off
-    # its recorder to the report writers once the scenario finishes.
+    # The state machine hands its recorder to the report writers through this callback when a scenario finishes.
     if _is_xdist_worker(item.config):
         reports = schema.config.reports
         if _has_reports(reports):
@@ -768,15 +759,14 @@ def _setup_stateful_test(item: pytest.Item, item_cls: type, schema: BaseSchema) 
             writers = entry[1]
 
             def _stateful_callback(recorder: ScenarioRecorder, elapsed_sec: float) -> None:
-                # Tags are not available for stateful tests — operations are discovered dynamically
+                # Stateful tests have no tags: their operations are discovered dynamically
                 write_to_writers(writers, recorder, elapsed_sec)
 
             StatefulCallbackMark.set(item_cls, _stateful_callback)
 
 
 def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:
-    # Applications reached over ASGI keep their lifespan running between requests; end it with the test that
-    # started it, while its fixtures are still alive.
+    # ASGI lifespans run between requests; end each with the test that started it, while its fixtures are alive.
     try:
         # Only the ASGI client starts lifespans, so while it is not loaded there is nothing to end.
         if "schemathesis.python.asgi" in sys.modules:

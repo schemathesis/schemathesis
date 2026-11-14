@@ -233,8 +233,7 @@ def run(
 ) -> None:
     """Generate and run property-based tests against your API.
 
-    Runs configured test phases in order and exits on completion.
-    Use --phases to select which phases to run.
+    Runs the test phases selected with --phases in order, then exits.
 
     \b
     LOCATION can be:
@@ -248,7 +247,6 @@ def run(
 
     config: SchemathesisConfig = ctx.obj
 
-    # First, set the right color
     color = resolve_color(force_color, no_color, config.color)
     ensure_color(ctx, color)
 
@@ -258,7 +256,6 @@ def run(
     if base_url is not None and origin is not None:
         raise click.UsageError(CONFLICTING_URL_MESSAGE)
 
-    # Then override the global config from CLI options
     config.update(
         color=color,
         suppress_health_check=suppress_health_check,
@@ -278,7 +275,6 @@ def run(
             f"{flag} needs a baseline file - pass `--baseline PATH` or set `baseline` in your configuration file"
         )
 
-    # These are filters for what API operations should be tested
     filter_set = build_filter_set(ctx.params)
     config.projects.override.phases.update(phases=phases)
     config.projects.override.checks.update(
@@ -305,7 +301,7 @@ def run(
     executor.execute(
         location=location,
         filter_set=filter_set,
-        # We don't the project yet, so pass the default config
+        # The project is not known yet, so pass the default config
         config=config.projects.get_default(),
         args=ctx.args,
         params=ctx.params,

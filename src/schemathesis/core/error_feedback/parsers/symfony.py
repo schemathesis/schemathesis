@@ -29,8 +29,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
-# Stable Symfony Validator constraint UUIDs — declared as `public const` on each
-# constraint class, covered by Symfony's BC promise. Browse the source at:
+# Symfony Validator error codes, stable under its BC promise, see
 # https://github.com/symfony/symfony/tree/7.1/src/Symfony/Component/Validator/Constraints
 _NOT_BLANK = "c1051bb4-d103-4f74-8988-acbcafc7fdc3"  # NotBlank::IS_BLANK_ERROR
 _NOT_NULL = "ad32d13f-c3d4-423b-909a-857b961eb720"  # NotNull::IS_NULL_ERROR
@@ -123,7 +122,7 @@ def _regex_handler(violation: dict) -> tuple[ClassificationResult, ...]:
     pattern = _params(violation).get("{{ pattern }}")
     if not isinstance(pattern, str) or not pattern:
         return ()
-    # Symfony emits Perl-style `/regex/flags` — strip delimiters to expose the bare regex.
+    # Symfony emits Perl-style `/regex/flags`; strip the delimiters.
     match = _PERL_REGEX.match(pattern)
     cleaned = match.group(1) if match is not None else pattern
     return ((ObservationKind.PATTERN, PatternPayload(regex=cleaned)),)
@@ -133,7 +132,7 @@ def _choice_handler(violation: dict) -> tuple[ClassificationResult, ...]:
     raw = _params(violation).get("{{ choices }}")
     if not isinstance(raw, str) or not raw:
         return ()
-    # `"\"admin\", \"user\", \"guest\""` → ("admin", "user", "guest").
+    # `"\"admin\", \"user\", \"guest\""` -> ("admin", "user", "guest").
     values = tuple(_strip_quotes(token.strip()) for token in raw.split(","))
     return ((ObservationKind.ENUM, EnumPayload(values=values)),)
 
@@ -179,7 +178,7 @@ def _is_violation(item: object) -> TypeGuard[dict]:
 
 
 def _extract_violations(body: object) -> list[dict] | None:
-    """Locate the violations list — top-level list (JSON-default) or under the `violations` key (API-Platform)."""
+    """The violations list: the top-level list (JSON default) or under `violations` (API Platform)."""
     if isinstance(body, list):
         if body and all(_is_violation(item) for item in body):
             return body
@@ -197,7 +196,7 @@ def _has_symfony_signature(violations: list[dict]) -> bool:
 
 @PARSERS.register
 class SymfonyParser:
-    """Parser for Symfony Validator envelopes — JSON-default and API-Platform / RFC 7807 forms."""
+    """Parser for Symfony Validator envelopes in JSON-default and API Platform / RFC 7807 forms."""
 
     priority = 5
 

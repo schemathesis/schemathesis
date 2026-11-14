@@ -80,12 +80,9 @@ def _last_scenario_checks(stream):
 
 def test_execute_base_url_not_found(ctx):
     api = ctx.openapi.apps.success_and_failure()
-    # When base URL is pointing to an unknown location
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.update(base_url=f"{api.base_url}/404/")
     EventStream(schema).execute()
-    # Then the engine should use this base
-    # And they will not reach the application
     assert _api_requests(api) == []
 
 
@@ -106,7 +103,6 @@ def test_interactions(ctx, workers):
     else:
         encoding = ["gzip, deflate"]
 
-    # failure
     interactions = _scenario_interactions(stream, status=Status.FAILURE)
     assert len(interactions) == 1
     failure = interactions[0]
@@ -124,7 +120,6 @@ def test_interactions(ctx, workers):
         },
     }
     assert failure.response.status_code == 500
-    # success
     interactions = _scenario_interactions(stream, status=Status.SUCCESS)
     assert len(interactions) == 1
     success = interactions[0]
@@ -185,13 +180,11 @@ def test_wsgi_interactions(ctx):
 def test_empty_response_interaction(ctx):
     api = ctx.openapi.serve(basic.empty())
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When there is a GET request and a response that doesn't return content (e.g. 204)
+    # The endpoint answers 204 with no content.
     stream = EventStream(schema).execute()
     interactions = _scenario_interactions(stream)
-    for interaction in interactions:  # There could be multiple calls
-        # Then the stored request has no body
+    for interaction in interactions:
         assert interaction.request.body is None
-        # And response encoding is missing
         assert interaction.response.encoding is None
 
 
@@ -257,11 +250,9 @@ def test_response_under_recorded_payload_limit_is_kept_intact(ctx, app_runner):
 def test_empty_string_response_interaction(ctx):
     api = ctx.openapi.serve(basic.empty_string())
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When there is a response that returns payload of length 0
     stream = EventStream(schema).execute()
     interactions = _scenario_interactions(stream)
-    for interaction in interactions:  # There could be multiple calls
-        # Then the stored response body should be an empty string
+    for interaction in interactions:
         assert interaction.response.content == b""
         assert interaction.response.encoding == "utf-8"
 
@@ -269,10 +260,8 @@ def test_empty_string_response_interaction(ctx):
 def test_auth(ctx):
     api = ctx.openapi.apps.success_and_failure()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When auth is specified as a tuple of 2 strings
     execute(schema, auth=("test", "test"))
 
-    # Then each API request should contain corresponding basic auth header
     api_calls = _api_requests(api)
     assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
     for request in api_calls:
@@ -283,12 +272,10 @@ def test_auth(ctx):
 def test_base_url(ctx, converter):
     api = ctx.openapi.apps.success_and_failure()
     base_url = converter(api.base_url)
-    # When `base_url` is specified explicitly with or without trailing slash
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.update(base_url=base_url)
     execute(schema)
 
-    # Then each request should reach the app in both cases
     api_calls = _api_requests(api)
     assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
 
@@ -315,11 +302,9 @@ def test_root_url():
 def test_execute_with_headers(ctx):
     api = ctx.openapi.apps.success_and_failure()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When headers are specified for the `execute` call
     headers = {"Authorization": "Bearer 123"}
     execute(schema, headers=headers)
 
-    # Then each API request should contain these headers
     api_calls = _api_requests(api)
     assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
     for request in api_calls:
@@ -329,10 +314,8 @@ def test_execute_with_headers(ctx):
 def test_execute_filter_endpoint(ctx):
     api = ctx.openapi.apps.success_and_failure()
     schema = schemathesis.openapi.from_url(api.schema_url).include(path_regex="success")
-    # When `endpoint` is passed in the `execute` call
     execute(schema)
 
-    # Then the engine will make calls only to the specified path
     api_calls = _api_requests(api)
     assert [(r.method, r.path) for r in api_calls] == [("GET", "/api/success")]
 
@@ -340,9 +323,8 @@ def test_execute_filter_endpoint(ctx):
 def test_execute_filter_method(ctx):
     api = ctx.openapi.apps.success_and_failure()
     schema = schemathesis.openapi.from_url(api.schema_url).include(method="POST")
-    # When `method` corresponds to a method that is not defined in the app schema
+    # The app defines no POST operations.
     execute(schema)
-    # Then engine will not make any requests
     assert _api_requests(api) == []
 
 
@@ -358,16 +340,12 @@ def test_form_data(ctx):
         assert isinstance(data["key"], str)
         assert data["value"].lstrip("-").isdigit()
 
-    # When API operation specifies parameters with `in=formData`
-    # Then responses should have 200 status, and not 415 (unsupported media type)
+    # `formData` parameters must not get a 415 Unsupported Media Type.
     stream = execute(schema, checks=(is_ok, check_content), max_examples=3)
-    # And there should be no errors or failures
     stream.assert_no_errors()
     stream.assert_no_failures()
     multipart_requests = api.calls_to("/api/multipart", method="POST")
-    # And the application should receive 3 requests as specified in `max_examples`
     assert len(multipart_requests) == 3
-    # And the Content-Type of incoming requests should be `multipart/form-data`
     assert multipart_requests[0].headers["Content-Type"].startswith("multipart/form-data")
 
 
@@ -387,11 +365,8 @@ def test_headers_override(ctx):
 def test_unknown_response_code(ctx):
     api = ctx.openapi.apps.teapot()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When API operation returns a status code, that is not listed in "responses"
-    # And "status_code_conformance" is specified
     stream = EventStream(schema, checks=(status_code_conformance,), max_examples=1).execute()
 
-    # Then there should be a failure
     assert stream.failures_count == 1
     check = _last_scenario_checks(stream)[0]
     assert check.name == "status_code_conformance"
@@ -403,12 +378,10 @@ def test_unknown_response_code(ctx):
 
 def test_unknown_response_code_with_default(ctx):
     api = ctx.openapi.apps.failure()
-    # When API operation returns a status code, that is not listed in "responses", but there is a "default" response
-    # And "status_code_conformance" is specified
+    # The app's 500 falls under its `default` response.
     stream = EventStream(
         schemathesis.openapi.from_url(api.schema_url), checks=(status_code_conformance,), max_examples=1
     ).execute()
-    # Then there should be no failure
     stream.assert_no_failures()
     check = _last_scenario_checks(stream)[0]
     assert check.name == "status_code_conformance"
@@ -418,10 +391,7 @@ def test_unknown_response_code_with_default(ctx):
 def test_unknown_content_type(ctx):
     api = ctx.openapi.apps.text()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When API operation returns a response with content type, not specified in "produces"
-    # And "content_type_conformance" is specified
     stream = EventStream(schema, checks=(content_type_conformance,), max_examples=1).execute()
-    # Then there should be a failure
     assert stream.failures_count == 1
     check = _last_scenario_checks(stream)[0]
     assert check.name == "content_type_conformance"
@@ -432,26 +402,20 @@ def test_unknown_content_type(ctx):
 
 def test_known_content_type(ctx):
     api = ctx.openapi.apps.success()
-    # When API operation returns a response with a proper content type
-    # And "content_type_conformance" is specified
     stream = execute(
         schemathesis.openapi.from_url(api.schema_url),
         checks=(content_type_conformance,),
         max_examples=1,
     )
-    # Then there should be no failures
     stream.assert_no_failures()
 
 
 def test_response_conformance_invalid(ctx):
     api = ctx.openapi.serve(basic.invalid_response())
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When API operation returns a response that doesn't conform to the schema
-    # And "response_schema_conformance" is specified
     stream = EventStream(
         schema, checks=(response_schema_conformance,), max_examples=1, phases=[PhaseName.FUZZING]
     ).execute()
-    # Then there should be a failure
     assert stream.failures_count == 1
     check = _last_scenario_checks(stream)[-1]
     assert check.failure_info.failure.title == "Response violates schema", check
@@ -494,12 +458,9 @@ Value:
 
 def test_response_conformance_valid(ctx):
     api = ctx.openapi.apps.success()
-    # When API operation returns a response that conforms to the schema
-    # And "response_schema_conformance" is specified
     stream = execute(
         schemathesis.openapi.from_url(api.schema_url), checks=(response_schema_conformance,), max_examples=1
     )
-    # Then there should be no failures or errors
     stream.assert_no_failures()
     stream.assert_no_errors()
 
@@ -507,14 +468,11 @@ def test_response_conformance_valid(ctx):
 def test_response_conformance_recursive_valid(ctx):
     api = ctx.openapi.serve(basic.recursive())
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When API operation contains a response that have recursive references
-    # And "response_schema_conformance" is specified
     stream = execute(
         schema,
         checks=(response_schema_conformance,),
         max_examples=1,
     )
-    # Then there should be no failures or errors
     stream.assert_no_failures()
     stream.assert_no_errors()
 
@@ -522,14 +480,12 @@ def test_response_conformance_recursive_valid(ctx):
 def test_response_conformance_text(ctx):
     api = ctx.openapi.apps.text()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When API operation returns a response that is not JSON
-    # And "response_schema_conformance" is specified
     stream = execute(
         schema,
         checks=(response_schema_conformance,),
         max_examples=1,
     )
-    # Then the check should be ignored if the response headers are not application/json
+    # The check skips responses that are not `application/json`.
     stream.assert_no_failures()
     stream.assert_no_errors()
 
@@ -537,14 +493,12 @@ def test_response_conformance_text(ctx):
 def test_response_conformance_malformed_json(ctx):
     api = ctx.openapi.apps.malformed_json()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When API operation returns a response that contains a malformed JSON, but has a valid content type header
-    # And "response_schema_conformance" is specified
+    # The body is malformed JSON under a valid JSON content type.
     stream = EventStream(
         schema,
         checks=(response_schema_conformance,),
         max_examples=1,
     ).execute()
-    # Then there should be a failure
     assert stream.failures_count == 1
     stream.assert_no_errors()
 
@@ -560,8 +514,7 @@ def test_response_conformance_malformed_json(ctx):
 
 @pytest.fixture
 def filter_path_parameters():
-    # ".." and "." strings are treated specially, but this behavior is outside the test's scope
-    # "" shouldn't be allowed as a valid path parameter
+    # ".." and "." resolve specially, outside this test's scope; "" is no valid path parameter.
 
     def before_generate_path_parameters(ctx, strategy):
         return strategy.filter(
@@ -575,15 +528,13 @@ def filter_path_parameters():
 def test_path_parameters_encoding(ctx):
     api = ctx.openapi.apps.path_variable()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # NOTE. WSGI and ASGI applications decode %2F as / and returns 404
-    # When API operation has a path parameter
+    # WSGI and ASGI apps decode %2F as / and return 404.
     stream = execute(
         schema,
         checks=(status_code_conformance,),
         deterministic=True,
     )
-    # Then there should be no failures
-    # since all path parameters are quoted
+    # Every path parameter is sent quoted.
     stream.assert_no_errors()
     stream.assert_no_failures()
 
@@ -623,8 +574,7 @@ def test_exceptions(ctx):
 
 def test_internal_exceptions(ctx):
     # GH: #236
-    # When there is an exception during the test
-    # And Hypothesis consider this test as a flaky one
+    # An exception during the test, which Hypothesis considers flaky.
     api = ctx.openapi.apps.multipart()
     schema = schemathesis.openapi.from_url(api.schema_url)
 
@@ -633,9 +583,7 @@ def test_internal_exceptions(ctx):
         raise ValueError
 
     stream = execute(schema, max_examples=3)
-    # Then the execution result should indicate errors
     stream.assert_errors()
-    # And an error from the buggy code should be collected
     assert [(type(error.value), type(error.value.__cause__)) for error in stream.find_all(events.NonFatalError)] == [
         (HookExecutionError, ValueError)
     ]
@@ -708,8 +656,7 @@ def test_deterministic_mode_sends_identical_requests_across_runs(ctx, make_api, 
 
 
 def test_fuzzing_phase_failure_requires_a_surfaced_failure(ctx):
-    # DELETE mutates server state that later feeds case generation, so Hypothesis reports
-    # inconsistent data generation; the phase must not be marked failed without a real failure.
+    # DELETE mutates state that later generation reads, so Hypothesis reports inconsistent data generation.
     api = ctx.openapi.apps.stateful_users()
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(schema, max_examples=15, phases=[PhaseName.FUZZING], seed=0, deterministic=True).execute()
@@ -724,14 +671,11 @@ def test_fuzzing_phase_failure_requires_a_surfaced_failure(ctx):
 def test_payload_explicit_example(ctx):
     api = ctx.openapi.apps.payload()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When API operation has an example specified
     stream = execute(schema)
-    # Then run should be successful
     stream.assert_no_errors()
     stream.assert_no_failures()
 
     payload_requests = api.calls_to("/api/payload", method="POST")
-    # And this example should be sent to the app
     assert payload_requests[0].json() == {"name": "John"}
 
 
@@ -772,20 +716,16 @@ def test_explicit_examples_from_response(ctx):
 def test_explicit_example_disable(ctx):
     api = ctx.openapi.apps.payload()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When API operation has an example specified
-    # And the `explicit` phase is excluded
     stream = execute(
         schema,
         max_examples=1,
         phases=[PhaseName.FUZZING],
     )
-    # Then run should be successful
     stream.assert_no_errors()
     stream.assert_no_failures()
     payload_requests = api.calls_to("/api/payload", method="POST")
     assert len(payload_requests) == 1
 
-    # And this example should NOT be used
     assert payload_requests[0].json() != {"name": "John"}
 
 
@@ -793,8 +733,7 @@ def test_plain_text_body(ctx):
     api = ctx.openapi.apps.plain_text_body()
     schema = schemathesis.openapi.from_url(api.schema_url)
 
-    # When the expected payload is text/plain
-    # Then the payload is not encoded as JSON
+    # A text/plain body is sent verbatim.
     def check_content(ctx, response, case):
         data = response.content
         assert case.body.encode("utf8") == data
@@ -806,30 +745,24 @@ def test_plain_text_body(ctx):
 
 def test_invalid_path_parameter(ctx):
     api = ctx.openapi.serve(basic.invalid_path_parameter())
-    # When a path parameter is marked as not required
-    # And schema validation is disabled
+    # The schema marks a path parameter as optional; Schemathesis treats it as required.
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(schema, max_examples=3)
-    # Then Schemathesis enforces all path parameters to be required
-    # And there should be no errors
     stream.assert_no_errors()
 
 
 def test_missing_path_parameter(ctx):
     api = ctx.openapi.apps.missing_path_parameter()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When a path parameter is missing
     stream = EventStream(schema, max_examples=3).execute()
-    # Then it leads to an error
     stream.assert_errors()
     assert "Path parameter 'id' is not defined" in str(stream.find(events.NonFatalError).info)
-    # And tests still should be executed
     event = _last_scenario(stream)
     assert len(event.recorder.cases) > 0
 
 
 def test_malformed_server_url_template(ctx):
-    # A malformed `servers` entry is a schema error, not a crash out of the engine.
+    # A malformed `servers` entry surfaces as a schema error.
     schema = ctx.openapi.from_full_schema(
         {
             "openapi": "3.0.0",
@@ -880,9 +813,7 @@ def test_identical_schema_errors_across_generation_modes_reported_once(ctx):
 def test_max_failures(ctx):
     api = ctx.openapi.apps.failure_multiple_failures_unsatisfiable()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    # When `max_failures` is specified
     stream = execute(schema, max_failures=2, phases=[PhaseName.FUZZING])
-    # Then the total numbers of failures and errors should not exceed this number
     assert stream.failures_count <= 2
     errors = stream.find_all(events.NonFatalError)
     assert stream.failures_count + len(errors) == 2
@@ -890,8 +821,7 @@ def test_max_failures(ctx):
 
 
 def test_max_time(ctx):
-    # A path parameter keeps generation from exhausting early; the example count needs several times
-    # the limit to run so the stop is the clock rather than the phase finishing on its own.
+    # A path parameter keeps generation from exhausting early, so the clock ends the phase.
     api = ctx.openapi.apps.path_variable()
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(schema, max_time=1, max_examples=2000, phases=[PhaseName.FUZZING])
@@ -915,8 +845,7 @@ def test_max_time_ends_once_unique_inputs_run_out(ctx, unique_inputs, stop_reaso
 
 @pytest.mark.parametrize("workers", [1, 2])
 def test_max_time_reaches_every_operation(ctx, workers):
-    # Without a per-operation share the first operation consumes the whole budget and the rest are
-    # never dispatched, which makes the tested set depend on schema order.
+    # Without a per-operation share the first operation takes the whole budget, and schema order decides what runs.
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
     # Work before an operation's first case cannot be interrupted, so scale the budget to the runner's speed.
@@ -991,7 +920,7 @@ def test_header_auth_sets_only_sometimes_is_still_generated(ctx, app_runner):
 
 
 def test_max_time_in_unit_phase_is_not_an_interrupt(ctx):
-    # Same misattribution as the stateful phase: the clock is not the user pressing Ctrl-C.
+    # Hitting the time limit is not the user pressing Ctrl-C.
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(schema, max_time=1, max_examples=2000, phases=[PhaseName.FUZZING])
@@ -1013,8 +942,7 @@ def test_max_time_in_stateful_phase_is_not_an_interrupt(ctx):
 
 
 def test_stateful_cycles_release_their_state_machines(ctx):
-    # Hypothesis caches every state machine class it runs; each cycle builds a new one, so unless the
-    # finished ones are released, memory grows for as long as the run lasts.
+    # Hypothesis caches every state machine class it runs, and each cycle builds one, so finished ones must be released.
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
     cycles = [
@@ -1050,11 +978,9 @@ def test_max_time_keeps_operation_errors_visible(ctx):
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_skip_operations_with_recursive_references(ctx, schema_with_recursive_references):
-    # When the test schema contains recursive references
     schema = ctx.openapi.from_full_schema(schema_with_recursive_references)
     schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     stream = EventStream(schema).execute()
-    # Then it causes an error with a proper error message
     stream.assert_after_execution_status(Status.ERROR)
     assert "Cannot generate test data for request body" in str(stream.find(events.NonFatalError).info)
 
@@ -1068,13 +994,12 @@ def test_skip_operations_with_recursive_references(ctx, schema_with_recursive_re
 )
 def test_unsatisfiable_example(ctx, phases, expected, total_errors):
     # See GH-904
-    # When filling missing properties during examples generation leads to unsatisfiable schemas
+    # Filling in missing properties during examples generation hits an unsatisfiable schema.
     schema = ctx.openapi.load_schema(
         {
             "/success": {
                 "post": {
                     "parameters": [
-                        # This parameter is not satisfiable
                         {
                             "name": "key",
                             "in": "query",
@@ -1099,10 +1024,8 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
             }
         }
     )
-    # Then the testing process should not raise an internal error
     schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     stream = EventStream(schema, max_examples=1, phases=phases).execute()
-    # And the tests are failing because of the unsatisfiable schema
     stream.assert_errors()
     errors = stream.find_all(events.NonFatalError)
     assert expected in [str(err.value).splitlines()[0] for err in errors]
@@ -1126,7 +1049,7 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
     ],
 )
 def test_non_serializable_example(ctx, phases, expected):
-    # When filling missing request body during examples generation leads to serialization error
+    # Filling in a missing request body during examples generation hits a serialization error.
     schema = ctx.openapi.load_schema(
         {
             "/success": {
@@ -1146,9 +1069,7 @@ def test_non_serializable_example(ctx, phases, expected):
             }
         }
     )
-    # Then the testing process should not raise an internal error
     stream = EventStream(schema, phases=phases, max_examples=1).execute()
-    # And the tests are failing because of the serialization error
     stream.assert_errors()
     errors = stream.find_all(events.NonFatalError)
     assert len(errors) == len(phases)
@@ -1175,10 +1096,8 @@ def test_invalid_header_in_example(ctx):
             }
         }
     )
-    # Then the testing process should not raise an internal error
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1).execute()
-    # And the tests are failing
     stream.assert_errors()
     expected = (
         "Failed to generate test cases from examples for this API operation because of some header examples are invalid"
@@ -1192,7 +1111,6 @@ def test_connection_error(ctx):
     schema = ctx.openapi.load_schema({"/success": {"post": {"responses": {"200": {"description": "OK"}}}}})
     schema.config.update(base_url="http://127.0.0.1:1")
     stream = EventStream(schema, max_examples=1).execute()
-    # And the tests are failing
     stream.assert_errors()
     expected = "Max retries exceeded with url"
     errors = stream.find_all(events.NonFatalError)
@@ -1208,17 +1126,15 @@ def test_reserved_characters_in_operation_name(ctx):
     def check(ctx, response, case):
         assert response.status_code == 200
 
-    # When there is `:` in the API operation path
+    # The operation path contains `:`.
     stream = execute(schema, checks=(check,))
-    # Then it should be reachable
     stream.assert_no_errors()
     stream.assert_no_failures()
 
 
 def test_hypothesis_errors_propagation(ctx):
     # See: GH-1046
-    # When the operation contains a media type, that Schemathesis can't serialize
-    # And there is still a supported media type
+    # Schemathesis can't serialize the `application/xml` body here, while `application/json` still works.
     api = ctx.openapi.apps.success()
     schema = ctx.openapi.load_schema(
         {
@@ -1227,13 +1143,11 @@ def test_hypothesis_errors_propagation(ctx):
                     "requestBody": {
                         "required": True,
                         "content": {
-                            # This one is known
                             "application/json": {
                                 "schema": {
                                     "type": "array",
                                 },
                             },
-                            # This one is not
                             "application/xml": {
                                 "schema": {
                                     "type": "array",
@@ -1254,10 +1168,8 @@ def test_hypothesis_errors_propagation(ctx):
         max_examples=max_examples,
         checks=[not_a_server_error],
     ).execute()
-    # Then the test outcomes should not contain errors
     after = _last_scenario(stream)
     assert after.status == Status.SUCCESS
-    # And there should be requested amount of test examples
     assert len(_scenario_checks(after)) == max_examples
     stream.assert_no_failures()
     stream.assert_no_errors()
@@ -1265,8 +1177,7 @@ def test_hypothesis_errors_propagation(ctx):
 
 def test_encoding_octet_stream(ctx):
     # See: GH-1134
-    # When the operation contains the `application/octet-stream` media type
-    # And has no `format: binary` in its schema
+    # An `application/octet-stream` body without `format: binary`.
     api = ctx.openapi.apps.success()
     schema = ctx.openapi.load_schema(
         {
@@ -1292,8 +1203,6 @@ def test_encoding_octet_stream(ctx):
         schema,
         checks=[not_a_server_error],
     ).execute()
-    # Then the test outcomes should not contain errors
-    # And it should not lead to encoding errors
     stream.assert_after_execution_status(Status.SUCCESS)
     stream.assert_no_failures()
     stream.assert_no_errors()
@@ -1318,14 +1227,13 @@ def test_interrupted_in_test(ctx):
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
 
-    # When an interrupt happens within a test body (check is called within a test body)
+    # Checks run within the test body.
     @schemathesis.check
     def interrupt_check(ctx, response, case):
         raise KeyboardInterrupt
 
     stream = EventStream(schema, checks=(interrupt_check,)).execute()
     interrupted = stream.find(events.Interrupted)
-    # Then the `Interrupted` event should be emitted
     assert interrupted is not None
     scenario_finished = _last_scenario(stream)
     assert scenario_finished is not None
@@ -1338,7 +1246,7 @@ def test_interrupted_outside_test(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
 
     # See GH-1325
-    # When an interrupt happens outside a test body
+    # Case generation hooks run outside the test body.
     @schemathesis.hook
     def before_generate_case(context, strategy):
         raise KeyboardInterrupt
@@ -1346,7 +1254,6 @@ def test_interrupted_outside_test(ctx):
     stream = EventStream(schema, phases=[PhaseName.FUZZING]).execute()
     try:
         interrupted = stream.find(events.Interrupted)
-        # Then the `Interrupted` event should be emitted
         assert interrupted is not None
     except KeyboardInterrupt:
         pytest.fail("KeyboardInterrupt should be handled")
@@ -1383,12 +1290,10 @@ def test_stop_event_stream_immediately(event_stream):
 
 
 def test_stop_event_stream_has_stop_reason_interrupted(event_stream):
-    # When the engine is stopped externally
     assert isinstance(next(event_stream), events.EngineStarted)
     event_stream.stop()
     finished = next(event_stream)
     assert isinstance(finished, events.EngineFinished)
-    # Then the stop reason is reflected in the final event
     assert finished.stop_reason == StopReason.INTERRUPTED
 
 
@@ -1461,12 +1366,9 @@ def test_abandoned_event_stream_absorbs_interrupt_during_shutdown(ctx):
     ],
 )
 def test_malformed_path_template(ctx, path, expected):
-    # When schema contains a malformed path template
     schema = ctx.openapi.load_schema({path: {"get": {"responses": {"200": {"description": "OK"}}}}})
-    # Then it should not cause a fatal error
     stream = EventStream(schema).execute()
     stream.assert_after_execution_status(Status.ERROR)
-    # And should produce the proper error message
     assert str(stream.find(events.NonFatalError).value) == expected
 
 
@@ -1495,7 +1397,6 @@ def test_explicit_header_negative(ctx, parameters, expected):
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, headers={"Authorization": "TEST"}, max_examples=1).execute()
 
-    # There should not be unsatisfiable
     stream.assert_no_errors()
     stream.assert_after_execution_status(expected)
 
@@ -1513,7 +1414,6 @@ def test_skip_non_negated_headers(ctx):
     )
     schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
     stream = EventStream(schema, max_examples=1).execute()
-    # There should not be unsatisfiable
     stream.assert_no_errors()
     stream.assert_after_execution_status(Status.SKIP)
 
@@ -1594,7 +1494,6 @@ def test_stateful_auth_and_override(ctx):
     interactions = stream.find_all_interactions()
     assert len(interactions) > 0
     assert {tuple(i.request.headers["Authorization"]) for i in interactions} == {("Basic YWRtaW46cGFzc3dvcmQ=",)}
-    # Check any request that uses user_id (GET or PATCH)
     user_requests = [
         i.request for i in interactions if "/users/" in i.request.uri and i.request.method in ("GET", "PATCH")
     ]
@@ -1763,10 +1662,8 @@ def test_stateful_phase_missing_deserializer_warnings(ctx):
 
     schema.config.update(base_url=f"{api.base_url}/api")
 
-    # Run only stateful phase
     stream = EventStream(schema, phases=[PhaseName.STATEFUL_TESTING], **STATEFUL_KWARGS).execute()
 
-    # Verify warnings were detected once for the run
     warning_event = stream.find(events.SetupWarnings)
     assert warning_event is not None
 
@@ -1910,7 +1807,7 @@ def test_max_time_cycles_do_not_repeat_the_same_cases(ctx):
 
 
 def test_max_time_stops_cycling_when_a_cycle_runs_nothing(ctx):
-    # Repeating a cycle that executes no scenario just burns the budget emitting skips.
+    # Repeating a cycle that executes no scenario burns the budget emitting skips.
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(schema, max_time=2, max_examples=5, phases=[PhaseName.EXAMPLES])

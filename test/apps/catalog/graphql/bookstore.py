@@ -20,7 +20,7 @@ logging.getLogger("werkzeug").setLevel(logging.CRITICAL)
 
 
 class _SpacedJson:
-    # Keep the response spelling independent of the installed strawberry, which switched to compact separators.
+    # Keep spaced JSON separators; the GraphQL library's default spelling varies by version.
     def encode_json(self, data: object) -> str:
         return json.dumps(data)
 

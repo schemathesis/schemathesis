@@ -54,10 +54,7 @@ class ConstantDraw:
 
 
 class ConstantsPool:
-    """Typed pool of `ConstantEntry`s with origin merging and a per-type cap.
-
-    Filled at engine init, read-only from the draw path's perspective.
-    """
+    """Typed pool of `ConstantEntry`s with origin merging and a per-type cap; filled at engine init, then read-only."""
 
     __slots__ = ("_entries", "_cap", "_failures")
 
@@ -86,7 +83,6 @@ class ConstantsPool:
             bucket[entry.value] = ConstantEntry(value=existing.value, type=existing.type, origins=merged)
             return
         if len(bucket) >= self._cap:
-            # Drop the oldest entry to keep memory bounded.
             bucket.popitem(last=False)
         bucket[entry.value] = entry
 
@@ -94,7 +90,7 @@ class ConstantsPool:
         return tuple(self._entries[type_].values())
 
     def has_values_for(self, type_: ConstantType) -> bool:
-        """Fast path: True if the pool has any values of `type_`, without materialising a tuple."""
+        """Whether the pool has values of `type_`, without materialising a tuple."""
         return bool(self._entries[type_])
 
     def is_empty(self) -> bool:

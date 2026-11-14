@@ -37,7 +37,7 @@ def _is_issues_list(candidate: object) -> TypeGuard[list[dict]]:
 
 
 def _extract_issues(body: object) -> list[dict] | None:
-    """Locate the issues list across the shapes captured from real servers (hand-rolled, Hono, Express)."""
+    """The issues list from hand-rolled, Hono or Express envelopes."""
     if isinstance(body, list):
         if not body or not isinstance(body[0], dict):
             return None
@@ -56,7 +56,7 @@ def _extract_issues(body: object) -> list[dict] | None:
 
 
 def _has_zod_signature(issues: list[dict]) -> bool:
-    """At least one issue must carry both a string `code` and a list `path` — Zod's structural discriminator."""
+    """True if any issue has a string `code` and a list `path`."""
     return any(isinstance(issue.get("code"), str) and isinstance(issue.get("path"), list) for issue in issues)
 
 
@@ -145,7 +145,7 @@ def _classify(issue: dict) -> tuple[ClassificationResult, ...]:
 
 @PARSERS.register
 class ZodParser:
-    """Parser for Zod `ZodError` envelopes — structured `{"errors": [{code, path, ...}]}` (or `issues` key)."""
+    """Parser for Zod `ZodError` envelopes: `{"issues" | "errors": [{code, path, ...}]}`."""
 
     priority = 11
 

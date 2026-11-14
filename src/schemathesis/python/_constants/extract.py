@@ -42,17 +42,9 @@ _STDLIB_PATH = os.path.realpath(_stdlib) if _stdlib else ""
 
 
 def _is_local_module(module_name: str, path: str) -> bool:
-    """Whether a module is user/local code, not stdlib or an installed package.
+    """Whether a module is local code, not stdlib or an installed package.
 
-    A real source `path` wins over the name heuristic, so a local `secrets.py` is
-    still extracted despite colliding with a stdlib name.
-
-    Examples:
-        ("myapp.views", "/proj/myapp/views.py")                 -> True
-        ("requests", "/venv/site-packages/requests/__init__.py") -> False
-        ("json", "/usr/lib/python3.12/json/__init__.py")         -> False
-        ("itertools", "")                                        -> False  # builtin, name-based
-
+    A real source `path` wins over the name, so a local `secrets.py` counts despite the stdlib name.
     """
     if not path:
         # Built-in / C-extension: rely on name-based stdlib detection.
@@ -66,12 +58,9 @@ def _is_local_module(module_name: str, path: str) -> bool:
 
 
 def local_imports_of(module_name: str) -> set[str]:
-    """Local modules that `module_name` imports directly, resolved from its source.
+    """Local modules that `module_name` imports directly, parsed from its source.
 
-    `from x import y` binds `y`, not `x`, so an import target isn't recoverable from the
-    imported module's namespace - parse the source to see what it depends on. Handler
-    modules are usually thin, and the constants worth reusing live in the enum/config/model
-    modules they import.
+    `from x import y` hides `x` from the namespace; thin handler modules import the modules holding useful constants.
     """
     try:
         module = importlib.import_module(module_name)
@@ -95,19 +84,14 @@ def local_imports_of(module_name: str) -> set[str]:
             base = _absolute_import_base(node, package)
             if base:
                 candidates.add(base)
-            # `from pkg import name` may pull in either a submodule or an attribute; keep both
-            # candidates and let the local-spec check drop whichever isn't a real module.
+            # `from pkg import name` may import a submodule or an attribute; the local-spec check drops non-modules.
             for alias in node.names:
                 candidates.add(f"{base}.{alias.name}" if base else alias.name)
     return {name for name in candidates if _is_local_import(name)}
 
 
 def _module_level_imports(tree: ast.Module) -> Iterable[ast.Import | ast.ImportFrom]:
-    """Module-scope imports, descending only `if`/`try` guards (TYPE_CHECKING, optional deps).
-
-    Skips function and class bodies; `ast.walk` visits every node and dominates extraction
-    time on large modules.
-    """
+    """Module-scope imports, descending only `if`/`try` guards; `ast.walk` over every node is too slow."""
     stack: list[ast.stmt] = list(reversed(tree.body))
     while stack:
         node = stack.pop()
@@ -146,20 +130,16 @@ def _is_local_import(name: str) -> bool:
 
 
 def extract_from_module(module_name: str, *, origin: Origin) -> Iterable[ConstantEntry]:
-    """Extract typed constants from a single module via Hypothesis's helper.
+    """Extract typed constants from a single module via Hypothesis's helper, skipping site-packages modules.
 
-    Skips site-packages modules. Hypothesis's internal pre-filter
-    (small ints, short strings cap at 20, empty values, bools, infinite floats)
-    applies automatically inside `constants_from_module`.
+    Hypothesis pre-filters them: small ints, short strings cap at 20, empty values, bools, infinite floats.
     """
     try:
         from hypothesis.internal.constants_ast import constants_from_module
     except ImportError:  # pragma: no cover
         return
 
-    # Importing user code can raise anything (settings reads, env probes, side-effecting
-    # top-level statements) including BaseException like `sys.exit()`; the broad catch keeps
-    # extraction failures non-fatal. Only a genuine interrupt is allowed through.
+    # Importing user code can raise anything, even `sys.exit()`; extraction failures stay non-fatal, interrupts pass.
     try:
         module = importlib.import_module(module_name)
     except KeyboardInterrupt:  # pragma: no cover
@@ -167,8 +147,7 @@ def extract_from_module(module_name: str, *, origin: Origin) -> Iterable[Constan
     except BaseException:
         return
 
-    # Built-in / C-extension modules raise TypeError from `getsourcefile`; treat them
-    # as non-local - `_is_local_module` will reject by the stdlib-name check anyway.
+    # Built-in and C-extension modules raise TypeError here; the stdlib-name check rejects them as non-local.
     try:
         source_path = inspect.getsourcefile(module) or ""
     except TypeError:

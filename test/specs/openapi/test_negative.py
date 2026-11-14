@@ -81,7 +81,7 @@ INTEGER_SCHEMA = {
 
 
 def validate_schema(schema):
-    """Validate schema by constructing a Draft4Validator (which validates the schema on construction)."""
+    """Draft4Validator construction raises on an invalid schema."""
     jsonschema_rs.Draft4Validator(schema)
 
 
@@ -169,8 +169,6 @@ def test_failing_mutations(data, mutation, schema, location, validate):
     if validate:
         validate_schema(schema)
     original_schema = deepclone(schema)
-    # When mutation can't be applied
-    # Then it returns "failure"
     result, metadata = mutation(
         MutationContext(
             keywords=schema,
@@ -185,7 +183,6 @@ def test_failing_mutations(data, mutation, schema, location, validate):
     )
     assert result == MutationResult.FAILURE
     assert metadata is None
-    # And doesn't mutate the input schema
     assert schema == original_schema
 
 
@@ -207,11 +204,9 @@ def test_change_type_non_json_media_types(data, media_type, schema):
         allow_extra_parameters=True,
         target_descriptors=(),
     )
-    # Then it should not be mutated
     result, metadata = change_type(context, data.draw, schema)
     assert result == MutationResult.FAILURE
     assert metadata is None
-    # And doesn't mutate the input schema
     assert schema == original_schema
 
 
@@ -234,8 +229,6 @@ def test_successful_mutations(data, mutation, schema):
     validate_schema(schema)
     validator = jsonschema_rs.Draft4Validator(schema)
     schema = deepclone(schema)
-    # When mutation can be applied
-    # Then it returns "success"
     result, metadata = mutation(
         MutationContext(
             keywords=schema,
@@ -250,9 +243,7 @@ def test_successful_mutations(data, mutation, schema):
     )
     assert result == MutationResult.SUCCESS
     assert metadata is not None
-    # And the mutated schema is a valid JSON Schema
     validate_schema(schema)
-    # And instances valid for this schema are not valid for the original one
     new_instance = data.draw(from_schema(schema))
     assert not validator.is_valid(new_instance)
 
@@ -287,7 +278,6 @@ def test_successful_mutations(data, mutation, schema):
 def test_path_parameters_are_string(data, schema):
     validator = jsonschema_rs.Draft4Validator(schema)
     new_schema = deepclone(schema)
-    # When path parameters are mutated
     new_schema, _ = data.draw(
         mutated(
             keywords=new_schema,
@@ -299,14 +289,10 @@ def test_path_parameters_are_string(data, schema):
         )
     )
     assert new_schema["type"] == "object"
-    # Then mutated schema is a valid JSON Schema
     validate_schema(new_schema)
-    # And parameters remain primitive types
     new_instance = data.draw(from_schema(new_schema))
     assert not isinstance(new_instance["foo"], ((list, dict)))
-    # And there should be no additional parameters
     assert len(new_instance) == 1
-    # And instances valid for this schema are not valid for the original one
     assert not validator.is_valid(new_instance)
 
 
@@ -314,13 +300,12 @@ def test_path_parameters_are_string(data, schema):
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_custom_fields_are_intact(data, key):
-    # When the schema contains some non-JSON Schema keywords (e.g. components from Open API)
+    # Non-JSON Schema keys such as Open API `components` must stay intact.
     schema = {
         "type": "object",
         "properties": {"X-Foo": {"type": "string", "maxLength": 5}},
         "additionalProperties": False,
     }
-    # Then they should not be negated
     new_schema, _ = data.draw(
         mutated(
             keywords=schema,
@@ -719,7 +704,6 @@ def test_mutation_result_success(left, right, expected):
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_negate_constraints_keep_dependencies(data, schema, validator_cls):
-    # When `negate_constraints` is used
     schema = deepclone(schema)
     negate_constraints(
         MutationContext(
@@ -733,10 +717,8 @@ def test_negate_constraints_keep_dependencies(data, schema, validator_cls):
         data.draw,
         schema,
     )
-    # Then it should always produce valid schemas
-    # Creating a validator validates the schema
+    # Building a validator checks the schema; `exclusiveMaximum`/`exclusiveMinimum` need their `maximum`/`minimum`.
     validator_cls(schema)
-    # E.g. `exclusiveMaximum` / `exclusiveMinimum` only work when `maximum` / `minimum` are present in the same schema
 
 
 @given(data=st.data())
@@ -899,8 +881,7 @@ def test_openapi_31_legacy_exclusive_bounds_in_response_schema(ctx):
     response_def = operation.responses.get("200")
     assert response_def is not None
     resolved = response_def.get_schema("application/json")
-    # Without upgrade: Draft 2020-12 ignores bool exclusiveMinimum -> schema is just {type: integer, minimum: 1}
-    # With upgrade: {type: integer, exclusiveMinimum: 1} — value must be strictly > 1
+    # Draft 2020-12 ignores a boolean `exclusiveMinimum`, so the bound must be upgraded to a number.
     assert resolved.schema == {"type": "integer", "exclusiveMinimum": 1}
 
 
@@ -923,8 +904,7 @@ def test_openapi_31_legacy_exclusive_bounds_in_negative_generation(ctx):
 
 
 def test_openapi_31_prefix_items_query_param_negative_generation(ctx):
-    # Draft 2020-12 `prefixItems` must not crash the negative-path validator with
-    # `items is not of types boolean, object` from meta-validation.
+    # Draft 2020-12 `prefixItems` must not fail meta-validation in the negative-path validator.
     schema = ctx.openapi.load_schema(
         {
             "/box": {
@@ -1031,7 +1011,6 @@ def test_json_sequence_body_is_negatable_only_with_violations_on_the_wire(ctx, v
 
 @pytest.mark.hypothesis_nested
 def test_optional_query_param_negation(ctx):
-    # When all query parameters are optional
     schema = ctx.openapi.load_schema(
         {
             "/bug": {
@@ -1049,7 +1028,6 @@ def test_optional_query_param_negation(ctx):
     def test(case):
         request = requests.PreparedRequest()
         request.prepare(**case.as_transport_kwargs(base_url="http://127.0.0.1"))
-        # Then negative schema should not generate empty queries
         assert urlparse(request.url).query != ""
 
 
@@ -1322,7 +1300,6 @@ def test_boolean_not_in_negative_body_schema(ctx, body_schema, negated):
 
 @pytest.mark.hypothesis_nested
 def test_negating_multiple_query_params(ctx):
-    # When all query parameters are optional
     schema = ctx.openapi.load_schema(
         {
             "/bug": {
@@ -1342,7 +1319,6 @@ def test_negating_multiple_query_params(ctx):
     def test(case):
         request = requests.PreparedRequest()
         request.prepare(**case.as_transport_kwargs(base_url="http://127.0.0.1"))
-        # Then negated parameter should always be serialized
         query = urlparse(request.url).query
         if "key1" in case.query:
             assert "key1" in query, case.query
@@ -1491,7 +1467,6 @@ DYNAMIC_OBJECT_PARAMETER = {"type": "object", "additionalProperties": {"type": "
 @pytest.mark.hypothesis_nested
 def test_non_default_styles(ctx, location, schema, style, explode):
     # See GH-1208
-    # When the schema contains a parameter with a not-default "style"
     schema = ctx.openapi.load_schema(
         {
             "/bug": {
@@ -1604,7 +1579,6 @@ def test_negative_body_never_validates_against_its_own_schema(ctx):
 
 @pytest.mark.hypothesis_nested
 def test_negative_format_generates_invalid_values(ctx):
-    # When a path parameter has `format: uuid`
     operation = ctx.openapi.load_operation(
         "GET /items/{id}",
         {
@@ -1620,11 +1594,9 @@ def test_negative_format_generates_invalid_values(ctx):
     def test(case):
         nonlocal invalid_uuid_found
         id_value = case.path_parameters["id"]
-        # Negative mode should generate values that DON'T match UUID format
         if not _is_valid_uuid(id_value):
             invalid_uuid_found = True
 
-    # Then at least some generated values should be invalid UUIDs
     assert invalid_uuid_found, "Negative mode should generate invalid UUID values"
 
 
@@ -1638,9 +1610,7 @@ def is_valid_uuid4(value: str) -> bool:
 
 @pytest.mark.hypothesis_nested
 def test_negative_custom_format_generates_invalid_values(ctx):
-    # When a user registers a custom format (uuid4)
     schemathesis.openapi.format("uuid4", st.uuids(version=4).map(str))
-    # And a path parameter uses that custom format
     operation = ctx.openapi.load_operation(
         "GET /items/{id}",
         {
@@ -1656,11 +1626,9 @@ def test_negative_custom_format_generates_invalid_values(ctx):
     def test(case):
         nonlocal invalid_uuid4_found
         id_value = case.path_parameters["id"]
-        # Negative mode should generate values that DON'T match the custom uuid4 format
         if not is_valid_uuid4(id_value):
             invalid_uuid4_found = True
 
-    # Then at least some generated values should be invalid UUID4s
     assert invalid_uuid4_found, "Negative mode should generate invalid UUID4 values for custom formats"
 
 
@@ -1733,7 +1701,7 @@ def test_multiple_mutations_render_one_line_each():
 )
 @pytest.mark.hypothesis_nested
 def test_ecma_regex_patterns(ctx, pattern):
-    # Large quantifiers can exceed jsonschema_rs's default compiled regex size limit
+    # Large quantifiers can exceed the validator's default regex size limit.
     operation = ctx.openapi.load_operation(
         "POST /test",
         {
@@ -1761,12 +1729,8 @@ def test_ecma_regex_patterns(ctx, pattern):
 
 @pytest.mark.hypothesis_nested
 def test_path_parameters_never_contain_slash(ctx):
-    # When fuzzing path parameters, mutated values should never contain `/`
-    # because this would change the URL structure and potentially route to different endpoints.
-    # For example, `/api/groups/{id}` with id="foo/bar" becomes `/api/groups/foo/bar`
-    # which could match `/api/groups/{id}/{user_id}` instead.
-    #
-    # This can happen when the generated value is a dict/object that gets stringified with `/` in keys
+    # A `/` in a path value changes the route: `/api/groups/{id}` with `foo/bar` may hit `/api/groups/{id}/{user_id}`.
+    # Objects stringified with `/` in their keys produce such values.
     operation = ctx.openapi.load_operation(
         "GET /api/groups/{id}",
         {
@@ -1973,8 +1937,6 @@ def test_integer_path_parameter_no_false_positive(ctx, cli, snapshot_cli):
 
 
 def test_negative_data_rejection_enum_path_params_no_false_positive(ctx, cli, app_runner):
-    # Enum path parameters in fuzzing mode: a validating server must not produce
-    # false positives for negative_data_rejection.
     app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/items/{kind}/{id}": {
@@ -2034,8 +1996,7 @@ def test_negative_data_rejection_enum_path_params_no_false_positive(ctx, cli, ap
 
 @pytest.mark.snapshot(replace_invalid_component=True)
 def test_negative_data_rejection_enum_path_params_non_validating_server(ctx, cli, snapshot_cli):
-    # A server that accepts everything. Mutations must fire and the check
-    # must report failures for enum + integer path parameters in fuzzing mode.
+    # Mutations must fire for enum and integer path parameters, and the check must report them.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items/{kind}/{id}": {
@@ -2068,7 +2029,6 @@ def test_negative_data_rejection_enum_path_params_non_validating_server(ctx, cli
 
     @app.route("/items/<kind>/<path:id>", methods=["POST"])
     def items(kind, id):
-        # Accepts everything — intentionally does not validate
         return jsonify({"ok": True}), 200
 
     assert (
@@ -2086,10 +2046,8 @@ def test_negative_data_rejection_enum_path_params_non_validating_server(ctx, cli
 
 
 def test_query_param_invalid_ecma262_pattern_no_runtime_error(ctx, cli, app_runner):
-    # `{,3}` is valid in Python, but jsonschema_rs rejects it as an incomplete quantifier when
-    # meta-validating the schema. A pattern it cannot compile constrains nothing during validation
-    # either, so it is dropped and the rest of the schema still drives generation - and the app
-    # accepting a request without the required parameter is a genuine finding, not a crash.
+    # The validator cannot compile `{,3}`, so generation drops the pattern and the rest of the schema still applies.
+    # The app accepting a request without the required parameter is a real finding, not a crash.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -2593,8 +2551,7 @@ def test_negative_body_stays_invalid_when_a_sibling_carries_a_format(ctx):
 
 
 def test_negative_declines_unbuildable_negated_body(ctx):
-    # `additionalProperties: false` plus an `allOf` of `if`/`then` negates to a shape the
-    # canonical strategy builder cannot draw for; must be declined, not raised as fatal.
+    # `additionalProperties: false` with an `allOf` of `if`/`then` negates to an undrawable shape; it must be declined.
     operation = ctx.openapi.load_operation(
         "POST /items",
         {

@@ -29,7 +29,7 @@ def is_type_mutation(body: Any, field: str, expected_type: type) -> bool:
 )
 def test_binary_format_negative_mutations(ctx, encoding):
     if encoding:
-        # Register custom media type to test that it's skipped in negative mode
+        # Negative mode must skip a registered custom media type.
         schemathesis.openapi.media_type("image/png", st.just(b"\x89PNG\r\n\x1a\n"))
 
     content = {
@@ -87,7 +87,7 @@ def test_binary_format_negative_mutations_with_multiple_content_types(ctx):
 
 
 def test_negative_body_is_invalid_against_real_schema_when_only_field_is_optional_binary(ctx):
-    # `format: binary` is permissive at runtime; mutations producing valid strings aren't actually negative.
+    # `format: binary` is permissive at runtime; mutations producing valid strings are not negative.
     operation = ctx.openapi.load_operation(
         "PUT /upload",
         {

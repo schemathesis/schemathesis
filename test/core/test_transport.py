@@ -97,7 +97,7 @@ def test_wsgi_response_encoding(response_factory):
 )
 def test_text_lossy_never_raises(response_factory, content, charset, expected):
     raw = response_factory.requests(content=content, content_type=f"text/plain; charset={charset}")
-    # Derive `encoding` from headers exactly like requests' adapter does for real responses.
+    # Derive `encoding` from headers as the requests adapter does for real responses.
     raw.encoding = requests.utils.get_encoding_from_headers(raw.headers)
     response = Response.from_requests(raw, verify=False)
     assert response.encoding == charset

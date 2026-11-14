@@ -83,7 +83,7 @@ def _crash(*, operation: str, fingerprint: str, case_id: str = "c1") -> CrashFil
 
 
 def test_build_crashes_skips_scenario_with_missing_interaction(case_factory):
-    # A case with no recorded response (e.g. a network error mid-scenario) is skipped, not fatal.
+    # A network error mid-scenario leaves a case with no recorded response.
     recorder = ScenarioRecorder(label="GET /users")
     case = case_factory()
     recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
@@ -95,7 +95,7 @@ def test_build_crashes_skips_scenario_with_missing_interaction(case_factory):
 
 
 def test_build_crashes_captures_request_body_link(case_factory, response_factory):
-    # When a link feeds a later request body, the crash records its definition so it can be re-extracted on replay.
+    # Replay re-extracts the linked value, so the crash records the link definition.
     recorder = ScenarioRecorder(label="GET /a -> PATCH /b")
     parent = case_factory()
     child = case_factory()
@@ -144,7 +144,7 @@ def test_build_crashes_includes_related_sibling_case(case_factory, response_fact
     crashes = build_crashes_from_recorder(recorder=recorder, failing_case_id=read.id, sanitization=SanitizationConfig())
 
     assert len(crashes) == 1
-    # Three steps (create, delete, read), not two — the freeing DELETE is preserved before the failing read.
+    # Create, delete, read: the freeing DELETE stays before the failing read.
     assert len(crashes[0].sequence) == 3
 
 
@@ -177,7 +177,6 @@ def test_remove_by_operation_skips_malformed_file(tmp_path):
 
 
 def test_remove_by_operation_skips_non_object_file(tmp_path):
-    # A valid-JSON-but-non-object file must be skipped, not crash cleanup on `data.get(...)`.
     writer = CrashWriter(directory=tmp_path)
     writer.open(schema_location="x", base_url="x")
     writer.write(_crash(operation="GET /users", fingerprint="aaaaaaaa"))
@@ -253,7 +252,7 @@ def test_remove_by_operation_tolerates_concurrent_removal(tmp_path):
 
 
 def test_remove_files_ignores_already_dropped_file(tmp_path):
-    # A filename already gone (cleaned or removed concurrently) must be skipped, not raise.
+    # The file may be cleaned or removed concurrently.
     writer = CrashWriter(directory=tmp_path)
     writer.open(schema_location="x", base_url="x")
     crash = _crash(operation="GET /users", fingerprint="aaaaaaaa")
@@ -279,7 +278,7 @@ def test_rerun_refreshes_stored_case_id(tmp_path):
 
 
 def test_same_run_keeps_first_case_id(tmp_path):
-    # When the same failure recurs in one run, the stored id stays the first occurrence shown in that run's output.
+    # A failure recurring in one run keeps the id of its first occurrence, as that run's output shows it.
     writer = CrashWriter(directory=tmp_path)
     writer.open(schema_location="x", base_url="x")
     writer.write(_crash(operation="GET /users", fingerprint="aaaaaaaa", case_id="FIRST1"))
@@ -304,7 +303,6 @@ def test_build_crashes_skips_timing_only_failure(case_factory, response_factory)
 
 
 def test_build_crashes_tolerates_unknown_response_charset(case_factory, response_factory):
-    # A server-supplied charset that Python can't resolve must not blow up crash building.
     recorder = _recorder_with_failure(case_factory, response_factory, encoding="not-a-real-codec")
 
     crashes = build_crashes_from_recorder(
@@ -365,7 +363,6 @@ def test_crash_step_roundtrips_bytes_in_mutation_metadata():
 
 
 def test_request_headers_are_sanitized(case_factory, response_factory):
-    # Sensitive request headers (e.g. Authorization) must be filtered out of the stored crash step.
     recorder = ScenarioRecorder(label="GET /users")
     case = case_factory()
     recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
@@ -388,7 +385,6 @@ def test_request_headers_are_sanitized(case_factory, response_factory):
 
 
 def test_list_root_request_body_is_sanitized(case_factory, response_factory):
-    # A JSON body whose root is a list (not an object) must still be sanitized before it reaches the cache.
     recorder = ScenarioRecorder(label="POST /items")
     case = case_factory(body=[{"token": "secret"}])
     recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
@@ -402,7 +398,7 @@ def test_list_root_request_body_is_sanitized(case_factory, response_factory):
 
 
 def test_load_manifest_rejects_unknown_format_version(tmp_path):
-    # A crash directory written by a newer Schemathesis is treated as incompatible, not crashed on or silently loaded.
+    # A newer Schemathesis may write a format this one cannot read.
     (tmp_path / MANIFEST_FILENAME).write_text(
         json.dumps(
             {

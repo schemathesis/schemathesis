@@ -84,15 +84,14 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             media_type, serializer = self._resolve_serializer(media_type)
 
         extra: dict[str, Any]
-        # Handle serialization. A body the caller passes replaces the generated one, so that one is not serialized.
+        # A body the caller passes replaces the generated one, which then goes unserialized.
         if serializer is not None and not replaces_body(kwargs):
             context = SerializationContext(case=case)
             extra = serializer(context, case.operation.schema.prepare_request_body(case))
         else:
             extra = {}
 
-        # Set content type for payload. A raw multipart payload is sent verbatim and carries no
-        # boundary, so declaring it as multipart would make it unparsable for the application.
+        # A raw multipart payload has no boundary, so declaring it multipart would make it unparsable.
         if media_type and not isinstance(case.body, NotSet) and not _is_raw_multipart(media_type, extra.get("data")):
             final_headers.setdefault("Content-Type", media_type)
 
@@ -252,7 +251,7 @@ def _capture_server_exception(application: object) -> Generator[_CapturedServerE
 
 @contextmanager
 def cookie_handler(client: werkzeug.Client, cookies: dict[str, Any] | None) -> Generator[None, None, None]:
-    """Set cookies required for a call."""
+    """Set `cookies` on the client for one call, deleting them afterwards."""
     if not cookies:
         yield
     else:

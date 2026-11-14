@@ -758,10 +758,7 @@ def test_fuzz_chains_post_with_get_via_link(cli, app_runner, ctx, snapshot_cli):
 
 
 def test_fuzz_chains_via_request_body_link(cli, app_runner, ctx, snapshot_cli):
-    # POST /products returns a fixed high-entropy (productId, secret) pair; only when /audit
-    # body carries that exact pair does the planted schema violation surface. Random fuzz
-    # has no way to guess the pair, so without body-link forwarding the bug is invisible.
-    # The link sets no `quantity`, so the bug also needs the generated one kept in the body.
+    # Only POST's exact (productId, secret) pair with a generated `quantity` reaches the bug; fuzzing cannot guess it.
     valid_product_id = "alpha-product-7af3-bbfd-4b2d-9b5d"
     valid_secret = "bravo-secret-9c11-c209-1cac-a29f"
     paths = {

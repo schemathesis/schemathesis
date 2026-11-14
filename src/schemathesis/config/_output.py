@@ -115,8 +115,7 @@ class TruncationConfig(DiffBase):
     max_payload_size: int
     max_lines: int
     max_width: int
-    # Bytes of a response body kept for reports; `0` keeps whole bodies. Independent of `enabled`,
-    # which only governs terminal display.
+    # Bytes of a response body kept for reports; `0` keeps whole bodies. `enabled` only governs terminal display.
     max_recorded_payload_size: int
 
     def __init__(

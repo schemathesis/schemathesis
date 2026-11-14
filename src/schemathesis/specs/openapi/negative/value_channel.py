@@ -1,7 +1,4 @@
-"""Value-level violators for the negative-fuzzing value channel.
-
-Used when schema-level `not:` wrappers don't reliably produce violations (e.g. format).
-"""
+"""Value-level violators for constraints that schema-level `not` wrappers violate unreliably, like `format`."""
 
 from __future__ import annotations
 
@@ -29,8 +26,7 @@ ValueChannelKeyword: TypeAlias = Literal[
 
 
 def violate_uuid(original: str) -> str:
-    # If already UUID-shaped, corrupt in place ('g' is not hex) so it still looks like a UUID.
-    # Otherwise use a hardcoded near-miss — nothing useful to corrupt in an arbitrary string.
+    # 'g' is not hex: a UUID-shaped value stays UUID-like; anything else gets a fixed near-miss
     if len(original) == 36 and original.count("-") == 4:
         return "g" + original[1:]
     return "g8fadcc5-ce2b-2f6f-a0cd-faaa313ba470"
@@ -49,7 +45,7 @@ def violate_date(_: str) -> str:
 
 
 def violate_pattern(original: str, pattern: str) -> str:
-    """Append a character outside common pattern classes. Naive but effective for typical patterns."""
+    """Append a character outside common pattern classes."""
     return original + "*"
 
 
@@ -57,8 +53,7 @@ def violate_min_length(original: str, min_length: int) -> str:
     return original[: max(0, min_length - 1)]
 
 
-# Specs often use `Integer.MAX_VALUE` as a "no real limit" sentinel; expanding
-# past this cap would OOM. Above the cap we skip and the next draw picks again.
+# Specs use `Integer.MAX_VALUE` as a "no limit" sentinel; above this cap the draw skips to avoid OOM.
 _NEGATIVE_MAX_LENGTH_CAP = 64 * 1024
 
 
@@ -97,11 +92,7 @@ def collect_value_targets(
 ) -> list[tuple[ParameterPath, str, JsonValue, str, JsonSchemaObject]]:
     """Emit `(path, schema_pointer, value, keyword, schema_at_path)` for every constraint-bearing leaf.
 
-    `path` tracks the body location (with concrete keys/indices, possibly random
-    for `additionalProperties`); `schema_pointer` tracks the schema-keyword chain
-    so error messages stay stable across runs, restarting at the referenced definition's
-    location in the original document after each `$ref`. Walks body and schema in lockstep,
-    resolving `$ref` against the schema's `x-bundled` map.
+    `schema_pointer` restarts at each `$ref` target's location, so error messages stay stable across runs.
     """
     if bundle is None:
         bundle_candidate = schema.get(BUNDLE_STORAGE_KEY)
@@ -111,7 +102,6 @@ def collect_value_targets(
 
     targets: list[tuple[ParameterPath, str, JsonValue, str, JsonSchemaObject]] = []
 
-    # Resolve $ref hops transparently.
     ref = schema.get("$ref")
     if isinstance(ref, str) and ref.startswith(REFERENCE_TO_BUNDLE_PREFIX):
         target_name = ref.rsplit("/", 1)[-1]
@@ -126,9 +116,7 @@ def collect_value_targets(
         properties_schema = schema.get("properties", {})
         if isinstance(properties_schema, dict):
             for name, prop_schema in properties_schema.items():
-                # Boolean property schemas (`{"x": true}` / `false`) are valid in
-                # JSON Schema / OpenAPI 3.1 but expose no constraint-bearing leaves;
-                # skip them rather than calling `.get` on a `bool`.
+                # Boolean property schemas carry no constraints
                 if name in body and isinstance(prop_schema, dict):
                     targets.extend(
                         collect_value_targets(
@@ -140,7 +128,6 @@ def collect_value_targets(
                             name_to_uri,
                         )
                     )
-        # Walk additionalProperties for keys NOT covered by `properties`.
         additional = schema.get("additionalProperties")
         if isinstance(additional, dict):
             covered = set(properties_schema) if isinstance(properties_schema, dict) else set()
@@ -181,14 +168,12 @@ def apply_value_channel(
     keyword: ValueChannelKeyword,
     schema_at_path: JsonSchemaObject,
 ) -> tuple[JsonValue, JsonValue | None, JsonValue]:
-    """Replace the value at `target_path` in `body` according to `keyword`.
+    """Replace the value at `target_path` in `body` according to `keyword`, mutating `body` in place.
 
-    Returns (new_body, original_value, new_value). `body` is mutated in place AND returned.
-    `original_value` is `None` for the `required` keyword when the dropped key was absent.
+    Returns `(body, original_value, new_value)`; `original_value` is `None` when `required` drops an absent key.
     """
     if keyword == "required":
-        # `target_path` points at the dict whose `required` constraint should be violated,
-        # not a leaf — drop one of its required keys.
+        # `target_path` points at the object; drop one of its required keys
         target_dict: JsonValue = body
         for segment in target_path:
             target_dict = target_dict[segment]  # type: ignore[index]  # JsonValue includes dict/list at this point

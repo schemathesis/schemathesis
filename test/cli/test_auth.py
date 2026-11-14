@@ -20,7 +20,6 @@ class TokenAuth:
 
 def test_custom_auth(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
-    # When a custom auth is used
     module = ctx.write_pymodule(
         f"""
 {AUTH_PROVIDER_MODULE_CODE}
@@ -31,8 +30,6 @@ def after_call(context, case, response):
     assert request_authorization == f"Bearer {TOKEN}", request_authorization
 """
     )
-    # Then CLI should run successfully
-    # And the auth should be used
     assert cli.main("run", api.schema_url, hooks=module) == snapshot_cli
 
 
@@ -45,7 +42,6 @@ def after_call(context, case, response):
 )
 def test_explicit_auth_precedence(ctx, cli, args, expected, snapshot_cli):
     api = ctx.openapi.apps.success()
-    # If explicit auth is passed via CLI
     module = ctx.write_pymodule(
         f"""
 {AUTH_PROVIDER_MODULE_CODE}
@@ -55,14 +51,10 @@ def after_call(context, case, response):
     assert request_authorization == "{expected}", request_authorization
 """
     )
-    # Then it overrides the one from the auth provider
-    # And the auth should be used
     assert cli.main("run", api.schema_url, "--checks=not_a_server_error", *args, hooks=module) == snapshot_cli
 
 
 def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, app_runner, snapshot_cli):
-    # When the schema defines multiple auth mechanisms on the same operation
-    # And the user passes an explicit `Authorization` header
     paths = {
         "/health": {
             "get": {
@@ -91,7 +83,6 @@ def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, app_runner, snaps
     app = ctx.openapi.make_permissive_flask_app(schema)
     base_url = app_runner.openapi_url(app, path="")
     schema_path = ctx.openapi.write_schema(paths, components=components, security=security)
-    # Then it should be able to generate requests
     assert (
         cli.run(
             str(schema_path),
@@ -132,7 +123,6 @@ def test_multiple_threads(ctx, cli, snapshot_cli):
         assert provider.get_calls == 1, provider.get_calls
     """
     )
-    # Then CLI should run successfully
     assert (
         cli.main(
             "run",
@@ -148,7 +138,6 @@ def test_multiple_threads(ctx, cli, snapshot_cli):
 
 
 def test_requests_auth(ctx, cli, snapshot_cli):
-    # When the user registers auth from `requests`
     api = ctx.openapi.apps.success_and_text()
     expected = "Basic dXNlcjpwYXNz"
     module = ctx.write_pymodule(
@@ -166,8 +155,6 @@ def after_call(context, case, response):
         assert request_authorization is None, request_authorization
 """
     )
-    # Then CLI should run successfully
-    # And the auth should be used
     assert (
         cli.main("run", api.schema_url, "--checks=not_a_server_error", "--mode=positive", hooks=module) == snapshot_cli
     )
@@ -250,7 +237,7 @@ def verify_auth(ctx, response, case):
 
 @pytest.mark.usefixtures("verify_auth")
 def test_conditional(ctx, cli, snapshot_cli):
-    # When the user sets up multiple auths applied to different API operations
+    # Each auth applies to a different set of operations.
     api = ctx.openapi.apps.success_and_text()
     module = ctx.write_pymodule("""
 TOKEN_1 = "ABC"
@@ -284,7 +271,6 @@ def verify_auth(ctx, response, case):
         expected = f"Bearer {TOKEN_2}"
     assert request_authorization == expected, f"Expected `{expected}`, got `{request_authorization}`"
     """)
-    # Then all auths should be properly applied
     assert cli.main("run", api.schema_url, "-c", "verify_auth", hooks=module) == snapshot_cli
 
 
@@ -292,7 +278,6 @@ def verify_auth(ctx, response, case):
 @pytest.mark.parametrize("refresh_interval", [None, 60], ids=["no-cache", "with-cache"])
 def test_auth_get_raises_exception(ctx, cli, snapshot_cli, refresh_interval):
     api = ctx.openapi.apps.success()
-    # When auth provider's get() method raises an exception (with or without caching)
     decorator = (
         "@schemathesis.auth()"
         if refresh_interval is None
@@ -309,7 +294,6 @@ class BrokenAuth:
         case.headers = {{"Authorization": f"Bearer {{data}}"}}
 """
     )
-    # Then the error should be caught and displayed clearly
     assert cli.main("run", api.schema_url, "--max-examples=1", hooks=module) == snapshot_cli
 
 

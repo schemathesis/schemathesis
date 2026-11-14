@@ -1,2 +1,2 @@
 class SkipTest(BaseException):
-    """Raised when the current test should be skipped and the executor then continues normally."""
+    """Raised to skip the current test without stopping the executor."""

@@ -1,5 +1,3 @@
-"""Shared CLI output utilities used by multiple commands."""
-
 from __future__ import annotations
 
 import io
@@ -115,8 +113,7 @@ def print_lines(lines: list[str | Generator[str, None, None]]) -> None:
 
 def display_seed(config: ProjectConfig) -> None:
     click.echo(style("Seed: ", bold=True), nl=False)
-    # Deterministic mode can be applied to a subset of tests, but we only care if it is enabled everywhere.
-    # If not everywhere, then the seed matters and should be displayed.
+    # The seed matters unless deterministic mode applies to every test.
     if config.seed is None or config.generation.deterministic:
         click.echo("not used in the deterministic mode")
     else:
@@ -158,8 +155,7 @@ def display_final_line(
         reason = ", ".join([*parts, "baseline not saved"]) if parts else "Baseline not saved"
         message = f"{reason} in {running_time:.2f}s"
         color = "red"
-    # Without failures or errors, a failing exit code comes from warnings configured with `fail-on`.
-    # `fail-on` may name only some of the shown warnings, so the line does not count them.
+    # Without failures or errors, a failing exit code comes from `fail-on` warnings; it may name only some, so no count.
     elif warnings and exit_code == ExitCode.FAILURES:
         message = f"Warnings fail the run in {running_time:.2f}s"
         color = "red"
@@ -205,7 +201,6 @@ def append_replay_command(code_sample: str | None, case_id: str | None) -> str |
 
 
 def format_duration(duration_ms: int) -> str:
-    """Format duration in milliseconds to seconds with 2 decimal places."""
     return f"{duration_ms / 1000:.2f}s"
 
 
@@ -229,8 +224,7 @@ def make_progress_bar(console: Console, *, indent: str = "", transient: bool = T
 
 
 def _degrade_unencodable_glyphs(stream: object) -> None:
-    # Status glyphs have no representation in every output encoding (CP1252 is the Windows default, and
-    # redirecting to a file drops UTF-8). Substitute them instead of aborting the run mid-output.
+    # Status glyphs may not encode (CP1252 on Windows, or redirected output); replace them instead of aborting mid-run.
     if isinstance(stream, io.TextIOWrapper) and stream.errors == "strict":
         stream.reconfigure(errors="replace")
 
@@ -307,7 +301,6 @@ class LoadingProgressManager(SpinnerProgressManager):
         self.location = location
 
     def get_completion_message(self) -> Text:
-        """Generate completion message including duration."""
         from rich.style import Style
         from rich.text import Text
 
@@ -352,7 +345,6 @@ class LoadingProgressManager(SpinnerProgressManager):
 
 
 def display_section_name(title: str, separator: str = "=", **kwargs: object) -> None:
-    """Print section name centered with separators."""
     message = format_banner(title, width=get_terminal_width(), separator=separator)
     kwargs.setdefault("bold", True)
     click.echo(style(message, **kwargs))
@@ -370,7 +362,7 @@ def failure_formatter(block: MessageBlock, content: str) -> str:
 
 
 def replay_command(group: GroupedFailures, *, record_crashes: bool) -> str | None:
-    # Only hint `st replay` when a crash file was actually recorded for this case.
+    # Only hint `st replay` when a crash file was recorded for this case.
     if record_crashes and group.case_id and any(is_reproducible_failure(failure) for failure in group.failures):
         return f"st replay {group.case_id}"
     return None
@@ -379,7 +371,6 @@ def replay_command(group: GroupedFailures, *, record_crashes: bool) -> str | Non
 def display_failures_for_single_test(
     config: OutputConfig, label: str, checks: Iterable[GroupedFailures], *, record_crashes: bool
 ) -> None:
-    """Display failures for a single operation."""
     display_section_name(label, "_", fg="red")
     for idx, group in enumerate(checks, 1):
         replay = replay_command(group, record_crashes=record_crashes)
@@ -395,7 +386,6 @@ def display_failures_for_single_test(
 
 
 def display_failures(statistic: Statistic, config: OutputConfig, *, record_crashes: bool) -> None:
-    """Display all failures in the test run."""
     if not statistic.failures:
         return
     display_section_name("FAILURES")
@@ -618,10 +608,7 @@ def display_fatal_error(
     *,
     wait_for_schema: float | int | None = None,
 ) -> None:
-    """Display a fatal error and raise click.Abort.
-
-    Handles both loader errors (schema loading failures) and internal execution errors.
-    """
+    """Display a fatal error, either a schema loading failure or an internal error, and raise `click.Abort`."""
     from rich.text import Text
 
     from schemathesis.core.errors import HookExecutionError, format_exception, split_traceback

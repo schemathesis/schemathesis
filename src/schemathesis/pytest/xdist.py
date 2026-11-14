@@ -57,11 +57,7 @@ SCHEMATHESIS_SEED_KEY = "schemathesis_seed"
 
 
 class _MimeProxy:
-    """Carries a mime-type string when replaying serialized attachment calls.
-
-    Satisfies the _HasMimeType protocol (runtime_checkable) checked inside
-    AllureWriter.accumulate_attachment.
-    """
+    """Carries a mime-type string when replaying serialized attachment calls to the Allure writer."""
 
     __slots__ = ("mime_type",)
 
@@ -70,11 +66,7 @@ class _MimeProxy:
 
 
 class _CaseMetaProxy:
-    """Minimal case proxy for controller-side deserialized recorders.
-
-    Holds only generation metadata - full Case objects carry APIOperation/schema
-    references that are not suitable for cross-process serialization.
-    """
+    """Controller-side case stand-in with only generation metadata; full cases do not serialize across processes."""
 
     __slots__ = ("meta",)
 
@@ -282,10 +274,9 @@ def _rebuilt_failure_class(code: str) -> type[Failure]:
 
 
 def _schema_id(schema: SchemaMetadata) -> str:
-    """Stable cross-process identifier for a schema instance.
+    """Stable cross-process id from the schema location, or raw content for in-memory schemas, and its report config.
 
-    Uses the schema's source location when available; falls back to the raw schema content for in-memory schemas.
-    The writer configuration separates identical schemas whose results belong to different reports.
+    The report config separates identical schemas whose results belong to different reports.
     """
     source = schema.location or jsonschema_rs.canonical.json.to_string(schema.raw_schema)
     writer_config = _serialize_writer_config(schema)

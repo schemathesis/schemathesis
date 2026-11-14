@@ -34,7 +34,7 @@ def make_flask_app_from_schema(schema: dict[str, Any]) -> Flask:
 
     @app.before_request
     def _capture_request() -> None:
-        # Skip startup capability probes — they are infrastructure, not user-facing requests.
+        # Skip startup capability probes: they are infrastructure, not user-facing requests.
         if HEADER_NAME in request.headers:
             return
         snapshot = CapturedRequest(
@@ -92,8 +92,7 @@ _HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
 
 
 def make_permissive_flask_app(schema: dict[str, Any]) -> Flask:
-    # Answers 200 to any unmatched path so tests that only care about CLI behavior
-    # don't accumulate 404 noise from generated requests.
+    # Answers 200 to any unmatched path, so CLI-behavior tests get no 404 noise from generated requests.
     app = make_flask_app_from_schema(schema)
 
     @app.route("/<path:_unused>", methods=_HTTP_METHODS)

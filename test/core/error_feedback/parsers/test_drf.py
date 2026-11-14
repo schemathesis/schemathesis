@@ -127,8 +127,7 @@ def test_drf_parser_walks_edge_cases(body, expected):
 
 
 def test_drf_parser_walks_skips_non_string_dict_keys():
-    # JSON deserialisation usually gives all-string keys, but custom decoders
-    # could yield int keys; the walker treats them as garbage and continues.
+    # Custom decoders may yield int keys; the walker skips them.
     assert list(_walk({1: ["msg"], "name": ["x"]})) == [(("name",), "x")]
 
 
@@ -139,8 +138,7 @@ def test_drf_parser_can_parse_bails_on_pathological_depth():
         wrapper: list = []
         nested.append({"y": wrapper})
         nested = wrapper
-    # The deepest leaf is well past the depth cap; can_parse must still return
-    # cleanly without scanning forever.
+    # The deepest leaf sits past the depth cap; `can_parse` must still return without scanning forever.
     assert DRFParser().can_parse(body=body) is False
 
 
@@ -461,7 +459,7 @@ def test_drf_parser_end_to_end_list_index_attribution(make_operation, case_facto
 
 def test_drf_parser_end_to_end_nested_serializer(make_operation, case_factory):
     obs = parse_observations(DRFParser(), _DRF_NESTED_BODY, make_operation, case_factory)
-    # Only the recognised "This field is required." emits — "Enter a valid value." is unmapped.
+    # Only "This field is required." is recognised; "Enter a valid value." is unmapped.
     assert obs == (
         drf_obs(
             op="POST /api/users",

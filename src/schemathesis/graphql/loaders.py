@@ -204,12 +204,9 @@ def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) 
     try:
         document = graphql.build_schema(data)
         result = graphql.execute(document, get_introspection_query_ast())
-        # TYPES: We don't pass `is_awaitable` above, therefore `result` is of the `ExecutionResult` type
+        # Without `is_awaitable`, `result` is an `ExecutionResult`
         result = cast(graphql.ExecutionResult, result)
-        # TYPES:
-        #  - `document` is a valid schema, because otherwise `build_schema` will rise an error;
-        #  - `INTROSPECTION_QUERY` is a valid query - it is known upfront;
-        # Therefore the execution result is always valid at this point and `result.data` is not `None`
+        # `build_schema` validated `document` and the introspection query is fixed, so `result.data` is not `None`
         schema = cast(dict[str, Any], result.data)
         # A schema library in the same process can replace graphql-core's shared `isOneOf` resolver with its own
         for type_ in schema["__schema"]["types"]:

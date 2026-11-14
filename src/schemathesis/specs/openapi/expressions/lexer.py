@@ -1,5 +1,3 @@
-"""Lexical analysis of runtime expressions."""
-
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from enum import Enum, unique
@@ -17,13 +15,9 @@ class TokenType(int, Enum):
 
 @dataclass(slots=True)
 class Token:
-    """Lexical token that may occur in a runtime expression."""
-
     value: str
     end: int
     type_: TokenType
-
-    # Helpers for cleaner instantiation
 
     @classmethod
     def variable(cls, value: str, end: int) -> "Token":
@@ -48,8 +42,6 @@ class Token:
     @classmethod
     def dot(cls, end: int) -> "Token":
         return cls(".", end, TokenType.DOT)
-
-    # Helpers for simpler type comparison
 
     @property
     def is_string(self) -> bool:
@@ -80,7 +72,6 @@ TokenGenerator = Generator[Token, None, None]
 
 
 def tokenize(expression: str) -> TokenGenerator:
-    """Do lexical analysis of the expression and return a list of tokens."""
     cursor = 0
 
     def is_eol() -> bool:
@@ -116,16 +107,7 @@ def tokenize(expression: str) -> TokenGenerator:
             move()
         elif current_symbol() == "#":
             start = cursor
-            # Symbol '}' is valid inside a JSON pointer, but also denotes closing of an embedded runtime expression
-            # This is an ambiguous situation, for example:
-            # Expression: `ID_{$request.body#/foo}}`
-            # Body: `{"foo}": 1, "foo": 2}`
-            # It could be evaluated differently:
-            #   - `ID_1` if we take the last bracket as the closing one
-            #   - `ID_2}` if we take the first bracket as the closing one
-            # In this situation we take the second approach, to support cases like this:
-            # `ID_{$response.body#/foo}_{$response.body#/bar}`
-            # Which is much easier if we treat `}` as a closing bracket of an embedded runtime expression
+            # A `}` ends the pointer even though pointers allow it, to support `{$request.body#/a}_{$request.body#/b}`
             move_until(lambda: is_eol() or current_symbol() == "}")
             yield Token.pointer(expression[start:cursor], cursor - 1)
         else:

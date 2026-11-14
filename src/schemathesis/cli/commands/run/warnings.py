@@ -35,7 +35,6 @@ class StatusCodeStatistic:
     classify_status: Callable[[int], StatusClass]
 
     def ratio_for(self, status_class: StatusClass) -> float:
-        """Calculate the ratio of responses with a status of the given class."""
         if self.total == 0:
             return 0.0
         return self._count(status_class) / self.total
@@ -47,32 +46,27 @@ class StatusCodeStatistic:
         return sum(count for code, count in self.counts.items() if self.classify_status(code) in status_classes)
 
     def _get_4xx_breakdown(self) -> tuple[int, int, int]:
-        """Get breakdown of client errors: (not_found_count, other_count, total_count).
-
-        Auth, conflict and rate-limit responses say nothing about the data sent, so they are left out.
-        """
+        """Count (not found, other, total) client errors, leaving out auth, conflict and rate-limit responses."""
         count_404 = self._count(StatusClass.NOT_FOUND)
         count_other_4xx = self._count(StatusClass.CLIENT_ERROR, StatusClass.METHOD_NOT_ALLOWED)
         total_4xx = count_404 + count_other_4xx
         return count_404, count_other_4xx, total_4xx
 
     def _is_only_4xx_responses(self) -> bool:
-        """Check if all responses are client errors, internal server errors aside."""
+        """Whether all responses are client errors, internal server errors aside."""
         classes = {self.classify_status(code) for code in self.counts}
         return all(status_class.is_client_error for status_class in classes - {StatusClass.INTERNAL_ERROR})
 
     def _can_warn_about_4xx(self) -> bool:
-        """Check basic conditions for 4xx warnings."""
         if self.total == 0:
             return False
-        # Skip if only auth errors
         classes = {self.classify_status(code) for code in self.counts}
         if classes <= {StatusClass.UNAUTHENTICATED, StatusClass.FORBIDDEN, StatusClass.INTERNAL_ERROR}:
             return False
         return self._is_only_4xx_responses()
 
     def should_warn_about_missing_test_data(self) -> bool:
-        """Check if an operation should be warned about missing test data (significant 404 responses)."""
+        """Whether 404 responses are significant enough to warn about missing test data."""
         if not self._can_warn_about_4xx():
             return False
 
@@ -84,7 +78,7 @@ class StatusCodeStatistic:
         return (count_404 / total_4xx) >= OTHER_CLIENT_ERRORS_THRESHOLD
 
     def should_warn_about_validation_mismatch(self) -> bool:
-        """Check if an operation should be warned about validation mismatch (significant 400/422 responses)."""
+        """Whether 400/422 responses are significant enough to warn about a validation mismatch."""
         if not self._can_warn_about_4xx():
             return False
 
@@ -104,11 +98,7 @@ MIN_CALLS_FOR_VALID_RATE = 10
 
 
 def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
-    """Classify every positive case by what the API did with it.
-
-    Auth rejections and server errors say nothing about whether the data was acceptable, so they
-    stay out of the count entirely rather than counting against the rate.
-    """
+    """Classify every positive case by what the API did with it; auth rejections and server errors are not counted."""
     outcomes = ValidRate()
     for case in recorder.cases.values():
         if not _is_positive(case):
@@ -131,11 +121,9 @@ def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
 def aggregate_status_codes(
     recorder: RecordedScenario, classify_status: Callable[[int], StatusClass], *, positive_only: bool = False
 ) -> StatusCodeStatistic:
-    """Analyze status codes the operation answered with.
+    """Count the status codes the operation answered with, skipping requests with an undeclared method.
 
-    Requests with a method the operation does not declare reach a different operation, or none,
-    so their responses say nothing about this one. With `positive_only`, responses to cases meant
-    to be rejected are left out too.
+    Those reach another operation or none. With `positive_only`, responses to cases meant to be rejected are left out.
     """
     counts: dict[int, int] = {}
     total = 0
@@ -188,8 +176,7 @@ def auth_error_codes(statistic: StatusCodeStatistic, recorder: RecordedScenario)
 def missing_base_path(operation: APIOperation) -> str | None:
     """The path the schema declares that the configured base URL leaves out, if any.
 
-    `--url` is the complete base URL by design, so nothing is merged from the schema. When every
-    request 404s, the difference between the two is the likely cause.
+    `--url` is the full base URL, nothing is merged from the schema; if every request 404s, this is the likely cause.
     """
     schema = operation.schema
     configured = schema.config.base_url
@@ -228,7 +215,7 @@ def _schema_warning_recorder(data: WarningData, warning: SchemaWarning) -> Calla
     if kind is SchemathesisWarning.MISSING_DESERIALIZER:
         return partial(_add_by_group, data.missing_deserializer, warning.group, label, message)
     if kind is SchemathesisWarning.UNUSED_OPENAPI_AUTH:
-        # UnusedOpenAPIAuthWarning has no operation_label (schema-level)
+        # Schema-level warning without an operation label
         return partial(data.unused_openapi_auth.add, message)
     if kind is SchemathesisWarning.UNSUPPORTED_REGEX:
         return partial(_add_by_label, data.unsupported_regex, label, message)
@@ -263,11 +250,7 @@ def _is_positive(case: CaseNode) -> bool:
 
 
 def any_positive_is_accepted(recorder: RecordedScenario) -> bool:
-    """Whether the API served any of the positive test cases.
-
-    Negative cases are excluded: an undocumented method may well be served while the operation
-    itself is refused.
-    """
+    """Whether the API served any positive test case; an undocumented method may be served when the operation is not."""
     for case in recorder.cases.values():
         if not _is_positive(case):
             continue
@@ -361,7 +344,7 @@ class WarningCollector:
         try:
             operation = ctx.find_operation(event.label)
         except RefResolutionError:
-            # This error will be reported elsewhere anyway
+            # Reported elsewhere
             return None
 
         warnings = self.config.warnings_for(operation=operation)
@@ -375,7 +358,6 @@ class WarningCollector:
                 self.data.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
                 if self.data.auth_flow_suggestion is None and operation is not None:
                     self.data.auth_flow_suggestion = auth_flow_suggestion(operation.schema)
-                # Check if this warning should cause test failure
                 if warnings.should_fail(SchemathesisWarning.MISSING_AUTH):
                     self.fails_on_auth.add(event.recorder.label)
 
@@ -393,8 +375,7 @@ class WarningCollector:
                 SchemathesisWarning.NOT_SERVED, lambda: self.data.not_served.add(event.recorder.label), warnings
             )
 
-        # A wrong base URL 404s everything, and those 404s trip other checks - so this must not be
-        # gated on the scenario passing, unlike the generic 404 warning below.
+        # Not gated on success, unlike the 404 warning below: a wrong base URL 404s everything and fails other checks.
         if (
             warnings.should_display(SchemathesisWarning.BASE_URL_MISMATCH)
             and GenerationMode.POSITIVE
@@ -412,7 +393,7 @@ class WarningCollector:
                     warnings,
                 )
 
-        # Warn if all positive test cases got 4xx in return and no failure was found
+        # All positive test cases got 4xx and no failure was found
         if (
             event.status == Status.SUCCESS
             and (
@@ -435,8 +416,7 @@ class WarningCollector:
                     lambda: self.data.validation_mismatch.add(event.recorder.label),
                     warnings,
                 )
-            # Where the status is the same whether the request was served or refused, the two checks above
-            # stay silent; the response bodies are the only evidence either way.
+            # When served and refused requests share a status, only the response bodies tell them apart.
             if operation is not None and not operation.schema.specification.supports_feature(
                 SpecificationFeature.STATUS_CODE_ANALYSIS
             ):
@@ -446,8 +426,7 @@ class WarningCollector:
                     warnings,
                 )
 
-        # A run that did not ask for positive data has no valid-input rate worth reporting; the few
-        # positive cases other phases contribute are incidental.
+        # Without positive generation, the few positive cases other phases add give no valid-input rate worth reporting.
         if (
             GenerationMode.POSITIVE
             not in self.config.generation_for(operation=operation, phase=event.phase.value).modes
@@ -457,8 +436,7 @@ class WarningCollector:
         outcomes = positive_call_outcomes(event.recorder)
         if outcomes.total:
             self.data.valid_rates.setdefault(event.recorder.label, {})[event.phase.value] = outcomes
-            # An operation nothing reached at all belongs to the two warnings above, which say more
-            # about why. This one is for the middle ground they leave silent.
+            # Operations nothing reached get the two warnings above; this one covers the middle ground they leave out.
             if (
                 outcomes.accepted
                 and outcomes.total >= MIN_CALLS_FOR_VALID_RATE
@@ -541,8 +519,7 @@ class WarningCollector:
             self._handle_warning(SchemathesisWarning.UNMATCHED_FILTER, partial(self.data.unmatched_filter.add, message))
 
     def _check_stateful_warnings(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
-        # If stateful testing had successful responses for API operations that were marked with "missing_test_data"
-        # warnings, then remove them from warnings
+        # Stateful responses that served an operation withdraw its missing-test-data warning
         for key, node in event.recorder.cases.items():
             label = node.value.operation.label
             self.data.stateful_exercised.add(label)

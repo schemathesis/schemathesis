@@ -23,7 +23,5 @@ class FlaskAdapter:
         from flask import Flask
 
         assert isinstance(app, Flask)
-        # `Flask(__name__)` records the module the app is defined in. Its resolvers and
-        # module-level literals live there even when the request handler is a library view
-        # (e.g. a GraphQL view), which route scanning alone cannot reach.
+        # Route scanning misses the app module's resolvers and literals when handlers are library views, e.g. GraphQL.
         return [app.import_name]

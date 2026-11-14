@@ -101,7 +101,6 @@ def prepare_multipart_v3(
     properties = body_param.form_properties if body_param is not None else {}
     for name, value in form_data.items():
         property_schema = properties.get(name)
-        # Use the selected content type if available, otherwise check encoding definition
         content_type = None
         if selected_content_types and name in selected_content_types:
             content_type = selected_content_types[name]

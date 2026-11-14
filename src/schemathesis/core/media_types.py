@@ -22,8 +22,7 @@ JSON_MEDIA_TYPES: frozenset[tuple[str, str]] = frozenset(
 
 FORM_MEDIA_TYPES: frozenset[str] = frozenset(["multipart/form-data", "application/x-www-form-urlencoded"])
 
-# Registry of user-supplied strategies for content types. Populated via the public
-# `schemathesis.openapi.media_type(...)` API, but the storage is spec-agnostic.
+# Strategies registered via `schemathesis.openapi.media_type(...)`; the storage itself is spec-agnostic.
 MEDIA_TYPE_STRATEGIES: dict[str, st.SearchStrategy[bytes]] = {}
 
 
@@ -91,7 +90,7 @@ def _parse_header(line: str) -> tuple[str, dict]:
 
 @lru_cache
 def parse(media_type: str) -> tuple[str, str]:
-    """Parse Content Type and return main type and subtype."""
+    """Lowercase `(main type, subtype)`; raises `MalformedMediaType`."""
     try:
         media_type, _ = _parse_header(media_type)
         main_type, sub_type = media_type.split("/", 1)
@@ -107,10 +106,7 @@ def parse_list(value: object) -> list[str]:
 
 
 def is_json(value: str) -> bool:
-    """Detect whether the content type is JSON-compatible.
-
-    For example - ``application/problem+json`` matches.
-    """
+    """True for JSON-compatible media types, e.g. `application/problem+json`."""
     return is_json_parts(parse(value))
 
 
@@ -128,21 +124,16 @@ _YAML_MEDIA_TYPE_PARTS: frozenset[tuple[str, str]] = frozenset(parse(media_type)
 
 
 def is_yaml(value: str) -> bool:
-    """Detect whether the content type is YAML-compatible.
-
-    For example - ``application/apply-patch+yaml`` matches.
-    """
+    """True for YAML-compatible media types, e.g. `application/apply-patch+yaml`."""
     main, sub = parse(value)
     return (main, sub) in _YAML_MEDIA_TYPE_PARTS or (main == "application" and sub.endswith("+yaml"))
 
 
 def is_plain_text(value: str) -> bool:
-    """Detect variations of the ``text/plain`` media type."""
     return parse(value) == ("text", "plain")
 
 
 def is_sse(value: str | None) -> bool:
-    """Detect the text/event-stream media type for Server-Sent Events."""
     if value is None:
         return False
     try:
@@ -162,7 +153,6 @@ def is_json_sequence(value: str | None) -> bool:
 
 
 def is_json_sequence_parts(media_type: tuple[str, str]) -> bool:
-    """Detect JSON Lines and JSON Text Sequences from a parsed tuple."""
     main, sub = media_type
     return main == "application" and (sub in ("jsonl", "x-ndjson", "json-seq") or sub.endswith("+json-seq"))
 
@@ -174,7 +164,6 @@ def is_json_text_sequence(value: str) -> bool:
 
 
 def is_form_urlencoded(value: str | None) -> bool:
-    """Detect the application/x-www-form-urlencoded media type."""
     if value is None:
         return False
     try:
@@ -184,7 +173,6 @@ def is_form_urlencoded(value: str | None) -> bool:
 
 
 def is_multipart(value: str | None) -> bool:
-    """Detect any ``multipart/*`` media type."""
     if value is None:
         return False
     try:
@@ -194,7 +182,6 @@ def is_multipart(value: str | None) -> bool:
 
 
 def is_json_parts(media_type: tuple[str, str]) -> bool:
-    """Detect variations of the ``application/json`` media type from a parsed tuple."""
     if media_type in JSON_MEDIA_TYPES:
         return True
     main, sub = media_type
@@ -215,13 +202,11 @@ def is_sent_as_text_parts(media_type: tuple[str, str]) -> bool:
 
 
 def is_xml(value: str) -> bool:
-    """Detect variations of the ``application/xml`` media type."""
     _, sub = parse(value)
     return sub == "xml" or sub.endswith("+xml")
 
 
 def is_xml_parts(media_type: tuple[str, str]) -> bool:
-    """Detect variations of the ``application/xml`` media type from a parsed tuple."""
     _, sub = media_type
     return sub == "xml" or sub.endswith("+xml")
 
@@ -232,7 +217,7 @@ def is_form_parts(media_type: tuple[str, str] | None) -> bool:
 
 
 def matches_parts(expected: tuple[str, str], actual: tuple[str, str]) -> bool:
-    """Check if two parsed media types match with wildcard support."""
+    """True if `actual` matches `expected`, where `*` in `expected` is a wildcard."""
     expected_main, expected_sub = expected
     actual_main, actual_sub = actual
     main_matches = expected_main == "*" or expected_main == actual_main

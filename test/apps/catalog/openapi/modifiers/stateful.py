@@ -128,7 +128,7 @@ class SingleLink:
 
 @dataclass(slots=True)
 class BearerAuth:
-    # Server enforces a Bearer token. Schema does NOT declare auth.
+    # The server enforces a Bearer token the schema does not declare.
     token: str
     priority: int = 0
 
@@ -139,8 +139,7 @@ class BearerAuth:
 
 @dataclass(slots=True)
 class IgnoredAuth:
-    # Schema declares Bearer auth but the server does not enforce it.
-    # Used to test the ignored_auth check detection.
+    # The schema declares Bearer auth the server does not enforce, for the `ignored_auth` check.
     token: str = "ignored"
     priority: int = 0
 
@@ -291,8 +290,7 @@ class ReturnPlainText:
         spec = app.config["schema"]
         # Pin name to a fixed value so snapshots stay stable.
         spec["components"]["schemas"]["NewUser"]["properties"]["name"] = {"enum": ["fixed-name"]}
-        # Every user gets the same ID, so a `GET` linked from `DELETE` finds a re-created user and the reported chain
-        # would depend on which path a seed reaches first
+        # All users share one ID, so a `GET` linked from `DELETE` finds a re-created user and the chain varies by seed.
         spec["paths"]["/users/{userId}"]["delete"]["responses"]["204"].pop("links")
         # Only `POST -> GET -> DELETE` extracts data from the plain-text response, so every scenario takes that path.
         post_links = spec["paths"]["/users"]["post"]["responses"]["201"]["links"]
@@ -311,7 +309,6 @@ class OmitRequiredField:
         spec = app.config["schema"]
         # Pin name to a fixed value so snapshots stay stable.
         spec["components"]["schemas"]["NewUser"]["properties"]["name"] = {"enum": ["fixed-name"]}
-        # Keep only DeleteUser link on POST; clear other link maps.
         post_links = spec["paths"]["/users"]["post"]["responses"]["201"]["links"]
         delete_link = post_links["DeleteUser"]
         post_links.clear()
@@ -331,7 +328,7 @@ class ReuseDeletedIds:
 
 @dataclass(slots=True)
 class RequireBearerAuth:
-    """Enable bearer-token enforcement on the server. Spec components advertise the scheme."""
+    """The server enforces bearer tokens; the spec lists the scheme in components only."""
 
     valid_token: str = "real-token"
     priority: int = 0
@@ -379,11 +376,9 @@ class SingleUseBearerTokens:
 
 @dataclass(slots=True)
 class SlowOperations:
-    """Inject per-operation latency into a stateful_users app.
+    """Sleep `latencies[(method, Werkzeug URL rule)]` seconds before the matching handler runs.
 
-    Keys of `latencies` are `(HTTP method, Werkzeug URL rule)` pairs, e.g.
-    `("DELETE", "/users/<int:user_id>")`. The matching handler sleeps for
-    the configured number of seconds before its body runs.
+    Keys look like `("DELETE", "/users/<int:user_id>")`.
     """
 
     latencies: dict[tuple[str, str], float]

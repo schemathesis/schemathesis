@@ -77,7 +77,7 @@ CANONICAL_NUMBER_SCHEMAS = [
     {"type": "number", "allOf": [{"multipleOf": 0.25}, {"multipleOf": 0.75}]},
     {"type": "number", "minimum": -1e308, "maximum": 1e308},
     {"type": "number", "exclusiveMinimum": 0, "maximum": 1e-320},
-    # Bounds outside the float range: only the representable part of the interval can be drawn.
+    # Bounds outside the float range: only the representable part can be drawn.
     {"type": "number", "minimum": -(10**400), "maximum": 10**400},
     # No float clears the minimum, leaving the integers above it.
     {"type": "number", "minimum": 10**400},
@@ -107,7 +107,6 @@ CANONICAL_OBJECT_SCHEMAS = [
     {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "string"}}, "required": ["a"]},
     {"type": "object", "properties": {"a": {"type": "string", "minLength": 2}}},
     {"type": "object", "properties": {"a": {"type": "object", "properties": {"b": {"type": "integer"}}}}},
-    # A required key the schema says nothing else about.
     {"type": "object", "required": ["a"]},
     {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a", "b"]},
     {"type": "object", "properties": {"a": {"anyOf": [{"type": "integer"}, {"type": "string"}]}}},
@@ -118,7 +117,7 @@ CANONICAL_OBJECT_SCHEMAS = [
         ]
     },
     {"type": "object", "additionalProperties": {"type": "integer"}},
-    # The required key is absent from `properties`, so its value answers to `additionalProperties`.
+    # The required key's value answers to `additionalProperties`.
     {"type": "object", "required": ["a"], "additionalProperties": {"type": "string", "minLength": 2}},
     {
         "type": "object",
@@ -147,7 +146,6 @@ CANONICAL_OBJECT_SCHEMAS = [
     {"type": "object", "propertyNames": {"pattern": "x[0-9]+"}, "minProperties": 2},
     {"type": "object", "propertyNames": {"maxLength": 4, "pattern": "^x"}, "minProperties": 2},
     {"type": "object", "propertyNames": {"anyOf": [{"pattern": "x[0-9]+"}, {"maxLength": 3}]}},
-    # A required key `properties` says nothing about, but a pattern does.
     {"type": "object", "patternProperties": {"^a": {"type": "integer"}}, "required": ["ax"]},
     {"type": "object", "properties": {"ab": {"minimum": 1}}, "patternProperties": {"^a": {"type": "integer"}}},
     {
@@ -269,7 +267,7 @@ CANONICAL_ARRAY_SCHEMAS = [
 ]
 
 
-# Formats the validator asserts, so generated values can be checked against the schema itself.
+# Formats the validator asserts, so drawn values can be checked against the schema.
 ASSERTED_FORMATS = [
     "date",
     "date-time",
@@ -292,8 +290,7 @@ ASSERTED_FORMATS = [
 ]
 
 
-# Each row pairs a schema with predicates for values that must be drawable from it. An empty tuple
-# checks only that every drawn value is valid.
+# Each row pairs a schema with predicates some drawn value must meet; `()` only checks validity.
 CANONICAL_CASES = [
     *[(schema, ()) for schema in CANONICAL_NUMBER_SCHEMAS],
     *[(schema, ()) for schema in CANONICAL_INTEGER_SCHEMAS],
@@ -326,8 +323,7 @@ CANONICAL_CASES = [
         # Any lowercase first letter the pattern leaves allowed; one fixed letter is too rare a draw.
         (lambda value: "a" <= value[:1] <= "y",),
     ),
-    # Both violations need a key of their own, and the ceiling has to leave room for them while the
-    # floor still reaches. Room for each is what the bounds on the base draw are computed against.
+    # Each violation needs its own key; the base draw's bounds leave room for both while still reaching the floor.
     (
         {
             "type": "object",
@@ -461,7 +457,6 @@ CANONICAL_CASES = [
         (),
     ),
     ({"type": "array", "items": {"$ref": "#/$defs/n"}, "$defs": {"n": {"type": "integer"}}}, ()),
-    # A pointer through another pointer.
     ({"$ref": "#/$defs/a", "$defs": {"a": {"$ref": "#/$defs/b"}, "b": {"type": "integer"}}}, ()),
     # A schema that names itself: shallow instances are instances, and deeper ones stay reachable.
     (
@@ -477,7 +472,6 @@ CANONICAL_CASES = [
         },
         (lambda value: isinstance(value.get("child"), dict),),
     ),
-    # Two schemas that name each other.
     (
         {
             "$ref": "#/$defs/a",
@@ -488,7 +482,6 @@ CANONICAL_CASES = [
         },
         (),
     ),
-    # Anything at all, and a property nothing satisfies.
     ({}, ()),
     ({"type": "object", "properties": {"a": False}}, (lambda value: "a" not in value,)),
     # A key the pattern claims is drawable even though nothing names it.
@@ -516,7 +509,6 @@ CANONICAL_CASES = [
         },
         (lambda value: any(key.startswith("ab") for key in value),),
     ),
-    # A closed schema whose only admitted keys come from the pattern.
     (
         {"type": "object", "patternProperties": {"^a": {"type": "integer"}}, "additionalProperties": False},
         (lambda value: len(value) > 1,),
@@ -558,7 +550,6 @@ CANONICAL_CASES = [
     # `#` names the document itself; canonicalization resolves these cycles before generation sees them.
     ({"type": "object", "properties": {"child": {"$ref": "#"}}}, ()),
     ({"type": "object", "properties": {"kids": {"type": "array", "items": {"$ref": "#"}}}}, ()),
-    # A demanded element pointing back at the document.
     ({"contains": {"$ref": "#"}}, (lambda value: isinstance(value, list) and len(value) > 0,)),
     ({"contains": {"required": ["a"], "$ref": "#"}}, (lambda value: isinstance(value, list) and len(value) > 0,)),
     (
@@ -586,7 +577,7 @@ CANONICAL_CASES = [
         },
         (lambda value: "A" in value and "B" in value,),
     ),
-    # Every item matches the demand, so the ceiling — not the filler — carries the lower size bound.
+    # Every item matches the demand, so the ceiling, not the filler, carries the lower size bound.
     (
         {
             "type": "array",
@@ -597,7 +588,7 @@ CANONICAL_CASES = [
         },
         (lambda value: len(value) > 3,),
     ),
-    # Only the prefix can meet the demand, so that position takes it on — and the tail still grows.
+    # Only the prefix can meet the demand, so that position takes it on, and the tail still grows.
     (
         {
             "type": "array",
@@ -640,14 +631,12 @@ CANONICAL_CASES = [
         {"type": "array", "contains": {"type": "integer"}, "minContains": 0, "maxContains": 0, "minItems": 2},
         (lambda value: len(value) > 2,),
     ),
-    # Three positions over a two-value domain cannot all differ, so the array stops early — but it
-    # still reaches the length that does work, in either order.
+    # Three positions cannot all differ over two values, so the array stops at two, in either order.
     (
         {"type": "array", "prefixItems": [{"enum": [1, 2]}, {"enum": [1, 2]}, {"enum": [1, 2]}], "uniqueItems": True},
         (lambda value: value == [1, 2], lambda value: value == [2, 1]),
     ),
-    # A demand contributing no element leaves nothing to build from its schema, and the array is
-    # still more than the empty one that trivially clears it.
+    # A demand contributing no element builds nothing, yet the array still grows past the empty one.
     (
         {
             "type": "array",
@@ -668,7 +657,7 @@ CANONICAL_CASES = [
         },
         (lambda value: len(value) == 1,),
     ),
-    # A position may take the demand on, so the shortest array is reachable — and the longer one.
+    # A position may take the demand on, so the shortest array is reachable, and so is a longer one.
     (
         {"type": "array", "prefixItems": [{"type": "integer"}], "contains": {"const": 7}, "maxItems": 2},
         (lambda value: value == [7], lambda value: len(value) == 2),
@@ -785,7 +774,7 @@ CANONICAL_CASES = [
         },
         (lambda value: len(value) == 4,),
     ),
-    # Extra keys have no value to carry — the object stays, with nothing but its named keys.
+    # Extra keys have no value to carry, so the object stays with only its named keys.
     (
         {
             "type": "object",
@@ -1081,8 +1070,7 @@ CANONICAL_CASES = [
         },
         (),
     ),
-    # The envelope pointer names what every level carries, so a level that draws without it is one
-    # nothing accepts - the position has to be built from both, not judged after the draw.
+    # Every level carries the envelope, so a level drawn without it is invalid; build each position from both.
     (
         {
             "$defs": {
@@ -1160,9 +1148,7 @@ CANONICAL_CASES = [
 ]
 
 
-# NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
-# a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and
-# gw11". Derive the ids from the schemas alone.
+# Not `ids=str`: pytest renders predicate tuples with memory addresses, so xdist workers collect different ids.
 CANONICAL_CASE_IDS = [str(schema) for schema, _ in CANONICAL_CASES]
 
 
@@ -1173,8 +1159,7 @@ def test_canonical_generation(schema, reaches):
         schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS
     ).is_valid
 
-    # A format generator cannot be steered by a pattern or a length, so those draws are discarded.
-    # A starved CI runner makes metaschema draws slow enough to trip `too_slow`; validity is what this checks.
+    # Health checks stay off: format draws discard pattern and length misses, and starved CI runners trip `too_slow`.
     @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
@@ -1201,8 +1186,7 @@ def test_canonical_generation(schema, reaches):
     ids=["root-under-any-of", "root-under-all-of", "root-via-definition", "target-leads-back"],
 )
 def test_barred_pointer_cycle_never_unsound(schema):
-    # A complement that points on reads at whatever depth it is reached from, not the one the schema
-    # means, so it must not be the thing that decides which values are drawn.
+    # A complement that points on reads at the depth it is reached from, so it must not decide what is drawn.
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
     @run_given(
@@ -1312,8 +1296,7 @@ def test_canonical_generation_reaches(schema, reaches):
 
 
 def test_optional_properties_are_size_biased():
-    # Including each optional key on its own coin flip lands on half of them, and that compounds
-    # at every nesting level into payloads orders of magnitude larger than the schema calls for.
+    # A coin flip per optional key includes half of them, compounding per nesting level into oversized payloads.
     schema = {
         "type": "object",
         "properties": {f"p{index}": {"type": "boolean"} for index in range(30)},
@@ -1439,8 +1422,7 @@ def test_canonical_integer_generation_emits_python_ints(schema):
 
 
 def test_canonical_reference_is_not_inlined(ctx):
-    # One target, many pointers: the strategy is built once and shared, where inlining would
-    # rebuild the same subtree for every pointer.
+    # The strategy for one target is built once and shared; inlining would rebuild it for every pointer.
     definitions = {"text": {"type": "string", "minLength": 3}}
     properties = {f"p{index}": {"$ref": "#/$defs/text"} for index in range(20)}
     schema = {"type": "object", "properties": properties, "required": list(properties), "$defs": definitions}
@@ -1455,13 +1437,12 @@ def test_canonical_reference_is_not_inlined(ctx):
 
 
 RECURSIVE_SHAPES = [
-    # A pointer under `properties`, the plain nesting case.
     {"type": "object", "properties": {"child": {"$ref": "#/$defs/node"}, "name": {"type": "string"}}},
-    # A pointer under `items`, where the value branches at every level.
+    # The value branches at every level.
     {"type": "array", "items": {"$ref": "#/$defs/node"}, "maxItems": 2},
-    # A pointer inside an `allOf`, which canonicalization cannot fold away.
+    # Canonicalization cannot fold an `allOf` around a pointer.
     {"allOf": [{"$ref": "#/$defs/node"}, {"type": "object"}]},
-    # A pointer inside a `oneOf`, where the other branch is what ends the value.
+    # The other branch is what ends the value.
     {
         "oneOf": [
             {"type": "integer"},
@@ -1470,18 +1451,16 @@ RECURSIVE_SHAPES = [
     },
     # A pointer through a second schema and back.
     {"type": "object", "properties": {"other": {"$ref": "#/$defs/other"}}},
-    # A pointer at a position `prefixItems` names, where the array may also stop before it.
+    # The array may stop before the pointer's position.
     {"type": "array", "prefixItems": [{"$ref": "#/$defs/node"}, {"type": "integer"}], "maxItems": 2},
-    # A pointer under `additionalProperties`, where every undeclared key nests another level.
+    # Every undeclared key nests another level.
     {"type": "object", "additionalProperties": {"$ref": "#/$defs/node"}},
-    # Pointers both at a `prefixItems` position and in the positions that follow it.
     {
         "type": "array",
         "prefixItems": [{"type": "string"}, {"$ref": "#/$defs/node"}],
         "items": {"$ref": "#/$defs/node"},
         "minItems": 1,
     },
-    # A pointer under `items` beside a `contains` demand, one level down.
     {
         "type": "object",
         "properties": {
@@ -1493,7 +1472,6 @@ RECURSIVE_SHAPES = [
             "v": {"type": "integer"},
         },
     },
-    # A pointer in the distinct positions after `prefixItems`.
     {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"$ref": "#/$defs/node"}, "uniqueItems": True},
     # A pointer among the positions a `maxContains` ceiling keeps clear of the demand.
     {
@@ -1615,8 +1593,7 @@ def test_canonical_all_of_with_a_pointer_back_into_the_value():
 
 
 def test_canonical_one_of_admits_only_what_a_single_branch_takes():
-    # Canonicalization keeps a `oneOf` whose branches are pointers, since folding one means
-    # unrolling what it names.
+    # Canonicalization keeps a `oneOf` over pointers, since folding a branch unrolls what it names.
     schema = {
         "oneOf": [{"$ref": "#/$defs/small"}, {"$ref": "#/$defs/large"}],
         "$defs": {"small": {"type": "integer", "maximum": 10}, "large": {"type": "integer", "minimum": 0}},
@@ -1715,8 +1692,7 @@ def test_canonical_meta_invalid_schema_is_reported(schema, keyword):
         _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
 
-# Real-world spellings the validator's engine turns down: a character class with `\w` as a range
-# bound, a lone surrogate range, Python's open-ended `{,2}`, and its `\Z` anchor.
+# Real-world patterns the validator rejects: `\w` as a range bound, a lone surrogate range, `{,2}` and `\Z`.
 UNCOMPILABLE_PATTERNS = [
     r"^[\w-.+]+@[\w-.+]+$",
     r"[ -퟿-�\uD800\uDBFF-\uDC00\uDFFF\t]*",
@@ -1732,8 +1708,7 @@ def test_canonical_pattern_the_validator_cannot_compile_is_reported(pattern):
 
 
 def test_canonical_pattern_naming_a_character_outside_the_alphabet(ctx):
-    # `from_regex` refuses a pattern that spells out a character the alphabet excludes, even where
-    # the same pattern admits others it does not. Those values are still fair game.
+    # `from_regex` refuses a pattern naming a character the alphabet excludes; its other values still draw.
     schema = {"type": "string", "pattern": "^[\\x85a-z]{1,10}$"}
     matches = re.compile("^[\x85a-z]{1,10}$").fullmatch
 
@@ -1810,8 +1785,7 @@ def test_canonical_unknown_script_property_is_named():
         _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
 
-# Draft 7 asserts content facets, and only there does the canonical view carry them; Draft 2020-12
-# treats them as annotations and drops them before generation.
+# Only Draft 7 asserts content facets and keeps them in the canonical view; 2020-12 drops them as annotations.
 CONTENT_STRING_CASES = [
     (
         {"type": "string", "contentEncoding": "base64"},
@@ -1825,7 +1799,7 @@ CONTENT_STRING_CASES = [
         {"type": "string", "contentEncoding": "base64", "minLength": 8},
         (lambda value: len(value) > 8,),
     ),
-    # A pattern applies to the encoded text, not to what it decodes to.
+    # A pattern applies to the encoded text.
     (
         {"type": "string", "contentEncoding": "base64", "pattern": "^[A-Za-z0-9+/=]*$"},
         (lambda value: len(b64decode(value, validate=True)) > 2,),
@@ -1865,8 +1839,7 @@ def test_canonical_number_generation_without_representable_values():
 
 
 def test_canonical_number_excluding_integers_under_draft4():
-    # Draft 4 spells "not an integer" on the leaf itself rather than as a barred divisor of one, and a
-    # half-integer grid is where that shows: every other point on it is a whole number.
+    # Draft 4 bars integers on the leaf itself; on a half-integer grid every other point is a whole number.
     schema = {"type": "number", "multipleOf": 0.5, "minimum": 0, "maximum": 5, "not": {"type": "integer"}}
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft4Validator)
     is_valid = jsonschema_rs.Draft4Validator(schema).is_valid
@@ -1880,8 +1853,7 @@ def test_canonical_number_excluding_integers_under_draft4():
 
 @pytest.mark.parametrize("pattern", ["[\\d\\D]", "[\\s\\S]", "[\\w\\W]"], ids=["digit", "space", "word"])
 def test_barred_pattern_naming_every_character(pattern):
-    # Flipping such a class names no character at all, so the draw has to bottom out here rather
-    # than fail inside Hypothesis on an empty alphabet.
+    # The flipped class names no character, so the draw stops here instead of failing on an empty alphabet.
     schema = {"type": "string", "minLength": 1, "not": {"pattern": pattern}}
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
@@ -2068,22 +2040,19 @@ def test_canonical_object_respects_alphabet():
     ],
 )
 def test_typed_group_checks(type_name, admitted, rejected):
-    # Nothing downstream would notice this table being wrong: no canonical body admits a value
-    # outside its own type, so the guard never fires. Pinned directly for that reason.
+    # No canonical body admits a value outside its type, so the guard never fires and only this test pins the table.
     check = strategy._TYPE_CHECKS[type_name]
     assert all(check(value) for value in admitted)
     assert not any(check(value) for value in rejected)
 
 
 def test_arbitrary_json_repr_stays_cheap():
-    # Hypothesis renders the strategy it draws from on its error paths, and nesting an
-    # unrestricted JSON value doubles that text at every level.
+    # Hypothesis renders the strategy on error paths, and a nested unrestricted JSON value doubles that per level.
     assert len(repr(strategy._anything_for(Alphabet()).strategy)) < 30_000
 
 
 def test_canonical_typed_group_keeps_the_type():
-    # `type` and the enum arrive as separate halves of one node: Draft 4 reads `enum` without a type
-    # check, so the type has to be applied on top of whatever the body admits.
+    # Draft 4 reads `enum` without a type check, so the type applies on top of whatever the body admits.
     schema = {"type": "integer", "oneOf": [{"enum": [1, "a"]}, {"enum": [2, None]}]}
     canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft4)
     assert canonical_schema.kind is canonical.CanonicalKind.TYPED_GROUP
@@ -2098,8 +2067,7 @@ def test_canonical_typed_group_keeps_the_type():
 
 
 UNSATISFIABLE_ARRAY_SCHEMAS = [
-    # Nothing clears the demand without matching it, and the ceiling admits fewer matches than
-    # the lower size bound needs.
+    # Nothing clears the demand without matching it, and the ceiling admits fewer matches than the floor needs.
     {
         "type": "array",
         "items": {"type": "string", "pattern": "^a{5,}$"},
@@ -2158,16 +2126,14 @@ UNSATISFIABLE_ARRAY_SCHEMAS = [
         "minItems": 3,
         "uniqueItems": True,
     },
-    # Two positions pinned to the same value. The prefix as a whole has three values to draw from,
-    # so only looking at a subset of it finds the pair that cannot be told apart.
+    # Two positions pinned to one value; only a subset of the three-value prefix shows the clash.
     {
         "type": "array",
         "prefixItems": [{"const": 1}, {"const": 1}, {"enum": [2, 3]}],
         "uniqueItems": True,
         "minItems": 3,
     },
-    # Every position must match the pattern and one of them must not; behind a reference the
-    # contradiction survives canonicalization, leaving the demand nothing to draw.
+    # Every position must match the pattern and one must not; behind a reference this survives canonicalization.
     {
         "$defs": {"tag": {"type": "string", "pattern": "^a+$", "maxLength": 8}},
         "type": "array",
@@ -2179,8 +2145,7 @@ UNSATISFIABLE_ARRAY_SCHEMAS = [
 
 
 def test_canonical_object_violations_leave_no_room_under_the_ceiling():
-    # Each violation lands on a key of its own, and a fresh key never coincides with a required one,
-    # so the ceiling has to fit both. Canonicalization does not fold that into `maxProperties`.
+    # Each violation needs its own fresh key, so the ceiling must fit both; canonicalization does not see that.
     schema = {
         "type": "object",
         "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
@@ -2196,8 +2161,7 @@ def test_canonical_object_violations_leave_no_room_under_the_ceiling():
 
 
 def test_grid_point_past_the_float_range_is_not_a_json_value():
-    # The stand-in for an unspellable grid point must not be `null`, which every one of these schemas
-    # admits nowhere but which would serialize just fine if it ever leaked past the filter.
+    # The stand-in must not be `null`: these schemas reject it, yet it would serialize if it leaked past the filter.
     value = strategy._fraction_to_json_number(Fraction(10**400) / 3)
     assert value is strategy._UNREPRESENTABLE
     assert not isinstance(value, (int, float, str, bool, list, dict))
@@ -2206,8 +2170,7 @@ def test_grid_point_past_the_float_range_is_not_a_json_value():
 
 @pytest.mark.parametrize("schema", UNSATISFIABLE_ARRAY_SCHEMAS, ids=str)
 def test_canonical_array_admits_nothing(schema):
-    # Canonicalization cannot see these contradictions; laying the positions out does, and the answer
-    # is a strategy that draws nothing.
+    # Canonicalization misses these contradictions; laying out the positions finds them and yields an empty strategy.
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     assert built.is_empty
 
@@ -2233,8 +2196,7 @@ def test_canonical_array_reaches_a_floor_past_what_one_draw_fits(items, min_item
 
 
 def test_canonical_array_min_contains_beyond_what_hypothesis_draws():
-    # No looser strategy to filter, so this is reported against the operation. Finding that out must
-    # not cost a strategy per demanded position — that would be gigabytes before the first draw.
+    # Nothing looser to filter, so the operation reports it; a strategy per demanded position would take gigabytes.
     with pytest.raises(InvalidSchema, match="5000000 demanded elements"):
         _canonical_strategy(
             {"type": "array", "items": {"type": "integer"}, "contains": {"const": 7}, "minContains": 5000000},
@@ -2335,8 +2297,7 @@ def test_canonical_string_format_binary():
 
 
 def test_canonical_format_drops_values_over_the_length_bound():
-    # A format generator cannot be steered by length, so the bound can only be filtered for; the
-    # generator reaches 32 characters here and every one of those must be discarded.
+    # A format generator ignores length, so the bound is filtered: 32-character date-times must all be discarded.
     schema = {"type": "string", "format": "date-time", "maxLength": 25}
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 

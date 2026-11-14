@@ -38,12 +38,10 @@ from schemathesis.core.jsonschema.patterns import (
 @pytest.mark.parametrize(
     ("pattern", "min_length", "max_length", "expected"),
     [
-        # Single literal
         ("a", None, 3, "^a{1,3}$"),
         ("a", 3, 3, "^a{3}$"),
         ("a", 0, 3, "^a{1,3}$"),
         ("}?", 1, None, "}{1}"),
-        # Simple quantifiers on a simple group
         (".*", None, 3, "^.{0,3}$"),
         (".*", 0, 3, "^.{0,3}$"),
         (".*", 1, None, ".{1,}"),
@@ -55,7 +53,6 @@ from schemathesis.core.jsonschema.patterns import (
         (".?", 0, 3, "^.{0,1}$"),
         (".*?", 0, 3, "^.{0,3}$"),
         (".+?", 0, 3, "^.{1,3}$"),
-        # Complex quantifiers on a simple group
         (".{1,5}", None, 3, "^.{1,3}$"),
         (".{0,3}", 1, None, ".{1,3}"),
         (".{2,}", 1, 3, "^.{2,3}$"),
@@ -65,18 +62,15 @@ from schemathesis.core.jsonschema.patterns import (
         (".{1,5}+", None, 3, "^.{1,3}$"),
         (".{0,3}+", 1, None, ".{1,3}"),
         (".{2,}+", 1, 3, "^.{2,3}$"),
-        # Group without quantifier
         ("[a-z]", None, 5, "^[a-z]{1,5}$"),
         ("[a-z]", 3, None, "[a-z]{3,}"),
         ("[a-z]", 3, 5, "^[a-z]{3,5}$"),
         ("[a-z]", 1, 5, "^[a-z]{1,5}$"),
         ("a|b", 1, 5, "^[ab]{1,5}$"),
-        # A more complex group with `*` quantifier
         ("[a-z]*", None, 5, "^[a-z]{0,5}$"),
         ("[a-z]*", 3, None, "[a-z]{3,}"),
         ("[a-z]*", 3, 5, "^[a-z]{3,5}$"),
         ("[a-z]*", 1, 5, "^[a-z]{1,5}$"),
-        # With anchors
         ("^[a-z]*", None, 5, "^[a-z]{0,5}$"),
         ("^[a-z]*", 3, 5, "^[a-z]{3,5}$"),
         ("^[a-z]+", 0, 5, "^[a-z]{1,5}$"),
@@ -86,8 +80,7 @@ from schemathesis.core.jsonschema.patterns import (
         ("^.+$", 0, 5, "^.{1,5}$"),
         ("^.{0,1}$", 0, 5, "^.{0,1}$"),
         ("^.$", 0, 5, "^.{1}$"),
-        # Fully anchored single-char content matches exactly one character, so the length
-        # budget may only narrow it - widening would admit strings the pattern rejects.
+        # Fully anchored single-char content matches one character, so the budget may only narrow it.
         ("^[a-z]$", None, 2, "^[a-z]{1}$"),
         ("^[a-z]$", 1, 3, "^[a-z]{1}$"),
         ("^[a-z]$", 2, 5, "^[a-z]$"),
@@ -102,7 +95,6 @@ from schemathesis.core.jsonschema.patterns import (
         ("[a-z]+$", 0, 5, "^[a-z]{1,5}$"),
         (r"\d*", 1, None, r"\d{1,}"),
         (r"0\A", 1, None, r"0{1,}^"),
-        # Noop
         ("abc*def*", 1, 3, "abc*def*"),
         ("[bc]*[de]*", 1, 3, "[bc]*[de]*"),
         ("[bc]3", 1, 3, "[bc]3"),
@@ -112,18 +104,14 @@ from schemathesis.core.jsonschema.patterns import (
         ("b$", None, None, "b$"),
         ("b$", 0, None, "b$"),
         ("}?", 0, None, "}?"),
-        # Literal length is outside of the quantifiers range
+        # The literal's length falls outside the bounds.
         ("^0$", 2, 2, "^0$"),
         ("^0$", 2, None, "^0$"),
         ("^0$", 0, 0, "^0$"),
-        # More complex patterns
-        # Fixed parts with single quantifier
         ("^abc[0-9]*$", None, 5, "^abc[0-9]{0,2}$"),
         ("^-[a-z]{1,10}-$", None, 4, "^-[a-z]{1,2}-$"),
-        # Multiple quantifiers
         (r"^[a-z]{2,4}-\d{4,15}$", 7, 7, r"^[a-z]{2}-\d{4}$"),
         (r"^[a-z]{2,4}-\d{4,15}$", 20, 20, r"^[a-z]{4}-\d{15}$"),
-        # Complex patterns with multiple parts
         ("^[A-Z]{1,3}-[0-9]{2,4}-[a-z]{1,5}$", 8, 8, "^[A-Z]{1}-[0-9]{2}-[a-z]{3}$"),
         (r"^\w{2,4}:\d{3,5}:[A-F]{1,2}$", 10, 10, r"^\w{2}:\d{4}:[A-F]{2}$"),
         (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 7, 7, r"^[a-zA-Z0-9]{2}-\d{4}$"),
@@ -139,10 +127,7 @@ from schemathesis.core.jsonschema.patterns import (
         (r"^abcd[a-zA-Z0-9]{2,4}$", None, 5, r"^abcd[a-zA-Z0-9]{2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 5, None, r"^abcd[a-zA-Z0-9]{2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 5, 10, r"^abcd[a-zA-Z0-9]{2,4}$"),
-        # When greedy would collapse the variable-inner suffix to `{0}`, the
-        # distributor falls back to a balanced split that gives both slots room
-        # — each slot's max gets the budget minus what other slots are required to
-        # consume, so the rewrite admits any skewed distribution the original allows.
+        # Greedy would collapse the suffix to `{0}`; each slot instead gets the budget minus the others' minimums.
         (
             r"^[a-zA-Z0-9]+([-a-zA-Z0-9]?[a-zA-Z0-9])*$",
             5,
@@ -151,18 +136,13 @@ from schemathesis.core.jsonschema.patterns import (
         ),
         (r"^\+[0-9]{5,}$", 6, 6, r"^\+[0-9]{5}$"),
         (r"^abcd$", 50, 50, r"^abcd$"),
-        # Edge cases
-        # Exact-length DP picks a non-zero shape when one fits, avoiding an
-        # unnecessary `{0}` collapse on either optional slot.
+        # An exact length picks a shape with no `{0}` collapse on either optional slot when one fits.
         ("^[a-z]*-[0-9]*$", 3, 3, "^[a-z]{1}-[0-9]{1}$"),
         (r"^[+][\s0-9()-]+$", 1, 20, r"^\+[\s0-9()\-]{1,19}$"),
         (r"^[\+][\s0-9()-]+$", 1, 20, r"^\+[\s0-9()\-]{1,19}$"),
-        # Multiple fixed parts
         ("^abc[0-9]{1,3}def[a-z]{2,5}ghi$", 12, 12, "^abc[0-9]{1}def[a-z]{2}ghi$"),
-        # Others
         ("^(((?:DB|BR)[-a-zA-Z0-9_]+),?){1,}$", None, 6000, r"^(((?:DB|BR)[\-a-zA-Z0-9_]{1,}),{0,1}){1,2000}$"),
-        # Optional `\*?` is preserved (collapsing it to `{0}` would reject "geo:abc*"),
-        # while `\w*` still tightens to use the remaining length budget.
+        # `\*?` stays optional (`{0}` would reject "geo:abc*") while `\w*` tightens to the remaining budget.
         (r"^geo:\w*\*?$", 5, 200, r"^geo:\w{0,196}\*{0,1}$"),
         (r"^[\w\W]$", 1, 3, r"^.{1}$"),
         (r"^[\w\W]+$", 1, 3, r"^.{1,3}$"),
@@ -174,13 +154,10 @@ from schemathesis.core.jsonschema.patterns import (
         (r"^[\W\w]*$", 1, 3, r"^.{1,3}$"),
         (r"^[\W\w]?$", 1, 3, r"^.{1}$"),
         (r"^[\W\w]{2,}$", 1, 3, r"^.{2,3}$"),
-        # Variable-length inner: outer count alone cannot encode maxLength (each
-        # tick may be arbitrarily long), so we pin the variable slot and tighten
-        # the leading slot for minLength only.
-        # At an exact length the leading slot spends the whole budget, so the trailing repeat drops out.
+        # A variable repeat cannot carry `maxLength`; an exact length goes to the leading slot and the repeat drops out.
         (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix\|{3994}(?:,prefix\|{1,}){0}$"),
         (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.[^,]{1}(?:,bar\.spam\.[^,]{1,}){0}$"),
-        # Optional finite group `()?` is preserved while `8+` tightens to use the budget.
+        # `()?` stays optional while `8+` tightens to the budget.
         (r"^\008+()?$", None, 2, r"^\x008{1}(){0,1}$"),
         (r"^\008+()?$", 2, None, r"^\x008{1,}(){0,1}$"),
         (r"^000(000)?$", 4, 5, r"^000(000)?$"),
@@ -188,27 +165,22 @@ from schemathesis.core.jsonschema.patterns import (
         ("(hello){2,5}", None, 12, "^(hello){2}$"),
         ("(abcd)*", 3, 7, "^(abcd){1}$"),
         ("^()?$", 4, 5, "^()?$"),
-        # Global inline flags
         (r"(?i).*", 1, 5, r"(?i)^.{1,5}$"),
         (r"(?i)[a-z]+", 2, 8, r"(?i)^[a-z]{2,8}$"),
         (r"(?im)[a-z]+", 1, 5, r"(?im)^[a-z]{1,5}$"),
         (r"(?s).+", 1, 3, r"(?s)^.{1,3}$"),
-        # \b and \B anchors
         (r"\b[a-z]+\b", 2, 5, r"\b[a-z]{2,5}\b"),
         (r"\B\d+\B", 1, 3, r"\B\d{1,3}\B"),
-        # Non-printable literal (U+200B, 0x100–0xFFFF range) — single-char class collapses to LITERAL
+        # A one-character class of a non-printable character collapses to a `\uXXXX` literal.
         (f"[{chr(0x200B)}]+", 2, 5, "^\\u200b{2,5}$"),
-        # Non-printable range in character class (stays as IN with RANGE)
+        # A non-printable range stays a class.
         (f"[{chr(0x200B)}-{chr(0x200D)}]+", 2, 5, "^[\\u200b-\\u200d]{2,5}$"),
-        # Subpatterns with inline flags
         ("(?i:[a-z])+", 2, 5, "^(?i:[a-z]){2,5}$"),
         ("(?im:[a-z])+", 1, 4, "^(?im:[a-z]){1,4}$"),
         ("(?-i:[A-Z])+", 2, 4, "^(?-i:[A-Z]){2,4}$"),
         ("(?i-m:[a-z])+", 1, 3, "^(?i-m:[a-z]){1,3}$"),
-        # Empty capturing group — zero-length inner
         (r"^()+$", 0, 5, "^(){0}$"),
         (r"^()+$", 1, 5, r"^()+$"),
-        # Multi-char quantified inner in groups
         (r"(\d{3})+", 6, 9, r"^(\d{3}){2,3}$"),
         (r"(\d{3})+", 3, 3, r"^(\d{3}){1}$"),
         (r"([A-Z]{2})+", 4, 10, r"^([A-Z]{2}){2,5}$"),
@@ -222,7 +194,6 @@ from schemathesis.core.jsonschema.patterns import (
         (r"(\d{3})+", 7, 7, r"(\d{3})+"),
         (r"(\d{3})+", 0, 0, r"(\d{3})+"),
         (r"(a|bb)+", 4, 8, "^(a|bb){2,8}$"),
-        # Anchored multi-part with multi-char groups
         (r"^(abc)+(def)+$", 6, 6, r"^(abc){1}(def){1}$"),
         (r"^(abc)+(def)+$", 9, 9, r"^(abc){1}(def){2}$"),
         (r"^(ab)+(cd)+(ef)+$", 6, 6, r"^(ab){1}(cd){1}(ef){1}$"),
@@ -231,7 +202,6 @@ from schemathesis.core.jsonschema.patterns import (
         (r"^(abc)+\d+$", 4, 10, r"^(abc){1,3}\d{1,7}$"),
         (r"^(abc)+(\d)+$", 7, 7, r"^(abc){1}(\d){4}$"),
         (r"^abc(\d{3})+$", 6, 12, r"^abc(\d{3}){1,3}$"),
-        # Patterns containing lookahead / lookbehind assertions inside quantified groups
         (r"^([a-z]+(?<!\s))+$", 1, 5, r"^([a-z]{1,}(?<!\s)){1,5}$"),
         (r"^([a-z]+(?!\s))+$", 1, 5, r"^([a-z]{1,}(?!\s)){1,5}$"),
         (r"^([a-z]+(?<=\s))+$", 1, 5, r"^([a-z]{1,}(?<=\s)){1,5}$"),
@@ -239,51 +209,37 @@ from schemathesis.core.jsonschema.patterns import (
         # Branch alternation with 1 or 2 chars per repetition: the count leaves room for `"a" * 100`.
         (r"^[a-z0-9]([a-z0-9]|-[a-z0-9])*$", 1, 100, r"^[a-z0-9]([a-z0-9]|-[a-z0-9]){0,99}$"),
         (r"^(foo|bar)+$", 3, 12, r"^(foo|bar){1,4}$"),
-        # Outer bound already finite and unchanged; inner content is variable-length
-        # — maxLength cannot be encoded through the outer repetition count alone.
+        # The outer bound is finite and the inner varies, so the outer count cannot encode `maxLength`.
         (r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", 1, 63, r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"),
-        # Optional group with variable inner: minLength absorbed but maxLength unrepresentable.
+        # A variable optional group absorbs `minLength` but cannot encode `maxLength`.
         (r"^([a-z][a-z]*)?$", 1, 5, r"^([a-z][a-z]*)?$"),
-        # Multi-part anchored pattern with an optional variable-length middle group:
-        # the variable-inner middle pin keeps `(...){0,2}` (collapsing it to `{0}`
-        # would reject "Doe-Smith"), while the trailing `\.?` is also pinned.
-        # maxLength cannot be enforced (middle slot can grow unboundedly), but the
-        # leading slot still tightens for minLength.
+        # The middle keeps `{0,2}` (`{0}` rejects "Doe-Smith") and leaves `maxLength` open; the first slot tightens.
         (
             r"^[a-zA-Z]+([ '-][a-zA-Z]+){0,2}\.?$",
             1,
             30,
             r"^[a-zA-Z]{1,30}([ '\-][a-zA-Z]{1,}){0,2}\.{0,1}$",
         ),
-        # Required-only siblings whose combined max can't reach the target minLength —
-        # both greedy and balanced bail and the original schema is kept.
+        # Required siblings cannot reach `minLength` together, so the pattern stays as is.
         (r"^[a-z]{1,3}_[a-z]{1,3}$", 10, 12, r"^[a-z]{1,3}_[a-z]{1,3}$"),
-        # A fixed count never drops below itself to fit the budget - the shorter strings miss the original pattern.
+        # A fixed count never shrinks to fit the budget; shorter strings would miss the original pattern.
         (r"^a?b{2}c{2}d?$", 2, 5, r"^a?b{2}c{2}d?$"),
         (r"^\+[0-9]{5}$", 2, 5, r"^\+[0-9]{5}$"),
-        # Nested unbounded inner (`([a-z]+)+`) — the per-tick max is unbounded so
-        # the slot is pinned and only the outer count is preserved.
+        # An unbounded nested inner stays open; only the outer count carries the budget.
         (r"^([a-z]+)+$", 1, 100, r"^([a-z]{1,}){1,100}$"),
-        # Bounded outer with unbounded nested inner — the outer count cannot bound
-        # the slot, the slot is pinned, and the rewrite stays at the original.
+        # A bounded outer over an unbounded inner cannot bound the slot, so the pattern stays as is.
         (r"^([a-z]+){2,5}$", 1, 50, r"^([a-z]+){2,5}$"),
-        # Multi-quantifier with one zero-contributing slot (empty group). Both the
-        # greedy and balanced distributors recognize the slot as silent and refuse
-        # to use it for the length budget.
+        # The empty group adds no length, so the budget never lands on it and the pattern stays as is.
         (r"^a+()+$", 2, 5, r"^a+()+$"),
-        # Pinned slot with unbounded inner alongside a finite sibling whose max can't
-        # absorb the remaining min-length budget — both distributors must bail rather
-        # than crash, and the original pattern is kept.
+        # A finite sibling cannot absorb the `minLength` a pinned slot leaves; the rewrite bails without crashing.
         (r"^(.|a+){1,3}\d{1,3}$", 100, 100, r"^(.|a+){1,3}\d{1,3}$"),
-        # A possessive part keeps everything it took, so any rewritten count admits strings the
-        # original rejects - `0++0` matches nothing at all, while `0{1,3}0` matches "00".
+        # A possessive part keeps what it took, so rewrites admit more: `0++0` matches nothing, `0{1,3}0` matches "00".
         ("0++0", None, 4, "0++0"),
         ("a{1,3}+a", None, 4, "a{1,3}+a"),
         ("(?:ab)++ab", None, 4, "(?:ab)++ab"),
         ("a+b++c", 1, 4, "a+b++c"),
         (r"^(a*+)[ab]$", 2, 3, r"^(a*+)[ab]$"),
-        # Anchored only at the start, with more than one part: the budget still lands, and encoding
-        # a maximum closes the pattern so longer strings stop matching.
+        # Anchored only at the start: the budget still lands, and a maximum closes the pattern with `$`.
         ("^[a-zA-Z][a-zA-Z0-9_]*", 63, 63, "^[a-zA-Z][a-zA-Z0-9_]{62}$"),
         ("^[a-zA-Z][a-zA-Z0-9_]*", 1, 63, "^[a-zA-Z][a-zA-Z0-9_]{0,62}$"),
         ("^[a-z][0-9]+", 3, 6, "^[a-z][0-9]{2,5}$"),
@@ -296,7 +252,7 @@ from schemathesis.core.jsonschema.patterns import (
         ("arn:([a-z0-9-]+):forecast:.*:.*:.+", 20, 40, r"^arn:([a-z0-9\-]{1,23}):forecast:.{0,22}:.{0,22}:.{1,23}$"),
         ("^prefix-([a-z]+)-[0-9]+$", 12, 24, "^prefix-([a-z]{1,15})-[0-9]{1,15}$"),
         ("^([a-z]+)-([0-9]+)$", 6, 12, "^([a-z]{1,10})-([0-9]{1,10})$"),
-        # A group wrapping the whole pattern is transparent to the budget - the quantifier inside it still tightens.
+        # A group wrapping the whole pattern is transparent to the budget; the quantifier inside still tightens.
         ("^([a-zA-Z0-9]*)$", 5, 5, "^([a-zA-Z0-9]{5})$"),
         ("^([a-zA-Z0-9]*)$", 1, 10, "^([a-zA-Z0-9]{1,10})$"),
         ("^([a-z]+)$", None, 7, "^([a-z]{1,7})$"),
@@ -413,9 +369,7 @@ def test_update_quantifier_unanchored_multi_enforces_min(pattern, min_length, ma
 @pytest.mark.parametrize(
     ("pattern", "min_length", "max_length", "value", "expected"),
     [
-        # Multi-slot rewrite must accept any distribution that satisfies the original
-        # pattern within the length budget; per-slot caps from a balanced split would
-        # reject valid lengths the original pattern allowed.
+        # The rewrite must admit every length split the original allows; balanced per-slot caps would reject some.
         (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" + "0" * 100, True),
         (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" + "0" * 127, True),
         (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" * 128, True),
@@ -571,8 +525,7 @@ def test_character_rules(pattern, expected):
 
 
 def test_pin_pattern_length_leaves_possessive_repeats_alone():
-    # A possessive run keeps what it took, so a count the following part could otherwise share
-    # would let strings through that the pattern turns down.
+    # A possessive run keeps what it took, so sharing its count with the next part would admit rejected strings.
     assert pin_pattern_length("^[a-z]++[a-z]$", 5, 5) == "^[a-z]++[a-z]$"
 
 
@@ -588,7 +541,6 @@ def test_pin_pattern_length_declines_when_zero_width_checks_reject_the_pinned_sh
 @pytest.mark.parametrize(
     ("pattern", "expected"),
     [
-        # Translatable patterns
         (
             r"^[\p{L}]+([ '-][\p{L}]+){0,2}$",
             r"^[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+([ '-][a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+){0,2}$",
@@ -596,19 +548,17 @@ def test_pin_pattern_length_declines_when_zero_width_checks_reject_the_pinned_sh
         (r"\p{L}+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+"),
         (r"\p{N}+", r"[0-9]+"),
         (r"\P{L}", r"[^a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]"),
-        # POSIX-like escapes
         (r"\p{Alpha}+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+"),
         (r"\p{Digit}+", r"[0-9]+"),
         (r"\p{Alnum}+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9]+"),
         (r"\p{Space}", r"[ \t\n\r\f\v]"),
         (r"\p{Z}", r"[ \t\n\r\f\v]"),
-        # Shorthand forms (without braces)
         (r"\pL+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+"),
         (r"\pN+", r"[0-9]+"),
         (r"\PL", r"[^a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]"),
         (r"\PN", r"[^0-9]"),
         (r"^[\w\s\-\/\pL,.#;:()']+$", r"^[\w\s\-\/a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F,.#;:()']+$"),
-        # `\p{X}` inside a character class with sibling chars: inline raw contents, never nest brackets.
+        # `\p{X}` beside other class members inlines its raw contents instead of nesting brackets.
         (r"[\p{Alnum}_]+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9_]+"),
         (r"[\p{Alpha}_]+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F_]+"),
         (
@@ -635,8 +585,7 @@ def test_pin_pattern_length_declines_when_zero_width_checks_reject_the_pinned_sh
         # Only the braced form of a known name carries contents to complement.
         (r"[\PL_]", None),
         (r"[\P{Tibetan}_]", None),
-        # A script class is a subset of the script, so its complement would admit characters the
-        # validator still counts as part of it.
+        # A script class covers part of the script, so its complement admits characters the validator counts in it.
         (r"[\P{Greek}_]", None),
         (r"[\P{Cyrillic}_]", None),
         (r"[\P{Katakana}_]", None),
@@ -644,7 +593,7 @@ def test_pin_pattern_length_declines_when_zero_width_checks_reject_the_pinned_sh
         (r"[\P{Han}_]", None),
         (r"[\P{Hiragana}_]", None),
         (r"[\p{Tibetan}_]+", None),
-        # Negated POSIX class `[:^X:]` and unknown POSIX names \u2014 bail out.
+        # Negated POSIX classes `[:^X:]` and unknown POSIX names bail out.
         (r"[[:^alnum:]_]", None),
         (r"[[:greek:]_]", None),
         # Brace hex naming no digits, or a codepoint past the last one.
@@ -675,10 +624,10 @@ def test_pin_pattern_length_declines_when_zero_width_checks_reject_the_pinned_sh
         (r"[a-\d-b-q]", r"[a\-\d\-b-q]"),
         (r"\w-/", None),
         (r"[\w-]", None),
-        # No translation needed (already valid Python regex)
+        # Already valid Python regex.
         (r"[a-z]+", None),
         (r"^\d+$", None),
-        # Unsupported escapes (no translation available)
+        # No translation exists.
         (r"\p{Tibetan}", None),
         (r"\p{Script=Latin}", None),
     ],
@@ -686,7 +635,7 @@ def test_pin_pattern_length_declines_when_zero_width_checks_reject_the_pinned_sh
 def test_normalize_regex(pattern, expected):
     assert normalize_regex(pattern) == expected
     if expected:
-        # FutureWarning "Possible nested set" means residual bracket nesting — translation didn't fully flatten.
+        # A "Possible nested set" FutureWarning means the translation left nested brackets.
         with warnings.catch_warnings():
             warnings.simplefilter("error", FutureWarning)
             re.compile(expected)
@@ -709,17 +658,15 @@ def test_negated_property_inside_class(pattern, matching, rejected):
 
 
 _ENGINE_AGREEMENT = [
-    # `||` is not an operator in the engine behind validation - it names a literal `|`.
+    # `||` names a literal `|` in the engine behind validation.
     (r"^[\p{L}||\p{N}]$", "a1|", "!"),
     (r"^[\p{L}||\p{M}||\p{Z}||\p{S}||\p{N}||\p{P}]$", "a1 .$|", "\x01"),
     (r"^[\p{Print}&&[^|:/]]$", ("a]", "&]", "[]", "^]", "|]", ":]", "/]"), ("a", "1", "]")),
     (r"^[[\p{L}]\p{N}]$", ("a1]", "[1]", "Z0]"), ("a]", "1]", "a1", "[]")),
     (r"^[\p{L}~~\p{N}]$", "a1~", "!"),
     (r"^[\p{L}\x{10FFFF}~~[a]]$", ("a]", "b]", "~]", "[]", "\U0010ffff]"), ("a", "1]", "\U0010ffff")),
-    # PCRE brace hex escapes.
     (r"^[a\x{60}]$", "a`", "b"),
     (r"^([$\-._+!*\x{60}(),;/?:@=&\w]|%([0-9a-fA-F?]{2}|[0-9a-fA-F?]?[*]))+$", "a`$_", " \t"),
-    # Unicode script names.
     (r"^[A-Za-z \p{Han}\p{Katakana}\p{Hiragana}\p{Hangul}-]$", "aZ -中アあ가", "1!"),
 ]
 
@@ -832,33 +779,26 @@ def test_is_valid_python_regex_does_not_warn(pattern: str) -> None:
 @given(st.data())
 @settings(suppress_health_check=list(HealthCheck))
 def test_update_quantifier_random(data):
-    # Generate a regex pattern
     pattern = data.draw(st.text(min_size=1).filter(is_valid_regex))
 
-    # Generate optional length constraints
     min_length = data.draw(st.integers(min_value=0, max_value=100) | st.none())
     max_length = data.draw(st.integers(min_value=0, max_value=100) | st.none())
 
-    # Ensure min_length <= max_length if both are present
     assume(
         max_length is None
         or min_length is None
         or (min_length <= max_length and not (min_length is None and max_length is None))
     )
 
-    # Apply length constraints
     modified_pattern = update_quantifier(pattern, min_length, max_length)
 
     assume(pattern != modified_pattern)
 
-    # Ensure the modified pattern is a valid regex
     assert is_valid_regex(modified_pattern)
 
-    # Generate a string matching the modified pattern
     generated = data.draw(st.from_regex(modified_pattern, fullmatch=True, alphabet=st.characters(codec=None)))
 
-    # A bound the rewrite cannot fold into the quantifiers stays with the schema, so only what the
-    # pattern claims on its own has to hold here - that claim is what decides whether a bound is dropped.
+    # Bounds the rewrite cannot fold stay with the schema, so only the pattern's own length claim must hold here.
     claimed_min, claimed_max = pattern_length_bounds(modified_pattern)
     assert len(generated) >= claimed_min, (
         f"Generated string '{generated}' is shorter than the claimed {claimed_min}\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
@@ -883,7 +823,6 @@ def is_valid_regex(pattern: str) -> bool:
 @pytest.mark.parametrize(
     "pattern",
     [
-        # LITERAL
         "a",
         "0",
         r"\.",
@@ -898,48 +837,38 @@ def is_valid_regex(pattern: str) -> bool:
         r"\{",
         r"\+",
         r"\?",
-        # NOT_LITERAL
         r"[^a]",
-        # ANY
         ".",
-        # AT (anchors)
         "^a",
         "a$",
         r"\ba\b",
         r"\Ba\B",
         r"\Aa",
         r"a\Z",
-        # IN (character classes)
         "[abc]",
         "[a-z]",
         "[^abc]",
         r"[\d]",
         r"[a-z\d_]",
         "[a-zA-Z0-9]",
-        # Non-printable chars in character classes
         f"[{chr(0x00)}-{chr(0x08)}]+",
         f"[{chr(0x200B)}]+",
-        # CATEGORY
         r"\d",
         r"\D",
         r"\w",
         r"\W",
         r"\s",
         r"\S",
-        # BRANCH
         "a|b",
         "a|b|c",
         "(a)|(b)",
-        # SUBPATTERN
         "(abc)",
         "(?:abc)",
         "((a)(b))",
-        # Subpatterns with inline flags
         "(?i:abc)",
         "(?-i:abc)",
         "(?im:abc)",
         "(?i-m:abc)",
-        # MAX_REPEAT
         "a*",
         "a+",
         "a?",
@@ -949,32 +878,26 @@ def is_valid_regex(pattern: str) -> bool:
         "(ab)*",
         "(ab)+",
         "[a-z]*",
-        # MIN_REPEAT
         "a*?",
         "a+?",
         "a??",
         "a{2,5}?",
-        # Combinations
         "^[a-z]+$",
         "abc",
         r"^[A-Z]{2}\d{3}-[a-z]+$",
         "(a|b)+",
         r"((\d{2})+)",
-        # ASSERT / ASSERT_NOT (lookahead and lookbehind)
         r"(?=abc)",
         r"(?!abc)",
         r"(?<=abc)",
         r"(?<!abc)",
         r"\w+(?<!\s)",
         r"(?=\d)\w+",
-        # GROUPREF (backreference)
         r"(foo)\1",
         r"([a-z])\1+",
-        # GROUPREF_EXISTS (conditional group)
         r"(x)(?(1)a|b)",
         r"(x)?(?(1)a|b)",
         r"(x)?(?(1)a)",
-        # ATOMIC_GROUP
         "(?>abc)",
         "(?>\\d+)",
     ],
@@ -984,10 +907,8 @@ def test_serialize_roundtrip(pattern):
     serialized = _serialize(list(parsed))
     re.compile(serialized)
 
-    # Idempotent
     assert _serialize(list(sre_parse.parse(serialized))) == serialized
 
-    # Semantically equivalent
     for s in ["", "a", "abc", "ABC", "123", "a-b", "\t\n", "\x00", "xa", "b"]:
         assert bool(re.search(pattern, s)) == bool(re.search(serialized, s))
 
@@ -1118,67 +1039,45 @@ def test_serialize_random_pattern(pattern):
 @pytest.mark.parametrize(
     ("pattern", "chars", "expected"),
     [
-        # Literal / outside brackets — every match must contain /
         ("arn:aws:[a-z]+/[a-z]+", "/", True),
-        # Multiple literal slashes
         ("arn:aws:[a-z]+/[a-z]+/[0-9]+", "/", True),
-        # Slash inside character class — optional, not required
+        # A class member is never required.
         ("[a-z/]+", "/", False),
-        # No slash at all
         ("^[a-zA-Z0-9_-]+$", "/", False),
-        # Slash in branch — only required if ALL branches contain it
+        # Required only when every branch contains it.
         ("(foo/bar|baz/qux)", "/", True),
-        # Slash in only one branch — not required (the other branch can match without it)
         ("(foo/bar|baz)", "/", False),
-        # Slash after quantifier (required: the literal is not quantified)
         ("[a-z]+/[0-9]+", "/", True),
-        # Pattern with anchors and literal slash
         ("^arn:aws:appsync:[A-Za-z0-9_/.-]+/apis/[0-9A-Za-z_-]+$", "/", True),
-        # Slash in zero-or-more quantified group — not required (0 repetitions possible)
+        # A quantified group requires its contents only when it must repeat at least once.
         ("(a/b)*", "/", False),
-        # Slash in one-or-more quantified group — required (at least 1 repetition)
         ("(a/b)+", "/", True),
-        # Slash in optional group — not required
         ("(a/b)?", "/", False),
-        # Slash in fixed repetition — required
         ("(a/b){2}", "/", True),
-        # Slash in {0,n} repetition — not required
         ("(a/b){0,3}", "/", False),
-        # Deeply nested: branch inside group with slash
         ("((foo/bar|baz/qux))+", "/", True),
-        # Only one nested branch has slash
         ("((foo/bar|baz))+", "/", False),
-        # Detect literal { outside brackets
         ("prefix{suffix", "{", True),
-        # Detect literal } outside brackets
         ("prefix}suffix", "}", True),
-        # { inside character class
         ("[{abc}]+", "{", False),
-        # Empty pattern
         ("", "/", False),
-        # Slash is the entire pattern
         ("/", "/", True),
-        # Invalid regex — return False (caller handles separately)
+        # An invalid pattern requires nothing; the caller handles it separately.
         (r"\P{C}*", "/", False),
-        # Real AWS ARN pattern
         (
             "arn:aws:kinesisvideo:[a-z0-9-]+:[0-9]+:[a-z]+/[a-zA-Z0-9_.-]+/[0-9]+",
             "/",
             True,
         ),
-        # Real AWS pattern where / only appears inside a character class — not required
         (
             "arn:(aws[a-zA-Z-]*)?:[a-z]+:([a-z]{2}((-gov)|(-iso(b?)))?-[a-z]+-\\d{1})?:(\\d{12})?:[a-zA-Z0-9-_/:.]+",
             "/",
             False,
         ),
-        # Pattern where / is only inside [...] — NOT required
         ("[a-zA-Z0-9/._-]+", "/", False),
-        # Multiple chars: pattern with / matches against "/{}
+        # With several characters, the pattern needs any one of them.
         ("arn:aws:[a-z]+/[a-z]+", "/{}", True),
-        # Multiple chars: pattern with { matches against "/{}
         ("prefix{suffix", "/{}", True),
-        # Multiple chars: none present
         ("^[a-zA-Z0-9_-]+$", "/{}", False),
     ],
 )
@@ -1195,7 +1094,6 @@ ALNUM = string.ascii_letters + string.digits
         ("abc123", ALNUM, False),
         ("abc-123", ALNUM, True),
         ("arn:aws:s3:::bucket", ALNUM, True),
-        # Real corpus case: ARN in a header parameter
         ("arn:[a-z0-9-\\.]{1,63}:[a-z0-9-\\.]{0,63}:[a-z0-9-\\.]{0,63}:[a-z0-9-\\.]{0,63}", ALNUM, True),
         ("[a-z0-9]+", ALNUM, False),
         ("[._-]+", ALNUM, True),
@@ -1241,7 +1139,7 @@ def test_pattern_requires_char_outside(pattern, allowed, expected):
         ("", True),
         (".+", False),
         ("^$", False),
-        # `^.*$` rejects "a\nb" — the anchors make the match position-dependent.
+        # `^.*$` rejects "a\nb": the anchors pin where the match can start.
         ("^.*$", False),
         ("[a-z]*x", False),
         ("(?=x).*", False),
@@ -1274,15 +1172,13 @@ def test_is_valid_jsonschema_rs_regex(pattern, expected):
 
 
 def test_rewrite_keeps_the_upper_bound_finite_when_parts_cannot_be_pinned():
-    # Optional alternations block exact length, and an open-ended rewrite then aims generation at
-    # strings orders of magnitude past the bound, which the length check throws away.
+    # Optional alternations block an exact length, and an open-ended rewrite would aim generation far past the bound.
     pattern = r"^arn:aws(-cn|-us-gov)?:[a-z0-9-]*:[a-z0-9-]*:([0-9]{12})?:.+$"
 
     assert pattern_length_bounds(update_quantifier(pattern, 1000, 1000)) == (1000, 1000)
 
 
-# Shapes chosen so every string over `ab` up to a handful of characters can be enumerated, which
-# turns the length walk's answers into something checkable rather than merely plausible.
+# Strings over `ab` up to a handful of characters can be enumerated, so the length walk's answers are checkable.
 BRUTE_FORCE_PATTERNS = [
     r"^(?:ab|abab)+$",
     r"^(?:a|bb)+$",
@@ -1338,8 +1234,7 @@ def _strings_of_length(length):
 
 @pytest.mark.parametrize("pattern", BRUTE_FORCE_PATTERNS)
 def test_unreachable_length_never_rules_out_a_length_the_pattern_matches(pattern):
-    # The walk over-approximates, so keeping a length nothing matches is fine; dropping one that
-    # matches silently throws away the coverage a schema asked for.
+    # The walk may keep a length nothing matches, but dropping a matching one loses coverage the schema asked for.
     compiled = re.compile(pattern)
     for length in range(BRUTE_FORCE_MAX_LENGTH):
         if any(compiled.fullmatch(text) for text in _strings_of_length(length)):

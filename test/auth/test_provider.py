@@ -59,24 +59,18 @@ def test_cache(auth_provider_class, token, case_factory):
         return current_time
 
     context = AuthContext(operation=case_factory().operation, app=None)
-    # When caching provider is used
     provider = CachingAuthProvider(auth_provider_class(), timer=timer)
-    # Then all `get` calls are cached
     assert provider.get(None, context) == token
     assert provider.get(None, context) == token
     assert provider.provider.get_calls == 1
-    # And refresh happens when the refresh period has passed
     current_time += provider.refresh_interval
     assert provider.get(None, context) == token
     assert provider.provider.get_calls == 2
     assert provider.get(None, context) == token
-    assert provider.provider.get_calls == 2  # No increase
+    assert provider.provider.get_calls == 2
 
 
 def test_register_invalid(auth_storage):
-    # When the class implementation is wrong
-    # Then it should not be possible to register it
-
     with pytest.raises(TypeError, match="`Invalid` does not implement the `AuthProvider` protocol"):
 
         @auth_storage.auth()
@@ -84,8 +78,6 @@ def test_register_invalid(auth_storage):
 
 
 def test_apply_twice(ctx, auth_provider_class):
-    # When auth is registered twice
-    # Then it is an error
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
     with pytest.raises(IncorrectUsage, match="`test` has already been decorated with `apply`"):
@@ -97,28 +89,24 @@ def test_apply_twice(ctx, auth_provider_class):
 
 
 def test_register_valid(auth_storage, auth_provider_class):
-    # When the class implementation is valid
-    # Then it should be possible to register it without issues
     auth_storage.auth(refresh_interval=None)(auth_provider_class)
     assert auth_storage.providers
     assert isinstance(auth_storage.providers[0], auth_provider_class)
 
 
 def test_register_cached(auth_storage, auth_provider_class):
-    # When the `refresh_interval` is not None
+    # The default `refresh_interval` wraps the provider in a cache.
     auth_storage.auth()(auth_provider_class)
-    # Then the actual provider should be cached
     assert auth_storage.providers
     assert isinstance(auth_storage.providers[0], CachingAuthProvider)
     assert isinstance(auth_storage.providers[0].provider, auth_provider_class)
 
 
 def test_set_noop(auth_storage, case_factory):
-    # When `AuthStorage.set` is called without `provider`
     case = case_factory()
     with pytest.raises(IncorrectUsage, match="No auth provider is defined."):
         auth_storage.set(case, AuthContext(operation=case.operation, app=None))
-    # This normally should not happen, as it is checked before.
+    # Earlier checks normally prevent this.
 
 
 @pytest.mark.parametrize(

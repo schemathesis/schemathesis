@@ -136,7 +136,6 @@ class SubprocessRunner:
         return port
 
     def cleanup(self) -> None:
-        """Cleanup all subprocess resources."""
         for process in self._processes:
             if process.poll() is None:
                 process.terminate()
@@ -156,7 +155,7 @@ def subprocess_runner(tmp_path):
 
 
 def run_flask_app(app: Flask, *, delay: float = 0.0) -> int:
-    """Start a thread with the given Flask application, `delay` seconds from now."""
+    """Serve `app` from a thread, `delay` seconds from now."""
     if not delay:
         # Binding port 0 inside the server leaves no window for another socket to take a pre-picked port.
         return _serve(make_server("127.0.0.1", 0, app, threaded=True))
@@ -294,13 +293,13 @@ def run_port_proxy(port: int, *, resets: int = 0) -> int:
 
 
 def openapi_url(app: Flask, *, path: str = "/openapi.json", delay: float = 0.0) -> str:
-    """Start `app` on a free port and return the URL where the OpenAPI schema is served."""
+    """Start `app` and return the URL of `path` on it."""
     port = run_flask_app(app, delay=delay)
     return f"http://127.0.0.1:{port}{path}"
 
 
 def run_asgi_app(app: ASGIApp, wait: bool = True) -> int:
-    """Start a daemon thread running uvicorn against the given ASGI application."""
+    """Serve `app` with uvicorn from a daemon thread."""
     # Keep the bound socket so no other socket can take the port before uvicorn listens on it.
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(("127.0.0.1", 0))

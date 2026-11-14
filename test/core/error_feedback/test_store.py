@@ -178,9 +178,7 @@ def test_store_evicts_lowest_count_entry_when_bucket_full():
 
 
 def test_store_observations_surface_on_first_record():
-    # Parsers only emit observations on a specific framework-string match, so a single
-    # occurrence is conclusive — observations propagate to the next phase immediately
-    # rather than waiting for a duplicate confirmation.
+    # Parsers emit only on a framework-specific match, so one occurrence is conclusive and surfaces at once.
     store = ErrorFeedbackStore()
     store.record(_obs("email"))
     out = store.observations(operation_label="POST /api/users", location=ParameterLocation.BODY)

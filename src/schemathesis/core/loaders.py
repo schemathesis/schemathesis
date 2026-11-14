@@ -36,14 +36,14 @@ SchemaResponse = TypeVar("SchemaResponse", bound=_SchemaResponse)
 
 
 def prepare_request_kwargs(kwargs: dict[str, Any]) -> None:
-    """Prepare common request kwargs."""
+    """Add the default User-Agent unless one is set."""
     headers = kwargs.setdefault("headers", {})
     if "user-agent" not in {header.lower() for header in headers}:
         kwargs["headers"]["User-Agent"] = USER_AGENT
 
 
 def handle_request_error(exc: requests.RequestException) -> NoReturn:
-    """Handle request-level errors."""
+    """Re-raise a request error as a `LoaderError`."""
     import requests
 
     url = exc.request.url if exc.request is not None else None
@@ -62,7 +62,7 @@ def handle_request_error(exc: requests.RequestException) -> NoReturn:
 
 
 def raise_for_status(response: SchemaResponse) -> SchemaResponse:
-    """Handle response status codes."""
+    """Raise a `LoaderError` for 4xx and 5xx responses."""
     status_code = response.status_code
     if status_code < 400:
         return response
@@ -84,7 +84,7 @@ def raise_for_status(response: SchemaResponse) -> SchemaResponse:
 
 
 def make_request(func: Callable[..., requests.Response], url: str, **kwargs: Any) -> requests.Response:
-    """Make HTTP request with error handling."""
+    """Call `func`, turning request errors and error statuses into `LoaderError`."""
     import requests
 
     try:
@@ -104,7 +104,7 @@ WAIT_FOR_SCHEMA_INTERVAL = 0.05
 
 
 class _ServiceUnavailableError(Exception):
-    """Internal: HTTP 503 during schema load, eligible for retry under wait_for_schema."""
+    """HTTP 503 during schema load, retried under `wait_for_schema`."""
 
 
 def load_from_url(
@@ -114,7 +114,7 @@ def load_from_url(
     wait_for_schema: float | None = None,
     **kwargs: Any,
 ) -> requests.Response:
-    """Load schema from URL with retries."""
+    """Load the schema, retrying connection errors, timeouts and 503s until `wait_for_schema` elapses."""
     import requests
 
     kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
@@ -151,7 +151,6 @@ def load_from_url(
 
 
 def require_relative_url(url: str) -> None:
-    """Raise an error if the URL is not relative."""
     # Deliberately simplistic approach
     if "://" in url or url.startswith("//"):
         raise ValueError("Schema path should be relative for WSGI/ASGI loaders")

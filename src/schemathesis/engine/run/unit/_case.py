@@ -36,9 +36,7 @@ if TYPE_CHECKING:
 def _is_ordinary_request(case: Case) -> bool:
     """True when the response to `case` says something about the operation under test.
 
-    Responses to requests malformed on purpose (an undeclared method, a malformed `Content-Type`) describe how the
-    server rejects the request, so response-driven signal must be filtered through this check before being
-    attributed to the operation.
+    Requests malformed on purpose (an undeclared method, a malformed `Content-Type`) show only how servers reject them.
     """
     return case.method.lower() == case.operation.method.lower() and coverage_scenario(case) not in CONTENT_TYPE_PROBES
 
@@ -78,15 +76,12 @@ def run_one_case(
 ) -> None:
     """Run one case end-to-end: call, record, validate, classify."""
     try:
-        # A slice may be shorter than a single case takes. Let the first one through anyway, so an
-        # operation is never selected and then left with nothing to show for it.
+        # A slice may be shorter than one case; let the first case through so a selected operation shows something.
         if ctx.is_operation_slice_expired and scenario.recorder.interactions:
             raise BudgetExpired
-        # One snapshot: reading the clock twice lets the deadline pass in between and turn a spent
-        # budget into a phantom interrupt.
+        # Read the stop reason once: a second clock read could pass the deadline and fake an interrupt.
         raise_if_stopped(ctx.stop_reason)
-        # Honor a supervisor SKIP verdict that flipped mid-scenario; without this,
-        # cases already drawn or queued would still hit the server.
+        # A SKIP verdict can flip mid-scenario; cases already drawn or queued must not reach the server.
         if _is_skipped_by_supervisor(case, ctx):
             return
         if scenario.generation.unique_inputs:
@@ -147,8 +142,7 @@ def _raise_case_error(
     network_error = _as_unrecoverable_network_error(exc, case, scenario.transport_kwargs)
     outage = detect_outage(exc, case, ctx, scenario.recorder)
     if network_error is not None:
-        # Server likely has crashed and does not accept any connections at all
-        # Don't report these error - only the original crash should be reported
+        # The server likely crashed; report only the original crash, not each refused connection
         scenario.state.store_unrecoverable_network_error(network_error)
         if outage:
             raise ServerWentAway from None
@@ -200,10 +194,7 @@ def _call_with_reauth(
     transport_kwargs: dict[str, Any],
     pending_events: list[events.EngineEvent],
 ) -> tuple[list[Response], Response]:
-    """Call the server, retrying on rate limits and replaying once with fresh credentials when auth expired.
-
-    Returns (rate_limited_responses, final_response).
-    """
+    """Call the server, retrying on rate limits and replaying once after expired auth."""
     try:
         return send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=pending_events.append)
     except TRANSPORT_ERRORS as error:
@@ -235,7 +226,7 @@ def _record_response_signals(
     if _is_ordinary_request(case):
         record_auth_outcome(case, response.status_code)
         ctx.supervisor.observe(case, response, cache_writer=ctx.cache.writer)
-    # Record DELETE attempts immediately to influence subsequent strategy draws.
+    # Record DELETE attempts now so later strategy draws see them.
     if ctx.extra_data_source is not None:
         record_delete_attempt(ctx.extra_data_source, case, response.status_code)
 

@@ -1,5 +1,3 @@
-"""Public Schemathesis errors."""
-
 from schemathesis.core.errors import (
     HookError,
     HookExecutionError,

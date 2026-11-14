@@ -35,7 +35,7 @@ def scalar(name: str, strategy: st.SearchStrategy[graphql.ValueNode]) -> None:
     r"""Register a custom Hypothesis strategy for generating GraphQL scalar values.
 
     Args:
-        name: Scalar name that matches your GraphQL schema scalar definition
+        name: Scalar name as defined in your GraphQL schema
         strategy: Hypothesis strategy that generates GraphQL AST ValueNode objects
 
     Example:
@@ -98,7 +98,6 @@ def scalar_strategies() -> dict[str, st.SearchStrategy[graphql.ValueNode]]:
 
 @lru_cache
 def get_extra_scalar_strategies() -> dict[str, st.SearchStrategy]:
-    """Get all extra GraphQL strategies."""
     from hypothesis import strategies as st
 
     from . import nodes

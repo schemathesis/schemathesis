@@ -65,11 +65,10 @@ ExtractSecurityDefinitions = Callable[[Mapping[str, Any], "Resolver"], Mapping[s
 class SchemaVocabulary(Protocol):
     """JSON Schema dialect of one specification version: how nullability is spelled and which validator matches."""
 
-    # Keyword used to mark nullable fields (e.g., "x-nullable" in OpenAPI 2.0, "nullable" in 3.x)
+    # `x-nullable` in Open API 2.0, `nullable` in 3.x
     nullable_keyword: str
 
-    # JSON Schema validator class appropriate for this specification version. Read-only, so an adapter may
-    # pin one draft's class.
+    # Read-only, so an adapter may pin one draft's validator class.
     @property
     def jsonschema_validator_cls(self) -> type[jsonschema_rs.Validator]: ...
 
@@ -82,18 +81,13 @@ def is_draft_2020_12(vocabulary: SchemaVocabulary) -> bool:
 class ParameterAdapter(SchemaVocabulary, Protocol):
     """Parameter definitions: enumeration, schema extraction, and serialization."""
 
-    # Whether this spec version allows sibling keywords alongside $ref (true for OAS 3.1+)
+    # True in Open API 3.1+, which allows keywords next to `$ref`
     ref_siblings: bool
-    # Keyword for a single example
     example_keyword: str
-    # Keyword for examples container
     examples_container_keyword: str
 
-    # Function to extract schema from parameter definition
     extract_parameter_schema: ExtractParameterSchema
-    # Function to iterate over API operation parameters
     iter_parameters: IterParameters
-    # Function to create a new path parameter
     build_path_parameter: BuildPathParameter
     get_parameter_serializer: GetParameterSerializer
 
@@ -101,21 +95,16 @@ class ParameterAdapter(SchemaVocabulary, Protocol):
 class ResponseAdapter(SchemaVocabulary, Protocol):
     """Response and header definitions: schema extraction, media-type resolution, examples."""
 
-    # Keyword used for required / optional headers. Open API 2.0 does not expect `required` there
+    # `x-required` in Open API 2.0, which has no `required` for headers
     header_required_keyword: str
-    # Keyword for Open API links
     links_keyword: str
 
-    # Function to extract response schema from specification
     extract_raw_response_schema: ExtractRawResponseSchema
-    # Functions for handling multiple media types in responses
     resolve_response_media_type: ResolveResponseMediaType
     extract_schema_for_media_type: ExtractSchemaForMediaType
     # Schema of a sequential media type that covers the whole stream, read as an array
     extract_stream_schema: ExtractSchemaForMediaType
-    # Function to extract header schema from specification
     extract_header_schema: ExtractHeaderSchema
-    # Function to extract examples from response definition
     iter_response_examples: IterResponseExamples
     get_response_content_types: GetResponseContentTypes
 
@@ -123,16 +112,14 @@ class ResponseAdapter(SchemaVocabulary, Protocol):
 class SecurityAdapter(Protocol):
     """Security scheme definitions and the parameters they contribute to an operation."""
 
-    # Function to extract security parameters for an API operation
     extract_security_parameters: ExtractSecurityParameters
-    # Function to extract security scheme definitions from the schema with resolved references
+    # Security scheme definitions with references resolved
     extract_security_definitions: ExtractSecurityDefinitions
 
 
 class SpecificationAdapter(ParameterAdapter, ResponseAdapter, SecurityAdapter, SchemaVocabulary, Protocol):
     """Full contract for one API specification format; composed of role protocols so callers can depend on a slice."""
 
-    # Whole-schema concerns: base path, media types, multipart bodies, and validation.
     prepare_multipart: PrepareMultipart
     get_request_payload_content_types: GetRequestPayloadContentTypes
     get_default_media_types: GetDefaultMediaTypes

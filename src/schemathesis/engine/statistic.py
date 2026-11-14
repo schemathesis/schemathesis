@@ -23,8 +23,6 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class GroupedFailures:
-    """Represents failures grouped by case ID."""
-
     # `None` for run-level checks (not tied to a case).
     case_id: str | None
     code_sample: str | None
@@ -60,7 +58,7 @@ def _collect_history(recorder: RecordedScenario, node: CaseNode, response: Respo
     current = node
     while current.parent_id is not None:
         current_response = recorder.find_response(case_id=current.parent_id)
-        # We need a response to get there, so it should be present
+        # A step follows its parent only after the parent got a response
         assert current_response is not None
         current = recorder.cases[current.parent_id]
         history.append((current.value, current_response))
@@ -97,7 +95,7 @@ def _extraction_failures(recorder: RecordedScenario, case_id: str, node: CaseNod
 
     parent = recorder.cases[transition.parent_id]
     response = recorder.find_response(case_id=parent.value.id)
-    # We need a response to get there, so it should be present
+    # A step follows its parent only after the parent got a response
     assert response is not None
     history = None
     for parameter, expression, error in _extraction_failure_inputs(transition):
@@ -119,10 +117,8 @@ def _extraction_failures(recorder: RecordedScenario, case_id: str, node: CaseNod
 
 @dataclass(slots=True)
 class Statistic:
-    """Running statistics about test execution."""
-
     failures: dict[str, dict[str, GroupedFailures]]
-    # Track first case_id where each unique failure was found
+    # Each unique failure -> the first case id that found it
     unique_failures_map: dict[Failure, str]
 
     # Failures the configured baseline already accounts for, and the entries they matched.
@@ -181,7 +177,6 @@ class Statistic:
         failure_label: Callable[[Case], str] | None = None,
         status: Status | None = None,
     ) -> None:
-        """Update statistics and store failures from a new batch of checks."""
         # Track failures per-label (may differ from recorder.label when method differs)
         failures_by_label: dict[str, dict[str, GroupedFailures]] = {}
 
@@ -234,7 +229,6 @@ class Statistic:
                 if check.failure_info is not None:
                     failure = check.failure_info.failure
 
-                    # Check if this is a new unique failure
                     identity = failure_identity(failure, check.name)
                     if failure not in self.unique_failures_map and identity not in self.known_failures:
                         self.observed_failures[identity] = (failure, check.name)
@@ -245,7 +239,6 @@ class Statistic:
                         self.unique_failures_map[failure] = recorded_id
                         found.setdefault(recorded_id, []).append(check.failure_info)
                     else:
-                        # This failure was already seen - skip it
                         continue
 
             for recorded_id, infos in found.items():

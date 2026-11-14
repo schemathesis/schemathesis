@@ -19,8 +19,7 @@ from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
 
 
-# Wire envelopes captured from running Luracast Restler apps. v3/v5 prefix the reason phrase, v6 does not;
-# `debug` is only present outside production mode.
+# Envelopes captured from Luracast Restler apps: v3/v5 prefix the reason phrase, v6 does not; `debug` is dev-only.
 def _restler(message: str, *, version: str = "v3") -> dict:
     if version == "v6":
         return {

@@ -47,7 +47,7 @@ def test_commands_help(cli, snapshot_cli):
 
 
 def test_run_subprocess(testdir):
-    # To verify that CLI entry point is installed properly
+    # The installed `schemathesis` entry point must run.
     result = testdir.run(str(pathlib.Path(sys.executable).with_name("schemathesis")))
     assert result.ret == ExitCode.INTERRUPTED
 
@@ -98,51 +98,38 @@ def test_run_rejects_unknown_phase(cli, snapshot_cli):
 
 
 def test_hooks_module_not_found(cli, snapshot_cli):
-    # When an unknown hook module is passed to CLI
     assert cli.main("run", "http://127.0.0.1:1", hooks="hook") == snapshot_cli
     assert os.getcwd() in sys.path
 
 
 def test_hooks_with_inner_import_error(ctx, cli, snapshot_cli):
-    # When the hook module itself raises an ImportError
     module = ctx.write_pymodule("import something_else")
     assert cli.main("run", "http://127.0.0.1:1", hooks=module) == snapshot_cli
 
 
 def test_hooks_invalid(ctx, cli):
-    # When hooks are passed to the CLI call
-    # And its importing causes an exception
     module = ctx.write_pymodule("1 / 0")
 
     result = cli.main("run", "http://127.0.0.1:1", hooks=module)
 
-    # Then CLI run should fail
     assert result.exit_code == 2, result.stdout
-    # And a helpful message should be displayed in the output
     lines = result.stdout.strip().split("\n")
     assert lines[0] == "Unable to load Schemathesis extension hooks"
     assert lines[8] == "ZeroDivisionError: division by zero"
 
 
 def test_certificate_only_key(cli, tmp_path, snapshot_cli):
-    # When cert key is passed without cert itself
-    # Then an appropriate error should be displayed
     assert cli.run("http://127.0.0.1", f"--request-cert-key={tmp_path}") == snapshot_cli
 
 
 @pytest.mark.parametrize("header", ["Authorization", "authorization"])
 def test_auth_and_authorization_header_are_disallowed(ctx, cli, header, snapshot_cli):
-    # When ``--auth`` is passed together with ``--header`` that sets the ``Authorization`` header
-    # Then it causes a validation error
     api = ctx.openapi.apps.success()
     assert cli.run(api.schema_url, "--auth=test:test", f"--header={header}:token123") == snapshot_cli
 
 
 @pytest.mark.parametrize("workers", [1, 2])
 def test_schema_not_available(cli, workers, snapshot_cli):
-    # When the given schema is unreachable
-    # Then the whole Schemathesis run should fail
-    # And error message is displayed
     assert cli.run("http://127.0.0.1:1/schema.yaml", f"--workers={workers}") == snapshot_cli
 
 
@@ -152,9 +139,7 @@ def test_workers_out_of_range_lists_compact_choices(cli, snapshot_cli):
 
 @pytest.mark.snapshot_suffix(platform.python_implementation().lower())
 def test_empty_schema_file(testdir, cli, snapshot_cli):
-    # When the schema file is empty
     filename = testdir.makefile(".json", schema="")
-    # Then a proper error should be reported
     assert cli.run(str(filename), "--url=http://127.0.0.1:1") == snapshot_cli
 
 
@@ -276,7 +261,6 @@ def test_explicit_seed_takes_precedence_over_deterministic_mode(ctx, cli):
 
 
 def test_hypothesis_parameters(ctx, cli):
-    # When Hypothesis options are passed via command line
     api = ctx.openapi.apps.success()
     cli.run_and_assert(
         api.schema_url,
@@ -285,8 +269,7 @@ def test_hypothesis_parameters(ctx, cli):
         "--suppress-health-check=all",
         "--checks=not_a_server_error",
     )
-    # Then they should be correctly converted into arguments accepted by `hypothesis.settings`
-    # Parameters are validated in `hypothesis.settings`
+    # `hypothesis.settings` validates the converted options, so a clean run proves the conversion.
 
 
 @pytest.mark.usefixtures("hypothesis_ci_profile")
@@ -494,9 +477,7 @@ def test_workers_beyond_operations_start_no_extra_threads(ctx, cli, tmp_path):
 
 @pytest.mark.snapshot(replace_reproduce_with=False)
 def test_cli_run_changed_base_url(ctx, cli, snapshot_cli):
-    # When the CLI receives custom base URL
     api = ctx.openapi.apps.success_and_failure()
-    # Then the base URL should be correctly displayed in the CLI output
     assert cli.run(api.schema_url, "--url", api.base_url, "-c not_a_server_error") == snapshot_cli
 
 
@@ -791,18 +772,13 @@ def test_read_content_timeout(cli, raw_http_server, snapshot_cli):
 
 @pytest.mark.parametrize("workers", [1, 2])
 def test_unsatisfiable(ctx, cli, workers, snapshot_cli):
-    # When the app's schema contains parameters that can't be generated
-    # For example if it contains contradiction in the parameters' definition - requires to be integer AND string at the
-    # same time
-    # And more clear error message is displayed instead of Hypothesis one
+    # Contradictory parameter definitions get a clearer error than Hypothesis's own.
     api = ctx.openapi.apps.unsatisfiable()
     assert cli.run(api.schema_url, "--mode=positive", f"--workers={workers}") == snapshot_cli
 
 
 def test_invalid_operation(ctx, cli, snapshot_cli):
-    # When the app's schema contains errors
-    # For example if its type is "int" but should be "integer"
-    # And schema validation is disabled
+    # The `id` parameter declares `type: int`, a typo for `integer`.
     api = ctx.openapi.apps.invalid()
     assert cli.run(api.schema_url, "--phases=fuzzing", "--mode=positive") == snapshot_cli
 
@@ -919,10 +895,6 @@ def test_schema_errors(cli, ctx, snapshot_cli, version):
 @pytest.mark.parametrize("workers", [1, 2])
 @pytest.mark.snapshot(replace_reproduce_with=False)
 def test_status_code_conformance(ctx, cli, workers, snapshot_cli):
-    # When operation returns a status code, that is not listed in "responses"
-    # And "status_code_conformance" is specified
-    # Then the whole Schemathesis run should fail
-    # And this operation should be marked as failed in the progress line
     api = ctx.openapi.apps.teapot()
     assert cli.run(api.schema_url, "-c", "status_code_conformance", f"--workers={workers}") == snapshot_cli
 
@@ -960,9 +932,6 @@ def test_multiple_failures_different_check(ctx, cli, snapshot_cli):
 
 @pytest.mark.parametrize("workers", [1, 2])
 def test_connection_error(ctx, cli, workers, snapshot_cli):
-    # When the given base_url is unreachable
-    # Then the whole Schemathesis run should fail
-    # And the proper error messages should be displayed for each operation
     api = ctx.openapi.apps.success_and_failure()
     assert (
         cli.run(api.schema_url, "--url=http://127.0.0.1:1/api", f"--workers={workers}", "--mode=positive")
@@ -1106,7 +1075,6 @@ def digits_format(ctx):
 
 def test_hooks_valid(ctx, cli, digits_format):
     api = ctx.openapi.apps.custom_format()
-    # When a hook is passed to the CLI call
     result = cli.main(
         "run",
         "--suppress-health-check=filter_too_much",
@@ -1115,11 +1083,10 @@ def test_hooks_valid(ctx, cli, digits_format):
         api.schema_url,
         hooks=digits_format,
     )
-    # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
     test_cases = [req for req in api.requests if req.path == "/api/custom_format" and "id" in req.query]
     assert test_cases
-    # And all registered new string format should produce digits as expected
+    # The custom string format produces digits.
     assert all(req.query["id"].isdigit() for req in test_cases)
 
 
@@ -1167,10 +1134,6 @@ def new_check(ctx, response, result):
 @pytest.mark.snapshot(replace_reproduce_with=False)
 def test_register_check(ctx, new_check, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
-    # When hooks are passed to the CLI call
-    # And it contains registering a new check, which always fails for the testing purposes
-    # Then CLI run should fail
-    # And a message from the new check should be displayed
     assert cli.main("run", "-c", "new_check", "--mode=positive", api.schema_url, hooks=new_check) == snapshot_cli
 
 
@@ -1292,7 +1255,6 @@ def test_keyboard_interrupt_in_custom_handler_during_stateful(ctx, cli, snapshot
 
 def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
     api = ctx.openapi.apps.teapot()
-    # When the schema contains references to other files
     uri = pathlib.Path(HERE).as_uri() + "/"
     schema = ctx.openapi.build_schema(
         {
@@ -1300,8 +1262,7 @@ def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
                 "post": {
                     "parameters": [
                         {
-                            # during the CLI run we have a different working directory,
-                            # so specifying an absolute uri
+                            # The CLI runs from another working directory, so the `$ref` uses an absolute URI.
                             "schema": {"$ref": urljoin(uri, "data/petstore_v2.yaml#/definitions/Pet")},
                             "in": "body",
                             "name": "user",
@@ -1315,7 +1276,6 @@ def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
         version="2.0",
     )
     schema_path = ctx.makefile(schema)
-    # And file path is given to the CLI
     result = cli.run(
         str(schema_path),
         f"--url={api.base_url}/api",
@@ -1323,9 +1283,7 @@ def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
         "--generation-deterministic",
         "-c not_a_server_error",
     )
-    # Then Schemathesis should resolve it and run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
-    # And all relevant requests should contain proper data for resolved references
     teapot_calls = api.calls_to("/api/teapot", method="POST")
     payload = teapot_calls[0].json()
     assert isinstance(payload["name"], str)
@@ -1542,7 +1500,7 @@ def map_query(ctx, query):
 def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, cli, media_type):
     api = ctx.openapi.apps.success()
     cassette_path = tmp_path / "output.yaml"
-    # When requestBody has a binary field or an array of binary items
+    # The body has a binary field and an array of binary items.
     responses = {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
     schema_path = ctx.openapi.write_schema(
         {
@@ -1599,7 +1557,6 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, cli, media_typ
         "-c not_a_server_error",
         "--mode=positive",
     )
-    # Then it should be correctly sent to the server
     assert "= ERRORS =" not in result.stdout
 
     with cassette_path.open(encoding="utf-8") as fd:
@@ -1618,7 +1575,7 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, cli, media_typ
     last_decoded = decode(-1)
     if last_decoded:
         assert re.search(rb'Content-Disposition: form-data; name="files"; filename="files(\.\w+)?"\r\n', last_decoded)
-    # NOTE, that the actual API operation is not checked in this test
+    # The API operation itself is not checked.
 
 
 @pytest.mark.parametrize(
@@ -1657,12 +1614,10 @@ def test_multipart_encoding_content_type(ctx, cli, snapshot_cli, field_name, fie
 
     @app.route("/upload", methods=["POST"])
     def upload():
-        # Check if field exists (could be in files or form)
         if field_name in request.files:
             file_obj = request.files[field_name]
             if file_obj.content_type != content_type:
                 return jsonify({"error": f"Expected {content_type}, got: {file_obj.content_type}"}), 500
-        # Accept any request as long as content type is correct when field is present
         return jsonify({"status": "ok"}), 200
 
     assert (
@@ -1925,8 +1880,6 @@ def test_nested_binary_in_yaml(ctx, cli, app_runner, snapshot_cli):
 
 
 def test_urlencoded_form(ctx, cli):
-    # When the API operation accepts application/x-www-form-urlencoded
-    # Then Schemathesis should generate appropriate payload
     api = ctx.openapi.serve(openapi_basic.form())
     cli.run_and_assert(api.schema_url, "--mode=positive")
 
@@ -1993,7 +1946,6 @@ def test_targeted(ctx, cli, workers):
     ],
 )
 def test_exclude_deprecated(ctx, cli, options, expected):
-    # When there are some deprecated API operations
     api = ctx.openapi.apps.success()
     definition = {
         "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
@@ -2016,7 +1968,6 @@ def test_exclude_deprecated(ctx, cli, options, expected):
         "--checks=not_a_server_error",
         *options,
     )
-    # Then only not deprecated API operations should be selected
     assert expected in result.stdout
 
 
@@ -2032,7 +1983,7 @@ def test_invalid_filter(ctx, cli, snapshot_cli):
 
 @pytest.mark.snapshot(replace_reproduce_with=False)
 def test_filter_case_sensitivity(ctx, cli, snapshot_cli):
-    # Method filter should be case insensitive
+    # Method filters ignore case.
     api = ctx.openapi.apps.success_and_failure()
     assert cli.run(api.schema_url, "--include-method=get", "--checks=not_a_server_error") == snapshot_cli
 
@@ -2069,7 +2020,7 @@ def test_colon_in_headers(ctx, cli):
 
 
 def test_headers_passed_to_schema_loading(cli, app_runner, ctx):
-    # GH-3440: Headers should be passed to schema loading request
+    # See GH-3440
     schema = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
     app = Flask("schemathesis_test")
@@ -2100,9 +2051,7 @@ def test_headers_passed_to_schema_loading(cli, app_runner, ctx):
 
 def test_yaml_parsing_of_floats(ctx, cli, testdir):
     api = ctx.openapi.apps.success()
-    # When a YAML schema contains a pattern that looks like a time (e.g., 00:00:00.00),
-    # YAML parses it as a float (0.0). The pattern should be gracefully ignored,
-    # allowing tests to proceed without errors.
+    # YAML parses a time-like pattern such as 00:00:00.00 as a float; the non-string pattern is ignored.
     schema = """info:
   description: Test
   title: Test
@@ -2121,7 +2070,6 @@ paths:
         '200':
           description: OK"""
     schema_file = testdir.makefile(".yaml", schema=schema)
-    # Non-string pattern is gracefully handled (ignored), so tests should pass
     cli.run_and_assert(
         str(schema_file),
         f"--url={api.base_url}/api",
@@ -2134,13 +2082,8 @@ paths:
 @pytest.mark.parametrize("workers", [1, 2])
 @pytest.mark.snapshot(replace_reproduce_with=False)
 def test_max_response_time_invalid(ctx, cli, workers, snapshot_cli):
-    # When maximum response time check is specified in the CLI and the request takes more time
-    # Then the whole Schemathesis run should fail
-    # And the given operation should be displayed as a failure
-    # And the proper error message should be displayed
     api = ctx.openapi.apps.slow()
-    # Only fuzz the declared GET: undeclared-method probes can exceed the tight limit under load, so their
-    # competing failures would make the reported case's method non-deterministic.
+    # Fuzz only the declared GET; undeclared-method probes can exceed the tight limit and make the reported method vary.
     assert (
         cli.run(api.schema_url, "--max-response-time=0.05", "--phases=fuzzing", f"--workers={workers}") == snapshot_cli
     )
@@ -2148,8 +2091,6 @@ def test_max_response_time_invalid(ctx, cli, workers, snapshot_cli):
 
 def test_max_response_time_valid(ctx, cli):
     api = ctx.openapi.apps.slow()
-    # When maximum response time check is specified in the CLI and the request takes less time
-    # Then no errors should occur
     cli.run_and_assert(api.schema_url, "--max-response-time=200")
 
 
@@ -2215,8 +2156,6 @@ def test_timeout_units_warning_can_be_disabled(ctx, cli, args, config):
 
 @pytest.mark.snapshot(replace_reproduce_with=False, remove_last_line=True)
 def test_exit_first(ctx, cli, snapshot_cli):
-    # When the `--max-failures=1` CLI option is passed
-    # And a failure occurs
     api = ctx.openapi.apps.success_and_failure()
     assert (
         cli.run(api.schema_url, "--max-failures=1", "--phases=fuzzing", "--checks=not_a_server_error") == snapshot_cli
@@ -2385,8 +2324,7 @@ def test_max_time_reports_coverage_once_beside_fuzzing(ctx, cli, snapshot_cli):
 
 def test_long_operation_output(ctx, cli, snapshot_cli):
     # See GH-990
-    # When there is a narrow screen
-    # And the API schema contains an operation with a long name
+    # A narrow screen and a long operation name.
     long_path = f"/{'a' * 100}"
     short_path = f"/{'a' * 10}"
     app, _ = ctx.openapi.make_flask_app(
@@ -2404,7 +2342,7 @@ def test_long_operation_output(ctx, cli, snapshot_cli):
     def short_operation():
         return jsonify({})
 
-    # Then its failure header still has separators on both sides
+    # The failure header keeps separators on both sides.
     assert cli.run_openapi_app(app, "-c not_a_server_error") == snapshot_cli
 
 
@@ -2430,7 +2368,6 @@ def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
             }
         }
 
-    # When an operation uses an unsupported regex syntax
     paths = {
         # Can't generate anything
         "/foo": make_definition(min_items=1),
@@ -2443,8 +2380,6 @@ def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
     app = ctx.openapi.make_permissive_flask_app(schema)
     base_url = app_runner.openapi_url(app, path="")
     schema_path = ctx.openapi.write_schema(paths)
-    # Then if it is possible it should generate at least something
-    # And if it is not then there should be an error with a descriptive error message
     assert (
         cli.run(
             str(schema_path),
@@ -2461,10 +2396,7 @@ def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=False)
 def test_auth_override_on_protected_operation(ctx, cli, extra, snapshot_cli):
     # See GH-792
-    # When the tested API operation has basic auth
-    # And the auth is overridden (directly or via headers)
-    # And there is an error during testing
-    # Then the code sample representation in the output should have the overridden value
+    # The code sample shows the overridden basic auth.
     api = ctx.openapi.apps.basic()
     assert cli.run(api.schema_url, "--output-sanitize=false", "--phases=fuzzing", extra) == snapshot_cli
 
@@ -2478,11 +2410,8 @@ def test_url_credentials_in_output(ctx, cli, snapshot_cli, sanitize):
 
 @pytest.mark.snapshot(replace_reproduce_with=False)
 def test_explicit_headers_in_output_on_errors(ctx, cli, snapshot_cli):
-    # When there is a non-fatal error during testing (e.g. flakiness)
-    # And custom headers were passed explicitly
     api = ctx.openapi.apps.flaky()
     auth = "Basic J3Rlc3Q6d3Jvbmcn"
-    # Then the code sample should have the overridden value
     assert (
         cli.run(api.schema_url, "--output-sanitize=false", f"-H Authorization: {auth}", "--mode=positive")
         == snapshot_cli
@@ -2492,8 +2421,7 @@ def test_explicit_headers_in_output_on_errors(ctx, cli, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=False)
 def test_response_payload_encoding(ctx, cli, snapshot_cli):
     # See GH-1073
-    # When the "failed" response has non UTF-8 encoding
-    # Then it should be displayed according its actual encoding
+    # A non-UTF-8 failed response renders in its own encoding.
     api = ctx.openapi.serve(openapi_basic.cp866())
     assert cli.run(api.schema_url) == snapshot_cli
 
@@ -2501,9 +2429,7 @@ def test_response_payload_encoding(ctx, cli, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=False, replace_test_cases=False)
 def test_response_schema_conformance_deduplication(ctx, cli, snapshot_cli):
     # See GH-907
-    # When the "response_schema_conformance" check is present
-    # And the app return different error messages caused by the same validator
-    # Then the errors should be deduplicated
+    # Errors from the same validator with different messages are deduplicated.
     api = ctx.openapi.serve(openapi_basic.conformance())
     assert cli.run(api.schema_url, "--checks=response_schema_conformance") == snapshot_cli
 
@@ -2512,8 +2438,7 @@ def test_response_schema_conformance_deduplication(ctx, cli, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=False)
 def test_malformed_json_deduplication(ctx, cli, snapshot_cli):
     # See GH-1518
-    # When responses are not JSON as expected and their content differ each time
-    # Then the errors should be deduplicated
+    # Non-JSON responses that differ each time are deduplicated.
     api = ctx.openapi.apps.malformed_json()
     assert cli.run(api.schema_url, "--checks=response_schema_conformance") == snapshot_cli
 
@@ -2534,7 +2459,6 @@ def test_no_color(ctx, monkeypatch, cli, kind):
 @pytest.mark.skipif(platform.system() == "Windows", reason="ANSI colors are not properly supported in Windows tests")
 def test_force_color(ctx, cli):
     api = ctx.openapi.apps.success()
-    # Using `--force-color` adds ANSI escape codes forcefully
     result = cli.run_and_assert(api.schema_url, "--force-color", color=False)
 
     assert "[1m" in result.stdout
@@ -2549,7 +2473,6 @@ def test_force_color(ctx, cli):
 )
 @pytest.mark.parametrize("endpoint", ["/graphql", "/foo"])
 def test_graphql_url(ctx, cli, endpoint, args, snapshot_cli):
-    # When the target API is GraphQL
     api = ctx.graphql.apps.books(endpoint=endpoint)
     assert cli.run(api.schema_url, "--max-examples=5", "--mode=positive", *args) == snapshot_cli
 
@@ -2623,13 +2546,10 @@ def test_graphql_stateful_unique_inputs(ctx, cli, snapshot_cli, factory):
 
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
 def test_missing_content_and_schema(ctx, cli, location, snapshot_cli):
-    # When an Open API 3 parameter is missing `schema` & `content`
     api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {"/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}}
     )
-    # Then CLI should show that this API operation errored
-    # And show the proper message under its "ERRORS" section
     assert cli.run(str(schema_path), "--max-examples=1", f"--url={api.base_url}/api") == snapshot_cli
 
 
@@ -2670,8 +2590,7 @@ def test_explicit_query_token_sanitization(ctx, cli, snapshot_cli):
 def test_skip_not_negated_tests(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     # See GH-1463
-    # When an endpoint has no parameters to negate
-    # Then it should be skipped
+    # An operation with nothing to negate is skipped.
     assert cli.run(api.schema_url, "--mode", "negative") == snapshot_cli
 
 
@@ -2683,7 +2602,6 @@ def test_dont_skip_when_generation_is_possible(ctx, cli, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=False)
 def test_explicit_example_failure_output(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.failure()
-    # When an explicit example fails
     schema_path = ctx.openapi.write_schema(
         {
             "/api/failure": {
@@ -2821,8 +2739,6 @@ def test_curl_with_non_printable_characters_unknown_shell(ctx, cli, snapshot_cli
 def test_skipped_on_no_explicit_examples(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     # See GH-1323
-    # When there are no explicit examples
-    # Then tests should be marked as skipped
     assert cli.run(api.schema_url, "--phases=examples") == snapshot_cli
 
 
@@ -2859,7 +2775,6 @@ def data_generation_check(ctx, response, case):
 
 def test_multiple_generation_modes(ctx, cli, data_generation_check):
     api = ctx.openapi.apps.payload()
-    # When multiple data generation methods are supplied in CLI
     result = cli.main(
         "run",
         "-c",
@@ -2873,7 +2788,6 @@ def test_multiple_generation_modes(ctx, cli, data_generation_check):
         "all",
         hooks=data_generation_check,
     )
-    # Then there should be cases generated from different methods
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "MODE: positive" in result.stdout
     assert "MODE: negative" in result.stdout
@@ -2895,7 +2809,6 @@ def test_multiple_generation_modes(ctx, cli, data_generation_check):
     ),
 )
 def test_wait_for_schema(cli, app_runner, schema_path, make_app):
-    # When Schemathesis is asked to wait for API schema to become available
     schema_url = app_runner.openapi_url(make_app(), path=f"/{schema_path}", delay=0.1)
     cli.run_and_assert(schema_url, "--wait-for-schema=1", "--max-examples=1", "--mode=positive")
 
@@ -2907,13 +2820,11 @@ def test_wait_for_schema_not_enough(cli, snapshot_cli):
 
 
 def test_wait_for_schema_retries_503(cli, ctx):
-    # When the schema endpoint returns 503 initially, then succeeds
     api = ctx.openapi.apps.schema_unavailable(failures=2)
     cli.run_and_assert(api.schema_url, "--wait-for-schema=5", "--max-examples=1", "--mode=positive")
 
 
 def test_wait_for_schema_503_exhausted(cli, app_runner, snapshot_cli):
-    # When the schema endpoint always returns 503 until the wait timeout expires
     app = Flask(__name__)
 
     @app.route("/openapi.json")
@@ -2954,21 +2865,18 @@ def test_invalid_tls_verify(ctx, cli, tmp_path, snapshot_cli, source):
 def test_invalid_schema_with_disabled_validation(
     ctx, cli, openapi_3_schema_with_invalid_security, version, snapshot_cli
 ):
-    # When there is an error in the schema
     api = ctx.openapi.apps.success()
     openapi_3_schema_with_invalid_security["openapi"] = version
     schema_path = ctx.makefile(openapi_3_schema_with_invalid_security)
-    # And the validation is disabled (default)
-    # Then we should show an error message derived from JSON Schema
+    # The error message comes from JSON Schema.
     assert cli.run(str(schema_path), f"--url={api.base_url}/api") == snapshot_cli
 
 
 def test_unresolvable_reference(ctx, cli, open_api_3_schema_with_recoverable_errors, snapshot_cli):
-    # When there is an error in the schema
     api = ctx.openapi.apps.success()
     del open_api_3_schema_with_recoverable_errors["paths"]["/bar"]["get"]
     schema_path = ctx.makefile(open_api_3_schema_with_recoverable_errors)
-    # Then we should show an error message derived from JSON Schema
+    # The error message comes from JSON Schema.
     assert cli.run(str(schema_path), f"--url={api.base_url}/api") == snapshot_cli
 
 
@@ -4474,8 +4382,7 @@ threading.Event().wait()
 @pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
 @pytest.mark.snapshot(replace_reproduce_with=False)
 def test_answered_case_survives_a_refused_check_request(subprocess_runner, cli, snapshot_cli):
-    # `ignored_auth` sends its own request after the case was answered; losing that answer to the
-    # refusal would drop a tested operation from the report.
+    # `ignored_auth` sends its own request after the case is answered; a refusal there must not drop the operation.
     port = subprocess_runner.run_app(ONE_SHOT_SERVER)
     assert (
         cli.main(
@@ -5072,8 +4979,7 @@ if __name__ == "__main__":
 
 
 def test_request_retries_option(cli, ctx, snapshot_cli):
-    # Server drops first 2 /users connections, succeeds on 3rd.
-    # Without --request-retries=2 the run would fail; with it, it passes.
+    # The server drops the first 2 /users connections, so the run passes only with --request-retries=2.
     paths = {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
     spec_bytes = json.dumps(ctx.openapi.build_schema(paths)).encode()
     attempt = [0]
@@ -5096,7 +5002,7 @@ def test_request_retries_option(cli, ctx, snapshot_cli):
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
-                # else: close without response → ConnectionError → retry
+                # Otherwise close without a response, which the client retries.
             else:
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -5160,8 +5066,7 @@ def test_skip_reasons_not_borrowed_from_tested_operations(ctx, cli, snapshot_cli
 
 
 def test_repeated_phase_keeps_its_executed_status():
-    # Under `--max-time` a phase runs once per cycle; a later cycle with no budget left must not
-    # rewrite the summary to say the phase never ran.
+    # Under `--max-time`, a later cycle with no budget must not mark a phase that already ran as never run.
     ctx = ExecutionContext(config=SchemathesisConfig().projects.get_default())
     phase = Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True, skip_reason=None)
     for status in (Status.SUCCESS, Status.SKIP):

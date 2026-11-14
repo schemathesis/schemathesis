@@ -128,7 +128,7 @@ class CrashStep:
     cookies: dict[str, Any] = field(default_factory=dict)
     case_body: Any = NOT_SET
     media_type: str | None = None
-    # Index of the step this link extracts from — the recorded parent, not always the previous step. None at root.
+    # Index of the recorded parent step this link extracts from, not always the previous one; None at root.
     parent_index: int | None = None
     # The configured identity that sent this step; None when no named identity did, or in older crash files.
     auth_identity: str | None = None

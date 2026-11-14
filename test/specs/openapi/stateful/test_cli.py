@@ -182,7 +182,7 @@ def before_call(context, case, kwargs):
     assert cli.run(api.schema_url, "--phases=stateful", hooks=module) == snapshot_cli
 
 
-# Need enough scenarios to exercise the per-operation demote path while other operations stay healthy.
+# Enough scenarios to demote the slow operation while the other operations stay healthy.
 def test_one_slow_operation_does_not_abort_stateful_phase(ctx, cli):
     api = ctx.openapi.apps.stateful_users(
         SlowOperations({("DELETE", "/users/<int:user_id>"): 2.0}),
@@ -195,10 +195,9 @@ def test_one_slow_operation_does_not_abort_stateful_phase(ctx, cli):
         "-c",
         "not_a_server_error",
     )
-    # Phase must NOT abort.
     assert "Unhealthy API" not in result.stdout
     assert "UnhealthyAPIError" not in result.stdout
-    # Phase actually ran (negative-only assertions could pass on a no-op skip).
+    # Negative-only assertions would also pass on a skipped phase.
     assert "Stateful" in result.stdout
 
 
@@ -233,7 +232,6 @@ def test_phase_aborts_when_all_ops_fail_transport(ctx, cli):
         "-c",
         "not_a_server_error",
     )
-    # Phase aborts with the rich health-monitor message listing the failing entry operations.
     assert "API stopped responding" in result.stdout
     assert "/users (" in result.stdout
     assert result.exit_code != 0
@@ -340,7 +338,6 @@ def test_links_from_operation_with_unusable_body(ctx, cli, snapshot_cli):
 
 
 def test_invalid_parameter_reference(ctx, cli, snapshot_cli):
-    # When a link references a non-existent parameter
     api = ctx.openapi.apps.stateful_users(InvalidParameter())
     assert cli.run(api.schema_url, "--phases=stateful", "-n 1") == snapshot_cli
 
@@ -497,12 +494,10 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, sn
                                     }
                                 }
                             },
-                            # Link: createOrder should take product id from response body
                             "links": {
                                 "CreateOrder": {
                                     "operationId": "createOrder",
-                                    # Attempt to populate order requestBody from response body id.
-                                    # This runtime expression will fail because producer omits `id`.
+                                    # The producer omits `id`, so this runtime expression fails.
                                     "requestBody": {"product_id": "$response.body#/id", "quantity": 1},
                                 }
                             },
@@ -546,7 +541,6 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, sn
         },
     }
 
-    # Minimal Flask app that stores products internally but returns a response that omits `id`.
     app = ctx.openapi.make_flask_app_from_schema(openapi)
     products = {}
     next_id = 1

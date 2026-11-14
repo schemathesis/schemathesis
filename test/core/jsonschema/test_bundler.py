@@ -36,7 +36,7 @@ DEFINITIONS = {
         (
             {"$ref": "#/definitions/User"},
             {"definitions": {"User": True}},
-            # "Truthy" schema is equal to an empty one
+            # A `true` schema equals an empty one.
             {},
         ),
         (
@@ -745,8 +745,7 @@ def test_bundle_keeps_mutual_cycle_through_pattern_properties():
 
 
 def test_unbundle_decodes_pointer_escaping_in_definition_names():
-    # Definition name with a literal `/` is encoded as `~1` in the URI fragment.
-    # Unbundling should recover the original key, not the encoded form.
+    # A `/` in a definition name is encoded as `~1` in the fragment; unbundling recovers the original key.
     name_to_uri = {"schema000001": "#/definitions/User~1Profile"}
     bundled = {
         "$ref": "#/x-bundled/schema000001",
@@ -938,8 +937,7 @@ def test_bundle_drops_id_around_references_into_the_bundle(keyword):
 
 @pytest.mark.parametrize("already_bundled", [0, 5, 95])
 def test_bundle_names_sort_in_creation_order(already_bundled):
-    # Canonicalization orders definitions by name, so names that sort differently depending on how
-    # much was bundled earlier give the same schema a different shape per load order.
+    # Canonicalization orders definitions by name, so names must sort the same however much was bundled earlier.
     definitions = {
         f"D{idx}": {"type": "object", "properties": {"next": {"$ref": f"#/definitions/D{idx + 1}"}}}
         for idx in range(12)

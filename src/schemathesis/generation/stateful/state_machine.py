@@ -45,20 +45,16 @@ DEFAULT_STATE_MACHINE_SETTINGS = hypothesis.settings(
     suppress_health_check=list(hypothesis.HealthCheck),
 )
 
-# Probability that a stateful rule generates a fresh value for an id-typed argument
-# instead of drawing from the bundle. Forces discovery of bugs that need unknown ids.
+# Chance a rule generates a fresh id-typed argument instead of drawing from the bundle, to find bugs with unknown ids.
 BASE_EXPLORATION_RATE: Final = 0.15
 
 
 @dataclass
 class StepInput:
-    """Input for a single state machine step."""
-
     case: Case
     transition: Transition | None  # None for initial steps
-    # Provenance of each value the link successfully substituted: (location, parameter name).
-    # `name=None` means the whole body was replaced. Empty list = extraction failed or the
-    # transition was deliberately skipped to widen coverage of non-stateful inputs.
+    # `(location, parameter name)` of each value the link substituted; a `None` name means the whole body.
+    # Empty when extraction failed or the transition was skipped to widen coverage of non-stateful inputs.
     applied_parameters: list[tuple[ParameterLocation, str | None]]
 
     __slots__ = ("case", "transition", "applied_parameters")
@@ -69,7 +65,6 @@ class StepInput:
 
     @property
     def is_applied(self) -> bool:
-        # If the transition has no parameters or body, count it as applied
         if self.transition is not None and not self.transition.parameters and self.transition.request_body is None:
             return True
         return bool(self.applied_parameters)
@@ -77,8 +72,6 @@ class StepInput:
 
 @dataclass
 class Transition:
-    """Data about transition execution."""
-
     # ID of the transition (e.g. link name)
     id: str
     parent_id: str
@@ -91,8 +84,6 @@ class Transition:
 
 @dataclass
 class ExtractedParam:
-    """Result of parameter extraction."""
-
     definition: Any
     value: Result[Any, Exception]
     is_required: bool
@@ -102,8 +93,6 @@ class ExtractedParam:
 
 @dataclass
 class ExtractionFailure:
-    """Represents a failure to extract data from a transition."""
-
     # e.g., "GetUser"
     id: str
     case_id: str
@@ -115,10 +104,9 @@ class ExtractionFailure:
     parameter_name: str
     # e.g., "$response.body#/id"
     expression: str
-    # Previous test cases in the chain, from newest to oldest
-    # Stored as a case + response pair
+    # Earlier cases in the chain with their responses, newest first
     history: list[tuple[Case, Response]]
-    # The actual response that caused the failure
+    # Response that caused the failure
     response: Response
     error: Exception | None
 
@@ -148,8 +136,6 @@ class ExtractionFailure:
 
 @dataclass
 class StepOutput:
-    """Output from a single transition of a state machine."""
-
     response: Response
     case: Case
 
@@ -171,7 +157,7 @@ def unique_rule_name(name: str, taken: Container[str]) -> str:
 
 
 class _ValidRuleFallbackFlags:
-    """Rule flags that enable every currently valid rule when the drawn flags disable all of them.
+    """Rule flags that enable every valid rule when the drawn flags disable all of them.
 
     Swarm testing disables a random subset of rules per scenario. API state machines usually have only one or two
     rules valid at a step, so a subset that disables all of them would reject the whole scenario.
@@ -220,7 +206,7 @@ def _shuffle_root_rules(strategy: RuleStrategy, machine: type[APIStateMachine], 
 
 def release_state_machines(*classes: type) -> None:
     """Drop Hypothesis' per-class caches for state machine classes that will not run again."""
-    # Both are private to Hypothesis; if either moves, the classes simply stay cached as before.
+    # Both are private to Hypothesis; if either moves, the classes stay cached.
     per_class = getattr(RuleBasedStateMachine, "_setup_state_per_class", None)
     if isinstance(per_class, dict):
         for cls in classes:
@@ -233,16 +219,13 @@ def release_state_machines(*classes: type) -> None:
 
 
 class APIStateMachine(RuleBasedStateMachine):
-    """State machine for executing API operation sequences based on inferred transitions.
+    """State machine that executes API operation sequences based on inferred transitions.
 
-    Automatically generates test scenarios by chaining API operations according
-    to spec-specific relationships (OpenAPI Links, GraphQL producer/consumer
-    inference, etc.).
+    Generates test scenarios by chaining API operations along spec-specific relationships,
+    such as OpenAPI links or GraphQL producer/consumer inference.
     """
 
-    # This is a convenience attribute, which happened to clash with `RuleBasedStateMachine` instance level attribute
-    # They don't interfere, since it is properly overridden on the Hypothesis side, but it is likely that this
-    # attribute will be renamed in the future
+    # Shares its name with a `RuleBasedStateMachine` instance attribute; Hypothesis overrides that one.
     bundles: ClassVar[dict[str, CaseInsensitiveDict]]  # type: ignore[misc, assignment]
     schema: BaseSchema
     # Names of rules that can start a scenario.
@@ -300,14 +283,12 @@ class APIStateMachine(RuleBasedStateMachine):
             settings = DEFAULT_STATE_MACHINE_SETTINGS
 
             def runTest(self) -> None:
-                # A callback is attached by the pytest plugin when report writers are configured.
-                # It connects this state machine class to the writers at the pytest level.
+                # The pytest plugin attaches a callback that connects this class to configured report writers
                 callback = StatefulCallbackMark.get(self.__class__)
                 if callback is not None:
                     _callback = callback
 
-                    # Wraps the state machine to capture interactions into the recorder,
-                    # then hands the recorder off to the callback (i.e. the report writers)
+                    # Captures interactions into the recorder, then hands it to the report writers' callback
                     # via schema-scoped hooks.
                     class _Capturing(cls):  # type: ignore[valid-type, misc]
                         def __init__(self) -> None:
@@ -315,7 +296,6 @@ class APIStateMachine(RuleBasedStateMachine):
                             super().__init__()
                             _recorder = self.recorder
 
-                            # Capture check results via the after_validate hook
                             def _on_after_validate(
                                 context: HookContext,
                                 case: Case,
@@ -330,7 +310,6 @@ class APIStateMachine(RuleBasedStateMachine):
                         def teardown(self) -> None:
                             self.schema.hooks.unregister(self._on_after_validate)
                             elapsed = self._started_at.elapsed
-                            # Hand the completed recorder to the pytest-level callback
                             _callback(self.recorder, elapsed)
                             super().teardown()
 

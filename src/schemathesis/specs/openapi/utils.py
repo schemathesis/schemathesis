@@ -66,12 +66,7 @@ def _admitted_types(schema: JsonSchema, bundled: object, references: frozenset[s
 
 
 def coerce_wire_string(value: str, expected_types: list[str]) -> int | float | bool | None:
-    """Try to coerce `value` to one of the numeric or boolean types in `expected_types`.
-
-    Returns the coerced value, or `None` if the string is not parseable as any expected type.
-    Used to bridge wire-level string transmission (query/header/cookie/path) and
-    the JSON-typed schema constraints those parameters declare.
-    """
+    """Coerce `value` to a numeric or boolean type in `expected_types`, or `None` if it parses as none."""
     # Python's number parsing also accepts `1_0`, ` 5`, or non-ASCII digits, which servers do not.
     if not value.isascii() or "_" in value or value != value.strip():
         return None

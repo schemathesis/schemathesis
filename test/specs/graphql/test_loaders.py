@@ -1,5 +1,3 @@
-"""GraphQL specific loader behavior."""
-
 import json
 from io import StringIO
 
@@ -33,11 +31,9 @@ type Query {
 
 def test_graphql_asgi_loader(ctx):
     api = ctx.graphql.apps.books(framework="fastapi")
-    # When an ASGI app is loaded via `from_asgi`
     schema = loaders.from_asgi("/graphql", api.wsgi_app)
     strategy = schema["Query"]["getBooks"].as_strategy()
 
-    # Then it should successfully make calls
     @run_given(strategy, max_examples=1)
     def test(case):
         assert case.call().status_code == 200
@@ -45,11 +41,9 @@ def test_graphql_asgi_loader(ctx):
 
 def test_graphql_wsgi_loader(ctx):
     api = ctx.graphql.apps.books()
-    # When a WSGI app is loaded via `from_wsgi`
     schema = loaders.from_wsgi("/graphql", api.wsgi_app)
     strategy = schema["Query"]["getBooks"].as_strategy()
 
-    # Then it should successfully make calls
     @run_given(strategy, max_examples=1)
     def test(case):
         assert case.call().status_code == 200

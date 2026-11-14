@@ -22,52 +22,34 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
-# Jackson `MismatchedInputException` / `InvalidFormatException` text. The verb
-# spelling (`Can not` -> `Cannot`) and type wrapping (bare -> backticks) changed
-# in jackson-databind 2.10 (Sep 2019). The type capture allows any non-backtick
-# character on the modern path so generic types like `java.util.List<E>` come
-# through verbatim — the consumer's type-to-format map ignores unknown shapes.
-# 2.10+ — String source: `Cannot deserialize value of type `X` from String "Y"`.
-# This is the only variant that captures the rejected value — used by the field-inference
-# fallback when a reference chain is absent.
+# jackson-databind 2.10+ writes `Cannot` and backtick-quoted types, generics like `java.util.List<E>` included.
+# String source, the only form with the rejected value, which locates the field when no reference chain exists.
 _JACKSON_STRING_SOURCE = re.compile(
     r'Cannot deserialize value of type `(?P<type>[^`]+)` from String "(?P<value>[^"]*)"'
 )
 _JACKSON_TYPE_PATTERNS: tuple[re.Pattern[str], ...] = (
     _JACKSON_STRING_SOURCE,
-    # 2.10+ — non-String source (object / array / boolean): `Cannot deserialize
-    # instance of \`X\` out of <token>`. Different verb form ("instance of" vs
-    # "value of type") because Jackson distinguishes the input shape internally.
+    # 2.10+ non-String source (object, array, boolean) says "instance of" instead of "value of type".
     re.compile(r"Cannot deserialize instance of `(?P<type>[^`]+)` out of \w+\s+token"),
-    # 2.10+ — Object/Array source on the `value of type` verb form. No quoted
-    # source string, so attribution requires the reference chain.
+    # 2.10+ Object/Array source; without a source string only the reference chain locates the field.
     re.compile(r"Cannot deserialize value of type `(?P<type>[^`]+)` from (?:Object|Array) value"),
-    # pre-2.10 (Spring Boot 2.1 and older Jakarta EE deployments) — bare type,
-    # different word order. No String value in this form.
+    # Before 2.10 (Spring Boot 2.1 and older): `Can not`, a bare type and no String value.
     re.compile(r"Can not deserialize instance of (?P<type>[\w.$<>]+)"),
 )
 
-# Jackson's reference chain: `through reference chain: Owner["address"]->Address["street"]`.
-# Each segment is either `["fieldName"]` (object property) or `[N]` (collection
-# index — e.g. `java.util.ArrayList[0]` for a failure inside a list element).
+# `through reference chain: Owner["address"]->Address["street"]`; a step is `["field"]` or an index like `List[0]`.
 _REFERENCE_CHAIN = re.compile(r"through reference chain: (?P<chain>[^\n)]+)")
 _CHAIN_STEP = re.compile(r'\["(?P<name>[^"]+)"\]|\[(?P<index>\d+)\]')
 
-# Jackson lists the enum's accepted values inline when a deserialization fails
-# on a non-matching string: "not one of the values accepted for Enum class: [USER, ADMIN]".
+# Enum failures list the accepted values: "not one of the values accepted for Enum class: [USER, ADMIN]".
 _JACKSON_ENUM = re.compile(r"not one of the values accepted for Enum class:\s*\[(?P<values>[^\]]+)\]")
 
-# Jackson `Numeric value (X) out of range of <java-type>` — JsonParser emits
-# this when an incoming JSON number doesn't fit the destination Java integer
-# width. The width tells us the bounds to inject as `minimum`/`maximum`.
+# A JSON number too wide for the Java integer type; the type gives the `minimum` / `maximum`.
 _JACKSON_NUMERIC_OVERFLOW = re.compile(
     r"Numeric value \([^)]+\) out of range of (?P<size>int|long|short|byte)\b",
 )
 
-# Jackson `LocalDateTime`/`LocalDate` parse failure: `Text 'X' could not be parsed`.
-# When a `LocalDateTime` field receives an `Instant`-shaped value (e.g. trailing `Z`),
-# Spring appends `T00:00:00` before parsing and the appended chars leak into the
-# error message — strip that suffix before walking the request to find the field.
+# `LocalDateTime` / `LocalDate` parse failure; Spring may append `T00:00:00` to an `Instant`-shaped value first.
 _JACKSON_DATE_PARSE = re.compile(r"Text '(?P<value>[^']+)' could not be parsed")
 _DATE_PARSE_APPENDED_SUFFIX = re.compile(r"T\d{2}:\d{2}:\d{2}$")
 
@@ -79,13 +61,9 @@ _JAVA_INT_BOUNDS: dict[str, tuple[int, int]] = {
     "long": (-9_223_372_036_854_775_808, 9_223_372_036_854_775_807),
 }
 
-# Top-level keys we look for the Jackson message under. Spring wraps Jackson
-# errors in its own envelope (`{"detail": "..."}` / `{"message": "..."}`);
-# Dropwizard, Micronaut, Quarkus all surface them through similar shapes.
+# Keys holding the Jackson message in Spring, Dropwizard, Micronaut and Quarkus envelopes.
 _CARRIER_KEYS = ("msg", "message", "error", "detail", "defaultMessage")
-# Custom `@ControllerAdvice` handlers sometimes funnel Jackson parse errors
-# through the same array envelope used for Bean-validation results, e.g.
-# `{"errors": [{"message": "JSON parse error: Cannot deserialize..."}]}`.
+# Custom `@ControllerAdvice` handlers may put Jackson errors in the Bean Validation array, `{"errors": [...]}`.
 _ARRAY_KEYS = ("errors", "subErrors", "fieldErrors")
 
 
@@ -126,9 +104,7 @@ def _resolve_date_parse_slot(case: Case, rejected_value: str) -> tuple[Parameter
     slot = infer_path_from_request(case=case, rejected_value=rejected_value)
     if slot is not None:
         return slot
-    # Spring's `LocalDateTime` coercion appends `T00:00:00` to the user value
-    # before parsing; that suffix leaks into the error message, so the wire-form
-    # value won't be present in the request as-is. Strip and retry.
+    # Spring appends `T00:00:00` to `LocalDateTime` input and the error echoes it; retry without the suffix.
     stripped = _DATE_PARSE_APPENDED_SUFFIX.sub("", rejected_value)
     if stripped == rejected_value:
         return None
@@ -247,12 +223,9 @@ def _append_observations_for_message(
 
 @PARSERS.register
 class JacksonParser:
-    """Parser for Jackson `InvalidFormatException` messages naming the offending Java type.
+    """Parser for Jackson messages naming the offending Java type, in any framework that binds JSON with Jackson.
 
-    Library-level (not Spring-specific) — Jackson messages surface in any framework using
-    Jackson as the JSON binder. Field attribution prefers the `through reference chain: ...`
-    segment when present; when absent, falls back to matching the rejected value against
-    the request's parameter slots.
+    Locates the field by the `through reference chain: ...` part, else by the rejected value in the request.
     """
 
     priority = 5

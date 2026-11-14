@@ -13,10 +13,9 @@ if TYPE_CHECKING:
 
 
 def build_descriptors(schema: OpenApiSchema) -> Sequence[ResourceDescriptor]:
-    """Build resource descriptors from dependency graph outputs."""
     graph = schema.analysis.dependency_graph
 
-    # Map (resource_name, base_path) -> identifier_field for path-based lookup
+    # Identifier field per (resource name, base path)
     identifier_by_path: dict[tuple[str, str], str] = {}
     identifier_fallback: dict[str, str] = {}
     consumed_resources: set[str] = set()
@@ -45,12 +44,10 @@ def build_descriptors(schema: OpenApiSchema) -> Sequence[ResourceDescriptor]:
     for label, operation in graph.operations.items():
         for output in operation.outputs:
             if (
-                # Path-keyed and body-keyed outputs only inform link inference - they
-                # have no response body to extract resource instances from.
+                # Path- and body-keyed outputs only inform link inference; no response body holds their instances.
                 output.path_parameter is not None
                 or output.body_field is not None
-                # Skip resources nothing reads - the captured instances would land in a bucket
-                # that no parameter requirement queries.
+                # Skip resources nothing reads: no parameter requirement queries their instances.
                 or output.resource.name not in consumed_resources
             ):
                 continue

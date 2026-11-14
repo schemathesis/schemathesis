@@ -42,7 +42,7 @@ class HarWriter:
         self._har: harfile.HarFile | None = None
 
     def open(self, seed: int | None = None) -> None:
-        """Open the HAR output file. `seed` is ignored — HAR has no header field for it."""
+        """Open the HAR output file; HAR has no field for `seed`, so it is ignored."""
         self._ctx = harfile.open(self._output)
         self._har = self._ctx.__enter__()
 
@@ -132,7 +132,6 @@ class HarWriter:
             )
 
     def close(self) -> None:
-        """Close the HAR output file."""
         if self._har is not None:
             self._ctx.__exit__(None, None, None)
             self._har = None
@@ -150,7 +149,7 @@ class HarWriter:
 
 
 def _truncation_comment(response: Response) -> str | None:
-    """Say how much of the body `text` holds — `size` alone cannot be told apart from compression."""
+    """Say how much of the body `text` holds, as `size` alone does not tell truncation from compression."""
     if not response.is_truncated:
         return None
     return f"Body truncated: {len(response.content)} of {response.content_size} bytes recorded"

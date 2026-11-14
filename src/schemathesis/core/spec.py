@@ -100,9 +100,6 @@ class AuthFlow(Protocol):
 
 
 class ApiSchema(SchemaMetadata, Protocol):
-    """Full schema contract."""
-
-    # Static-analysis warnings collected from the schema.
     def iter_schema_warnings(self) -> list[SchemaWarning]: ...  # pragma: no cover
 
     # Operation enumeration, lookup, statistics, and unit-phase scheduling.

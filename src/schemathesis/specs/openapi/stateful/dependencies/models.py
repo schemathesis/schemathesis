@@ -88,7 +88,6 @@ class DependencyGraph:
             for fk_field in [*resource["fk_fields"], *resource["nested_fk_fields"]]:
                 del fk_field["holds_array"]
                 del fk_field["value_types"]
-            # Simplify FK fields for readability
             if not resource["fk_fields"]:
                 del resource["fk_fields"]
             if not resource["nested_fk_fields"]:
@@ -97,22 +96,15 @@ class DependencyGraph:
         return serialized
 
     def iter_links(self) -> Iterator[ResponseLinks]:
-        """Generate OpenAPI Links connecting producer and consumer operations.
-
-        Creates links from operations that produce resources to operations that
-        consume them. For example: `POST /users` (creates `User`) -> `GET /users/{id}`
-        (needs `User.id` parameter).
-        """
+        """Yield links from resource producers to consumers, e.g. `POST /users` -> `GET /users/{id}`."""
         references = {id(op): operation_reference(op.path, op.method) for op in self.operations.values()}
         template_fields = {id(op): get_template_fields(op.path) for op in self.operations.values()}
 
-        # Precomputed data for the cross-namespace scope guard (bare {id} collision check).
-        # All string work happens once here rather than inside the hot inner loop.
+        # String work for the bare `{id}` scope guard happens once here, outside the hot loop.
         path_resource_names, stripped_paths, id_collection_paths = _scope_guard_paths(self.operations.values())
         qualifiers = _collection_qualifiers(list(self.operations.values()))
         item_keys = _item_keys(self.operations.values(), stripped_paths)
 
-        # Index consumers by resource
         consumers_by_resource: dict[int, dict[int, tuple[OperationNode, list[InputSlot]]]] = defaultdict(dict)
         for consumer in self.operations.values():
             consumer_id = id(consumer)
@@ -137,14 +129,12 @@ class DependencyGraph:
             qualifier = qualifiers.get(producer_id)
 
             for output_slot in producer.outputs:
-                # Only iterate over consumers that match this resource
                 relevant_consumers = consumers_by_resource.get(id(output_slot.resource), {})
                 if qualifier is not None:
                     relevant_consumers = _consumers_under(relevant_consumers, qualifier, output_slot)
                 confirmed = _confirmed_input(producer, output_slot)
 
                 for consumer_id, (consumer, input_slots) in relevant_consumers.items():
-                    # Skip self-references
                     if consumer_id == producer_id:
                         continue
 
@@ -168,10 +158,7 @@ class DependencyGraph:
                             continue
                         if not _keys_same_collection(input_slot, producer, consumer, stripped_paths, item_keys):
                             continue
-                        # Scope guard: skip bare {id} links where the producer is from a
-                        # different namespace. Triggered only when the resource name matches the
-                        # producer's path-derived name — i.e., the collision is path-based, not
-                        # schema-based (POST /something -> CategoryFields is left untouched).
+                        # Skip a bare `{id}` from another namespace when the resource is named after the producer path.
                         if (
                             input_slot.parameter_name == "id"
                             and output_slot.resource.name == path_resource_names[producer_id]
@@ -193,13 +180,11 @@ class DependencyGraph:
                         # Types of the value sent; any type when unknown
                         value_types: Collection[str] = ANY_VALUE_TYPES
                         if output_slot.path_parameter is not None:
-                            # Path-keyed producer: the resource value lives in the producer's
-                            # request URL, not the response body (e.g. POST /products/{productName}).
+                            # The value lives in the producer's request URL (e.g. POST /products/{productName}).
                             value_expr = f"$request.path.{output_slot.path_parameter}"
                             value_types = _request_value_types(confirmed, input_slot)
                         elif output_slot.body_field is not None:
-                            # Body-keyed producer: the resource value lives in the producer's
-                            # request body (e.g. POST /sessions with body {sessionId: ...}).
+                            # The value lives in the producer's request body (`{sessionId: ...}` in POST /sessions).
                             value_expr = f"$request.body#/{output_slot.body_field}"
                             value_types = _request_value_types(confirmed, input_slot)
                         elif output_slot.is_primitive_identifier:
@@ -316,9 +301,8 @@ class DependencyGraph:
                             request_body=request_body,
                         )
 
-                    # Propagate shared path parameters that weren't mapped via resources
-                    # For /users/{userId}/posts -> /users/{userId}/posts/{postId}, userId is shared
-                    # but only postId gets mapped from the response. We need to propagate userId.
+                    # Forward shared path parameters no resource mapped:
+                    # `userId` for /users/{userId}/posts -> /users/{userId}/posts/{postId}.
                     if links:
                         producer_fields = template_fields[producer_id]
                         listed_identifier = any(slot.is_listed_identifier for slot in input_slots)
@@ -357,9 +341,7 @@ class DependencyGraph:
                             else []
                         )
                         for link_name, link_def in links.items():
-                            # Find which path parameters are already mapped
                             mapped_params = {name for name, _ in iter_path_parameters(link_def.parameters)}
-                            # Add $request.path.X for shared params not already mapped
                             for param in shared_params if link_name in forwarding else parent_params:
                                 if param in mapped_params:
                                     continue
@@ -371,15 +353,10 @@ class DependencyGraph:
                             links=links,
                         )
 
-        # Generate links from FK fields (e.g., customer_id -> GET /customers/{id})
         yield from self._iter_fk_links(references)
 
     def _iter_fk_links(self, references: dict[int, str]) -> Iterator[ResponseLinks]:
-        """Generate links from foreign key fields in producer responses.
-
-        For example, if GET /orders/{id} returns {"id": "...", "customer_id": "..."},
-        this creates a link to GET /customers/{id} using the customer_id field value.
-        """
+        """Yield links from foreign key fields in responses, e.g. `customer_id` -> `GET /customers/{id}`."""
         # Consumers by the resource field they take; FK values never fill body parameters
         consumers_by_field: dict[tuple[int, str | None], dict[int, tuple[OperationNode, list[InputSlot]]]] = (
             defaultdict(dict)
@@ -399,10 +376,10 @@ class DependencyGraph:
             producer_id = id(producer)
 
             for output_slot in producer.outputs:
-                # Skip primitive identifiers (they don't have FK fields)
+                # A primitive identifier has no FK fields
                 if output_slot.is_primitive_identifier:
                     continue
-                # Skip path-keyed and body-keyed outputs (no response body to extract FK fields from)
+                # Path- and body-keyed outputs have no response body to read FK fields from
                 if output_slot.path_parameter is not None or output_slot.body_field is not None:
                     continue
                 # These statuses forbid a body, whatever the schema declares.
@@ -428,7 +405,6 @@ class DependencyGraph:
                     relevant_consumers = consumers_by_field.get((id(target_resource), fk_field.target_field), {})
 
                     for consumer_id, (consumer, input_slots) in relevant_consumers.items():
-                        # Skip self-references
                         if consumer_id == producer_id:
                             continue
 
@@ -437,13 +413,12 @@ class DependencyGraph:
                         for input_slot in input_slots:
                             if not input_slot.takes_foreign_key(fk_field):
                                 continue
-                            # Build the body pointer to the FK field
                             if fk_field.is_array:
                                 # For array FK, fan out across every element: /data/*/site_ids/*
                                 body_pointer = extend_pointer(
                                     output_slot.pointer, fk_field.field_name, output_slot.cardinality
                                 )
-                                body_pointer += "/*"  # Fan out across every element of the FK array
+                                body_pointer += "/*"
                             else:
                                 body_pointer = extend_pointer(
                                     output_slot.pointer, fk_field.field_name, output_slot.cardinality
@@ -468,7 +443,7 @@ class DependencyGraph:
                                 request_body={},
                             )
 
-                # Process nested FK fields (e.g., shipping.warehouse_id, line_items[].product_id)
+                # Nested FK fields: `shipping.warehouse_id`, `line_items[].product_id`
                 for nested_fk in resource.nested_fk_fields:
                     if declared is not None and next(iter_decoded_pointer_segments(nested_fk.pointer)) not in declared:
                         continue
@@ -487,7 +462,6 @@ class DependencyGraph:
                         for input_slot in input_slots:
                             if not input_slot.takes_foreign_key(nested_fk):
                                 continue
-                            # Build pointer: output_slot.pointer + nested_fk.pointer
                             if output_slot.cardinality == Cardinality.MANY:
                                 base = output_slot.pointer.rstrip("/") + "/*"
                             else:
@@ -522,8 +496,7 @@ class DependencyGraph:
                     )
 
     def assert_fieldless_resources(self, key: str, known: dict[str, frozenset[str]]) -> None:  # pragma: no cover
-        """Verify all resources have at least one field."""
-        # Fieldless resources usually indicate failed schema extraction, which can be caused by a bug
+        """Fail on fieldless resources: they usually mean schema extraction failed, possibly from a bug."""
         known_fieldless = known.get(key, frozenset())
 
         for name, resource in self.resources.items():
@@ -560,8 +533,7 @@ class DependencyGraph:
                     raise AssertionError(message)
 
 
-# FK field suffix -> (target_field, is_array)
-# Maps FK naming conventions to the identifier field they reference
+# FK field suffix -> (identifier field it references, is_array)
 FK_SUFFIX_MAP: dict[str, tuple[str, bool]] = {
     "_ids": ("id", True),
     "_uuids": ("uuid", True),
@@ -584,31 +556,21 @@ _CAMEL_FK_SUFFIXES: tuple[tuple[str, str, bool], ...] = (
     ("Uuid", "uuid", False),
     ("Guid", "guid", False),
 )
-# Floor below which the leading lowercase run is unlikely to name a real resource;
-# blocks `bId`/`fId`/`lId` style fragments while still permitting names like `Order`.
+# Shorter camelCase bases are fragments (`bId`, `fId`, `lId`) rather than resource names like `Order`.
 _CAMEL_FK_MIN_BASE_LEN = 3
 
 
 @lru_cache(maxsize=2048)
 def infer_fk_target(field: str) -> tuple[str, str, bool] | None:
-    """Extract target resource name and field from a FK field name.
+    """`(resource_name, target_field, is_array)` a FK field name points to, or `None` for a non-FK name.
 
-    Returns (resource_name, target_field, is_array) or None if not a FK field.
-
-    Examples:
-        customer_id -> ("Customer", "id", False)
-        site_ids -> ("Site", "id", True)
-        user_uuid -> ("User", "uuid", False)
-        session_guids -> ("Session", "guid", True)
-        locationId -> ("Location", "id", False)
-        orderGuids -> ("Order", "guid", True)
-
+    `customer_id` -> `("Customer", "id", False)`, `orderGuids` -> `("Order", "guid", True)`.
     """
     field_lower = field.lower()
 
-    # snake_case and kebab-case path. Check suffixes (longer ones first to match _ids before _id).
+    # snake_case and kebab-case; longer suffixes come first, so `_ids` matches before `_id`.
     for suffix, (target_field, is_array) in FK_SUFFIX_MAP.items():
-        # Skip bare identifier fields (not FKs, they're primary identifiers)
+        # A bare identifier field is a primary key, not a FK
         if field_lower == suffix.lstrip("_"):
             return None
         if field_lower.endswith(suffix) and len(field) > len(suffix):
@@ -616,8 +578,7 @@ def infer_fk_target(field: str) -> tuple[str, str, bool] | None:
             if base_name:
                 return to_pascal_case(base_name), target_field, is_array
 
-    # camelCase path. Base must start with an ASCII lowercase letter; rules out
-    # PascalCase types and prevents the bare `Id` from matching as a FK.
+    # camelCase: a lowercase ASCII first letter rules out PascalCase types and the bare `Id`.
     if not field or not ("a" <= field[0] <= "z"):
         return None
     for suffix, target_field, is_array in _CAMEL_FK_SUFFIXES:
@@ -823,11 +784,7 @@ def declared_field_types(properties: Mapping[str, tuple[Resolver, JsonSchema]]) 
 
 
 def extract_fk_fields(properties: Mapping[str, tuple[Resolver, JsonSchema]]) -> list[FKField]:
-    """Extract FK fields from the properties of a resource schema.
-
-    Pre-computes FK information once during resource creation
-    to avoid repeated inference during link generation.
-    """
+    """Computed once per resource, so link generation does not infer FK targets again."""
     result = []
     for name in sorted(properties):
         fk_info = infer_fk_target(name)
@@ -854,21 +811,7 @@ def extract_nested_fk_fields(
     pointer: str = "",
     max_depth: int = 5,
 ) -> list[NestedFKField]:
-    """Recursively extract FK fields from nested schema properties.
-
-    This finds FK fields (like warehouse_id, product_ids) at any nesting depth
-    within an object schema, including inside arrays.
-
-    Args:
-        schema: The JSON schema to scan
-        resolver: JSON reference resolver
-        pointer: Current JSON pointer path
-        max_depth: Maximum recursion depth to prevent infinite loops
-
-    Returns:
-        List of NestedFKField objects for all FK fields found
-
-    """
+    """FK fields (`warehouse_id`, `product_ids`) below the top level, inside objects and array items."""
     if max_depth <= 0:
         return []
 
@@ -882,10 +825,9 @@ def extract_nested_fk_fields(
 
         field_pointer = f"{pointer}/{encode_pointer(field_name)}"
 
-        # Check if this field is a FK field
         fk_info = infer_fk_target(field_name)
         if fk_info is not None:
-            # Skip top-level FK fields - they're already captured in fk_fields
+            # The resource's own FK fields cover the top level
             if pointer:
                 target_resource, target_field, is_array = fk_info
                 holds_array, value_types = _foreign_key_values(field_schema, resolver, is_array=is_array)
@@ -900,23 +842,20 @@ def extract_nested_fk_fields(
                         holds_array=holds_array,
                     )
                 )
-            continue  # Don't recurse into FK fields
+            continue
 
-        # Resolve nested schema
         field_resolver, resolved_field = maybe_resolve_with_resolver(field_schema, resolver)
         field_type = resolved_field.get("type")
 
-        # Recurse into nested objects
         if field_type == "object" or "properties" in resolved_field:
             result.extend(extract_nested_fk_fields(resolved_field, field_resolver, field_pointer, max_depth - 1))
 
-        # Recurse into array items
         elif field_type == "array":
             items = resolved_field.get("items")
             if isinstance(items, dict):
                 items_resolver, resolved_items = maybe_resolve_with_resolver(items, field_resolver)
                 if isinstance(resolved_items, dict):
-                    # Use /* to fan out across every array element
+                    # `/*` fans out across every array element
                     items_pointer = f"{field_pointer}/*"
                     result.extend(
                         extract_nested_fk_fields(resolved_items, items_resolver, items_pointer, max_depth - 1)
@@ -1028,15 +967,7 @@ def _key_kind(parameter_name: str | int) -> KeyKind | None:
 
 
 def build_nested_body(path: BodyPath, value: object) -> dict[str, Any] | list[Any]:
-    """Build a body holding `value` at `path`, integers marking array items.
-
-    Examples:
-        build_nested_body(("customer_id",), "$val") -> {"customer_id": "$val"}
-        build_nested_body(("shipping", "warehouse_id"), "$val") -> {"shipping": {"warehouse_id": "$val"}}
-        build_nested_body(("items", 0, "product_id"), "$val") -> {"items": [{"product_id": "$val"}]}
-        build_nested_body((0, "product_id"), "$val") -> [{"product_id": "$val"}]
-
-    """
+    """A body holding `value` at `path`, integers marking array items: `("a", 0, "b")` -> `{"a": [{"b": value}]}`."""
     *parents, leaf = path
     body: dict[str, Any] | list[Any] = [value] if isinstance(leaf, int) else {leaf: value}
     for step in reversed(parents):
@@ -1059,12 +990,10 @@ def merge_request_body(
 
 
 def _merge_nested_body(target: dict[str, Any], source: dict[str, Any]) -> None:
-    """Deep merge source into target dict."""
     for key, value in source.items():
         if key in target and isinstance(target[key], dict) and isinstance(value, dict):
             _merge_nested_body(target[key], value)
         elif key in target and isinstance(target[key], list) and isinstance(value, list):
-            # Merge list items (for array body fields)
             target[key] = merge_request_body(target[key], value)
         else:
             target[key] = value
@@ -1089,11 +1018,7 @@ def extend_pointer(base: str, field: str, parent_cardinality: Cardinality) -> st
 
 @dataclass(slots=True)
 class LinkDefinition:
-    """OpenAPI Link Object definition.
-
-    Represents a single link from a producer operation's response to a
-    consumer operation's input parameter.
-    """
+    """One link from a producer's response to a consumer's input."""
 
     operation_ref: str
     """Reference to target operation (e.g., '#/paths/~1users~1{id}/get')"""
@@ -1105,7 +1030,6 @@ class LinkDefinition:
     """Request body (e.g., {'path.id': '$response.body#/id'})"""
 
     def to_openapi(self) -> dict[str, Any]:
-        """Convert to OpenAPI Links format."""
         links: dict[str, Any] = {
             "operationRef": self.operation_ref,
             SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True},
@@ -1120,18 +1044,7 @@ class LinkDefinition:
 
 @dataclass(slots=True)
 class ResponseLinks:
-    """Collection of OpenAPI Links for a producer operation's response.
-
-    Represents all links from a single response (e.g., POST /users -> 201)
-    to consumer operations that can use the produced resource.
-
-    Example:
-        POST /users -> 201 might have links to:
-        - GET /users/{id}
-        - PATCH /users/{id}
-        - DELETE /users/{id}
-
-    """
+    """Links from one producer response (`POST /users` 201) to the operations using its resource."""
 
     producer_operation_ref: str
     """Reference to producer operation (e.g., '#/paths/~1users/post')"""
@@ -1143,14 +1056,11 @@ class ResponseLinks:
     """Named links (e.g., {'GetUserById': LinkDefinition(...)})"""
 
     def to_openapi(self) -> dict[str, Any]:
-        """Convert to OpenAPI response links format."""
         return {name: link_def.to_openapi() for name, link_def in self.links.items()}
 
 
 @dataclass(slots=True)
 class NormalizedLink:
-    """Normalized representation of a link."""
-
     path: str
     method: str
     parameters: set[str]
@@ -1163,9 +1073,7 @@ class OperationNode:
 
     method: str
     path: str
-    # What this operation NEEDS
     inputs: list[InputSlot]
-    # What this operation PRODUCES
     outputs: list[OutputSlot]
 
 
@@ -1216,19 +1124,15 @@ class DeferredBindings:
 class InputSlot:
     """A required input for an operation."""
 
-    # Which resource is needed
     resource: ResourceDefinition
-    # Which field from that resource (e.g., "id").
-    # None if passing the whole resource
+    # Field of that resource, e.g. `id`; `None` to pass the whole resource
     resource_field: str | None
-    # Where it goes in the request (e.g., "userId")
-    # Integer means index in an array (only single items are supported)
+    # Name in the request, e.g. `userId`; an integer is an array index (single items only)
     parameter_name: str | int
     parameter_location: ParameterLocation
     # Whether a parameter takes an array of values, e.g. `?ids=1&ids=2`, or a body field `customer_ids: [1, 2]`
     takes_array: bool = False
-    # Whether this input was matched via suffix matching (e.g., "file_name" -> "BackupFile")
-    # Suffix-matched inputs can be upgraded by merge_related_resources if a producer exists
+    # Matched by name suffix (`file_name` -> `BackupFile`); a resource with a producer may replace it later
     is_suffix_matched: bool = False
     # Whether this input sends back a value a response returned, e.g. a `version` token for an update
     echoes_response: bool = False
@@ -1248,8 +1152,8 @@ class InputSlot:
     takes_uuid: bool = False
     # Types of one value this input takes, its items' for an array; any type for a form field or when undeclared
     value_types: frozenset[str] = ANY_VALUE_TYPES
-    # Schemas of the object a body key sits in when that object is named after the key's resource (`{option: {option_id}}`);
-    # `None` for other inputs
+    # Schemas of the object a body key sits in when that object is named after the key's resource
+    # (`{option: {option_id}}`); `None` for other inputs
     item_schemas: frozenset[str] | None = None
 
     def takes(self, value_types: Collection[str]) -> bool:
@@ -1275,31 +1179,22 @@ class OpenFields(frozenset[str]):
 
 @dataclass(slots=True)
 class OutputSlot:
-    """Describes how to extract a resource from an operation's response."""
+    """Where a resource sits in an operation's response."""
 
-    # Which resource type
     resource: ResourceDefinition
-    # Where in response body (JSON pointer)
+    # JSON pointer into the response body
     pointer: str
-    # Is this a single resource or an array?
     cardinality: Cardinality
-    # HTTP status code
     status_code: str
-    # True when response is a bare primitive (string/int) rather than an object
+    # The response is a bare string or integer
     is_primitive_identifier: bool = False
-    # Set when the resource value comes from a request path parameter rather
-    # than the response body (POST/PUT to `/products/{productName}` confirms
-    # the product exists once the response is 2xx).
+    # Request path parameter holding the value: a 2xx from POST/PUT `/products/{productName}` confirms it exists
     path_parameter: str | None = None
-    # Set when the resource value comes from a request body field rather than
-    # the response body (POST `/sessions {sessionId: ...}` confirms the session
-    # exists once the response is 2xx).
+    # Request body field holding the value: a 2xx from POST `/sessions {sessionId: ...}` confirms it exists
     body_field: str | None = None
-    # True when the response body is a map keyed by identifier; capture every map key
-    # as a resource instance (e.g. `{<teamKey>: {...}, ...}` from `GET /teams/statuses`).
+    # The body maps identifiers to items (`{<teamKey>: {...}}` from `GET /teams/statuses`); each key is an instance
     extract_object_keys: bool = False
-    # Fields the response declares at `pointer`; `None` when it declares none.
-    # Resources are shared by name, so this can differ from `resource.fields`.
+    # Fields the response declares at `pointer`, `None` for none; resources are shared by name, so the two can differ
     response_fields: frozenset[str] | None = None
     # Envelope field identifying the resource when the resource itself declares no identifier
     # (`/bookingid` in `{bookingid: 1, booking: {...}}`).
@@ -1338,13 +1233,12 @@ class OutputSlot:
 class FKField:
     """A top-level foreign key field in a resource schema."""
 
-    # The FK field name (e.g., "customer_id")
     field_name: str
-    # Target resource name inferred from field (e.g., "Customer")
+    # Resource the field name points to, e.g. `Customer` for `customer_id`
     target_resource: str
-    # Target field the FK references (e.g., "id", "uuid")
+    # Identifier it references, e.g. `id` or `uuid`
     target_field: str
-    # Whether the FK field is an array (e.g., site_ids)
+    # A plural name, e.g. `site_ids`
     is_array: bool
     # Types of the identifiers the field holds, e.g. `integer` for `customer_id: 3` or `site_ids: [1, 2]`
     value_types: frozenset[str]
@@ -1356,15 +1250,14 @@ class FKField:
 class NestedFKField:
     """A foreign key field found at a nested path in a resource schema."""
 
-    # JSON pointer path to the FK field (e.g., "/shipping/warehouse_id")
+    # e.g. `/shipping/warehouse_id`
     pointer: str
-    # The FK field name (e.g., "warehouse_id")
     field_name: str
-    # Target resource name inferred from field (e.g., "Warehouse")
+    # Resource the field name points to, e.g. `Warehouse` for `warehouse_id`
     target_resource: str
-    # Target field the FK references (e.g., "id", "uuid")
+    # Identifier it references, e.g. `id` or `uuid`
     target_field: str
-    # Whether the FK field is an array (e.g., site_ids)
+    # A plural name, e.g. `site_ids`
     is_array: bool
     # Types of the identifiers the field holds, e.g. `integer` for `warehouse_id: 3` or `product_ids: [1, 2]`
     value_types: frozenset[str]
@@ -1377,17 +1270,13 @@ class ResourceDefinition:
     """A minimal description of a resource structure."""
 
     name: str
-    # A sorted list of resource fields
+    # Sorted
     fields: list[str]
-    # Field types mapping
     types: dict[str, set[str]]
-    # How this resource was created
     source: DefinitionSource
-    # Top-level FK fields (e.g., customer_id, order_ids)
     fk_fields: list[FKField]
-    # FK fields found at nested paths in the schema
     nested_fk_fields: list[NestedFKField]
-    # Fields inherited through `allOf` rather than declared by the schema itself
+    # Fields inherited through `allOf`
     inherited_fields: frozenset[str] = frozenset()
 
     @classmethod
@@ -1431,17 +1320,11 @@ def _unique_link_name(
 
 
 class DefinitionSource(enum.IntEnum):
-    """Quality level of resource information.
+    """Reliability of resource information: a higher source replaces a lower one, equal sources merge their fields."""
 
-    Lower values are less reliable and should be replaced by higher values.
-    Same values should be merged (union of fields).
-    """
-
-    # From spec but no structural information
     SCHEMA_WITHOUT_PROPERTIES = 0
-    # Guessed from parameter names (not in spec)
+    # Guessed from parameter names, absent from the schema
     PARAMETER_INFERENCE = 1
-    # From spec with actual field definitions
     SCHEMA_WITH_PROPERTIES = 2
 
 
@@ -1463,9 +1346,9 @@ def _scope_guard_paths(
     operations: Iterable[OperationNode],
 ) -> tuple[dict[int, str | None], dict[int, str], dict[int, tuple[str, str] | None]]:
     path_resource_names: dict[int, str | None] = {}
-    # Stripped producer path per operation
+    # Paths without their version prefix
     stripped_paths: dict[int, str] = {}
-    # (consumer_collection, consumer_collection + "/") for ops with a bare {id} segment
+    # `(collection, collection + "/")` before a bare `{id}` segment, `None` without one
     id_collection_paths: dict[int, tuple[str, str] | None] = {}
     for op in operations:
         op_id = id(op)
@@ -1508,8 +1391,7 @@ def _consumers_under(
 def _keys_different_items(producer: OperationNode, consumer: OperationNode, parameter: str) -> bool:
     """Whether `{parameter}` sits under different parents, so each operation names a different item with it.
 
-    `/warehouses/{name}` and `/warehouses/{warehouse}/shelves/{name}/bins` share `{name}`, but one is a warehouse
-    and the other a shelf.
+    `/warehouses/{name}` and `/warehouses/{warehouse}/shelves/{name}/bins` share `{name}` for a warehouse and a shelf.
     """
     return _parents_differ(producer.path, consumer.path, parameter)
 
@@ -1548,9 +1430,8 @@ def _keys_same_collection(
 ) -> bool:
     """Whether a producer may hold the item a key identifies, when only paths name that item's resource.
 
-    `{option: {option_id}}` sent to `/kits/options/add` identifies a kit option, so it takes keys from `/kits/options`
-    or `/options`, but options listed under `/variants/{sku}/options` share only a name with kit options. So does
-    `{optionId}` in `/kits/options/{optionId}`, as operations on kit options send them as such objects.
+    `{option: {option_id}}` sent to `/kits/options/add` takes keys from `/kits/options` or `/options`, not from
+    `/variants/{sku}/options`; so does `{optionId}` in `/kits/options/{optionId}`, as kit operations send such objects.
     """
     resource = input_slot.resource
     if (
@@ -1578,7 +1459,7 @@ def _keys_same_collection(
         if _same_collection(producer_collection, consumer_collection):
             return True
     else:
-        # Only a parameter names the item, so it fits when one collection holds such items or it is under that one's parent
+        # Only a parameter names the item: it fits when one collection holds such items or under that one's parent
         parent = consumer_collection.rsplit("/", 1)[0]
         if f"{path_shape(producer_path)}/".startswith(f"{parent}/") or all(
             other is None or _same_collection(other, consumer_collection)

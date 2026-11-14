@@ -46,11 +46,7 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class Controller:
-    """Sidecar surface for a case generator.
-
-    Holds `deferred_errors` for pre-iteration failures the engine surfaces after
-    iteration ends, and `unserializable_media_types` for payloads dropped mid-iteration.
-    """
+    """Side channel of a case generator: setup errors to report after iteration, media types dropped during it."""
 
     deferred_errors: list[Exception] = field(default_factory=list)
     unserializable_media_types: set[str] = field(default_factory=set)
@@ -277,8 +273,7 @@ class ExamplesGenerator:
 
     def _defer_materialization_error(self, exc: Exception) -> None:
         translated = _translate_examples_materialization_error(exc, self._operation)
-        # `InvalidSchema` and non-regex `ValidationError` are silently absorbed: they
-        # surface during the Coverage phase, where the schema-quality signal belongs.
+        # `InvalidSchema` and non-regex `ValidationError` surface in the Coverage phase instead.
         if translated is not None:
             self._controller.deferred_errors.append(translated)
 

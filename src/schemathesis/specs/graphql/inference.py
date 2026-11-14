@@ -12,18 +12,13 @@ PRODUCER_PREFIXES: Final = frozenset(
 CLEANUP_PREFIXES: Final = frozenset({"delete", "remove", "destroy", "purge", "clear", "revoke"})
 UPDATE_PREFIXES: Final = frozenset({"update", "edit", "modify"})
 
-# Camel-case tokenizers: extract the leading and trailing word tokens so the
-# vocabularies can match verb-first (createBook) and verb-last (productCreate)
-# naming. Each branch handles either an initial-cap-or-lowercase run
-# (createBook -> create) or an all-caps run when no lowercase follows
-# (CREATEbook -> CREATE, productCREATE -> CREATE).
+# Leading and trailing camelCase tokens, for verb-first (`createBook`) and verb-last (`productCreate`) names;
+# an all-caps run counts as one token (`CREATEbook` -> `CREATE`).
 _LEADING_TOKEN_RE: Final = re.compile(r"^(?:[A-Z]?[a-z]+|[A-Z]+)")
 _TRAILING_TOKEN_RE: Final = re.compile(r"(?:[A-Z]?[a-z]+|[A-Z]+)$")
 
 
 class RootType(enum.Enum):
-    """GraphQL root operation type."""
-
     QUERY = enum.auto()
     MUTATION = enum.auto()
 
@@ -41,9 +36,7 @@ class OperationRole(enum.IntEnum):
 def entity_candidates(field_name: str, *, prefixes: frozenset[str]) -> tuple[str, ...]:
     """Strip a leading or trailing verb token and name the entity the rest refers to, most specific first.
 
-    With `prefixes=CLEANUP_PREFIXES`: `deleteBook` -> `("Book",)`; `deleteBookCover` and `bookCoverDelete`
-    -> `("BookCover", "Cover")`, falling back to the head noun for qualified names (`deleteUserSession`).
-    Returns an empty tuple when no matching verb is found or nothing remains after it.
+    `deleteBookCover` -> `("BookCover", "Cover")`; empty when no verb in `prefixes` matches or nothing remains.
     """
     leading = _LEADING_TOKEN_RE.match(field_name)
     trailing = _TRAILING_TOKEN_RE.search(field_name)
@@ -66,11 +59,8 @@ def entity_candidates(field_name: str, *, prefixes: frozenset[str]) -> tuple[str
 def classify_operation(*, field_name: str, root_type: RootType) -> OperationRole:
     """Classify a GraphQL root field by its name and root type.
 
-    Queries always classify as `READER`. Mutations classify by case-insensitive
-    equality of either the leading or trailing camelCase token against the
-    built-in vocabularies; trailing is consulted only when the leading token
-    is distinct from it. Mutations that match neither fall through to
-    `MUTATOR` (mid-pack).
+    Queries are `READER`s. Mutations match their leading, then trailing, camelCase token case-insensitively
+    against the vocabularies, else `MUTATOR`.
     """
     if root_type == RootType.QUERY:
         return OperationRole.READER

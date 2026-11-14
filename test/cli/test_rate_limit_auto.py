@@ -139,9 +139,9 @@ def test_stateful_retried_and_final_both_fail_checks(ctx, cli):
     def get_user(user_id):
         calls["n"] += 1
         if calls["n"] == 1:
-            # Undocumented status -> fails `status_code_conformance`.
+            # Undocumented status fails `status_code_conformance`.
             return _rate_limited()
-        # Documented status but missing required `id` -> fails `response_schema_conformance`.
+        # Documented status without the required `id` fails `response_schema_conformance`.
         return jsonify({}), 200
 
     result = cli.run_openapi_app(_stateful_429_app(ctx, get_user), *_STATEFUL_ARGS)

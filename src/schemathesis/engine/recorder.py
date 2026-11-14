@@ -64,17 +64,12 @@ class RecordedScenario(Protocol):
 
 @dataclass
 class ScenarioRecorder:
-    """Tracks and organizes all data related to a logical block of testing.
+    """Cases, their hierarchy, network interactions and check results of one scenario."""
 
-    Records test cases, their hierarchy, API interactions, and results of checks performed during execution.
-    """
-
-    # Human-readable label
     label: str
 
-    # Recorded test cases
     cases: dict[str, CaseNode]
-    # Results of checks categorized by test case ID
+    # Check results by case ID
     checks: dict[str, list[CheckNode]]
     # How many failures `filter_failure` hooks dropped, by test case ID
     filtered_failures: dict[str, int]
@@ -110,7 +105,6 @@ class ScenarioRecorder:
         is_transition_applied: bool = False,
         is_probe: bool = False,
     ) -> None:
-        """Record a test case and its relationship to a parent, if applicable."""
         self.cases[case.id] = CaseNode(
             value=case,
             parent_id=parent_id,
@@ -120,10 +114,7 @@ class ScenarioRecorder:
         )
 
     def record_response(self, *, case_id: str, response: Response) -> None:
-        """Record the API response for a given test case.
-
-        Oversized bodies are stored as a truncated copy so checks keep seeing the whole body.
-        """
+        """Record the response, storing an oversized body as a truncated copy so checks still see the whole body."""
         request = Request.from_prepared_request(response.request)
         limit = self.max_recorded_payload_size
         if limit and response.content and len(response.content) > limit:
@@ -131,7 +122,7 @@ class ScenarioRecorder:
         self.interactions[case_id] = Interaction(request=request, response=response)
 
     def record_request(self, *, case_id: str, request: requests.PreparedRequest) -> None:
-        """Record a network-level error for a given test case."""
+        """Record a request that got no response."""
         self.interactions[case_id] = Interaction(request=Request.from_prepared_request(request), response=None)
 
     def record_network_error(self, *, case_id: str, error: requests.RequestException) -> None:
@@ -169,7 +160,6 @@ class ScenarioRecorder:
         failure: Failure,
         steps: list[ReproductionStep] | None = None,
     ) -> None:
-        """Record a failure of a check for a given test case."""
         self.checks.setdefault(case_id, []).append(
             CheckNode(
                 name=name,
@@ -192,7 +182,6 @@ class ScenarioRecorder:
         )
 
     def record_check_results(self, case: Case, response: Response, results: list[CheckResult]) -> None:
-        """Record the results of checks that ran on `response` to `case`."""
         for result in results:
             if result.failure is not None:
                 code_sample = case.as_reproduction_command(
@@ -209,35 +198,28 @@ class ScenarioRecorder:
                 self.record_check_success(name=result.name, case_id=case.id)
 
     def record_filtered_failure(self, *, case_id: str) -> None:
-        """Record that a `filter_failure` hook dropped a failure for a given test case."""
         self.filtered_failures[case_id] = self.filtered_failures.get(case_id, 0) + 1
 
     def record_check_success(self, *, name: str, case_id: str) -> None:
-        """Record a successful pass of a check for a given test case."""
         self.checks.setdefault(case_id, []).append(CheckNode(name=name, status=Status.SUCCESS, failure_info=None))
 
     def record_check_error(self, *, name: str, case_id: str) -> None:
-        """Record a check that crashed for a given test case."""
         self.checks.setdefault(case_id, []).append(CheckNode(name=name, status=Status.ERROR, failure_info=None))
 
     def record_interaction(self, case_id: str, interaction: Interaction) -> None:
-        """Record a pre-built `Interaction` (used for serialization round-trips, e.g. xdist worker IPC)."""
+        """For serialization round-trips, e.g. xdist worker IPC."""
         self.interactions[case_id] = interaction
 
     def record_check_node(self, case_id: str, node: CheckNode) -> None:
-        """Record a pre-built `CheckNode` (used for serialization round-trips)."""
+        """For serialization round-trips."""
         self.checks.setdefault(case_id, []).append(node)
 
     def record_case_node(self, case_id: str, node: CaseNode) -> None:
-        """Record a pre-built `CaseNode` (used for serialization round-trips)."""
+        """For serialization round-trips."""
         self.cases[case_id] = node
 
     def find_failure_data(self, *, parent_id: str, failure: Failure) -> FailureData:
-        """Retrieve the relevant test case & interaction data for a failure.
-
-        It may happen that a failure comes from a different test case if a check generated some additional
-        test cases & interactions.
-        """
+        """Case and interaction data for a failure, which may come from a case a check generated."""
         case_id = failure.case_id or parent_id
         case = self.cases[case_id].value
         request = self.interactions[case_id].request
@@ -246,7 +228,7 @@ class ScenarioRecorder:
         return FailureData(case=case, headers=_flatten_headers(request.headers), verify=response.verify)
 
     def find_request_headers(self, *, case_id: str) -> dict[str, str]:
-        """Retrieve the headers a given test case actually sent."""
+        """Headers the case sent on the wire."""
         return _flatten_headers(self.interactions[case_id].request.headers)
 
     def reproduction_steps(self, cases: Iterable[Case], *, failure: Failure, verify: bool) -> list[ReproductionStep]:
@@ -267,11 +249,9 @@ class ScenarioRecorder:
                 yield node.value
 
     def find_parent(self, *, case_id: str) -> Case | None:
-        """Find the parent case of a given test case, if it exists."""
         case = self.cases.get(case_id)
         if case is not None and case.parent_id is not None:
             parent = self.cases.get(case.parent_id)
-            # The recorder state should always be consistent
             assert parent is not None, "Parent does not exist"
             return parent.value
         return None
@@ -280,7 +260,6 @@ class ScenarioRecorder:
         """Iterate over all cases in the tree, starting from the root."""
         seen = {case_id}
 
-        # First, find the root by going up
         current_id = case_id
         while True:
             current_node = self.cases.get(current_id)
@@ -295,16 +274,13 @@ class ScenarioRecorder:
             if node.parent_id is not None:
                 children[node.parent_id].append(child_id)
 
-        # Then traverse the whole tree from root
         def traverse(node_id: str) -> Iterator[Case]:
             for child_id in children.get(node_id, ()):
                 if child_id not in seen:
                     seen.add(child_id)
                     yield self.cases[child_id].value
-                    # Recurse into children
                     yield from traverse(child_id)
 
-        # Start traversal from root
         root_node = self.cases.get(root_id)
         if root_node and root_id not in seen:
             seen.add(root_id)
@@ -317,18 +293,16 @@ class ScenarioRecorder:
             yield node.value
 
     def find_response(self, *, case_id: str) -> Response | None:
-        """Retrieve the API response for a given test case, if available."""
         interaction = self.interactions.get(case_id)
         if interaction is None or interaction.response is None:
             return None
         return interaction.response
 
     def iter_chain_cases(self, *, case_id: str, related_case_ids: tuple[str, ...] = ()) -> Iterator[Case]:
-        """Iterate over cases needed to reproduce a failure, in execution order.
+        """Cases needed to reproduce a failure, in execution order.
 
-        Yields the failing case's parent chain plus any explicitly-referenced cases
-        (e.g. a sibling DELETE for `use_after_free`) and their ancestors, and the earlier
-        writes that used a value from the same parent, as they may have changed the server state.
+        The parent chain, referenced cases such as a sibling DELETE for `use_after_free` with their ancestors,
+        and earlier writes that used a value from the same parent, since they may have changed server state.
         """
         interesting: set[str] = set()
 
@@ -363,12 +337,9 @@ class ScenarioRecorder:
 
 @dataclass(slots=True)
 class CaseNode:
-    """Represents a test case and its parent-child relationship."""
-
     value: Case
     parent_id: str | None
-    # Transition may be absent if `parent_id` is present for cases when a case is derived inside a check
-    # and outside of the implemented transition logic (e.g. spec-specific stateful transitions)
+    # `None` alongside a `parent_id` when a check derived the case outside the stateful transitions
     transition: Transition | None
     is_transition_applied: bool
     # A request sent on the parent case's behalf, e.g. by a check, not a generated test case.
@@ -486,8 +457,6 @@ class Request:
 
 @dataclass(slots=True)
 class Interaction:
-    """Represents a single interaction with the tested application."""
-
     request: Request
     response: Response | None
     timestamp: float
@@ -500,8 +469,6 @@ class Interaction:
 
 @dataclass(slots=True)
 class FailureData:
-    """Details about a test failure, including the case and its context."""
-
     case: Case
     headers: dict[str, str]
     verify: bool

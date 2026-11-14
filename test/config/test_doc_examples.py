@@ -162,7 +162,7 @@ def _resolve(current):
 
 
 def _search_rest(current, variant, title, segment):
-    # Check if current uses additionalProperties (e.g., auth.openapi.<scheme>)
+    # Map-like sections such as `auth.openapi.<scheme>` use `additionalProperties`.
     if "additionalProperties" in current and "properties" not in current:
         data = _resolve(current["additionalProperties"])
     else:
@@ -171,8 +171,7 @@ def _search_rest(current, variant, title, segment):
     if rest:
         for rest_segment in rest.split("."):
             if "properties" not in data or rest_segment not in data["properties"]:
-                # Field doesn't exist in this variant (e.g., operation-ordering not in StatefulPhaseConfig)
-                # This is expected for phase-specific fields
+                # Phase-specific fields like `operation-ordering` exist only in some variants.
                 return
             data = data["properties"][rest_segment]
 
@@ -200,7 +199,7 @@ def test_titles_are_valid():
                     else:
                         variants = CHECKS.get_all_names()
                 elif name == "scheme":
-                    # For auth.openapi.<scheme> - use a sample scheme name
+                    # `auth.openapi.<scheme>` takes a sample scheme name.
                     variants = ["ApiKeyAuth"]
                 else:
                     raise ValueError(f"Unknown segment: {name}")

@@ -1,5 +1,3 @@
-"""Control for the Schemathesis Engine execution."""
-
 from __future__ import annotations
 
 import threading
@@ -18,7 +16,7 @@ class BudgetExpired(KeyboardInterrupt):
 
 @dataclass(slots=True)
 class ExecutionControl:
-    """Controls engine execution flow and tracks failures."""
+    """Stop signal, time budget and failure limit of one run."""
 
     stop_event: threading.Event
     max_failures: int | None
@@ -74,7 +72,6 @@ class ExecutionControl:
 
     @property
     def is_stopped(self) -> bool:
-        """Check if execution should stop."""
         return (
             self.is_interrupted
             or self.is_server_unavailable
@@ -87,7 +84,6 @@ class ExecutionControl:
         return self.stop_event.is_set()
 
     def stop(self) -> None:
-        """Signal to stop execution."""
         self.stop_event.set()
 
     def count_failure(self, key: Hashable) -> None:

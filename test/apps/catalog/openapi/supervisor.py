@@ -10,14 +10,12 @@ from test.apps.runtime import OpenAPIApp
 
 @dataclass
 class UnimplementedMethodStore:
-    """Wire counters surfaced via `app.config['store']` for assertions."""
+    """Hit counters, exposed as `app.config['store']`."""
 
     hits: dict[str, int] = field(default_factory=lambda: {"missing": 0, "items": 0, "items_id": 0})
 
 
-# Body has six fields so the Coverage phase generates enough positive-mode mutations
-# to drive the supervisor's streak past `METHOD_NOT_ALLOWED_THRESHOLD` before later
-# phases queue scenarios.
+# Six fields give enough positive coverage cases to cross the 405-streak threshold before later phases queue scenarios.
 _MISSING_BODY_PROPERTIES: dict[str, dict[str, str]] = {
     "name": {"type": "string"},
     "size": {"type": "integer"},
@@ -29,7 +27,7 @@ _MISSING_BODY_PROPERTIES: dict[str, dict[str, str]] = {
 
 
 def unimplemented_method() -> OpenAPIApp:
-    """Two-operation app: a healthy `GET /items` and a `POST /missing` that always returns 405."""
+    """A healthy `GET /items` and a `POST /missing` that always returns 405."""
     spec = build_schema(
         {
             "/missing": {
@@ -64,11 +62,7 @@ def unimplemented_method() -> OpenAPIApp:
 
 
 def linked_with_unimplemented_method() -> OpenAPIApp:
-    """`GET /items` -> `GET /items/{itemId}` link plus a `POST /missing` that always returns 405.
-
-    The link gives the stateful state machine a meaningful chain so it actually runs;
-    the dead `POST /missing` is the operation the supervisor must filter out.
-    """
+    """`GET /items` -> `GET /items/{itemId}` link for the stateful phase, plus a `POST /missing` that returns 405."""
     spec = build_schema(
         {
             "/items": {

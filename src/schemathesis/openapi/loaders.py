@@ -270,7 +270,6 @@ class ContentType(enum.Enum):
 
 
 def detect_content_type(*, headers: Mapping[str, str] | Headers | None = None, path: str | None = None) -> ContentType:
-    """Detect content type from various sources."""
     if headers is not None and (content_type := _detect_from_headers(headers)) != ContentType.UNKNOWN:
         return content_type
     if path is not None and (content_type := _detect_from_path(path)) != ContentType.UNKNOWN:
@@ -279,7 +278,6 @@ def detect_content_type(*, headers: Mapping[str, str] | Headers | None = None, p
 
 
 def _detect_from_headers(headers: Mapping[str, str] | Headers) -> ContentType:
-    """Detect content type from HTTP headers."""
     content_type = headers.get("Content-Type", "").lower()
     try:
         if content_type and media_types.is_json(content_type):
@@ -292,7 +290,6 @@ def _detect_from_headers(headers: Mapping[str, str] | Headers) -> ContentType:
 
 
 def _detect_from_path(path: str) -> ContentType:
-    """Detect content type from file path."""
     suffix = Path(path).suffix.lower()
     if suffix == ".json":
         return ContentType.JSON
@@ -302,12 +299,10 @@ def _detect_from_path(path: str) -> ContentType:
 
 
 def load_content(content: str, content_type: ContentType) -> dict[str, Any]:
-    """Load content using appropriate parser."""
     if content_type == ContentType.JSON:
         return _load_json(content)
     if content_type == ContentType.YAML:
         return _load_yaml(content)
-    # If type is unknown, try JSON first, then YAML
     try:
         return _load_json(content)
     except LoaderError:

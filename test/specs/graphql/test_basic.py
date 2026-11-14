@@ -164,11 +164,9 @@ def test_custom_base_url(ctx):
     schema = _books_schema(ctx)
     schema.config.update(base_url="http://0.0.0.0:1234/something")
 
-    # Then the base path is changed, in this case it is the only available path
     assert schema.base_path == "/something"
     strategy = schema["Query"]["getBooks"].as_strategy()
     case = strategy.example()
-    # And all requests should go to the specified URL
     assert case.as_transport_kwargs()["url"] == "http://0.0.0.0:1234/something"
 
 
@@ -218,19 +216,17 @@ def test_client_error(ctx):
 @pytest.mark.parametrize(
     ("payload", "expected"),
     [
-        # Client error: no data, no path in error
+        # Client error: null data, no path
         ({"data": None, "errors": [{"message": "Missing required arg"}]}, True),
-        # Client error: explicit null data, no path
+        # Client error: no data, no path
         ({"errors": [{"message": "Syntax error"}]}, True),
         # Server error: has path (resolver execution failed)
         ({"data": None, "errors": [{"message": "Resolver error", "path": ["field"]}]}, False),
         # Server error: has partial data
         ({"data": {"field": "value"}, "errors": [{"message": "Error"}]}, False),
-        # No errors at all
         ({"data": {"field": "value"}}, False),
-        # Empty errors array
         ({"data": None, "errors": []}, False),
-        # Apollo caller-side code outweighs the resolver `path`
+        # A caller-side `code` outweighs the resolver `path`
         (
             {
                 "data": None,
@@ -238,9 +234,9 @@ def test_client_error(ctx):
             },
             True,
         ),
-        # Apollo server-side code outweighs the missing `path`
+        # A server-side `code` outweighs the missing `path`
         ({"data": None, "errors": [{"message": "Boom", "extensions": {"code": "INTERNAL_SERVER_ERROR"}}]}, False),
-        # graphql-java caller-side classification outweighs the resolver `path`
+        # A caller-side `classification` outweighs the resolver `path`
         (
             {
                 "data": None,
@@ -250,7 +246,7 @@ def test_client_error(ctx):
             },
             True,
         ),
-        # graphql-java server-side classification outweighs the missing `path`
+        # A server-side `classification` outweighs the missing `path`
         (
             {"data": None, "errors": [{"message": "Boom", "extensions": {"classification": "DataFetchingException"}}]},
             False,
@@ -547,7 +543,6 @@ def test_schema_violation_on_real_server(ctx):
 
 
 def test_no_query(ctx):
-    # When GraphQL schema does not contain the `Query` type
     api = ctx.graphql.apps.books()
     response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=10)
     decoded = response.json()
@@ -555,7 +550,6 @@ def test_no_query(ctx):
     raw_schema["__schema"]["queryType"] = None
     raw_schema["__schema"]["mutationType"] = None
     schema = ctx.graphql.load_introspection(raw_schema)
-    # Then no operations should be collected
     assert list(schema.get_all_operations()) == []
     assert schema.statistic.operations.total == 0
 
@@ -613,7 +607,6 @@ CUSTOM_MUTATION_NAME = "MyMutation"
 
 @pytest.mark.parametrize("name", [CUSTOM_QUERY_NAME, CUSTOM_MUTATION_NAME])
 def test_type_names(ctx, name):
-    # When the user gives custom names to query types
     raw_schema = f"""
     schema {{
        query: {CUSTOM_QUERY_NAME}
@@ -627,9 +620,7 @@ def test_type_names(ctx, name):
        v(i: Int): String
     }}
     """
-    # Then the schema should be loaded without errors
     schema = ctx.graphql.load_sdl(raw_schema)
-    # And requests should be properly generated
 
     @run_given(case=schema[name]["v"].as_strategy(), max_examples=1)
     def test(case):
@@ -748,7 +739,6 @@ def test_type_as_strategy(ctx, type_name):
     operations = schema[type_name]
     strategy = operations.as_strategy()
     for operation in operations.values():
-        # All fields should be possible to generate
         find_first(
             strategy,
             lambda x, op=operation: op.definition.field_name in x.body,
@@ -761,7 +751,6 @@ def test_schema_as_strategy(ctx):
     strategy = schema.as_strategy()
     for operations in schema.values():
         for operation in operations.values():
-            # All fields should be possible to generate
             find_first(
                 strategy,
                 lambda x, op=operation: op.definition.field_name in x.body,
@@ -775,7 +764,6 @@ def test_schema_as_strategy(ctx):
 )
 def test_ignored_checks(ctx, check):
     schema = _books_schema(ctx)
-    # Just in case
     case = schema["Query"]["getBooks"].Case()
     assert check(None, None, case)
 
@@ -786,7 +774,7 @@ def test_coverage_phase_cli(ctx, cli, snapshot_cli):
 
 
 def test_negative_mode_cli(ctx, cli, snapshot_cli):
-    # Test that negative mode generates invalid queries for mutations with required arguments
+    # Mutations with required arguments get invalid queries.
     api = ctx.graphql.apps.books()
     assert cli.run(api.schema_url, "--max-examples=1", "--mode=negative") == snapshot_cli
 

@@ -82,8 +82,7 @@ def test_aggregate_counts_gap_kinds_and_marks_errored_apis():
             ],
             ["weak"],
         ),
-        # Both APIs are at 100% partial+full; ranking must use `full` only so the
-        # mostly-partial one (with real `needs_valid`/`needs_invalid` gaps) ranks worse.
+        # Both APIs are at 100% partial+full; ranking by `full` alone puts the mostly-partial one worse.
         (
             [
                 ("mostly_partial", {"full": 4, "partial": 6, "total": 10}),

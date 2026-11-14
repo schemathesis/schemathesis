@@ -71,7 +71,6 @@ class WarningsConfig(DiffBase):
         fail_on = value.get("fail-on", False)
         low_valid_rate = LowValidRateConfig.from_dict(value.get("low_valid_rate") or {})
 
-        # Determine which warnings to display
         if not enabled:
             display = []
         elif display_list is not None:
@@ -79,7 +78,6 @@ class WarningsConfig(DiffBase):
         else:
             display = list(DEFAULT_DISPLAYED_WARNINGS)
 
-        # Determine which warnings should fail
         if fail_on is False or fail_on is None:
             fail_on_list = []
         elif fail_on is True:
@@ -90,9 +88,7 @@ class WarningsConfig(DiffBase):
         return cls(display=display, fail_on=fail_on_list, low_valid_rate=low_valid_rate)
 
     def should_display(self, warning: SchemathesisWarning) -> bool:
-        """Check if a warning should be displayed."""
         return warning in self.display
 
     def should_fail(self, warning: SchemathesisWarning) -> bool:
-        """Check if a warning should cause test failure."""
         return warning in self.fail_on

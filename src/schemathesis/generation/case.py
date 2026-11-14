@@ -80,8 +80,7 @@ class Case(Generic[OperationT]):
     """Generated cookies"""
     query: dict[str, Any]
     """Generated query parameters"""
-    # By default, there is no body, but we can't use `None` as the default value because it clashes with `null`
-    # which is a valid payload.
+    # No body by default; `None` cannot mark that, since `null` is a valid payload.
     body: Body
     """Generated request body"""
     media_type: str | None
@@ -139,7 +138,7 @@ class Case(Generic[OperationT]):
         _auth: requests.auth.AuthBase | None = None,
         _has_explicit_auth: bool = False,
     ) -> None:
-        # Use object.__setattr__ to bypass __setattr__ tracking during initialization
+        # Bypass modification tracking during initialization
         object.__setattr__(self, "operation", operation)
         object.__setattr__(self, "method", method)
         object.__setattr__(self, "path", path)
@@ -159,7 +158,6 @@ class Case(Generic[OperationT]):
         object.__setattr__(self, "_components", store_components(self))
         object.__setattr__(self, "_freeze_metadata", False)
 
-        # Initialize hash tracking if we have metadata
         if self._meta is not None:
             self._init_hashes()
 
@@ -181,14 +179,12 @@ class Case(Generic[OperationT]):
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Track modifications to containers for metadata revalidation."""
-        # Set the value
         object.__setattr__(self, name, value)
 
-        # Mark as dirty if we modified a tracked container and have metadata
         if name in CONTAINER_TO_LOCATION and self._meta is not None:
             location = CONTAINER_TO_LOCATION[name]
             self._meta.mark_dirty(location)
-            # Update hash immediately so future in-place modifications can be detected
+            # Rehash now so later in-place edits are detected
             self._meta.update_validated_hash(location, self._hash_container(value))
 
     @property
@@ -217,7 +213,7 @@ class Case(Generic[OperationT]):
 
     def get_container(self, location: ParameterLocation) -> dict[str, Any] | CaseInsensitiveDict | Body | None:
         """Return the value container for a parameter location; `None` for unknown locations."""
-        # Hand-rolled chain — queried per parameter in hot check / generation paths.
+        # Hand-rolled chain, since hot check and generation paths query it per parameter.
         match location:
             case ParameterLocation.QUERY:
                 return self.query
@@ -237,7 +233,6 @@ class Case(Generic[OperationT]):
     def _init_hashes(self) -> None:
         """Initialize hash tracking in metadata for generated components only."""
         assert self._meta is not None
-        # Only track components that were actually generated
         for location in self._meta.components:
             value = self.get_container(location)
             if location in self._meta._initial_hashes:
@@ -245,11 +240,9 @@ class Case(Generic[OperationT]):
             else:
                 hash_value = self._hash_container(value)
             self._meta.update_validated_hash(location, hash_value)
-            # Snapshot the wire-form hash so revalidation can tell whether the
-            # container is still the unmodified value produced by generation.
+            # Wire-form hash, so revalidation can tell whether the container is still the generated value
             self._meta._initial_hashes[location] = hash_value
-            # Snapshot the wire-form values so revalidation can tell, per key, which
-            # ones a hook overwrote and validate those against their live values.
+            # Wire-form values, so revalidation can spot per key what a hook overwrote and validate the live value
             if isinstance(value, Mapping):
                 self._meta._initial_containers[location] = dict(value)
 
@@ -277,18 +270,16 @@ class Case(Generic[OperationT]):
         if self._meta is None:
             return
 
-        # Only check components that were actually generated
+        # Only generated components are tracked
         for location in self._meta.components:
             last_hash = self._meta._last_validated_hashes[location]
             value = self.get_container(location)
             current_hash = self._hash_container(value)
 
             if current_hash != last_hash:
-                # Container was modified in-place
                 self._meta.mark_dirty(location)
 
     def _revalidate_metadata(self) -> None:
-        """Revalidate dirty components and update metadata."""
         assert self._meta and self._meta.is_dirty()
         self.operation.schema.revalidate_case_metadata(self)
 
@@ -298,18 +289,15 @@ class Case(Generic[OperationT]):
         value: Any,
         validator_cls: type[Validator],
     ) -> bool:
-        """Validate a component value against its schema."""
         from requests.structures import CaseInsensitiveDict
 
         if location == ParameterLocation.BODY:
-            # Validate body against media type schema
             if isinstance(value, NotSet) or value is None or self.media_type is None or contains_binary(value):
                 return False
             alternative = self.operation.get_body_for_media_type(self.media_type)
             if alternative is None:
                 return False
             return make_validator(alternative.validation_schema, validator_cls).is_valid(value)
-        # Validate other locations against container schema
         container = getattr(self.operation, location.container_name)
         if isinstance(value, CaseInsensitiveDict):
             value = dict(value)
@@ -318,14 +306,10 @@ class Case(Generic[OperationT]):
         return make_validator(container.validation_schema, validator_cls).is_valid(value)
 
     def _hash_container(self, value: object) -> int:
-        """Create a hash representing the current state of a container.
-
-        Recursively hashes nested dicts/lists/tuples and primitives to detect modifications.
-        """
+        """Hash a container's current state, nested values included, to detect modifications."""
         if isinstance(value, NotSet):
             return _NOTSET_HASH
-        # Plain JSON-shaped containers (the common case for bodies) go through canonical JSON in
-        # Rust; deeply-nested schemas like Kubernetes Pods are ~10x faster than recursive hashing.
+        # JSON-shaped containers hash via canonical JSON in Rust, which beats recursive hashing on deep nesting.
         # Other mappings, like case-insensitive headers, take the same path through a plain copy.
         plain = dict(value) if isinstance(value, Mapping) and type(value) is not dict else value
         if type(plain) is dict or type(plain) is list:
@@ -417,7 +401,7 @@ class Case(Generic[OperationT]):
 
         Args:
             headers: Additional headers to include in the command.
-            verify: When False, adds `--insecure` flag to curl command.
+            verify: When `False`, adds the `--insecure` flag.
             base_url: Base URL the request was sent to. Defaults to the one passed to `call`, then the schema's.
 
         """
@@ -441,9 +425,9 @@ class Case(Generic[OperationT]):
         cookies: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Response:
-        """Make an HTTP request using this test case's data without validation.
+        """Send an HTTP request with this test case's data, without validating the response.
 
-        Use when you need to validate response separately
+        Use it when you validate the response separately.
 
         Args:
             base_url: Override the schema's base URL.
@@ -486,9 +470,7 @@ class Case(Generic[OperationT]):
                 curl = self.as_reproduction_command(headers=headers, verify=verify)
                 exc.add_note(f"\nReproduce with:\n\n    {curl}")
             except Exception:
-                # Curl generation can fail for the same reason as the original error
-                # (e.g., malformed path template). Skip adding curl command to avoid
-                # replacing the original exception with a secondary error.
+                # Curl generation can fail for the same reason, e.g. a malformed path template; keep the original error
                 pass
             # Notify hooks about network-level failures (connection errors, timeouts, etc.)
             import requests
@@ -533,8 +515,7 @@ class Case(Generic[OperationT]):
         __tracebackhide__ = True
         from requests.structures import CaseInsensitiveDict
 
-        # In some cases checks may not be loaded.
-        # For example - non-Schemathesis tests that manually construct `Case` instances
+        # Checks may not be loaded yet, e.g. in non-Schemathesis tests that construct `Case` by hand
         load_all_checks()
 
         sent_base_url = _sent_base_url(self, response, transport_kwargs)
@@ -606,7 +587,7 @@ class Case(Generic[OperationT]):
         excluded_checks: list[CheckFunction] | None = None,
         **kwargs: Any,
     ) -> Response:
-        """Make an HTTP request and validates the response automatically.
+        """Send an HTTP request and validate the response.
 
         Args:
             base_url: Override the schema's base URL.

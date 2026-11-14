@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-# High-entropy literal no random string strategy will realistically produce on its own.
+# No string strategy produces this high-entropy value on its own.
 UNLOCK_CODE = "e4b1a7c0f9d3268a"
 
 

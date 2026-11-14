@@ -15,8 +15,6 @@ from test.apps.runtime import Modifier
 
 
 class CalibrationObserver(LinkCalibrationState):
-    """LinkCalibrationState plus a request counter populated by the engine factory."""
-
     __slots__ = ("target_request_count",)
 
     def __init__(self) -> None:
@@ -83,8 +81,6 @@ def engine_factory(ctx, stop_event):
 
 @pytest.fixture
 def calibration_engine_factory(ctx, stop_event):
-    """Engine factory that injects a CalibrationObserver so tests can inspect observation accumulation."""
-
     def _factory(*modifiers: Modifier[UserStore], max_examples: int = 15) -> CalibrationObserver:
         observer = CalibrationObserver()
         api, engine_ctx = _build_stateful_engine_ctx(

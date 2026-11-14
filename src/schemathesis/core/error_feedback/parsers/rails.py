@@ -33,15 +33,11 @@ LegacyShape = Sequence[str]
 # Object-level (cross-field) errors have no attribute to adjust against, so skip them.
 _BASE_KEY = "base"
 
-# Tokens every Rails default phrasing starts with. The legacy-form splitter
-# treats everything before the first match as the humanised attribute name
-# and the rest as the message body.
+# Rails default messages start with one of these; in `full_messages`, the text before it is the attribute name.
 _LEAD_TOKENS = ("can't", "is", "must", "doesn't", "has", "should", "may", "are")
 _LEAD_PATTERN = re.compile(r"\b(" + "|".join(re.escape(t) for t in _LEAD_TOKENS) + r")\b")
 
-# Vocabulary discriminator — substrings that, if found in any message, lock
-# detection to Rails. Disambiguates from sibling parsers whose envelope shape
-# overlaps (dict-of-lists with field names as keys) but whose vocabulary differs.
+# Substrings that tell Rails messages apart from other parsers sharing the dict-of-lists envelope.
 _RAILS_VOCABULARY: frozenset[str] = frozenset(
     {
         "can't be blank",
@@ -68,11 +64,7 @@ _RAILS_VOCABULARY: frozenset[str] = frozenset(
 
 
 def _walk_modern(body: ModernShape, path: ParameterPath = ()) -> Iterator[WalkPair]:
-    """Walk the modern `errors.as_json` shape — dict-of-lists of strings.
-
-    Also handles the dotted-key form Rails emits for nested attributes
-    (`{"address.street": ["can't be blank"]}`) by splitting the key on `.`.
-    """
+    """Walk the `errors.as_json` dict of string lists; dotted keys like `address.street` become nested paths."""
     for raw_key, value in body.items():
         if not isinstance(raw_key, str) or raw_key == _BASE_KEY:
             continue
@@ -85,15 +77,9 @@ def _walk_modern(body: ModernShape, path: ParameterPath = ()) -> Iterator[WalkPa
 
 
 def _split_legacy_message(line: str) -> tuple[str, str] | None:
-    """Strip the humanised field name prefix from a `full_messages` entry.
+    """Split a `full_messages` entry into `(snake_case_field, message)` at the first lead token, or `None`.
 
-    Rails formats each entry as `f"{attribute.humanize} {message}"` — for
-    `:terms_accepted` the humanised form is `"Terms accepted"`, with a space
-    between the original underscore-separated tokens. We recover the field
-    name by taking everything up to the first lead token (`can't`, `is`,
-    `must`, `doesn't`, ...), lowercasing, and joining with underscores.
-
-    Returns `(snake_case_field, message)` or `None` if no lead token is found.
+    Rails writes `f"{attribute.humanize} {message}"`, so `"Terms accepted must be ..."` gives `terms_accepted`.
     """
     match = _LEAD_PATTERN.search(line)
     if match is None:
@@ -105,7 +91,7 @@ def _split_legacy_message(line: str) -> tuple[str, str] | None:
 
 
 def _walk_legacy(messages: LegacyShape, path: ParameterPath = ()) -> Iterator[WalkPair]:
-    """Walk the legacy `full_messages` shape — flat list of humanised strings."""
+    """Walk the legacy `full_messages` list of humanised strings."""
     for line in messages:
         if not isinstance(line, str) or not line:
             continue
@@ -135,8 +121,7 @@ _LITERAL_MESSAGES: dict[str, ClassificationResult] = {
 
 
 _REGEX_PATTERNS: tuple[tuple[re.Pattern[str], RegexHandler], ...] = (
-    # `is too short (minimum is N character(s))` — Rails uses `characters`
-    # for both string and array length, so a single pattern covers both.
+    # Rails says `characters` for string and array length alike, so one pattern covers both.
     (
         re.compile(r"^is too short \(minimum is (\d+) characters?\)$"),
         size_bound(direction=BoundDirection.MIN),
@@ -149,8 +134,7 @@ _REGEX_PATTERNS: tuple[tuple[re.Pattern[str], RegexHandler], ...] = (
         re.compile(r"^is the wrong length \(should be (\d+) characters?\)$"),
         size_bound_exact(),
     ),
-    # Numericality bounds. Rails formats integers without decimals
-    # (`must be greater than 0`) and floats with (`must be greater than 0.0`).
+    # Numericality bounds: `0` for integers, `0.0` for floats.
     (
         re.compile(r"^must be greater than or equal to (-?\d+(?:\.\d+)?)$"),
         numeric_bound(direction=BoundDirection.MIN, exclusive=False),
@@ -171,7 +155,7 @@ _REGEX_PATTERNS: tuple[tuple[re.Pattern[str], RegexHandler], ...] = (
 
 
 def _classify_message(message: str) -> ClassificationResult | None:
-    """Return the (kind, payload) for `message`, or None when no JSON-Schema constraint maps to it."""
+    """`(kind, payload)` for `message`, or `None` when no JSON Schema constraint maps to it."""
     if message in _LITERAL_MESSAGES:
         return _LITERAL_MESSAGES[message]
     for pattern, handler in _REGEX_PATTERNS:
@@ -182,7 +166,6 @@ def _classify_message(message: str) -> ClassificationResult | None:
 
 
 def _has_rails_vocabulary(messages: Iterator[str]) -> bool:
-    """Return True when any message contains a Rails-only canonical phrasing."""
     return any(phrase in message for message in messages for phrase in _RAILS_VOCABULARY)
 
 
@@ -210,9 +193,9 @@ def _is_legacy_shape(messages: object) -> TypeGuard[LegacyShape]:
 
 
 def _unwrap_ar_envelope(body: object) -> object:
-    """Strip the `{"errors": <inner>, ...}` wrapper if present, return inner; otherwise return body unchanged."""
+    """The inner value of a `{"errors": <inner>}` wrapper (one more key allowed), else `body`."""
     if isinstance(body, dict) and "errors" in body and len(body) <= 2:
-        # Laravel pairs `errors` with a top-level string `message` — let LaravelParser claim it.
+        # Laravel pairs `errors` with a string `message`; leave it to the Laravel parser.
         if isinstance(body.get("message"), str):
             return body
         return body["errors"]
@@ -229,13 +212,7 @@ def _walk_observations(body: object) -> Iterator[WalkPair]:
 
 @PARSERS.register
 class RailsParser:
-    """Parser for Rails `ActiveModel::Errors` envelopes.
-
-    Accepts three response shapes:
-    - Modern `as_json` — `{"<field>": ["<message>", ...], ...}`
-    - Legacy `full_messages` — `["<Humanised Field> <message>", ...]`
-    - AR-wrapped — `{"errors": <one of the above>}`
-    """
+    """Parser for Rails `ActiveModel::Errors`: `{"<field>": [...]}`, `["<Field> <message>", ...]`, or under `errors`."""
 
     priority = 4
 

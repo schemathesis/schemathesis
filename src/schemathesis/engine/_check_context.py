@@ -61,10 +61,7 @@ def collect_check_context_data(*, operation: APIOperation, ctx: EngineContext, p
 
 @dataclass(slots=True)
 class CheckContextCache:
-    """Per-operation check context cache.
-
-    Per-operation config is constant for the lifetime of a run; caching avoids repeated lookups.
-    """
+    """Per-operation check contexts; operation config stays constant for the whole run."""
 
     _cache: dict[str, CheckContextData] = field(default_factory=dict)
 

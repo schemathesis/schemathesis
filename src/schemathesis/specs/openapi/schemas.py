@@ -124,14 +124,11 @@ _V3_2 = version.parse("3.2")
 
 def _validation_value(meta: CaseMetadata, location: ParameterLocation, value: object, current_hash: int) -> object:
     raw = meta.raw_containers.get(location)
-    # When the container still equals its generated form, validate the typed
-    # snapshot, as coverage stringifies query/path values for the wire and the
-    # validation schema is expressed in the typed form.
+    # An unchanged container validates as its typed snapshot, since coverage stringifies query and path values.
     if current_hash == meta._initial_hashes.get(location) and raw is not None:
         return raw
     if isinstance(value, Mapping) and isinstance(raw, Mapping):
-        # A key still equal to its generated wire form validates against the typed snapshot;
-        # a key a hook overwrote (or one auth/overrides added) validates against its live value.
+        # Keys still in generated wire form validate as typed; keys set by hooks, auth or overrides validate as sent.
         original = meta._initial_containers.get(location, {})
         return {
             key: raw[key] if key in raw and key in original and original[key] == current else current
@@ -167,9 +164,7 @@ class OpenApiSchema(BaseSchema):
         self._operations = OperationLoader(self)
         # Path-level dedup of undeclared-method coverage probes for callers that pass no run-scoped session.
         self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
-        # Per-operation security overlays populated by runtime auth inference. Empty when the server
-        # never enforces auth on a declared-public operation; otherwise generations consult this
-        # instead of mutating the parsed spec.
+        # Security requirements found by runtime auth inference, per operation; the parsed spec stays unchanged.
         self._inferred_security: dict[str, SecurityRequirements] = {}
         # Credentials from automatic sign-up, keyed by security scheme.
         self.bootstrapped_auth: dict[str, HttpBearerAuthConfig | ApiKeyAuthConfig] = {}
@@ -262,10 +257,7 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
-        """Apply OpenAPI-aware authentication to a test case.
-
-        Returns True if authentication was applied, False otherwise.
-        """
+        """Apply OpenAPI-aware authentication to `case`; returns whether any was applied."""
         all_schemes = self.auth_schemes
         if not all_schemes:
             return False
@@ -273,12 +265,6 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def create_extra_data_source(self) -> ExtraDataSource | None:
-        """Create an extra data source for augmenting test generation with real data.
-
-        Returns:
-            OpenApiExtraDataSource if resource descriptors are available, None otherwise.
-
-        """
         return self.analysis.extra_data_source
 
     @override
@@ -347,8 +333,7 @@ class OpenApiSchema(BaseSchema):
             validation_value = _validation_value(meta, location, value, current_hash)
             is_valid: bool | None
             if location == ParameterLocation.HEADER and coverage_scenario(case) in CONTENT_TYPE_PROBES:
-                # A Content-Type probe is negative through its media type, which no header parameter declares,
-                # so the headers cannot judge it and the generation-time mode stands.
+                # Headers cannot judge a Content-Type probe, which is negative through its media type.
                 is_valid = None
             else:
                 try:
@@ -416,7 +401,6 @@ class OpenApiSchema(BaseSchema):
         feedback: FeedbackSources,
         link_calibration: LinkCalibrationState | None,
     ) -> type[APIStateMachine]:
-        # Apply dependency inference if configured and not already done
         if self.analysis.should_inject_links():
             _ = self._validation_error
             self.analysis.inject_links()
@@ -428,8 +412,7 @@ class OpenApiSchema(BaseSchema):
 
         layers = compute_operation_layers(self, operations)
         if len(layers) == 1:
-            # Stable-sort by RESTful priority so producers dispatch before consumers
-            # without reordering same-priority operations against each other.
+            # Stable sort: producers run before consumers, same-priority operations keep their order.
             return [sorted(operations, key=lambda op: restful_method_priority(op.method))]
         return layers
 
@@ -447,9 +430,7 @@ class OpenApiSchema(BaseSchema):
                 injected += self.analysis.inferencer.inject_links(self[operation.path][operation.method], body_entries)
         if self.analysis.should_inject_links():
             injected += self.analysis.inject_links()
-        # Injected links land in the schema, where operations may share a response definition, so one
-        # injection can add several transitions. Drop the memoized measurement so this call and every
-        # later reader see them, rather than the counts from before the injection.
+        # Operations may share a response definition, so one injection adds several transitions; recount them.
         if injected:
             self.__dict__.pop("statistic", None)
             self._operations.clear_cache()
@@ -471,8 +452,7 @@ class OpenApiSchema(BaseSchema):
                 weights[op.label] = 1
             else:
                 node = graph.operations.get(op.label)
-                # Path-keyed and body-keyed outputs don't contribute response-body
-                # values to the resource pool, so they shouldn't bias fuzz scheduling weights.
+                # Path- and body-keyed outputs add no response values to the pool, so they do not weigh in scheduling.
                 out_degree = (
                     sum(1 for output in node.outputs if output.path_parameter is None and output.body_field is None)
                     if node is not None
@@ -627,21 +607,7 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
-        """Iterate over all operations defined in the API.
-
-        Each yielded item is either `Ok` or `Err`, depending on the presence of errors during schema processing.
-
-        There are two cases for the `Err` variant:
-
-          1. The error happened while resolving a group of API operations. In Open API, you can put all operations for
-             a specific path behind a reference, and if it is not resolvable, then all operations won't be available
-             for testing. For example - a file with those definitions was removed. Here we know the path but don't
-             know what operations are there.
-          2. Errors while processing a known API operation.
-
-        In both cases, Schemathesis lets the callee decide what to do with these variants. It allows it to test valid
-        operations and show errors for invalid ones.
-        """
+        """Yield every operation as `Ok`, or `Err` for an unresolvable Path Item `$ref` or an unparsable operation."""
         __tracebackhide__ = True
         yield from self._operations.iter_all()
 
@@ -679,10 +645,9 @@ class OpenApiSchema(BaseSchema):
         return self.adapter.get_request_payload_content_types(operation)
 
     def _get_default_media_type(self, operation: APIOperation) -> str:
-        # If the user wants to send payload, then there should be a media type, otherwise the payload is ignored
+        # A payload without a media type would be ignored
         media_types = self.get_request_payload_content_types(operation)
         if len(media_types) == 1:
-            # The only available option
             return media_types[0]
         media_types_repr = ", ".join(media_types)
         raise IncorrectUsage(
@@ -695,32 +660,22 @@ class OpenApiSchema(BaseSchema):
     def get_strategies_from_examples(
         self, operation: APIOperation, feedback: FeedbackSources = NO_FEEDBACK, **kwargs: Any
     ) -> list[SearchStrategy[Case]]:
-        """Get examples from the API operation."""
         return get_strategies_from_examples(operation, feedback=feedback, **kwargs)
 
     def find_operation_by_id(self, operation_id: str) -> APIOperation:
-        """Find an `APIOperation` instance by its `operationId`."""
         return self._operation_lookup.find_by_id(operation_id)
 
     def find_operation_by_reference(self, reference: str) -> APIOperation:
-        """Find local or external `APIOperation` instance by reference.
-
-        Reference example: #/paths/~1users~1{user_id}/patch
-        """
+        """Find an operation by a local or external reference, e.g. `#/paths/~1users~1{user_id}/patch`."""
         return self._operation_lookup.find_by_reference(reference)
 
     def find_operation_by_path(self, method: str, path: str) -> APIOperation | None:
-        """Find an `APIOperation` by matching an actual request path.
-
-        Matches path templates with parameters, e.g., /users/42 matches /users/{user_id}.
-        Returns None if no operation matches.
-        """
+        """Find the operation whose template matches a concrete path, e.g. `/users/{user_id}` for `/users/42`."""
         from werkzeug.exceptions import MethodNotAllowed, NotFound
         from werkzeug.routing import RequestRedirect
 
         from schemathesis.specs.openapi.stateful.inference import OperationById
 
-        # Match path and method using werkzeug router
         try:
             operation_ref, _ = self.analysis.inferencer._adapter.match(path, method=method.upper())
         except (NotFound, MethodNotAllowed, RequestRedirect):
@@ -844,18 +799,13 @@ class OpenApiSchema(BaseSchema):
 
 @dataclass
 class MethodMap(Mapping):
-    """Container for accessing API operations.
-
-    Provides a more specific error message if API operation is not found.
-    """
+    """Operations of one path; a missing operation raises a specific error."""
 
     _schema: OpenApiSchema
     _resolver: Resolver
     # Reference resolution scope
     _scope: str
-    # Methods are stored for this path
     _path: str
-    # Storage for definitions
     _path_item: CaseInsensitiveDict
     # Path Item as declared, so its operations are found under the same keys as when loading all operations
     _raw_path_item: Mapping[str, Any]
@@ -914,7 +864,6 @@ class MethodMap(Mapping):
 
 
 if TYPE_CHECKING:
-    # Verify structural conformance to the spec-agnostic protocol; mypy fails here
-    # if a method is renamed or its signature drifts from `ApiSchema`.
+    # mypy fails here when a method drifts from the spec-agnostic `ApiSchema` protocol.
     def _verify_api_schema_protocol(schema: OpenApiSchema) -> ApiSchema:
         return schema

@@ -129,9 +129,7 @@ def test_audit_schema_records_cookie_parameter_coverage(ctx):
 
 
 def test_audit_schema_records_required_invalid_for_form_urlencoded_body(ctx):
-    # `requests` collapses an empty form body to None, which used to skip the body schema
-    # in the recorder; the omit-required negative case must still register `/required` as
-    # invalid so the keyword stops appearing as `needs_invalid`.
+    # `requests` collapses an empty form body to None; the omit-required case must still mark `/required` invalid.
     raw = ctx.openapi.build_schema(
         {
             "/items": {
@@ -194,8 +192,7 @@ def test_audit_schema_records_required_invalid_for_multipart_body(ctx):
 
 
 def test_audit_schema_skips_unserializable_media_types_without_aborting_operation(ctx):
-    # An unserializable body alternative (no built-in serializer for `application/x-msgpack`)
-    # must not abort coverage for sibling media types that *are* serializable.
+    # A body with no serializer (`application/x-msgpack`) must not abort coverage for serializable sibling media types.
     raw = ctx.openapi.build_schema(
         {
             "/messages": {
@@ -429,8 +426,7 @@ def test_audit_schema_records_rss_jumps_per_operation(ctx):
 
 
 def test_clear_all_drains_known_caches(ctx):
-    # An audit pass populates the schemathesis internal caches; the shared helper must
-    # empty them so audit workers don't carry per-schema state forward to the next task.
+    # Audit workers must not carry per-schema cache state into the next task.
     raw = ctx.openapi.build_schema(_PATHS)
     audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
     audit_schema(raw, api="t", corpus="external", phase=PhaseName.FUZZING)

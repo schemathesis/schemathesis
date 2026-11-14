@@ -10,7 +10,7 @@ from test.apps.catalog.openapi.under_declared_security import UnderDeclaredSecur
 
 @dataclass(slots=True)
 class DeclareSecurity:
-    """Add `security: [{BearerAuth: []}]` to the operation — server still enforces it the same way."""
+    """Declare `security: [{BearerAuth: []}]` on the operation; the server enforces it as before."""
 
     priority: int = 0
 
@@ -32,7 +32,7 @@ class RespondWithStatus:
 
 @dataclass(slots=True)
 class DocumentResponseStatus:
-    """Add `status` to the operation's `responses` block — pairs with `RespondWithStatus`."""
+    """Document `status` in the operation's `responses`; pairs with `RespondWithStatus`."""
 
     status: int
     description: str = "documented response"

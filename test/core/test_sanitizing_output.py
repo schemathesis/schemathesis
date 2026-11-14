@@ -46,11 +46,11 @@ def test_sanitize_case(sanitized_case_factory, attr, initial, expected):
 
 
 def test_sanitize_case_body_not_dict_or_not_set(sanitized_case_factory):
-    assert sanitized_case_factory(body="Some string body").body == "Some string body"  # Body should remain unchanged
+    assert sanitized_case_factory(body="Some string body").body == "Some string body"
 
 
 def test_sanitize_case_body_is_not_set(sanitized_case_factory):
-    assert sanitized_case_factory(body=NOT_SET).body is NOT_SET  # Body should remain unchanged
+    assert sanitized_case_factory(body=NOT_SET).body is NOT_SET
 
 
 def test_sanitize_case_custom_keys_to_sanitize(sanitized_case_factory):
@@ -84,42 +84,34 @@ URLENCODED_REPLACEMENT = urlencode({"": DEFAULT_REPLACEMENT})[1:]  # skip the `=
 @pytest.mark.parametrize(
     ("input_url", "expected_url"),
     [
-        # No sensitive data
         (
             "http://127.0.0.1/path?param1=value1&param2=value2",
             "http://127.0.0.1/path?param1=value1&param2=value2",
         ),
-        # Masking authority
         (
             "http://user:pass@127.0.0.1/path",
             f"http://{DEFAULT_REPLACEMENT}@127.0.0.1/path",
         ),
-        # Masking query parameters with default keys
         (
             "http://127.0.0.1/path?password=secret&token=abc123",
             f"http://127.0.0.1/path?password={URLENCODED_REPLACEMENT}&token={URLENCODED_REPLACEMENT}",
         ),
-        # Masking both authority and query parameters
         (
             "http://user:pass@127.0.0.1/path?password=secret&token=abc123",
             f"http://{DEFAULT_REPLACEMENT}@127.0.0.1/path?password={URLENCODED_REPLACEMENT}&token={URLENCODED_REPLACEMENT}",
         ),
-        # URL with fragment
         (
             "http://127.0.0.1/path?password=secret#fragment",
             f"http://127.0.0.1/path?password={URLENCODED_REPLACEMENT}#fragment",
         ),
-        # URL with port
         (
             "http://127.0.0.1:8080/path?password=secret",
             f"http://127.0.0.1:8080/path?password={URLENCODED_REPLACEMENT}",
         ),
-        # URL with special characters in query params
         (
             "http://127.0.0.1/path?password=secret%20password",
             f"http://127.0.0.1/path?password={URLENCODED_REPLACEMENT}",
         ),
-        # No query parameters
         (
             "http://127.0.0.1/path",
             "http://127.0.0.1/path",

@@ -24,9 +24,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
-# Bean Validation messages we recognize as "this field is required and non-blank":
-# Spring's stdlib `must not be blank/null/empty`, plus common custom variants
-# (apostrophe-contracted "can't be blank", "must be filled", etc.).
+# "Required and non-blank": Bean Validation's `must not be blank/null/empty` and custom forms like "can't be blank".
 _NON_BLANK = re.compile(
     r"\b(?:(?:must|shall) not be (?:blank|null|empty)"
     r"|can(?:not|'?t) be (?:blank|empty|null)"
@@ -35,46 +33,32 @@ _NON_BLANK = re.compile(
     re.IGNORECASE,
 )
 
-# Bean Validation `@Size`/`@Length` messages — apply to String, Collection, Map,
-# and array; the message text doesn't reveal which, so the consumer branches on
-# schema type. Spring stdlib emits "size must be between X and Y"; Hibernate
-# Validator's `@Length` emits "length must be between X and Y".
+# `@Size` / `@Length` text does not say whether the field is a string or a collection; the consumer checks the schema.
 _SIZE_BOUND = re.compile(
     r"\b(?:size|length) must be between (\d+) and (\d+)\b",
     re.IGNORECASE,
 )
 
-# Hibernate's `@Range` reports a numeric interval with the same wording minus the
-# `size`/`length` prefix, so it is only reachable once `_SIZE_BOUND` has declined.
+# Hibernate `@Range` uses the same wording without the `size` / `length` prefix, so try it after the size pattern.
 _RANGE_BOUND = re.compile(
     r"must be between (-?\d+(?:\.\d+)?) and (-?\d+(?:\.\d+)?)",
     re.IGNORECASE,
 )
 
-# Bean-validation format constraints. Hibernate's `@Email` emits "must be a
-# well-formed email address"; `@URL`/`@UUID` extensions emit "must be a valid
-# URL"/"must be a valid UUID". Custom @ControllerAdvice handlers also use
-# softer phrasings like "Please enter a valid e-mail address" — we don't
-# require a leading verb, only the `(well-formed|valid) <token>` core.
-# Order matters: UUID before URI so the more specific phrase wins on edge
-# strings, and email last because its token is short and easiest to misclassify.
+# Match `(well-formed|valid) <token>` in any phrasing; UUID before URI, and email last as its short token misfires most.
 _FORMAT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(?:well-formed|valid)\s+UUID\b", re.IGNORECASE), "uuid"),
     (re.compile(r"\b(?:well-formed|valid)\s+(?:URL|URI)\b", re.IGNORECASE), "uri"),
     (re.compile(r"\b(?:well-formed|valid)\s+e-?mail(?:\s+address)?\b", re.IGNORECASE), "email"),
 )
 
-# Bean-validation numeric bounds. Hibernate's stdlib emits this single shape
-# for `@Min`/`@Max`/`@DecimalMin`/`@DecimalMax` and `@Positive`/`@Negative`/
-# `@PositiveOrZero`/`@NegativeOrZero` (the last four expand to "greater/less
-# than 0" with the appropriate `or equal to` suffix).
+# One Hibernate shape covers `@Min`, `@Max`, `@DecimalMin`, `@DecimalMax`, and `@Positive`-style bounds at 0.
 _NUMERIC_BOUND = re.compile(
     r"\bmust be (?P<dir>greater|less) than(?P<inclusive>\s+or\s+equal\s+to)?\s+(?P<value>-?\d+(?:\.\d+)?)\b",
     re.IGNORECASE,
 )
 
-# `Value shall be a positive number` and friends — wraps `@Positive` /
-# `@PositiveOrZero` (and the negative mirrors) at bound=0.
+# "Value shall be a positive number" and similar `@Positive` / `@Negative` (OrZero) wordings, bound 0.
 _NUMERIC_KEYWORD = re.compile(
     r"\b(?:must|shall)\s+be\s+(?:a\s+)?"
     r"(?P<kind>positive|non[-\s]?negative|negative|non[-\s]?positive)"
@@ -88,29 +72,20 @@ _NUMERIC_KEYWORD_PAYLOADS: dict[str, NumericBoundPayload] = {
     "nonpositive": NumericBoundPayload(bound=0.0, direction=BoundDirection.MAX, exclusive=False),
 }
 
-# Bean-validation `@Pattern(regexp = "...")` — Hibernate emits the regex
-# verbatim between double quotes. Java regex syntax is a superset of ECMA-262;
-# the consumer normalizes Java-only constructs before writing it to the schema.
+# `@Pattern` quotes the Java regex verbatim; the consumer converts Java-only syntax before writing it to the schema.
 _PATTERN = re.compile(r'\bmust match "(?P<regex>[^"]+)"')
 
 
-# `MissingServletRequestParameterException` — Spring stdlib emits this when a
-# `@RequestParam`-bound field is absent from the request. Always a query param.
+# `MissingServletRequestParameterException`: a missing `@RequestParam`, always a query parameter.
 _MISSING_PARAMETER = re.compile(
     r"Required\s+\w+\s+parameter\s+'(?P<field>[\w.]+)'\s+is\s+not\s+present",
     re.IGNORECASE,
 )
 
-# `HttpMessageNotReadableException` with no body — Spring emits this when an
-# `@RequestBody`-annotated controller receives an empty body. Refers to the
-# body itself, not a sub-field.
+# `HttpMessageNotReadableException` for an empty `@RequestBody`; refers to the whole body.
 _MISSING_BODY = re.compile(r"\bRequired\s+request\s+body\s+is\s+missing\b", re.IGNORECASE)
 
-# `MethodArgumentTypeMismatchException` — request-param coercion failure (path
-# / query / header). The `Method parameter '<X>':` prefix only appears when
-# Spring 6 / Spring Boot 3+ wraps it in RFC 7807 ProblemDetail; the older
-# stdlib envelope omits it. We require the prefix because it's the only way
-# we get a field name out of the message.
+# `MethodArgumentTypeMismatchException`; only Spring 6+ ProblemDetail adds the `Method parameter '<X>':` field name.
 _TYPE_COERCION = re.compile(
     r"Method parameter '(?P<field>[\w.]+)':\s+"
     r"Failed to convert value of type '[\w.$<>]+' to required type '(?P<to>[\w.$<>]+)'",
@@ -129,31 +104,24 @@ _HEX_PATTERN = PatternPayload(regex="^[0-9a-fA-F]+$")
 _OBJECT_ID_PATTERN = PatternPayload(regex="^[0-9a-f]{24}$")
 
 
-# Custom `@ControllerAdvice` shape: each entry of `messages: [...]` is a string
-# of the form `<field> - <message>` (e.g. blog API).
+# Custom `@ControllerAdvice` shape: `messages: ["<field> - <message>", ...]`.
 _MESSAGE_LINE = re.compile(r"^\s*([\w.]+)\s*-\s*(.+?)\s*$")
 
-# Pagination-style type hint: `Parameter 'page' must be 'Integer'` (or 'Long').
-# Spring emits this when a `@RequestParam` int/long fails coercion. The hint
-# alone gives us the language-level upper bound for the field.
+# `Parameter 'page' must be 'Integer'` (or 'Long') after a failed `@RequestParam` coercion gives the type's maximum.
 _PARAMETER_TYPE_HINT = re.compile(r"Parameter '(?P<param>\w+)' must be '(?P<type>Integer|Long)'")
 _JAVA_TYPE_MAX = {"Integer": 2_147_483_647, "Long": 9_223_372_036_854_775_807}
 
-# Top-level keys that carry standalone Spring exception messages: standard
-# `message`/`detail`/`error` shapes plus `msg` used by custom @ControllerAdvice
-# envelopes (e.g. `{"msg": ..., "throwable": ..., "status": "BAD_REQUEST"}`).
+# Top-level keys with a standalone Spring exception message; custom `@ControllerAdvice` envelopes use `msg`.
 _TOP_LEVEL_KEYS = ("message", "detail", "error", "msg")
 
-# RFC 7807 ProblemDetail shape: field/message pairs are embedded inside
-# `detail`, e.g. `... [Field error in object 'X' on field 'Y': ...; default message [must not be null]]`.
+# ProblemDetail embeds field errors in `detail`: `... on field 'Y': ...; default message [must not be null]]`.
 _PROBLEM_DETAIL = re.compile(
     r"on field '([^']+)':.*?default message \[([^\]]+)\]",
     re.DOTALL,
 )
 
 
-# Spring carriers a user-facing message in top-level scalars and inside the
-# entries of common error arrays.
+# Error arrays, and the keys of their entries, that carry a user-facing message.
 _CARRIER_ARRAY_KEYS = ("fieldErrors", "errors", "subErrors")
 _CARRIER_ITEM_KEYS = ("message", "defaultMessage")
 
@@ -233,8 +201,7 @@ def _classify(message: str) -> tuple[tuple[ObservationKind, ObservationPayload],
 def _emit(operation: APIOperation, field: str, message: str) -> list[Observation]:
     if not field:
         return []
-    # Spring envelopes don't carry a location tag; match the name against what the operation
-    # declares, and fall back to the body when nothing matches.
+    # Spring envelopes carry no location: use the declared parameter with this name, else the body.
     if field in operation.path_parameters:
         location = ParameterLocation.PATH
     elif field in operation.query:
@@ -256,7 +223,7 @@ def _emit(operation: APIOperation, field: str, message: str) -> list[Observation
 
 @PARSERS.register
 class SpringParser:
-    """Parser for the five empirically-observed Spring 4xx error shapes."""
+    """Parser for the five Spring 4xx error shapes seen in practice."""
 
     priority = 10
 
@@ -275,9 +242,7 @@ class SpringParser:
             return True
         if isinstance(body.get("fieldErrors"), list):
             return True
-        # `MissingServletRequestParameterException` / `MethodArgumentTypeMismatchException`
-        # land in Spring's stdlib envelope (`{message, error, ...}`) or RFC 7807
-        # ProblemDetail (`{detail, ...}`) without the field-list shapes above.
+        # Exception messages in `{message, error, ...}` or ProblemDetail `{detail, ...}`, without a field list.
         for key in _TOP_LEVEL_KEYS:
             text = body.get(key)
             if isinstance(text, str) and (
@@ -314,7 +279,7 @@ class SpringParser:
 
     @staticmethod
     def _extract_messages(operation: APIOperation, body: dict) -> Iterable[Observation]:
-        # `{"messages": ["<field> - <message>", ...]}` — custom @ControllerAdvice.
+        # Custom `@ControllerAdvice`: `{"messages": ["<field> - <message>", ...]}`.
         messages = body.get("messages")
         if not isinstance(messages, list):
             return
@@ -343,8 +308,7 @@ class SpringParser:
 
     @staticmethod
     def _extract_sub_errors(operation: APIOperation, body: dict) -> Iterable[Observation]:
-        # `{"subErrors": [{"field": "...", "message": "..."}, ...]}` — common
-        # validation-error wrapper.
+        # Common validation-error wrapper: `{"subErrors": [{"field": "...", "message": "..."}, ...]}`.
         sub_errors = body.get("subErrors")
         if not isinstance(sub_errors, list):
             return
@@ -358,7 +322,7 @@ class SpringParser:
 
     @staticmethod
     def _extract_problem_detail(operation: APIOperation, body: dict) -> Iterable[Observation]:
-        # RFC 7807 ProblemDetail — field/message pairs are embedded in `detail`.
+        # RFC 7807 ProblemDetail embeds field/message pairs in `detail`.
         detail = body.get("detail")
         if not isinstance(detail, str):
             return
@@ -367,8 +331,7 @@ class SpringParser:
 
     @staticmethod
     def _extract_errors(operation: APIOperation, body: dict) -> Iterable[Observation]:
-        # `{"errors": [{"field": "...", "defaultMessage": "..."}, ...]}` —
-        # default Spring Boot Bean Validation shape.
+        # Spring Boot Bean Validation default: `{"errors": [{"field": "...", "defaultMessage": "..."}, ...]}`.
         errors = body.get("errors")
         if not isinstance(errors, list):
             return
@@ -382,8 +345,7 @@ class SpringParser:
 
     @staticmethod
     def _extract_field_errors(operation: APIOperation, body: dict) -> Iterable[Observation]:
-        # `{"fieldErrors": [{"property": "...", "message": "..."}, ...]}` —
-        # wimdeblauwe error-handling-spring-boot-starter shape.
+        # error-handling-spring-boot-starter: `{"fieldErrors": [{"property": "...", "message": "..."}, ...]}`.
         field_errors = body.get("fieldErrors")
         if not isinstance(field_errors, list):
             return
@@ -397,10 +359,7 @@ class SpringParser:
 
     @staticmethod
     def _extract_top_level_message(operation: APIOperation, body: dict) -> Iterable[Observation]:
-        # Spring stdlib / ProblemDetail envelopes carry exception messages directly
-        # in `message`/`detail`/`error`. We pull two non-body Spring exceptions
-        # out of these strings: a missing query parameter and a request-param
-        # type-coercion failure.
+        # Top-level exception messages: a missing query parameter or a request parameter coercion failure.
         for key in _TOP_LEVEL_KEYS:
             message = body.get(key)
             if not isinstance(message, str):
@@ -414,7 +373,7 @@ class SpringParser:
                     raw_message=message,
                 )
             if _MISSING_BODY.search(message):
-                # Empty `parameter_path` means the body itself is required, not a sub-field.
+                # Empty `parameter_path`: the body itself is required.
                 yield Observation(
                     operation_label=operation.label,
                     location=ParameterLocation.BODY,
@@ -423,10 +382,7 @@ class SpringParser:
                     raw_message=message,
                 )
             for coercion_match in _TYPE_COERCION.finditer(message):
-                # Field name + target Java type. Spring doesn't tell us whether
-                # the parameter was bound from the path or query, so we emit on
-                # both — the consumer's `_walk_to_property` ignores locations
-                # whose schema doesn't declare the field.
+                # The message omits path vs query, so emit both; the consumer ignores locations lacking the field.
                 payload = TypeMismatchPayload(type_name=coercion_match.group("to"))
                 for location in (ParameterLocation.PATH, ParameterLocation.QUERY):
                     yield Observation(
@@ -440,8 +396,7 @@ class SpringParser:
 
     @staticmethod
     def _extract_unexpected_properties(operation: APIOperation, body: dict) -> Iterable[Observation]:
-        # Body-side `Unrecognized field` and query-side `parameter name "X" is not
-        # allowed` — both name a property the schema must drop.
+        # `Unrecognized field` (body) and `parameter name "X" is not allowed` (query) name a property to drop.
         for message in _iter_carrier_strings(body):
             for match in _UNRECOGNIZED_FIELD.finditer(message):
                 yield Observation(

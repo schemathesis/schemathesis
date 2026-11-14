@@ -89,7 +89,7 @@ def _display_pointer(pointer: str, name_to_uri: dict[str, str]) -> str:
 
 
 def _describe_keyword(schema: JsonSchema, pointer: str, keyword: str) -> str:
-    """The keyword with its value, or just its name when the value says less than the name."""
+    """The keyword with its value, or only its name when the value says less than the name."""
     node = resolve_pointer(schema, pointer)
     if not isinstance(node, dict) or keyword not in node:
         return f"`{keyword}`"
@@ -117,8 +117,7 @@ def _describe_branches(
 ) -> str | None:
     """Each branch of a `oneOf`/`anyOf` that its siblings leave empty, or `None` when one survives.
 
-    The branch itself admits values, so it is never reported on its own; it is checked here against
-    the keywords beside it.
+    A branch admits values on its own, so it is checked against the keywords beside it.
     """
     node = resolve_pointer(schema, cause.pointer)
     if not isinstance(node, dict):
@@ -253,9 +252,8 @@ def describe_unsatisfiable(
 ) -> str | None:
     """Why no value satisfies this schema, named at the subschema that carries the conflict.
 
-    Emptiness that does not reach the root is routine - `additionalProperties: false` is an empty
-    position and says nothing is wrong - so only a root that admits nothing is reported. A pattern
-    the analysis cannot read is named instead, with the conflict left unlocated.
+    Only an empty root counts, since inner emptiness such as `additionalProperties: false` is routine.
+    A pattern the analysis cannot read is named instead, with the conflict unlocated.
     """
     draft = CANONICALIZE_DRAFT_BY_VALIDATOR.get(validator_cls)
     if draft is None:
@@ -321,8 +319,7 @@ Schema:
 def is_empty_strategy_error(exc: InvalidArgument) -> bool:
     """Whether `exc` reports a required strategy that can never produce a value.
 
-    Hypothesis raises this when a non-empty collection is built from an empty element
-    strategy - e.g. an array with `minItems` >= 1 whose items schema is unsatisfiable.
+    E.g. an array with `minItems` >= 1 whose items schema is unsatisfiable.
     """
     message = str(exc)
     return "because it has no values" in message or "no elements can be drawn from the element strategy" in message
@@ -387,8 +384,6 @@ HEALTH_CHECK_TITLES = {
 
 @dataclass(slots=True)
 class SlowParameter:
-    """Information about a parameter with slow or problematic data generation."""
-
     location: ParameterLocation
     name: str
     schema: JsonSchema

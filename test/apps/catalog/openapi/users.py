@@ -78,8 +78,7 @@ def _build_users_schema() -> dict:
                                     "type": "object",
                                     "properties": {
                                         "first_name": {"type": "string", "minLength": 3},
-                                        # Planted bug: `last_name` is incorrectly nullable, so the GET
-                                        # handler's `first + " " + last` blows up on a follow-up read.
+                                        # Planted bug: a nullable `last_name` crashes the GET handler.
                                         "last_name": {"type": "string", "minLength": 3, "nullable": True},
                                     },
                                     "required": ["first_name", "last_name"],
@@ -165,7 +164,7 @@ def _register_users_handlers(app: Flask) -> None:
             for field in ("first_name", "last_name"):
                 if field not in data:
                     return jsonify({"detail": f"Missing `{field}`"}), 400
-                # No type check on purpose — emulates a buggy operation that accepts `None`.
+                # No type check: emulates a buggy operation that accepts `None`.
                 user[field] = data[field]
             return jsonify(user)
         except KeyError:
@@ -180,7 +179,7 @@ def crud() -> OpenAPIApp:
 
 
 def create_user_only() -> OpenAPIApp:
-    """Just POST /users/ — used to verify behaviour when stateful linking has no target operations."""
+    """Only `POST /users/`, so stateful links have no target operation."""
     full = _build_users_schema()
     paths = {"/users/": full["paths"]["/users/"]}
     return flask_app(paths, _register_users_handlers, components=full["components"])
@@ -212,8 +211,7 @@ class _CreateUser(BaseModel):
 
 class _UpdateUser(BaseModel):
     first_name: str = Field(min_length=3)
-    # Planted bug: nullable last_name slips past validation, then GET /users/{id}
-    # blows up when concatenating it into a full_name.
+    # Planted bug: a nullable `last_name` passes validation, then crashes `GET /users/{id}` building `full_name`.
     last_name: str | None = Field(None, min_length=3, json_schema_extra={"nullable": True})
     model_config = ConfigDict(extra="forbid")
 

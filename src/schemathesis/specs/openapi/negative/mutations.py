@@ -1,5 +1,3 @@
-"""Schema mutations."""
-
 from __future__ import annotations
 
 import enum
@@ -70,11 +68,9 @@ class WalkStep:
 
 @dataclass(frozen=True, slots=True)
 class MutationTargetDescriptor:
-    """Identity-free walk recipe for one mutation target.
+    """Identity-free walk recipe for one mutation target, replayed against each case's cloned schema.
 
-    Materialization replays the walk against a per-case cloned schema to produce
-    a concrete `MutationTarget` record with resolved parents. Frozen so cached
-    descriptors cannot be mutated by downstream consumers.
+    Frozen, so consumers cannot change cached descriptors.
     """
 
     walk: tuple[WalkStep, ...]
@@ -95,10 +91,7 @@ def compute_mutation_targets(raw_schema: JsonSchemaObject | bool) -> tuple[Mutat
             return
         new_stack = stack + (id(node),)
 
-        # Bundled $ref: dereference and descend into the target. Unreachable targets (missing or cyclic) yield
-        # no descriptor for the inner walk. Fall through afterwards: OpenAPI 3.1 / JSON Schema 2019-09+ allow
-        # `$ref` to have sibling keywords (e.g. `{$ref, minLength: 3}`), so the wrapper itself can carry
-        # mutable constraints.
+        # Descend into a bundled `$ref`, then fall through: its siblings (`{$ref, minLength: 3}`) are mutable too
         ref = node.get("$ref")
         if isinstance(ref, str) and ref.startswith(REFERENCE_TO_BUNDLE_PREFIX):
             target_name = ref.rsplit("/", 1)[-1]
@@ -106,9 +99,7 @@ def compute_mutation_targets(raw_schema: JsonSchemaObject | bool) -> tuple[Mutat
             if isinstance(target, dict) and id(target) not in new_stack:
                 walk(target, recipe + (WalkStep("$ref", target_name),), new_stack)
 
-        # Skip nodes with no mutable content (empty `{}`, external `$ref`-only wrappers). Operators have
-        # nothing to negate at such targets; emitting a descriptor would waste a primary slot on
-        # guaranteed-FAILURE dispatch.
+        # Nodes with nothing to negate (`{}`, a bare external `$ref`) would waste the primary target slot
         if any(key != BUNDLE_STORAGE_KEY and key != "$ref" for key in node):
             descriptors.append(MutationTargetDescriptor(walk=recipe))
 
@@ -140,7 +131,7 @@ def compute_mutation_targets(raw_schema: JsonSchemaObject | bool) -> tuple[Mutat
 
 
 def _descend(node: JsonSchemaObject, keyword: PathKeyword, selector: PathSelector) -> JsonSchemaObject:
-    """Navigate one structural keyword from `node`. Caller resolves $refs separately."""
+    """Step through one structural keyword; the caller resolves `$ref`s."""
     match keyword:
         case "properties":
             return node["properties"][selector]
@@ -160,12 +151,7 @@ def _materialize_one(
     bundle_map: JsonSchemaObject,
     owned: set[str],
 ) -> MutationTarget | None:
-    """Replay one descriptor against `new_schema` and return the resolved MutationTarget.
-
-    Returns `None` when the walk can't be followed (e.g., a `properties` hop where
-    the parent has no `properties` key, or a `$ref` hop into a missing bundle entry).
-    This happens when error-feedback adjustments transform the schema between
-    strategy build and case generation.
+    """Replay one descriptor against `new_schema`; `None` when error feedback reshaped the schema off its walk.
 
     `owned` names the bundle entries this case already copied for its own walks.
     """
@@ -184,9 +170,7 @@ def _materialize_one(
             return None
         steps.append(PathStep(parent=current, keyword=hop.keyword, selector=hop.selector))
         current = next_node
-    # The walk explicitly steps through every `$ref` via a `WalkStep("$ref", …)` hop, so a node ending the
-    # walk on `$ref` is intentional — sibling-bearing wrappers (`{$ref, minLength: 3}`) need their siblings
-    # mutated, not the dereferenced target. Don't defensively dereference here.
+    # Walks step through `$ref` explicitly; ending on one targets its siblings (`{$ref, minLength: 3}`)
     return MutationTarget(schema=current, path=tuple(steps))
 
 
@@ -264,12 +248,9 @@ def _propagate_required_path(path: tuple[PathStep, ...]) -> None:
 def _disjoint_descriptor_pool(
     candidates: tuple[MutationTargetDescriptor, ...], chosen: list[MutationTargetDescriptor]
 ) -> list[MutationTargetDescriptor]:
-    """Filter descriptors that don't conflict with any already-chosen one.
+    """Descriptors that conflict with no chosen one.
 
-    Two walks conflict when one is a prefix of the other (chain), or when they
-    diverge at a `oneOf`/`anyOf` step (sibling branches; the schema mutation at
-    the chosen branch collapses the alternative). Used by the dispatcher to
-    drop disqualified candidates before materialization.
+    Walks conflict when one is a prefix of the other, or when they split at a `oneOf`/`anyOf` step.
     """
 
     def is_on_chain(a: tuple[WalkStep, ...], b: tuple[WalkStep, ...]) -> bool:
@@ -297,15 +278,10 @@ def _disjoint_descriptor_pool(
 def _absolutize(
     target: MutationTarget, descriptor: MutationTargetDescriptor, local: Mutation, name_to_uri: dict[str, str]
 ) -> Mutation:
-    """Prefix a local Mutation's path/schema_pointer with the target's path-from-root.
+    """Prefix a local mutation's path and schema pointer with the target's path from the root.
 
-    Past a `$ref`, the schema pointer starts over at the referenced definition's location in the
-    original document. Also derives the parameter name from the path's last `properties` step when the
-    operator didn't set one explicitly. Operators only set `parameter` when negating
-    a single-element `required` list; for any other mutation on a parameter-shaped
-    target (a single property under root), we want the parameter name to surface
-    in error messages so callers see "parameter `X` in <location>" instead of just
-    "in <location>".
+    The pointer restarts at each `$ref` target's location. Without an explicit `parameter`, the last `properties`
+    step names it, so messages read "parameter `X` in <location>".
     """
     body_path_prefix: ParameterPath = tuple(
         step.selector for step in target.path if step.keyword == "properties" and isinstance(step.selector, str)
@@ -348,8 +324,7 @@ def _synthesize_property_name(parent: JsonSchemaObject) -> str:
     return f"k{counter}"
 
 
-# Curated probe set covering common JSON-Schema patternProperties shapes: lowercase / uppercase /
-# alphanumeric / kebab- / snake- / CamelCase / digit. Tried in order, so the simplest matching name wins.
+# Probe names for common `patternProperties` shapes, tried in order so the simplest match wins.
 _PATTERN_NAME_CANDIDATES = ("x", "X", "0", "x0", "Xx", "_x", "x-y", "x_y", "foo", "Foo")
 
 
@@ -366,13 +341,7 @@ def _synthesize_pattern_property_name(pattern: str) -> str | None:
 
 
 class MutationResult(int, enum.Enum):
-    """The result of applying some mutation to some schema.
-
-    Failing to mutate something means that by applying some mutation, it is not possible to change
-    the schema in the way, so it covers inputs not covered by the "positive" strategy.
-
-    Knowing this, we know when the schema is mutated and whether we need to apply more mutations.
-    """
+    """`SUCCESS` when a mutation changed the schema to cover inputs the positive strategy misses."""
 
     SUCCESS = 1
     FAILURE = 2
@@ -381,17 +350,12 @@ class MutationResult(int, enum.Enum):
         return self | other
 
     def __or__(self, other: Any) -> MutationResult:
-        # Syntactic sugar to simplify handling of multiple results
         if self == MutationResult.SUCCESS:
             return self
         return other
 
 
-# Mutator contract:
-#   - SUCCESS  -> (MutationResult.SUCCESS, MutationMetadata(mutations=(one_mutation,)))
-#   - FAILURE  -> (MutationResult.FAILURE, None)
-# The dispatcher relies on len(mutations) == 1 for any successful operator return;
-# operators must not produce multi-mutation metadata.
+# Returns `(SUCCESS, metadata with exactly one mutation)` or `(FAILURE, None)`; the dispatcher relies on it.
 Mutator: TypeAlias = Callable[["MutationContext", Draw, Schema], tuple[MutationResult, MutationMetadata | None]]
 ANY_TYPE_KEYS = {"$ref", "allOf", "anyOf", "const", "else", "enum", "if", "not", "oneOf", "then", "type"}
 TYPE_SPECIFIC_KEYS = {
@@ -428,8 +392,6 @@ ALL_TYPE_SPECIFIC_KEYS = frozenset(keyword for keywords in TYPE_SPECIFIC_KEYS.va
 
 
 class MutationContext:
-    """Meta information about the current mutation state."""
-
     __slots__ = (
         "keywords",
         "non_keywords",
@@ -479,22 +441,15 @@ class MutationContext:
         return self.location == ParameterLocation.QUERY
 
     def ensure_bundle(self, schema: Schema) -> None:
-        """Ensure schema has the bundle from context if needed.
-
-        This is necessary when working with nested schemas (e.g., property schemas)
-        that may contain bundled references but don't have the x-bundled key themselves.
-        """
-        # NOTE: nested targets get the *original* bundle reference, while `mutate()` clones the
-        # bundle for the root schema. Operators today only read bundle entries, so the aliasing is
-        # latent — but if any future operator writes into a bundle entry on a nested target, the
-        # mutation will leak across cases. Clone here (or thread `bundle_map`) before that happens.
+        """Attach the context's bundle to a nested schema whose bundled references lack it."""
+        # Nested targets share the original bundle; an operator writing into it would leak across cases
         if BUNDLE_STORAGE_KEY in self.non_keywords and BUNDLE_STORAGE_KEY not in schema:
             schema[BUNDLE_STORAGE_KEY] = self.non_keywords[BUNDLE_STORAGE_KEY]
 
     def mutate(self, draw: Draw) -> tuple[Schema, MutationMetadata | None]:
-        """Target-dispatch: pick one primary target uniformly + up to 2 disjoint secondaries.
+        """Pick one primary target uniformly and up to 2 disjoint secondaries, then run one operator on each.
 
-        One operator runs per chosen target; `required` is propagated along each path.
+        `required` propagates along each target's path.
         """
         new_schema = deepclone(self.keywords)
         if BUNDLE_STORAGE_KEY in self.non_keywords:
@@ -511,9 +466,8 @@ class MutationContext:
         # (Groce et al., "Swarm Testing", ISSTA '12, DOI 10.1145/2338965.2336763).
         enabled_operators = draw(st.shared(FeatureStrategy(), key="operators"))
 
-        # Uniform sampling over a precomputed list of every reachable site counters the root-bias diagnosed
-        # in Regehr, "Helping Generative Fuzzers Avoid Looking Only Where the Light is Good"
-        # (blog.regehr.org/archives/1700, 2019): without it, deeper leaves draw exponentially less weight than the root
+        # Uniform sampling over every reachable target keeps deep leaves from drawing exponentially less weight
+        # than the root (Regehr, blog.regehr.org/archives/1700)
         primary_descriptor = draw(st.sampled_from(descriptors)) if len(descriptors) > 1 else descriptors[0]
         owned: set[str] = set()
         primary = _materialize_one(new_schema, primary_descriptor, bundle_map, owned)
@@ -563,23 +517,17 @@ class MutationContext:
             properties = new_schema.get("properties", {})
             for name, sub_schema in properties.items():
                 if not isinstance(sub_schema, dict):
-                    # A header written as `true` claims every value; one written as `false` takes none,
-                    # and stays that way.
+                    # A `false` header schema admits no value and stays that way; `true` becomes `{}`
                     if sub_schema is False:
                         continue
                     sub_schema = properties[name] = {}
                 sub_schema["type"] = "string"
-                # `_header_value` keeps generated values within RFC 9110 codepoints so `is_valid_header` doesn't
-                # reject them. Without this, mutated header sub-schemas (e.g. `{type: string, not: {pattern: …}}`)
-                # produce non-Latin-1 strings that the upstream filter discards, forcing Hypothesis to fall back
-                # to empty values that hide bugs.
+                # Keeps mutated header values within RFC 9110 codepoints; the header filter would discard the rest
                 sub_schema.setdefault("format", "_header_value")
             if self.allow_extra_parameters and draw(st.booleans()):
-                # Headers default `additionalProperties: False`, so without this branch Schemathesis can never generate
-                # undeclared header names — opt in here to exercise that surface when extra parameters are allowed.
+                # Headers default to `additionalProperties: false`; only this branch sends undeclared header names
                 new_schema["additionalProperties"] = {"type": "string", "format": "_header_value"}
-        # Empty arrays / objects may still validate against the original schema,
-        # turning a "negative" case into a positive one — force at least one element.
+        # Empty arrays and objects may still match the original schema; require at least one element
         not_schema = new_schema.get("not")
         if (
             "array" in get_type(new_schema)
@@ -613,12 +561,10 @@ class MutationContext:
         return None
 
     def _applicable_operators(self, target: MutationTarget) -> list[Mutator]:
-        """Per-location applicability table.
+        """Operators that apply at `target`, by location.
 
-        BODY accepts every operator at every target. HEADER/COOKIE/QUERY/PATH
-        preserve the root parameter object (negation only — never type-change or
-        required-removal that would strip declared params); deeper per-parameter
-        schemas additionally accept change_type.
+        Bodies take every operator. Other locations keep the root parameter object (negation only); deeper
+        per-parameter schemas also take `change_type`.
         """
         is_root = len(target.path) == 0
         if self.location == ParameterLocation.BODY:
@@ -651,10 +597,6 @@ def for_types(*allowed_types: str) -> Callable[[Mutator], Mutator]:
 def remove_required_property(
     ctx: MutationContext, draw: Draw, schema: Schema
 ) -> tuple[MutationResult, MutationMetadata | None]:
-    """Remove a required property.
-
-    Effect: Some property won't be generated.
-    """
     required = schema.get("required")
     if not required:
         return MutationResult.FAILURE, None
@@ -693,7 +635,6 @@ def remove_required_property(
 def change_type(
     ctx: MutationContext, draw: Draw, schema: JsonSchemaObject
 ) -> tuple[MutationResult, MutationMetadata | None]:
-    """Change type of values accepted by a schema."""
     if "type" not in schema:
         # No `type`: schema accepts every type; nothing to change.
         return MutationResult.FAILURE, None
@@ -701,9 +642,7 @@ def change_type(
         # Form data must stay object-shaped.
         return MutationResult.FAILURE, None
     old_types = get_type(schema)
-    # `string` is wire-equivalent to "anything" for string-stringifying transports — path/query/header/cookie
-    # always serialize to strings, XML bodies stringify via `_escape_xml`, binary/byte bodies accept any bytes.
-    # Skip rather than emit a mutation that won't change what reaches the server.
+    # Parameters, XML and binary bodies reach the server as strings, which a `string` schema accepts anyway
     if "string" in old_types and (
         ctx.location.is_in_header
         or ctx.is_path_location
@@ -759,18 +698,13 @@ def change_type(
 
 def _ensure_query_serializes_to_non_empty(ctx: MutationContext, schema: Schema) -> None:
     if ctx.is_query_location and schema.get("type") == "array":
-        # Empty arrays / `None` items / empty objects all serialize to a missing query string, which the request
-        # would never carry — force at least one value-bearing element so the mutation actually reaches the server.
+        # Empty arrays, `None` items and empty objects vanish from the query string; force a value-bearing element
         schema["minItems"] = schema.get("minItems") or 1
         schema.setdefault("items", {}).update({"not": {"enum": [None, [], {}]}})
 
 
 def _ensure_path_string_not_numeric(ctx: MutationContext, schema: Schema, old_types: list[str]) -> None:
-    """Exclude numeric strings when mutating integer/number to string for path parameters.
-
-    Numeric strings like "7" serialize to the same URL as integer 7,
-    making them indistinguishable and causing false positive failures.
-    """
+    """Exclude numeric strings when mutating a number to string for path parameters: "7" and 7 share a URL."""
     if not ctx.is_path_location:
         return
     if schema.get("type") != "string":
@@ -783,8 +717,7 @@ def _ensure_path_string_not_numeric(ctx: MutationContext, schema: Schema, old_ty
 def _ensure_boolean_not_coercible(ctx: MutationContext, schema: Schema, old_types: list[str]) -> None:
     """Exclude wire-coercible values when mutating a boolean query/path parameter.
 
-    Lenient parsers read 0/1/true/false as booleans, so those serialize to a value the server
-    accepts as valid, making the mutation indistinguishable from the original boolean.
+    Lenient parsers read 0/1/true/false as booleans.
     """
     if not (ctx.is_query_location or ctx.is_path_location):
         return
@@ -811,13 +744,12 @@ def _ensure_number_not_whole(schema: Schema, old_types: list[str]) -> None:
 def _get_type_candidates(ctx: MutationContext, schema: Schema) -> set[str]:
     types = set(get_type(schema))
     if ctx.is_path_location:
-        # Path params: skip null/boolean by default — they rarely surface real
-        # bugs and waste budget; `_get_type_candidates_with_weights` adds them back occasionally.
+        # Null and boolean path values rarely find bugs; they get added back at a low rate
         candidates = {"string", "integer", "number"} - types
     else:
         candidates = {"string", "integer", "number", "object", "array", "boolean", "null"} - types
     # A single-element array (`[0]` -> `flag=0`) or single-key object (`{"0": ...}` -> `flag=0`)
-    # serializes to a scalar query value that can still read as a coercible boolean — drop both.
+    # serializes to a scalar query value that can still read as a coercible boolean; drop both.
     if "boolean" in types and ctx.is_query_location:
         candidates.discard("array")
         candidates.discard("object")
@@ -904,8 +836,7 @@ def has_negatable_target(
 ) -> bool:
     """Whether any operator would find something to bar here or at a target nested below.
 
-    Mirrors what the mutation walk reaches, so a parameter is only ruled out when every
-    reachable target is one both operators decline.
+    Mirrors the mutation walk: a parameter is ruled out only when both operators decline every reachable target.
     """
     if not isinstance(schema, dict) or depth > MAX_WALK_DEPTH:
         return False
@@ -942,12 +873,11 @@ def has_negatable_target(
 def negate_constraints(
     ctx: MutationContext, draw: Draw, schema: Schema
 ) -> tuple[MutationResult, MutationMetadata | None]:
-    """Negate schema constrains while keeping the original type."""
+    """Negate schema constraints while keeping the original type."""
     ctx.ensure_bundle(schema)
     if not can_negate(schema):
         return MutationResult.FAILURE, None
     copied = schema.copy()
-    # Preserve x-bundled before clearing
     bundled = schema.get(BUNDLE_STORAGE_KEY)
     schema.clear()
     if bundled is not None:
@@ -987,8 +917,7 @@ def negate_constraints(
         for key in negated_keys:
             value = copied[key]
             if key == "required":
-                # Carry the full list so `transport.prepare.get_exclude_headers` can
-                # diff it against the actually-sent headers when `parameter` stays None.
+                # The full list lets the transport tell which headers went missing when `parameter` stays `None`
                 original_required = list(value)
                 if len(value) == 1:
                     parameter = value[0]
@@ -1022,8 +951,5 @@ def ident(x: T) -> T:
 
 
 def ordered(items: Sequence[T], unique_by: Callable[[T], Any] = ident) -> st.SearchStrategy[list[T]]:
-    """Returns a strategy that generates randomly ordered lists of T.
-
-    NOTE. Items should be unique.
-    """
+    """All of `items` in random order; they must be unique under `unique_by`."""
     return st.lists(st.sampled_from(items), min_size=len(items), unique_by=unique_by)

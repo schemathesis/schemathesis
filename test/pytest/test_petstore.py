@@ -18,7 +18,7 @@ def testdir(request, testdir):
         result.stdout.re_match_lines([rf"Hypothesis calls: {tests_num}"])
 
     testdir.assert_petstore = assert_petstore
-    testdir.param = request.param  # `request.param` is not available in test for some reason
+    testdir.param = request.param  # `request.param` is not available in the test
 
     return testdir
 

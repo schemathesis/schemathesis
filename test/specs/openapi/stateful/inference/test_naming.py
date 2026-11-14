@@ -13,7 +13,7 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
         ("accountUuid", "/accounts/{accountUuid}", "Account"),
         ("Uuid", "/accounts/{accountUuid}", None),
         ("sessionGuid", "/sessions/{sessionGuid}", "Session"),
-        # Plural foreign-key arrays (`siteIds`, `site_ids`, …)
+        # Plural foreign-key arrays
         ("siteIds", "/events", "Site"),
         ("userUuids", "/groups", "User"),
         ("orderGuids", "/reports", "Order"),
@@ -44,28 +44,28 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
         ("ref", "/commits/{ref}", None),
         ("identifier", "/images", None),
         ("someRandom", "/users/{someRandom}", None),
-        # Generic prefixes - should use path context when it's a path parameter
+        # Generic prefixes take the resource from the path
         ("item_id", "/api/groups/{item_id}", "Group"),
         ("resource_id", "/api/users/{resource_id}", "User"),
         ("object_uuid", "/api/pets/{object_uuid}", "Pet"),
         ("entity-guid", "/api/orders/{entity-guid}", "Order"),
-        # Bare slug - should use path context when it's a path parameter
+        # A bare slug takes the resource from the path
         ("slug", "/api/recipes/{slug}", "Recipe"),
-        # Non-generic prefixes - should still extract from parameter name
+        # Specific prefixes name the resource themselves
         ("user_id", "/api/members/{user_id}", "User"),
         ("recipe_slug", "/api/items/{recipe_slug}", "Recipe"),
-        # Generic prefixes for query params - should NOT use path context (no placeholder in path)
+        # Query parameters have no path placeholder, so the prefix names the resource
         ("item_id", "/api/groups", "Item"),
         ("itemId", "/items/search", "Item"),
-        # Name suffix - common for file/resource name parameters
+        # `name` suffix
         ("file_name", "/backups/{file_name}", "File"),
         ("recipe-name", "/recipes/{recipe-name}", "Recipe"),
         ("user_name", "/users/{user_name}", "User"),
-        # Bare "name" parameter - use path context if it's a path parameter
+        # A bare `name` takes the resource from the path
         ("name", "/users/{name}", "User"),
         ("name", "/files/{name}", "File"),
         ("name", "/api/users", None),  # Not a path parameter, no placeholder
-        # Concatenated identifier suffix (no separator) - require path context to confirm
+        # A suffix without a separator needs the path to confirm it
         ("username", "/api/users/{username}/giveAdmin", "User"),
         ("username", "/users/{username}", "User"),
         ("userid", "/users/{userid}", "User"),
@@ -74,20 +74,20 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
         ("recipeslug", "/recipes/{recipeslug}", "Recipe"),
         ("userName", "/users/{userName}", "User"),
         ("USERNAME", "/users/{USERNAME}", "User"),
-        # Common English words ending in identifier-like tokens - should NOT match
+        # English words that end in identifier-like tokens
         ("paid", "/items/{paid}", None),
         ("rapid", "/transfers/{rapid}", None),
-        # Prefix doesn't align with the path-derived resource - should NOT match
+        # Prefix disagrees with the resource from the path
         ("custid", "/users/{custid}", None),
         # Prefix too short
         ("xid", "/items/{xid}", None),
         # Concatenated suffix only fires for path parameters
         ("username", "/users", None),
-        # API version prefixes alone don't qualify as a resource collection
+        # A version prefix alone is no resource collection
         ("name", "/v1/{name}", None),
         ("name", "/api/v1/{name}", None),
         ("username", "/v1/{username}", None),
-        # But version prefixes followed by a real collection still work
+        # A version prefix before a real collection works
         ("username", "/v1/users/{username}", "User"),
         ("name", "/api/v2/users/{name}", "User"),
         # Path parameter named after its parent collection (route-model-binding style)
@@ -96,7 +96,7 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
         ("session", "/sessions/{session}/quiz", "Session"),
         ("quiz", "/quizzes/{quiz}", "Quiz"),
         ("user", "/users/{user}", "User"),
-        # Param name unrelated to its parent collection - must stay None
+        # Parameter unrelated to its parent collection
         ("session", "/users/{session}", None),
     ],
 )
@@ -265,15 +265,11 @@ def test_strip_affixes(name, prefixes, suffixes, expected):
 @pytest.mark.parametrize(
     ["parameter", "resource", "fields", "expected"],
     [
-        # Exact match
         pytest.param("id", "User", ["id", "name"], "id", id="exact-match"),
         pytest.param("name", "User", ["id", "name"], "name", id="exact-match-name"),
-        # Normalized match
         pytest.param("userId", "User", ["user_id", "name"], "user_id", id="normalized-match"),
-        # Parameter has resource prefix, field is suffix
         pytest.param("channelId", "Channel", ["id", "name"], "id", id="resource-prefix-in-param"),
         pytest.param("userId", "User", ["id", "email"], "id", id="user-id-to-id"),
-        # ID synonym matching
         pytest.param("user_id", "User", ["uuid", "name"], "uuid", id="id-synonym-uuid"),
         pytest.param("item_id", "Item", ["guid", "name"], "guid", id="id-synonym-guid"),
         pytest.param("identifier", "Image", ["id", "identifier"], "identifier", id="identifier-exact"),
@@ -282,14 +278,12 @@ def test_strip_affixes(name, prefixes, suffixes, expected):
         pytest.param("uuid", "Image", ["id", "title"], "id", id="uuid-to-id"),
         pytest.param("pk", "Image", ["id", "pk"], "pk", id="pk-exact"),
         pytest.param("pk", "Image", ["id", "title"], "id", id="pk-to-id"),
-        # Plural ids parameter resolves to the singular id field on the resource
         pytest.param("ids", "Person", ["id", "name"], "id", id="plural-ids-to-id"),
-        # Resource-hint matching (parameter prefix hints at resource, suffix is field)
+        # The prefix names the resource, the suffix names the field
         pytest.param("file_name", "BackupFile", ["name", "date", "size"], "name", id="resource-hint-file-name"),
         pytest.param("user_email", "User", ["id", "email", "name"], "email", id="resource-hint-user-email"),
         pytest.param("backup_file_name", "BackupFile", ["name"], "name", id="resource-hint-compound"),
         pytest.param("category_name", "RecipeCategory", ["id", "name", "slug"], "name", id="resource-hint-category"),
-        # Resource-hint: resource starts with prefix (prefix matching)
         pytest.param("file_name", "FileManager", ["name"], "name", id="resource-hint-prefix-at-start"),
         pytest.param(
             "group_slug", "GroupSummary", ["id", "name", "slug"], "slug", id="resource-hint-prefix-group-slug"
@@ -297,9 +291,8 @@ def test_strip_affixes(name, prefixes, suffixes, expected):
         pytest.param(
             "household_slug", "HouseholdInDB", ["id", "name", "slug"], "slug", id="resource-hint-prefix-household"
         ),
-        # Resource-hint: prefix too short (< 3 chars)
+        # A prefix under 3 chars gives no resource hint
         pytest.param("xy_name", "Oxy", ["name"], None, id="resource-hint-prefix-too-short"),
-        # No match cases
         pytest.param("random", "User", ["id", "name"], None, id="no-match"),
         pytest.param("the_name", "User", ["name"], None, id="no-match-resource-mismatch"),
         # camelCase capital suffixes (no separator)
@@ -314,7 +307,6 @@ def test_strip_affixes(name, prefixes, suffixes, expected):
         pytest.param("userSlug", "User", ["id", "slug"], "slug", id="camel-slug-resource-prefix"),
         pytest.param("userUuid", "User", ["id", "uuid"], "uuid", id="camel-uuid-resource-prefix"),
         pytest.param("userGuid", "User", ["id", "guid"], "guid", id="camel-guid-resource-prefix"),
-        # camel-Name with no matching field -> falls back to existing behavior
         pytest.param("containerGroupName", "ContainerGroup", ["id", "type"], None, id="camel-name-no-name-field"),
     ],
 )
@@ -374,7 +366,7 @@ def test_collect_candidate_resource_names(raw_schema, expected):
 @pytest.mark.parametrize(
     ["name", "expected"],
     [
-        # Hyphenated suffixes (safest - always normalize)
+        # Hyphenated suffixes always normalize
         pytest.param("Recipe-Output", "Recipe", id="hyphen-output"),
         pytest.param("Recipe-Input", "Recipe", id="hyphen-input"),
         pytest.param("User-Response", "User", id="hyphen-response"),
@@ -385,34 +377,30 @@ def test_collect_candidate_resource_names(raw_schema, expected):
         pytest.param("UserIn", "User", id="pascal-in"),
         pytest.param("RecipeOut", "Recipe", id="pascal-out-recipe"),
         pytest.param("OrderIn", "Order", id="pascal-in-order"),
-        # PascalCase Output/Input suffixes (at word boundary)
         pytest.param("RecipeOutput", "Recipe", id="pascal-output"),
         pytest.param("RecipeInput", "Recipe", id="pascal-input"),
-        # PascalCase Response/Request are NOT normalized (often response wrappers)
+        # Response/Request suffixes stay, as they often mark wrapper types
         pytest.param("UserResponse", "UserResponse", id="pascal-response-not-normalized"),
         pytest.param("UserRequest", "UserRequest", id="pascal-request-not-normalized"),
         pytest.param("CountryResponse", "CountryResponse", id="country-response-wrapper"),
-        # DTO patterns
         pytest.param("OrderDTO", "Order", id="dto-uppercase"),
         pytest.param("OrderDto", "Order", id="dto-titlecase"),
         pytest.param("UserDTO", "User", id="dto-user"),
-        # Should NOT normalize - name is too short
+        # Too short to normalize
         pytest.param("Output", "Output", id="just-output"),
         pytest.param("Input", "Input", id="just-input"),
         pytest.param("In", "In", id="just-in"),
         pytest.param("Out", "Out", id="just-out"),
         pytest.param("A-Output", "A-Output", id="single-char-base"),
-        # Should NOT normalize - suffix is part of word (lowercase before suffix)
+        # A lowercase letter before the suffix makes it part of the word
         pytest.param("Timeout", "Timeout", id="timeout-word"),
         pytest.param("Within", "Within", id="within-word"),
         pytest.param("Scout", "Scout", id="scout-word"),
         pytest.param("Spin", "Spin", id="spin-word"),
         pytest.param("Login", "Login", id="login-word"),
         pytest.param("Logout", "Logout", id="logout-word"),
-        # Edge cases - PascalCase word boundary detection
         pytest.param("AudioOutput", "Audio", id="audio-output"),
         pytest.param("DataInput", "Data", id="data-input"),
-        # Empty and short strings
         pytest.param("", "", id="empty"),
         pytest.param("X", "X", id="single-char"),
         pytest.param("AB", "AB", id="two-chars"),

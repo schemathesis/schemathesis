@@ -87,7 +87,7 @@ def test_fuzz_crash_records_real_operation_not_phase_label(case_factory, respons
 
 
 def test_passing_operation_removes_only_stale_crash(case_factory, response_factory, tmp_path):
-    # Cross-run healing still works: an operation that passed and never failed this run has its stale crash dropped.
+    # An operation that passed and never failed this run drops its stale crash from an earlier run.
     crashes_dir = tmp_path / "crashes"
     writer_queue: Queue = Queue()
     writer_queue.put(
