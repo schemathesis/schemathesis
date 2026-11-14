@@ -10,9 +10,12 @@ import pytest
 from hypothesis import strategies as st
 from hypothesis.vendor.pretty import pretty
 
+import schemathesis
 from schemathesis.config import GenerationConfig
 from schemathesis.core import deserialization
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.engine import events
+from schemathesis.engine.run import PhaseName
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis.examples import generate_many
@@ -31,7 +34,8 @@ from schemathesis.specs.openapi.examples import get_strategies_from_examples
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource, ParameterRequirement
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex
 from schemathesis.specs.openapi.stateful.dependencies.models import InputSlot, ResourceDefinition
-from test.utils import objects_at, run_given
+from test.apps.catalog.openapi import basic
+from test.utils import EventStream, objects_at, run_given
 
 USER_RESOURCE = "User"
 POST_USERS = "POST /users"
@@ -2967,3 +2971,161 @@ def test_coverage_sends_a_captured_child_under_the_parent_it_was_created_under(c
     base = [case.path_parameters for case in cases if case._meta.phase.data.scenario.value.endswith("object")]
     assert base, "the coverage phase produced no base case"
     assert all(path == {"parent_pk": "2", "id": "4"} for path in base), base
+
+
+def _pool_share(ctx, paths, producer, consumer, get_strategy):
+    schema = ctx.openapi.load_schema(paths)
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation=producer, status_code=201, payload={"id": "known-1"})
+    method, path = consumer
+    results = generate_many(get_strategy(schema[path][method], data_source), 50)
+    return sum(isinstance(r, GeneratedValue) and bool(r.pool_draws) for r in results) / len(results)
+
+
+def _creates(link_name, operation_id, parameter):
+    return {
+        "post": {
+            "responses": {
+                "201": {
+                    "content": {
+                        "application/json": {"schema": {"type": "object", "properties": {"id": {"type": "string"}}}}
+                    },
+                    "links": {
+                        link_name: {"operationId": operation_id, "parameters": {parameter: "$response.body#/id"}}
+                    },
+                }
+            },
+        }
+    }
+
+
+# Other inputs of the case are still generated, so reusing the only known resource does not repeat the case.
+def test_single_captured_value_reused_alongside_generated_body_fields(ctx):
+    paths = {
+        "/projects": _creates("CreateTask", "createTask", "project_id"),
+        "/tasks": {
+            "post": {
+                "operationId": "createTask",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"project_id": {"type": "string"}, "title": {"type": "string"}},
+                                "required": ["project_id", "title"],
+                            }
+                        }
+                    },
+                },
+                "responses": {"201": {"description": "Created"}},
+            }
+        },
+    }
+    share = _pool_share(
+        ctx,
+        paths,
+        "POST /projects",
+        ("POST", "/tasks"),
+        lambda operation, data_source: operation.body[0].get_strategy(
+            operation,
+            GenerationConfig(),
+            GenerationMode.POSITIVE,
+            feedback=FeedbackSources(extra_data_source=data_source),
+        ),
+    )
+    assert share >= 0.5
+
+
+def test_single_captured_value_reused_alongside_generated_path_parameters(ctx):
+    paths = {
+        "/sessions": _creates("GetSession", "getSession", "id"),
+        "/sessions/{source}/{id}": {
+            "get": {
+                "operationId": "getSession",
+                "parameters": [
+                    {"name": "source", "in": "path", "required": True, "schema": {"type": "string"}},
+                    {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+                ],
+                "responses": {"200": {"description": "Success"}},
+            }
+        },
+    }
+    share = _pool_share(
+        ctx,
+        paths,
+        "POST /sessions",
+        ("GET", "/sessions/{source}/{id}"),
+        lambda operation, data_source: operation.path_parameters.get_strategy(
+            operation,
+            GenerationConfig(),
+            GenerationMode.POSITIVE,
+            feedback=FeedbackSources(extra_data_source=data_source),
+        ),
+    )
+    assert share >= 0.5
+
+
+def _fuzzing_cases(stream):
+    return [
+        case.value
+        for scenario in stream.find_all(events.ScenarioFinished)
+        if scenario.phase == PhaseName.FUZZING
+        for case in scenario.recorder.cases.values()
+    ]
+
+
+def _run_examples_and_fuzzing(api, mode):
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.generation.update(modes=[mode])
+    stream = EventStream(
+        schema,
+        phases=[PhaseName.EXAMPLES, PhaseName.FUZZING],
+        seed=1,
+        max_examples=10,
+        deterministic=True,
+        checks=(),
+    ).execute()
+    stream.assert_no_errors()
+    return stream
+
+
+# Credentials do not vary the resource lookup, so a security header is not another varying input.
+@pytest.mark.parametrize("secured", [False, True], ids=["public", "secured"])
+def test_single_captured_resource_does_not_dominate_fuzzing(ctx, secured):
+    api = ctx.openapi.apps.resource_pool(secured=secured)
+
+    stream = _run_examples_and_fuzzing(api, GenerationMode.POSITIVE)
+
+    fuzzing_ids = [case.path_parameters["itemId"] for case in _fuzzing_cases(stream)]
+    assert len(api.calls_under("/api/items/", method="GET")) >= 11
+    assert len(fuzzing_ids) == 10
+    assert fuzzing_ids.count(12) <= len(fuzzing_ids) / 2, fuzzing_ids
+    assert len(set(fuzzing_ids)) >= len(fuzzing_ids) / 2, fuzzing_ids
+
+
+def test_multiple_captured_resources_are_reused(ctx):
+    api = ctx.openapi.apps.resource_pool(existing_ids=frozenset({1, 2, 12, 2999, 3000}))
+
+    stream = _run_examples_and_fuzzing(api, GenerationMode.POSITIVE)
+
+    fuzzing_cases = _fuzzing_cases(stream)
+    assert len(fuzzing_cases) == 10
+    assert sum(bool(case.meta.pool_draws) for case in fuzzing_cases) >= len(fuzzing_cases) / 2
+
+
+# A valid id with an invalid body reaches the update logic instead of stopping at 404.
+def test_captured_resource_is_reused_when_other_inputs_vary(ctx):
+    api = ctx.openapi.serve(basic.resource_update())
+
+    stream = _run_examples_and_fuzzing(api, GenerationMode.NEGATIVE)
+
+    item_ids = [
+        case.path_parameters["itemId"]
+        for case in _fuzzing_cases(stream)
+        if case.method.upper() == "PATCH"
+        and case.meta.components["path"].mode == GenerationMode.POSITIVE
+        and case.meta.components["body"].mode == GenerationMode.NEGATIVE
+    ]
+    assert item_ids
+    assert item_ids.count(12) >= len(item_ids) / 2, item_ids
