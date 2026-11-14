@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import click
 
 from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
+from schemathesis.cli.commands.run.handlers.output import SetupProgressManager, display_setup
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import (
     Indent,
@@ -33,11 +34,14 @@ from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, StopReason
 from schemathesis.engine.events import (
     EngineFinished,
-    EngineStarted,
     FatalError,
     FuzzScenarioFinished,
+    Interrupted,
     NonFatalError,
+    PhaseFinished,
+    PhaseStarted,
 )
+from schemathesis.engine.run import PhaseName
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderResult
@@ -142,6 +146,8 @@ class FuzzProgressManager:
         from rich.live import Live
         from rich.text import Text
 
+        # Fuzzing time excludes setup, which runs before this display starts.
+        self.started_at = Instant()
         group = Group(
             self.title_progress,
             Text(),
@@ -204,13 +210,15 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
 
     console: Console
     loading_manager: LoadingProgressManager | None
+    setup_manager: SetupProgressManager | None
     progress_manager: FuzzProgressManager
 
-    __slots__ = ("console", "loading_manager", "progress_manager")
+    __slots__ = ("console", "loading_manager", "setup_manager", "progress_manager")
 
     def __init__(self) -> None:
         self.console = make_console()
         self.loading_manager = None
+        self.setup_manager = None
         self.progress_manager = FuzzProgressManager(console=self.console)
 
     def start(self, ctx: FuzzExecutionContext) -> None:
@@ -223,8 +231,21 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
             self._finish_loading()
             if ctx.initialization_lines:
                 print_lines(ctx.initialization_lines)
-        elif isinstance(event, EngineStarted):
-            self.progress_manager.start()
+        elif isinstance(event, PhaseStarted):
+            if event.phase.name == PhaseName.SETUP:
+                self.setup_manager = SetupProgressManager(console=self.console)
+                self.setup_manager.start()
+            elif event.phase.name == PhaseName.CONTINUOUS_FUZZING:
+                self.progress_manager.start()
+        elif isinstance(event, PhaseFinished) and event.phase.name == PhaseName.SETUP:
+            self._finish_setup()
+            if event.payload is not None:
+                display_setup(self.console, event.payload)
+        elif isinstance(event, Interrupted) and self.setup_manager is not None:
+            self.setup_manager.interrupt()
+            self.console.print(Indent(self.setup_manager.get_completion_message()))
+            self.console.print()
+            self.setup_manager = None
         elif isinstance(event, FuzzScenarioFinished):
             self.progress_manager.update(
                 unique_failures=len(ctx.statistic.unique_failures_map), passed=_has_passed(event)
@@ -238,9 +259,15 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
             self._render_report(ctx, event)
 
     def shutdown(self, ctx: FuzzExecutionContext) -> None:
+        self._finish_setup()
         self.progress_manager.stop()
         if self.loading_manager is not None:
             self.loading_manager.stop()
+
+    def _finish_setup(self) -> None:
+        if self.setup_manager is not None:
+            self.setup_manager.stop()
+            self.setup_manager = None
 
     def _render_report(self, ctx: FuzzExecutionContext, event: EngineFinished) -> None:
         from rich.text import Text

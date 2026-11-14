@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import _thread
 import json
 import re
 import time
@@ -186,7 +187,19 @@ def test_fuzz_final_line_with_failure(cli, app_runner, ctx, tmp_path, snapshot_c
 
 def test_fuzz_final_line_with_error(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.slow()
-    assert cli.main("fuzz", api.schema_url, "--max-time=30", "--request-timeout=0.001") == snapshot_cli
+    assert cli.main("fuzz", api.schema_url, "--max-time=30", "--request-timeout=0.25") == snapshot_cli
+
+
+# Ctrl-C lands while a setup probe waits for the base URL to respond.
+def test_fuzz_interrupted_during_setup(cli, app_runner, ctx, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app({"/api/success": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/")
+    def root():
+        _thread.interrupt_main()
+        return ""
+
+    assert cli.main("fuzz", app_runner.openapi_url(app), "--max-time=30") == snapshot_cli
 
 
 def test_fuzz_interrupted(cli, app_runner, ctx, snapshot_cli):
@@ -337,7 +350,7 @@ def test_fuzz_checks_steps_after_a_failure(cli, app_runner, ctx):
     )
     requested = set()
 
-    @app.route("/<name>")
+    @app.route("/<any(failure, a, b, c):name>")
     def endpoint(name):
         requested.add(name)
         return (jsonify({}), 500) if name == "failure" else jsonify({})

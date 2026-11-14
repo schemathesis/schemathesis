@@ -1,0 +1,30 @@
+Exit code: 130
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+ ⚡  Setup interrupted after 0.00s
+
+ ⚡  Fuzzing (interrupted after 0.00s)
+
+     No scenarios were run
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: N
+  Skipped: 1
+    - Interrupted
+
+Stop reason: Interrupted
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+=========================== Interrupted after 0.00s ============================
