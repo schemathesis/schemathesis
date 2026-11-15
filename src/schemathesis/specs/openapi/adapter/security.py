@@ -44,7 +44,7 @@ class SecurityParameter:
 
     name: str
     location: ParameterLocation
-    # Scheme `type` from the schema: `apiKey`, `http` or Swagger 2.0 `basic`.
+    # Scheme `type` from the schema: `apiKey`, `http`, Swagger 2.0 `basic`, `oauth2` or `openIdConnect`.
     scheme_type: str
     # Parameter definition shaped like a declared one, for generating and serializing the credential.
     definition: dict[str, Any]
@@ -227,6 +227,20 @@ def extract_security_parameters_v3(
             continue
 
         yield _security_parameter(param, ty)
+
+
+def iter_bearer_token_parameters(operation: APIOperation) -> Iterator[SecurityParameter]:
+    """`Authorization` headers carrying the access tokens of the operation's OAuth 2 and OpenID Connect schemes."""
+    raw_schema = operation.schema.raw_schema
+    defined = operation.schema.security.security_definitions
+    unconditional = get_unconditional_security_schemes(raw_schema, operation.definition.raw)
+    for key in get_security_requirements(raw_schema, operation.definition.raw):
+        ty = defined.get(key, {}).get("type")
+        if ty in ("oauth2", "openIdConnect"):
+            param = make_auth_header(
+                required=key in unconditional, schema=make_auth_header_schema({"scheme": "bearer"})
+            )
+            yield _security_parameter(param, ty)
 
 
 def _security_parameter(definition: dict[str, Any], scheme_type: str) -> SecurityParameter:

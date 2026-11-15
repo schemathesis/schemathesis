@@ -10,6 +10,7 @@ from flask import jsonify, redirect, request
 from hypothesis import Phase, given, settings
 
 import schemathesis
+from schemathesis.config._auth import AuthConfig
 from schemathesis.core.failures import AuthScenario, FailureGroup, IgnoredAuth
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
@@ -527,6 +528,69 @@ def test_enforced_auth_is_probed_once_per_operation(ctx, app_runner):
 
     assert len(queries) > 1
     assert probes == [None, "Bearer SCHEMATHESIS-INVALID-VALUE"]
+
+
+OAUTH2_SCHEME = {
+    "type": "oauth2",
+    "flows": {"clientCredentials": {"tokenUrl": "https://example.com/token", "scopes": {}}},
+}
+OPENID_CONNECT_SCHEME = {
+    "type": "openIdConnect",
+    "openIdConnectUrl": "https://example.com/.well-known/openid-configuration",
+}
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("scheme", "security", "enforces_auth", "expected"),
+    [
+        pytest.param(OAUTH2_SCHEME, [{"token": []}, {"session": []}], True, [], id="oauth2-beside-cookie"),
+        pytest.param(
+            OPENID_CONNECT_SCHEME, [{"token": []}, {"session": []}], True, [], id="openid-connect-beside-cookie"
+        ),
+        pytest.param(OAUTH2_SCHEME, [{"token": []}], True, [], id="oauth2-enforced"),
+        pytest.param(
+            OAUTH2_SCHEME,
+            [{"token": []}],
+            False,
+            ["API accepts requests without authentication\n\nExpected 401 or 403, got `200 OK` for `GET /items`"],
+            id="oauth2-ignored",
+        ),
+    ],
+)
+def test_configured_bearer_token_for_token_schemes(ctx, app_runner, scheme, security, enforces_auth, expected):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "security": security,
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {"token": scheme, "session": {"type": "apiKey", "in": "cookie", "name": "session"}}
+        },
+    )
+
+    @app.route("/items")
+    def items():
+        if enforces_auth and request.headers.get("Authorization") != "Bearer good-token":
+            return jsonify({"detail": "Unauthorized"}), 401
+        return jsonify([])
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.auth = AuthConfig.from_dict({"openapi": {"token": {"bearer": "good-token"}}})
+    failures = []
+
+    @run_given(case=schema["/items"]["GET"].as_strategy(), max_examples=1)
+    def test(case):
+        try:
+            case.call_and_validate(checks=[ignored_auth])
+        except FailureGroup as exc:
+            failures.extend(str(failure) for failure in exc.exceptions)
+
+    assert failures == expected
 
 
 def test_server_error_without_auth_is_reported():

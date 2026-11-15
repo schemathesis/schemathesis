@@ -53,8 +53,10 @@ def set_auth_for_case(case: Case, parameter: SecurityParameter) -> None:
 
 
 def get_security_parameters(operation: APIOperation) -> list[SecurityParameter]:
-    """Security parameters the operation requires, for apiKey, basic and http schemes."""
-    return [param for param in operation.security.iter_parameters() if param.scheme_type in ["apiKey", "basic", "http"]]
+    """Credentials the operation's security schemes send, including OAuth 2 and OpenID Connect access tokens."""
+    from schemathesis.specs.openapi.adapter.security import iter_bearer_token_parameters
+
+    return [*operation.security.iter_parameters(), *iter_bearer_token_parameters(operation)]
 
 
 def remove_auth_from_container(
