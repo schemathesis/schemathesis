@@ -2,6 +2,7 @@ from itertools import groupby
 from pathlib import Path
 
 import pytest
+from flask import jsonify, request
 
 import schemathesis
 from schemathesis.generation.modes import GenerationMode
@@ -651,3 +652,39 @@ def test_a(case):
     )
     result = testdir.runpytest()
     assert "INTERNALERROR" not in result.stdout.str() + result.stderr.str()
+
+
+def test_values_suggested_by_a_hook_reach_later_requests(ctx, testdir, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/check": {
+                "get": {
+                    "parameters": [{"name": "code", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    seen = []
+
+    @app.route("/check")
+    def check():
+        seen.append(request.args.get("code"))
+        return jsonify({})
+
+    testdir.make_test(
+        f"""
+@schemathesis.hook
+def after_call(context, case, response):
+    context.suggest(["SECRET42"], parameter="query.code")
+
+schema = schemathesis.openapi.from_url("{app_runner.openapi_url(app)}")
+
+@schema.parametrize()
+@settings(max_examples=20)
+def test_a(case):
+    case.call()
+"""
+    )
+    testdir.runpytest()
+    assert "SECRET42" in seen

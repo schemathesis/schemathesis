@@ -108,22 +108,25 @@ def resolve_parameter_bindings(
     # `properties` must be the overlay's validator view so bindings can't outlive removed params.
     # Precedence: op-specific parameter > global parameter > op-specific type-wide > global type-wide.
     config: ProjectConfig = operation.schema.config
+    suggestions = operation.schema.suggestions
     dictionaries = config.dictionaries
-    if not dictionaries:
+    if not dictionaries and not suggestions.dictionaries:
         return {}
 
     operation_config = config.operations.get_for_operation(operation)
     location_value = location.value
 
-    type_wide_bindings = generation_config.dictionaries
+    # The user's bindings win over suggested values of the same kind.
+    parameter_sources = (operation_config.parameters, config.parameters, *suggestions.parameters(operation.label))
+    type_wide_bindings = {**suggestions.types(operation.label), **generation_config.dictionaries}
 
     resolved: dict[str, _ResolvedBinding] = {}
     for parameter_name, parameter_schema in properties.items():
-        binding: ParameterDictionaryBinding | DictionaryBinding | None = _find_parameter_binding(
-            operation_config.parameters, parameter_name=parameter_name, location=location_value
-        )
-        if binding is None:
-            binding = _find_parameter_binding(config.parameters, parameter_name=parameter_name, location=location_value)
+        binding: ParameterDictionaryBinding | DictionaryBinding | None = None
+        for source in parameter_sources:
+            binding = _find_parameter_binding(source, parameter_name=parameter_name, location=location_value)
+            if binding is not None:
+                break
         ty: str | None = None
         if binding is None and type_wide_bindings:
             ty = _infer_ty(parameter_schema)
@@ -132,7 +135,7 @@ def resolve_parameter_bindings(
         if binding is None:
             continue
 
-        dictionary = dictionaries[binding.dictionary]
+        dictionary = dictionaries.get(binding.dictionary) or suggestions.dictionaries[binding.dictionary]
         is_parameter_specific = isinstance(binding, ParameterDictionaryBinding)
         if is_parameter_specific:
             # Values fetched from the API take the parameter's type, so an integer ID fills a string path parameter.
@@ -366,14 +369,20 @@ def resolve_body_bindings(
 ) -> list[_ResolvedBodyBinding]:
     # Operation-scope vetoes global entries under the same key regardless of form; unresolved paths drop.
     config: ProjectConfig = operation.schema.config
+    suggestions = operation.schema.suggestions
     dictionaries = config.dictionaries
-    if not dictionaries:
+    if not dictionaries and not suggestions.dictionaries:
         return []
     operation_config = config.operations.get_for_operation(operation)
     operation_scoped_body_keys = {key for key in operation_config.parameters if key.startswith(BODY_PREFIX)}
     seen: set[str] = set()
     resolved: list[_ResolvedBodyBinding] = []
-    for is_operation_source, source in ((True, operation_config.parameters), (False, config.parameters)):
+    sources = (
+        (True, operation_config.parameters),
+        (False, config.parameters),
+        *((False, suggested) for suggested in suggestions.parameters(operation.label)),
+    )
+    for is_operation_source, source in sources:
         for key, binding in source.items():
             if not key.startswith(BODY_PREFIX):
                 continue
@@ -389,7 +398,7 @@ def resolve_body_bindings(
             if found is None:
                 continue
             leaf_schema, unique_items = found
-            dictionary = dictionaries[binding.dictionary]
+            dictionary = dictionaries.get(binding.dictionary) or suggestions.dictionaries[binding.dictionary]
             entries = tuple((entry.index, entry.value) for entry in dictionary.entries)
             resolved.append(
                 _ResolvedBodyBinding(

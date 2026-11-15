@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Callable, Generator, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum, unique
@@ -15,6 +15,7 @@ from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import Response
 from schemathesis.filters import FilterSet, attach_filter_chain
+from schemathesis.generation.suggestions import DEFAULT_PROBABILITY, HOOKS_SOURCE
 
 if TYPE_CHECKING:
     import requests
@@ -53,9 +54,33 @@ class HookContext:
 
     operation: APIOperation | None
     """API operation that is currently being processed."""
+    _schema: SchemaMetadata | None
+    # The hook being called, to tell which extension a suggestion comes from
+    _hook: Callable | None
 
-    def __init__(self, *, operation: APIOperation | None = None) -> None:
+    def __init__(self, *, operation: APIOperation | None = None, schema: SchemaMetadata | None = None) -> None:
         self.operation = operation
+        self._schema = schema if schema is not None or operation is None else operation.schema
+        self._hook = None
+
+    def suggest(
+        self,
+        values: Iterable[str | int | float],
+        *,
+        parameter: str | None = None,
+        operation: str | None = None,
+        probability: float = DEFAULT_PROBABILITY,
+    ) -> None:
+        # `parameter` uses the keys of `[parameters]` in the config; without it the values go to every parameter of
+        # a matching type. `operation` is a label, by default the operation this hook runs for, or every operation.
+        if self._schema is None:
+            raise RuntimeError("`suggest` needs a loaded schema; `before_load_schema` runs before there is one")
+        if operation is None and self.operation is not None:
+            operation = self.operation.label
+        source = _extension_name(self._hook) if self._hook is not None else None
+        self._schema.suggestions.add(
+            values, source=source or HOOKS_SOURCE, operation=operation, parameter=parameter, probability=probability
+        )
 
 
 def to_filterable_hook(dispatcher: HookDispatcher) -> Callable:
@@ -295,6 +320,7 @@ def _dispatch_to_all(
 ) -> None:
     for dispatcher in dispatchers:
         for hook in dispatcher.applicable(name, context):
+            context._hook = hook
             try:
                 hook(context, *args)
             except (Exception, SystemExit) as exc:
@@ -390,12 +416,13 @@ def load_with_hooks(
     project_config = config.projects.get(raw_schema)
     instance = build(project_config)
     instance.filter_set = project_config.operations.filter_set_with(include=instance.filter_set)
+    context._schema = instance
     dispatch_after_load_schema(GLOBAL_HOOK_DISPATCHER, context=context, schema=instance)
     return instance
 
 
 def dispatch_setup(schema: SchemaMetadata) -> None:
-    _dispatch_schema_cascade(schema, "setup", HookContext(), schema)
+    _dispatch_schema_cascade(schema, "setup", HookContext(schema=schema), schema)
 
 
 def defines_teardown(schema: SchemaMetadata) -> bool:
@@ -404,11 +431,12 @@ def defines_teardown(schema: SchemaMetadata) -> bool:
 
 def dispatch_teardown(schema: SchemaMetadata) -> list[HookExecutionError]:
     """Run every `teardown` hook, even after one fails, and return the errors they raised."""
-    context = HookContext()
+    context = HookContext(schema=schema)
     errors = []
     # A later hook may build on what an earlier one set up, so it is torn down first.
     for dispatcher in reversed(schema_hook_dispatchers(schema)):
         for hook in reversed(dispatcher.get_all_by_name("teardown")):
+            context._hook = hook
             try:
                 hook(context, schema)
             except (Exception, SystemExit) as exc:
@@ -426,6 +454,7 @@ def dispatch_before_call(
     name = "before_call"
     for dispatcher in dispatchers:
         for hook in dispatcher.applicable(name, context):
+            context._hook = hook
             try:
                 # Support both `def before_call(ctx, case, kwargs)` and `def before_call(ctx, case, **kwargs)`.
                 if has_var_keyword(hook):
@@ -455,6 +484,7 @@ def should_keep_failure(failure: Failure, case: Case, response: Response) -> boo
     context = HookContext(operation=case.operation)
     for dispatcher in dispatchers:
         for hook in dispatcher.applicable(name, context):
+            context._hook = hook
             try:
                 if not hook(context, failure, case, response):
                     return False
