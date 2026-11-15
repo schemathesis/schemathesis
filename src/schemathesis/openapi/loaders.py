@@ -52,8 +52,7 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
         response = load_from_url(client.get, url=path, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=path)
     schema = load_content(decode_lossy(response.content, response.encoding), content_type)
-    loaded = _from_dict(schema, config=config, stringify=False)
-    loaded.app = app
+    loaded = _from_dict(schema, config=config, stringify=False, app=app)
     loaded.location = path
     return loaded
 
@@ -86,8 +85,7 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     content_type = detect_content_type(headers=response.headers, path=path)
     encoding = response.mimetype_params.get("charset", "utf-8")
     schema = load_content(decode_lossy(response.get_data(), encoding), content_type)
-    loaded = _from_dict(schema, config=config, stringify=False)
-    loaded.app = app
+    loaded = _from_dict(schema, config=config, stringify=False, app=app)
     loaded.location = path
     return loaded
 
@@ -226,7 +224,9 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
     return _from_dict(schema, config=config, stringify=True)
 
 
-def _from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None, stringify: bool) -> OpenApiSchema:
+def _from_dict(
+    schema: dict[str, Any], *, config: SchemathesisConfig | None, stringify: bool, app: Any = None
+) -> OpenApiSchema:
     if not isinstance(schema, dict):
         raise LoaderError(LoaderErrorKind.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)
 
@@ -254,7 +254,7 @@ def _from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None, str
             )
         from schemathesis.specs.openapi.schemas import OpenApiSchema
 
-        instance = OpenApiSchema(raw_schema=schema, config=project_config)
+        instance = OpenApiSchema(raw_schema=schema, config=project_config, app=app)
         wfc.setup_auth(instance, project_config, LoaderErrorKind.OPEN_API_INVALID_SCHEMA)
         return instance
 

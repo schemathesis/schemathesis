@@ -14,6 +14,7 @@
 - `from-operation` dictionaries fill from Open API and GraphQL responses, keeping parent and child IDs paired. [#5751](https://github.com/schemathesis/schemathesis/issues/5751)
 - `setup` and `teardown` hooks run once around testing in `st run` and `st fuzz`.
 - `from-operation` dictionaries fill from API responses, including nested listings per parent. [#5751](https://github.com/schemathesis/schemathesis/issues/5751)
+- `from-operation` dictionaries fill from API responses, including nested listings, keeping parent and child IDs paired. [#5751](https://github.com/schemathesis/schemathesis/issues/5751)
 - `setup` and `teardown` hooks run once around testing in `st run`, `st fuzz` and pytest.
 - `@schemathesis.extension` registers a hook class with its own `[extensions.<name>]` settings.
 - `hooks` config option accepts a list of modules, loaded in order.
@@ -29,6 +30,7 @@
 
 - Path parameter names containing `.`, `:`, `!` or `[` failing to load.
 - Unresolvable remote references written as relative paths reported as missing files.
+- `schema.app` unset in `after_load_schema` hooks for `from_asgi` and `from_wsgi` schemas.
 - Open API 3.2 references to the `$self` URI, or relative to it, failing to resolve.
 
 #### Reporting

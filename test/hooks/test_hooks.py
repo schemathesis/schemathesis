@@ -2,6 +2,7 @@ from unittest.mock import ANY
 
 import graphql
 import pytest
+from fastapi import FastAPI
 from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 
@@ -20,6 +21,8 @@ from schemathesis.hooks import (
 )
 from schemathesis.pytest.plugin import SchemaHandleMark
 from schemathesis.transport.prepare import get_default_headers
+from test.apps.catalog.graphql import bookstore
+from test.apps.catalog.openapi import basic
 from test.utils import assert_requests_call, run_given
 
 
@@ -666,3 +669,73 @@ def test_component_hooks_shape_generated_parts_in_examples_phase(ctx):
     assert [(case.query["q"], case.headers) for case in cases] == [("e", {"X-Token": "secret"})]
     assert filtered
     assert all(set(query) == {"limit"} for query in filtered), filtered
+
+
+def _fastapi_app():
+    app = FastAPI()
+
+    @app.get("/items")
+    def items():
+        return []
+
+    return app
+
+
+@pytest.mark.parametrize(
+    ("loader", "path", "make_app"),
+    [
+        (schemathesis.openapi.from_asgi, "/openapi.json", _fastapi_app),
+        (schemathesis.openapi.from_wsgi, "/openapi.json", lambda: basic.success().server),
+        (schemathesis.graphql.from_asgi, "/graphql", lambda: bookstore.books(framework="fastapi").server),
+        (schemathesis.graphql.from_wsgi, "/graphql", lambda: bookstore.books().server),
+    ],
+    ids=["openapi-asgi", "openapi-wsgi", "graphql-asgi", "graphql-wsgi"],
+)
+def test_after_load_schema_receives_the_app(loader, path, make_app):
+    app = make_app()
+    seen = []
+
+    @schemathesis.hook
+    def after_load_schema(context, schema):
+        seen.append(schema.app)
+
+    loader(path, app)
+    assert seen == [app]
+
+
+def _asgi_tap(app, seen):
+    async def tapped(scope, receive, send):
+        if scope["type"] == "http":
+            seen.append(dict(scope["headers"])[b"x-schemathesis-testcaseid"].decode())
+        await app(scope, receive, send)
+
+    return tapped
+
+
+def _wsgi_tap(app, seen):
+    def tapped(environ, start_response):
+        seen.append(environ["HTTP_X_SCHEMATHESIS_TESTCASEID"])
+        return app(environ, start_response)
+
+    return tapped
+
+
+@pytest.mark.parametrize(
+    ("loader", "make_app", "tap"),
+    [
+        (schemathesis.openapi.from_asgi, _fastapi_app, _asgi_tap),
+        (schemathesis.openapi.from_wsgi, lambda: basic.success().server, _wsgi_tap),
+    ],
+    ids=["asgi", "wsgi"],
+)
+def test_app_wrapped_in_after_load_schema_sees_test_case_ids(loader, make_app, tap):
+    seen = []
+
+    @schemathesis.hook
+    def after_load_schema(context, schema):
+        schema.app = tap(schema.app, seen)
+
+    schema = loader("/openapi.json", make_app())
+    case = next(schema.get_all_operations()).ok().Case()
+    case.call()
+    assert seen == [case.id]
