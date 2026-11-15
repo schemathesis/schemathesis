@@ -50,7 +50,7 @@ from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.errors import never_reached_server
 from schemathesis.engine.run import ELASTIC_PHASES, INTERNAL_PHASES, UNIT_PHASES, PhaseName
 from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
-from schemathesis.engine.run.dictionary_loading import DictionaryLoad
+from schemathesis.engine.run.dictionary_loading import MAX_SOURCE_REQUESTS, DictionaryLoad
 from schemathesis.engine.run.probes import ProbeOutcome, ProbeRun
 from schemathesis.engine.summary import WarningBlock, WarningGroup, WarningItem
 
@@ -97,10 +97,22 @@ def _dictionary_load_line(load: DictionaryLoad) -> Text:
     from rich.style import Style
     from rich.text import Text
 
+    text = f"{pluralize(load.entries, 'value')} from {load.operation}"
+    details = [
+        detail
+        for detail, applies in (
+            (f"{load.requests} requests", load.requests > 1),
+            (f"{load.failed} failed", load.failed > 0),
+            (f"capped at {MAX_SOURCE_REQUESTS}", load.capped),
+        )
+        if applies
+    ]
+    if details:
+        text += f" ({', '.join(details)})"
     return Text.assemble(
         ("✅  ", Style(color="green")),
         (f"Dictionary `{load.dictionary}`: ", Style(color="bright_white", bold=True)),
-        (f"{pluralize(load.entries, 'value')} from {load.operation}", Style(color="green")),
+        (text, Style(color="green")),
     )
 
 

@@ -128,7 +128,7 @@ integer = { dictionary = "users", probability = 0.1 }
 
 Load entries from a libFuzzer/AFL-format file via `from-file = "fuzz/edge.dict"` instead of `values = [...]`. Paths resolve relative to the config file directory; absolute paths are accepted.
 
-Fill a dictionary from an API response via `from-operation = "GET /users"` with `pointer = "/data/*/id"`, a JSON Pointer into the response body where `*` matches each array item. Optional `parameters` set the request's parameters, keyed by `path.`, `query.`, `header.` or `cookie.` names, e.g. `parameters = { "query.limit" = 100 }`. `st run` and `st fuzz` send the request before testing starts; see [Fuzz Dictionaries](../guides/fuzz-dictionary.md#fill-a-dictionary-from-the-api).
+Fill a dictionary from an API response via `from-operation = "GET /users"` with `pointer = "/data/*/id"`, a JSON Pointer into the response body where `*` matches each array item. Optional `parameters` set the request's parameters, keyed by `path.`, `query.`, `header.` or `cookie.` names, e.g. `parameters = { "query.limit" = 100 }`. A parameter set to `{ dictionary = "users" }` sends one request per value of that dictionary, up to 100 per dictionary. `st run` and `st fuzz` send the request before testing starts; see [Fuzz Dictionaries](../guides/fuzz-dictionary.md#fill-a-dictionary-from-the-api).
 
 For request bodies, target fields with a JSONPath subset ([RFC 9535](https://www.rfc-editor.org/rfc/rfc9535)) rooted at `body.`:
 

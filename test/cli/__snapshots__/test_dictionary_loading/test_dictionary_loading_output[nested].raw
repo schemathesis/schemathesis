@@ -1,0 +1,46 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       4 selected / 4 total
+     Configuration:    /tmp/config.toml
+     Dictionaries:     2 dictionaries / 0 entries
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ✅  Dictionary `parents`: 3 values from GET /api/parents
+ ✅  Dictionary `children`: 4 values from GET /api/parents/{parentId}/children (3 requests)
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  4 skipped
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 4/4
+  Tested: 0
+  Skipped: 4
+    - No examples in schema
+
+Test Phases:
+  ⏭  Examples
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  ⏭  Stateful (disabled)
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+===================== Every selected operation was skipped =====================

@@ -839,11 +839,28 @@
         "parameters": {
           "type": "object",
           "additionalProperties": {
-            "type": [
-              "string",
-              "integer",
-              "number",
-              "boolean"
+            "anyOf": [
+              {
+                "type": [
+                  "string",
+                  "integer",
+                  "number",
+                  "boolean"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "dictionary"
+                ],
+                "properties": {
+                  "dictionary": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             ]
           }
         }
