@@ -529,6 +529,9 @@
         "object_level_authorization": {
           "$ref": "#/$defs/SimpleCheckConfig"
         },
+        "mass_assignment": {
+          "$ref": "#/$defs/MassAssignmentConfig"
+        },
         "unsupported_method": {
           "$ref": "#/$defs/SimpleCheckConfig"
         },
@@ -545,6 +548,47 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "MassAssignmentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "fields": {
+          "type": "object"
+        },
+        "exclude-fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "privilege-fields": {
+          "type": "boolean"
+        },
+        "request-envelope": {
+          "type": "string"
+        },
+        "response-envelope": {
+          "type": "string"
+        },
+        "read": {
+          "type": "string",
+          "pattern": "^GET /"
+        },
+        "id-field": {
+          "type": "string"
+        },
+        "max-attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cleanup": {
           "type": "boolean"
         }
       }

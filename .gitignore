@@ -223,3 +223,6 @@ reports/
 .schemathesis/
 test-corpus/.schemastore-cache/
 uv.lock
+
+# Local design docs, not part of upstream PRs
+engineering/

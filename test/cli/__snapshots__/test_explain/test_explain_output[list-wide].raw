@@ -59,6 +59,8 @@ Security (ST4xx)
                                                               operation that requires authentication.
   ST402  Object-level authorization bypass                    One user's object returned to another user who should not
                                                               see it.
+  ST403  Mass assignment                                      Write stored a field that clients must not set, such as a
+                                                              `readOnly` or privilege field.
 
 Custom checks (ST9xx)
   ST901  Custom check failed                                  Response that breaks a rule a custom `@schemathesis.check`

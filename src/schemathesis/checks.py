@@ -134,12 +134,15 @@ class CheckContext:
     """The testing phase this context belongs to, or `None` for standalone validation."""
     auth_enforced_operations: set[str] | None
     """Operations already shown to reject missing and invalid credentials, shared across a run."""
+    mass_assignment_attempts: dict[str, int] | None
+    """Mass assignment probes sent per operation in this run."""
 
     __slots__ = (
         "config",
         "internals",
         "phase",
         "auth_enforced_operations",
+        "mass_assignment_attempts",
     )
 
     def __init__(
@@ -154,6 +157,7 @@ class CheckContext:
         response_checks: ResponseChecks | None = None,
         phase: PhaseName | None = None,
         auth_enforced_operations: set[str] | None = None,
+        mass_assignment_attempts: dict[str, int] | None = None,
     ) -> None:
         self.config = config
         checks: list[CheckFunction] = []
@@ -177,6 +181,7 @@ class CheckContext:
         )
         self.phase = phase
         self.auth_enforced_operations = auth_enforced_operations
+        self.mass_assignment_attempts = mass_assignment_attempts
 
 
 CheckMethodName = Literal["after_response", "after_run"]
@@ -293,6 +298,7 @@ class RunChecks:
     locks: dict[str, threading.Lock]
     # Operations whose missing and invalid credentials were already rejected in this run.
     auth_enforced_operations: set[str] = field(default_factory=set)
+    mass_assignment_attempts: dict[str, int] = field(default_factory=dict)
 
     @classmethod
     def from_registry(cls, config: ChecksConfig) -> RunChecks:

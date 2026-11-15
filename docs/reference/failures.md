@@ -399,6 +399,28 @@ checks.object_level_authorization.enabled = false
 
 `--exclude-checks object_level_authorization` turns it off.
 
+### ST403 Mass assignment {#st403}
+
+Reported by [`mass_assignment`](checks.md#mass_assignment).
+
+Write stored a field that clients must not set, such as a `readOnly` or privilege field.
+
+```text
+POST  /users     201  {"id": 7, "name": "a", "role": "user"}
+POST  /users     201  {"id": 8, "name": "a", "role": "admin"}   # sent with "role": "admin"
+GET   /users/8   200  {"id": 8, "name": "a", "role": "admin"}
+```
+
+Bind request bodies to an allowlist of writable fields, and ignore or reject the rest with `400` or `422`. A field clients may set belongs in the request schema without `readOnly`. The check is off unless enabled:
+
+```toml
+# schemathesis.toml
+[checks]
+mass_assignment.enabled = true
+```
+
+`--exclude-checks mass_assignment` turns it off.
+
 ## Custom checks (ST9xx)
 
 ### ST901 Custom check failed {#st901}

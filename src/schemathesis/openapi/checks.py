@@ -496,6 +496,39 @@ class ObjectLevelAuthorizationViolation(Failure):
         return {self.owner: "owner", self.peer: "peer"}
 
 
+class MassAssignment(Failure):
+    """The API stored fields that clients must not set."""
+
+    code = "ST403"
+    checks = ("mass_assignment",)
+    kind_title = "Mass assignment"
+
+    __slots__ = ("fields", "read_case_id")
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        message: str,
+        fields: list[str],
+        read_case_id: str | None = None,
+        title: str | None = None,
+        case_id: str | None = None,
+    ) -> None:
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.CRITICAL)
+        self.fields = fields
+        self.read_case_id = read_case_id
+
+    @property
+    def _unique_key(self) -> str:
+        return ""
+
+    def related_case_ids(self) -> tuple[str, ...]:
+        if self.read_case_id is None:
+            return ()
+        return (self.read_case_id,)
+
+
 class RejectedPositiveData(Failure):
     """Response with positive data was rejected."""
 

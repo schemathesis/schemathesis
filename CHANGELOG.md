@@ -18,6 +18,8 @@
 - `setup` and `teardown` hooks run once around testing in `st run`, `st fuzz` and pytest.
 - `@schemathesis.extension` registers a hook class with its own `[extensions.<name>]` settings.
 - `hooks` config option accepts a list of modules, loaded in order.
+- `mass_assignment` check for writes that store `readOnly`, response-only or privilege fields.
+- `before_mass_assignment_probe` hook to change or skip `mass_assignment` probes.
 
 ### :wrench: Changed
 

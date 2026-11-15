@@ -68,6 +68,7 @@ Hooks that execute during test case execution.
 | **after_network_error** | `(ctx, case: Case, request: PreparedRequest) -> None` | When HTTP request fails at network level | Record or log failed connection attempts |
 | **after_validate** | `(ctx, case: Case, response: Response, results: list[CheckResult]) -> None` | After all checks run | Observe check outcomes for logging or reporting |
 | **filter_failure** | `(ctx, failure: Failure, case: Case, response: Response) -> bool` | Once per check failure | Drop failures that are not your API's fault |
+| **before_mass_assignment_probe** | `(ctx, probe: MassAssignmentProbe) -> None` | Before a [`mass_assignment`](checks.md#mass_assignment) probe is sent | Change injected fields, add headers, or skip the probe |
 
 **Success flow:** `before_call` -> HTTP Request -> `after_call` -> Checks -> `filter_failure` -> `after_validate`
 
@@ -96,7 +97,7 @@ Use it for failures that depend on the response rather than on which operation w
 |-------|-------------------|-----------------|
 | **Global** | `@schemathesis.hook` or `@schemathesis.hook("hook_name")` | All hooks |
 | **Schema** | `@schema.hooks.hook` or `@schema.hooks.hook("hook_name")` | All hooks except `before_load_schema`, `after_load_schema`, `before_call` |
-| **Test** | `@schema.hooks.apply(hook_func)` | All hooks except `before_load_schema`, `after_load_schema`, `before_call`, `after_call`, `after_network_error`, `setup`, `teardown` |
+| **Test** | `@schema.hooks.apply(hook_func)` | All hooks except `before_load_schema`, `after_load_schema`, `before_call`, `after_call`, `after_network_error`, `before_mass_assignment_probe`, `setup`, `teardown` |
 
 **Hook Name Detection:** If not specified, uses function name (must match hook name exactly).
 
@@ -149,6 +150,7 @@ Not all hooks apply in every phase.
 | `after_network_error` | ✓ | ✓ | ✓ | ✓ |
 | `after_validate` | ✓ | ✓ | ✓ | ✓ |
 | `filter_failure` | ✓ | ✓ | ✓ | ✓ |
+| `before_mass_assignment_probe` | ✓ | ✓ | ✓ | ✓ |
 
 **Examples phase** runs test cases built from examples embedded in the schema. \* Component-level hooks apply only to the parts Schemathesis generates to complete an example, such as a required parameter without an example, so `map_headers` can still add a header the example lacks. Values taken from schema examples are never changed by hooks. Case-level hooks (`before_generate_case`, `filter_case`, `map_case`, `flatmap_case`) have no effect on example cases. With [`fill-missing`](configuration.md#phasesexamplesfill-missing) enabled, the case generated for an operation without examples gets all data generation hooks.
 

@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(checks=ChecksConfig(mass_assignment=MassAssignmentConfig(enabled=True, fields={'plan': 'enterprise'}, exclude_fields=['nickname'])))))
