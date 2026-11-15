@@ -4,7 +4,12 @@ import re
 import pytest
 
 from schemathesis.config import ConfigError, GenerationConfig, SchemathesisConfig
-from schemathesis.config._dictionaries import OperationSource, coerce_entries_for_type, parse_body_path
+from schemathesis.config._dictionaries import (
+    OperationSource,
+    coerce_entries_for_type,
+    pair_groups,
+    parse_body_path,
+)
 
 
 def test_from_file_loaded_with_relative_path_and_escapes(tmp_path):
@@ -289,3 +294,54 @@ def test_type_wide_binding_accepts_from_operation_dictionary():
     assert repr(config.projects.default.generation.dictionaries) == (
         "{'string': DictionaryBinding(dictionary='parents', probability=0.1)}"
     )
+
+
+CHILDREN = {
+    "from-operation": "GET /api/parents/{parentId}/children",
+    "pointer": "/data/*/id",
+    "parameters": {"path.parentId": {"dictionary": "parents"}},
+}
+TOYS = {
+    "from-operation": "GET /api/parents/{parentId}/children/{childId}/toys",
+    "pointer": "/data/*/id",
+    "parameters": {"path.parentId": {"dictionary": "parents"}, "path.childId": {"dictionary": "children"}},
+}
+
+
+def _nested_dictionaries(**extra):
+    return SchemathesisConfig.from_dict(
+        {"dictionaries": {"parents": PARENTS, "children": CHILDREN, "toys": TOYS, **extra}}
+    ).dictionaries
+
+
+def test_source_parameters_set_dictionary_origin():
+    assert {name: definition.origin for name, definition in _nested_dictionaries().items()} == {
+        "parents": frozenset(),
+        "children": frozenset({"parents"}),
+        "toys": frozenset({"parents", "children"}),
+    }
+
+
+def test_pair_groups_lead_with_the_deepest_dictionary():
+    dictionaries = _nested_dictionaries(colors={"values": ["red"]})
+    groups = pair_groups([dictionaries[name] for name in ("parents", "colors", "toys", "children")])
+    assert [(leader.name, [follower.name for follower in followers]) for leader, followers in groups] == [
+        ("toys", ["parents", "children"]),
+        ("colors", []),
+    ]
+
+
+def test_source_parameter_cycle_is_rejected():
+    def bound_to(name):
+        return {"from-operation": "GET /x/{id}", "pointer": "/id", "parameters": {"path.id": {"dictionary": name}}}
+
+    with pytest.raises(ConfigError, match="Dictionary source parameters form a cycle: `[ab]` -> `[ab]` -> `[ab]`"):
+        SchemathesisConfig.from_dict({"dictionaries": {"a": bound_to("b"), "b": bound_to("a")}})
+
+
+def test_source_parameter_references_unknown_dictionary():
+    children = {**CHILDREN, "parameters": {"path.parentId": {"dictionary": "nope"}}}
+    with pytest.raises(
+        ConfigError, match="Dictionary `children` parameter `path.parentId` references unknown dictionary `nope`"
+    ):
+        SchemathesisConfig.from_dict({"dictionaries": {"children": children}})

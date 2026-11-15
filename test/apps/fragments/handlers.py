@@ -422,6 +422,12 @@ def register_parents_with_children(app: Flask) -> None:
             return jsonify({"detail": "Unknown child"}), 404
         return jsonify({"id": child_id}), 200
 
+    @app.route("/api/parents/<parent_id>/children/<child_id>/toys", methods=["GET"])
+    def list_toys(parent_id: str, child_id: str) -> Any:
+        if child_id not in _CHILDREN_BY_PARENT.get(parent_id, []):
+            return jsonify({"detail": "Unknown child"}), 404
+        return jsonify({"data": [{"id": f"{child_id}-toy"}]}), 200
+
 
 def register_languages_with_codes(app: Flask) -> None:
     @app.route("/languages/", methods=["GET"])

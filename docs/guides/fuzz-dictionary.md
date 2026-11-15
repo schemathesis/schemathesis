@@ -70,11 +70,34 @@ parameters = { "query.limit" = 100 }
 "path.user_id" = { dictionary = "users" }
 ```
 
-Before testing starts, `st run` and `st fuzz` send one `GET /users?limit=100` request and collects every value at `pointer`, a JSON Pointer into the response body where `*` matches each item of an array. The request carries your headers and configured auth, and Schemathesis calls the operation even when filters exclude it from testing. Keys in `parameters` start with `path.`, `query.`, `header.` or `cookie.`; every path parameter of the source operation needs a value.
+Before testing starts, `st run` and `st fuzz` send one `GET /users?limit=100` request and collect every value at `pointer`, a JSON Pointer into the response body where `*` matches each item of an array. The request carries your headers and configured auth, and Schemathesis calls the operation even when filters exclude it from testing. Keys in `parameters` start with `path.`, `query.`, `header.` or `cookie.`; every path parameter of the source operation needs a value.
 
 Fetched values take the type of the parameter they fill, so an integer ID `42` reaches a `type: string` path parameter as `"42"`. Strings and numbers count as values; objects, arrays, booleans and `null` do not.
 
 If the request fails, returns a non-2xx status, or yields no values, the dictionary stays empty and its parameters fall back to generated values. Schemathesis reports the error and exits with code 1, but the run continues. The pytest plugin does not load these dictionaries.
+
+## Fetch Nested IDs
+
+Child resources often live under a parent, as in `/users/{user_id}/orders/{order_id}`. Let one dictionary fill the source parameters of another:
+
+```toml
+[dictionaries.users]
+from-operation = "GET /users"
+pointer = "/data/*/id"
+
+[dictionaries.orders]
+from-operation = "GET /users/{user_id}/orders"
+pointer = "/data/*/id"
+parameters = { "path.user_id" = { dictionary = "users" } }
+
+[parameters]
+"path.user_id" = { dictionary = "users" }
+"path.order_id" = { dictionary = "orders" }
+```
+
+Schemathesis loads `users` first, then sends `GET /users/{user_id}/orders` once per user. Users without orders are fine, and a failed request only shows up as `N failed` in the setup line: `orders` fails only when no request returns a value. Each dictionary sends at most 100 requests.
+
+Every order remembers the user it was listed under. A source that binds both dictionaries, such as `GET /users/{user_id}/orders/{order_id}/items`, therefore sends one request per order with its own user, not one per user and order.
 
 ## Target Body Fields
 

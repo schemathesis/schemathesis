@@ -936,6 +936,9 @@ def parents_with_children() -> dict[str, Any]:
         "/api/parents/{parentId}/children/{childId}": {
             "get": {"parameters": [parent_id, child_id], "responses": responses}
         },
+        "/api/parents/{parentId}/children/{childId}/toys": {
+            "get": {"parameters": [parent_id, child_id], "responses": responses}
+        },
     }
 
 

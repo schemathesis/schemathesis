@@ -11,7 +11,7 @@
 - Open API 3.2 `itemSchema` for `multipart/mixed` and other non-form multipart request bodies.
 - XML request bodies place children of `nodeType: none` objects directly in the parent element.
 - Error feedback learns integer, hex and ObjectId formats from Java and MongoDB parse errors.
-- `from-operation` dictionaries fill from an API response before testing starts. [#5751](https://github.com/schemathesis/schemathesis/issues/5751)
+- `from-operation` dictionaries fill from API responses, including nested listings per parent. [#5751](https://github.com/schemathesis/schemathesis/issues/5751)
 
 ### :wrench: Changed
 
