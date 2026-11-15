@@ -23,6 +23,7 @@ from schemathesis.generation.hypothesis.given import (
     resolve_given,
 )
 from schemathesis.pytest._keys import track_schema
+from schemathesis.pytest._lifecycle import SchemaFixtureMark
 from schemathesis.pytest._subtests import make_subtests
 from schemathesis.pytest._test_builder import build_operation_test, schema_error_suffix
 from schemathesis.pytest.control_flow import fail_on_no_matches
@@ -269,6 +270,7 @@ def _as_pytest_test(
     # For methods, wrap with staticmethod to prevent pytest from passing self
     result = staticmethod(wrapped_test) if "self" in signature(test_func).parameters else wrapped_test
 
+    SchemaFixtureMark.set(wrapped_test, fixture_name)
     setattr(result, GIVEN_TARGET_ATTR, test_func)
     setattr(result, GIVEN_REFRESH_ATTR, refresh)
 

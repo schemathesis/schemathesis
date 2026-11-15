@@ -561,9 +561,21 @@ def extension(name: str) -> Callable[[type], type]:
         if handle_event is not None:
             _validate_arguments(handle_event, 3, f"`{cls.__qualname__}.handle_event` must take `(self, ctx, event)`")
         EXTENSIONS[name] = cls
+        if _extension_listener is not None:
+            _extension_listener(name, cls)
         return cls
 
     return register
+
+
+_extension_listener: Callable[[str, type], None] | None = None
+
+
+def set_extension_listener(listener: Callable[[str, type], None] | None) -> Callable[[str, type], None] | None:
+    """Call `listener` with every extension registered from now on; returns the listener it replaces."""
+    global _extension_listener
+    previous, _extension_listener = _extension_listener, listener
+    return previous
 
 
 def _signature(target: Callable) -> inspect.Signature | None:
@@ -608,8 +620,7 @@ def _extension_name(hook: Callable) -> str | None:
     return next((name for name, cls in EXTENSIONS.items() if cls is owner), None)
 
 
-def bind_extensions(settings: dict[str, dict[str, object]]) -> dict[str, object]:
-    """Create every registered extension for one run and register its hook methods globally."""
+def check_extension_tables(settings: dict[str, dict[str, object]]) -> None:
     for name in settings:
         if name not in EXTENSIONS:
             if EXTENSIONS:
@@ -617,19 +628,31 @@ def bind_extensions(settings: dict[str, dict[str, object]]) -> dict[str, object]
             else:
                 hint = "add the extension's module to `hooks`"
             raise ConfigError(f"`[extensions.{name}]` matches no loaded extension; {hint}")
-    instances: dict[str, object] = {}
-    for name, cls in EXTENSIONS.items():
-        try:
-            instances[name] = cls(settings.get(name, {}))
-        except ValueError as exc:
-            raise ConfigError(f"Extension `{name}` rejected its settings: {exc}") from exc
-        except Exception as exc:
-            trace = format_exception(exc, with_traceback=True, skip_frames=1)
-            raise ConfigError(f"Extension `{name}` failed to start\n\n{trace}") from exc
+
+
+def create_extension(name: str, cls: type, settings: dict[str, object]) -> object:
+    try:
+        return cls(settings)
+    except ValueError as exc:
+        raise ConfigError(f"Extension `{name}` rejected its settings: {exc}") from exc
+    except Exception as exc:
+        trace = format_exception(exc, with_traceback=True, skip_frames=1)
+        raise ConfigError(f"Extension `{name}` failed to start\n\n{trace}") from exc
+
+
+def bind_extension(instance: object) -> None:
+    """Register the hook methods of an extension instance globally."""
+    for attribute in _hook_methods(type(instance)):
+        # Validated at registration; native methods may lack the signature that plain hook registration checks
+        GLOBAL_HOOK_DISPATCHER._hooks[attribute].append(getattr(instance, attribute))
+
+
+def bind_extensions(settings: dict[str, dict[str, object]]) -> dict[str, object]:
+    """Create every registered extension for one run and register its hook methods globally."""
+    check_extension_tables(settings)
+    instances = {name: create_extension(name, cls, settings.get(name, {})) for name, cls in EXTENSIONS.items()}
     for instance in instances.values():
-        for attribute in _hook_methods(type(instance)):
-            # Validated at registration; native methods may lack the signature that plain hook registration checks
-            GLOBAL_HOOK_DISPATCHER._hooks[attribute].append(getattr(instance, attribute))
+        bind_extension(instance)
     return instances
 
 

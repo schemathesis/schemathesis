@@ -196,7 +196,7 @@ def after_load_schema(context: HookContext, schema: BaseSchema) -> None:
 
 @HookDispatcher.register_spec([HookScope.GLOBAL, HookScope.SCHEMA])
 def setup(context: HookContext, schema: BaseSchema) -> None:
-    """Called once before testing starts in `st run` and `st fuzz`, after Schemathesis's own setup.
+    """Called once before testing starts, after Schemathesis's own setup.
 
     Use cases:
      - Seeding test data or starting services the API depends on.
@@ -205,7 +205,7 @@ def setup(context: HookContext, schema: BaseSchema) -> None:
 
 @HookDispatcher.register_spec([HookScope.GLOBAL, HookScope.SCHEMA])
 def teardown(context: HookContext, schema: BaseSchema) -> None:
-    """Called once after testing ends in `st run` and `st fuzz`, even when the run failed or was interrupted.
+    """Called once after testing ends, even when the run failed or was interrupted.
 
     Use cases:
      - Removing test data or stopping services started in `setup`.

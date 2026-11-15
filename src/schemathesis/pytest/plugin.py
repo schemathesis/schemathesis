@@ -43,6 +43,13 @@ from schemathesis.generation.hypothesis.reporting import (
 from schemathesis.generation.stateful import StatefulCallbackMark, StatefulSchemaMark
 from schemathesis.pytest import _subtests
 from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, _WORKER_AFTER_RUN_FAILURES_KEY, track_schema
+from schemathesis.pytest._lifecycle import (
+    attach_schema,
+    attach_schema_fixture,
+    check_extension_settings,
+    start_extensions,
+    stop_extensions,
+)
 from schemathesis.pytest._subtests import HAS_CORE_SUBTESTS, is_subtest_report
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.reporting import PytestReportOutcome, open_writers, write_report_locations, write_to_writers
@@ -341,6 +348,22 @@ def pytest_pycollect_makeitem(collector: Module | Class, name: str, obj: Any) ->
         outcome.get_result()
 
 
+def pytest_unconfigure(config: pytest.Config) -> None:
+    stop_extensions(config)
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    check_extension_settings(config)
+    for item in items:
+        item_cls = getattr(item, "cls", None)
+        if isinstance(item, SchemathesisFunction):
+            attach_schema(item, item.schema)
+        elif item_cls is not None and (schema := StatefulSchemaMark.get(item_cls)) is not None:
+            attach_schema(item, schema)
+        elif isinstance(item, pytest.Function):
+            attach_schema_fixture(item)
+
+
 @hookimpl(hookwrapper=True, trylast=True)
 def pytest_report_teststatus(
     report: pytest.TestReport,
@@ -474,6 +497,7 @@ def _is_xdist_worker(config: pytest.Config) -> bool:
 
 def pytest_configure(config: pytest.Config) -> None:
     config.stash[_CASSETTE_KEY] = {}
+    start_extensions(config)
     if not HAS_CORE_SUBTESTS:
         config.pluginmanager.register(_subtests, "schemathesis-subtests")
     if config.pluginmanager.hasplugin("xdist"):
