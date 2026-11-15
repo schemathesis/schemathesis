@@ -1,0 +1,4 @@
+Exit code: 2
+---
+Stdout:
+Error: Extension `taint` rejected its settings: `depth` must be positive

@@ -9,8 +9,8 @@ from enum import Enum, unique
 from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeVar, cast
 
-from schemathesis.config import SchemathesisConfig
-from schemathesis.core.errors import HookExecutionError
+from schemathesis.config import ConfigError, SchemathesisConfig
+from schemathesis.core.errors import HookExecutionError, format_exception
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import Response
@@ -298,7 +298,7 @@ def _dispatch_to_all(
             try:
                 hook(context, *args)
             except (Exception, SystemExit) as exc:
-                raise HookExecutionError(name, exc) from exc
+                raise HookExecutionError(name, exc, extension=_extension_name(hook)) from exc
 
 
 def apply_to_all_dispatchers(
@@ -412,7 +412,7 @@ def dispatch_teardown(schema: SchemaMetadata) -> list[HookExecutionError]:
             try:
                 hook(context, schema)
             except (Exception, SystemExit) as exc:
-                errors.append(HookExecutionError("teardown", exc))
+                errors.append(HookExecutionError("teardown", exc, extension=_extension_name(hook)))
     return errors
 
 
@@ -433,7 +433,7 @@ def dispatch_before_call(
                 else:
                     hook(context, case, kwargs)
             except (Exception, SystemExit) as exc:
-                raise HookExecutionError(name, exc) from exc
+                raise HookExecutionError(name, exc, extension=_extension_name(hook)) from exc
 
 
 def dispatch_after_call(*dispatchers: HookDispatcher, context: HookContext, case: Case, response: Response) -> None:
@@ -459,7 +459,7 @@ def should_keep_failure(failure: Failure, case: Case, response: Response) -> boo
                 if not hook(context, failure, case, response):
                     return False
             except (Exception, SystemExit) as exc:
-                raise HookExecutionError(name, exc) from exc
+                raise HookExecutionError(name, exc, extension=_extension_name(hook)) from exc
     return True
 
 
@@ -516,3 +516,125 @@ def hook(hook: str | Callable) -> Callable:
 
 
 hook.__dict__ = GLOBAL_HOOK_DISPATCHER.hook.__dict__
+
+
+# Registered extension classes by name, in registration order.
+EXTENSIONS: dict[str, type] = {}
+
+
+def extension(name: str) -> Callable[[type], type]:
+    """Register a class whose methods are hooks; each `st run` / `st fuzz` gets one instance.
+
+    The instance is created with the `[extensions.<name>]` table from the config as a dict.
+    Public methods must be hook names or `handle_event`, which receives CLI events.
+
+    Example:
+        ```python
+        @schemathesis.extension("taint")
+        class Taint:
+            def __init__(self, settings):
+                self.depth = settings.get("depth", 3)
+
+            def after_call(self, context, case, response):
+                ...
+        ```
+
+    """
+    if not isinstance(name, str):
+        raise TypeError('Extension name is missing; use `@schemathesis.extension("name")`')
+
+    def register(cls: type) -> type:
+        if not isinstance(cls, type):
+            raise TypeError(f"Extension `{name}` must be a class, got `{type(cls).__name__}`")
+        registered = EXTENSIONS.get(name)
+        if registered is cls:
+            return cls
+        if registered is not None:
+            raise ValueError(f"Extension `{name}` is already registered by `{registered.__qualname__}`")
+        other = next((other for other, existing in EXTENSIONS.items() if existing is cls), None)
+        if other is not None:
+            raise ValueError(f"`{cls.__qualname__}` is already registered as extension `{other}`")
+        for attribute in _hook_methods(cls):
+            _validate_extension_method(cls, attribute)
+        _validate_arguments(cls, 1, f"`{cls.__qualname__}` must take the settings table: `__init__(self, settings)`")
+        handle_event = getattr(cls, "handle_event", None)
+        if handle_event is not None:
+            _validate_arguments(handle_event, 3, f"`{cls.__qualname__}.handle_event` must take `(self, ctx, event)`")
+        EXTENSIONS[name] = cls
+        return cls
+
+    return register
+
+
+def _signature(target: Callable) -> inspect.Signature | None:
+    try:
+        return inspect.signature(target)
+    except (TypeError, ValueError):
+        # Native callables may not expose a signature
+        return None
+
+
+def _validate_arguments(target: Callable, count: int, message: str) -> None:
+    signature = _signature(target)
+    if signature is not None:
+        try:
+            signature.bind(*[None] * count)
+        except TypeError:
+            raise TypeError(message) from None
+
+
+def _hook_methods(cls: type) -> Iterator[str]:
+    for attribute in dir(cls):
+        if not attribute.startswith("_") and attribute != "handle_event" and callable(getattr(cls, attribute)):
+            yield attribute
+
+
+def _validate_extension_method(cls: type, attribute: str) -> None:
+    spec = HookDispatcher._specs.get(attribute)
+    qualname = f"{cls.__qualname__}.{attribute}"
+    if spec is None or HookScope.GLOBAL not in spec.scopes:
+        raise TypeError(f"`{qualname}` is not a hook; extension methods must be hooks or `handle_event`")
+    signature = _signature(getattr(cls, attribute))
+    if signature is None:
+        return
+    defined = len(signature.parameters) - 1
+    expected = len(spec.signature.parameters)
+    if defined != expected:
+        raise TypeError(f"`{qualname}` takes {defined} arguments, but the `{attribute}` hook passes {expected}")
+
+
+def _extension_name(hook: Callable) -> str | None:
+    owner = type(getattr(hook, "__self__", None))
+    return next((name for name, cls in EXTENSIONS.items() if cls is owner), None)
+
+
+def bind_extensions(settings: dict[str, dict[str, object]]) -> dict[str, object]:
+    """Create every registered extension for one run and register its hook methods globally."""
+    for name in settings:
+        if name not in EXTENSIONS:
+            if EXTENSIONS:
+                hint = "loaded: " + ", ".join(f"`{loaded}`" for loaded in EXTENSIONS)
+            else:
+                hint = "add the extension's module to `hooks`"
+            raise ConfigError(f"`[extensions.{name}]` matches no loaded extension; {hint}")
+    instances: dict[str, object] = {}
+    for name, cls in EXTENSIONS.items():
+        try:
+            instances[name] = cls(settings.get(name, {}))
+        except ValueError as exc:
+            raise ConfigError(f"Extension `{name}` rejected its settings: {exc}") from exc
+        except Exception as exc:
+            trace = format_exception(exc, with_traceback=True, skip_frames=1)
+            raise ConfigError(f"Extension `{name}` failed to start\n\n{trace}") from exc
+    for instance in instances.values():
+        for attribute in _hook_methods(type(instance)):
+            # Validated at registration; native methods may lack the signature that plain hook registration checks
+            GLOBAL_HOOK_DISPATCHER._hooks[attribute].append(getattr(instance, attribute))
+    return instances
+
+
+def unbind_extensions(instances: dict[str, object]) -> None:
+    """Remove the hook methods of these extension instances."""
+    owners = list(instances.values())
+    for hooks in GLOBAL_HOOK_DISPATCHER._hooks.values():
+        hooks[:] = [hook for hook in hooks if not any(getattr(hook, "__self__", None) is owner for owner in owners)]

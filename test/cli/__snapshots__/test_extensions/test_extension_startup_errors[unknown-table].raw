@@ -1,0 +1,4 @@
+Exit code: 2
+---
+Stdout:
+Error: `[extensions.tiant]` matches no loaded extension; loaded: `taint`

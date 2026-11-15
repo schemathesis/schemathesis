@@ -144,7 +144,13 @@
       "type": "object"
     },
     "hooks": {
-      "type": "string"
+      "$ref": "#/$defs/Hooks"
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
     },
     "proxy": {
       "type": "string"
@@ -205,6 +211,19 @@
     }
   },
   "$defs": {
+    "Hooks": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
     "RequestRetriesConfig": {
       "description": "Number of retries on network failures (connection errors, timeouts). N retries = N+1 total attempts. Integer shorthand is equivalent to { max-attempts: N }.",
       "oneOf": [
@@ -1097,7 +1116,7 @@
           "type": "object"
         },
         "hooks": {
-          "type": "string"
+          "$ref": "#/$defs/Hooks"
         },
         "proxy": {
           "type": "string"

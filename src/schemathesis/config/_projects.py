@@ -12,7 +12,7 @@ from schemathesis.config._cache import CacheConfig
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.config._dictionaries import DictionaryDefinition
 from schemathesis.config._diff_base import DiffBase
-from schemathesis.config._env import resolve
+from schemathesis.config._env import resolve, resolve_nested
 from schemathesis.config._error import ConfigError
 from schemathesis.config._fuzz import FuzzConfig
 from schemathesis.config._generation import GenerationConfig
@@ -63,7 +63,7 @@ class ProjectConfig(DiffBase):
     base_url: str | None
     origin: str | None
     headers: dict | None
-    hooks: str | None
+    hooks: str | list[str] | None
     proxy: str | None
     workers: int
     continue_on_failure: bool | None
@@ -127,7 +127,7 @@ class ProjectConfig(DiffBase):
         base_url: str | None = None,
         origin: str | None = None,
         headers: dict | None = None,
-        hooks_: str | None = None,
+        hooks_: str | list[str] | None = None,
         workers: int | Literal["auto"] = DEFAULT_WORKERS,
         proxy: str | None = None,
         continue_on_failure: bool | None = None,
@@ -163,8 +163,8 @@ class ProjectConfig(DiffBase):
         self.headers = headers
         self.hooks = hooks_
         hooks.load_from_env()
-        if hooks_:
-            hooks.load_from_path(hooks_)
+        for path in [hooks_] if isinstance(hooks_, str) else hooks_ or []:
+            hooks.load_from_path(path)
         if isinstance(workers, int):
             self.workers = workers
         else:
@@ -224,7 +224,7 @@ class ProjectConfig(DiffBase):
             headers={resolve(key): resolve(value) for key, value in data.get("headers", {}).items()}
             if "headers" in data
             else None,
-            hooks_=resolve(data.get("hooks")),
+            hooks_=resolve_nested(data.get("hooks")),
             workers=data.get("workers", DEFAULT_WORKERS),
             proxy=resolve(data.get("proxy")),
             continue_on_failure=data.get("continue-on-failure", None),
@@ -620,6 +620,10 @@ class ProjectConfig(DiffBase):
     @property
     def dictionaries(self) -> dict[str, DictionaryDefinition]:
         return self._get_parent().dictionaries
+
+    @property
+    def extensions(self) -> dict[str, dict[str, object]]:
+        return self._get_parent().extensions
 
     @property
     def output(self) -> OutputConfig:
