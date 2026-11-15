@@ -2919,8 +2919,9 @@ def test_large_minimum_array_size(ctx, cli, snapshot_cli, min_items):
             },
             {"feline", "canine", "Cat", "Dog"},
         ),
+        ({"propertyName": "petType", "mapping": {"feline": "Cat", "canine": "Dog"}}, {"feline", "canine"}),
     ],
-    ids=["implicit", "explicit"],
+    ids=["implicit", "explicit", "schema-name"],
 )
 def test_discriminator_property_pinned_in_generation(ctx, discriminator, valid_values):
     operation = ctx.openapi.load_operation(

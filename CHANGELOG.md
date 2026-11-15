@@ -43,6 +43,7 @@
 #### Data generation
 
 - False positive `negative_data_rejection` for unmapped discriminator values under `defaultMapping`.
+- Missing discriminator `mapping` values written as schema names in generated data.
 
 #### Coverage phase
 
