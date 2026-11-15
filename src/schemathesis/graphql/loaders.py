@@ -51,8 +51,7 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
             return extract_schema_from_response(response, lambda r: load_json_lossy(r.content, r.encoding))
 
         schema = _introspect(fetch, kwargs)
-    loaded = from_dict(schema=schema, config=config)
-    loaded.app = app
+    loaded = _from_dict(schema, config=config, app=app)
     loaded.location = path
     return loaded
 
@@ -89,8 +88,7 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
         )
 
     schema = _introspect(fetch, kwargs)
-    loaded = from_dict(schema=schema, config=config)
-    loaded.app = app
+    loaded = _from_dict(schema, config=config, app=app)
     loaded.location = path
     return loaded
 
@@ -256,13 +254,17 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
         ```
 
     """
+    return _from_dict(schema, config=config)
+
+
+def _from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None, app: Any = None) -> GraphQLSchema:
     from schemathesis.specs.graphql.schemas import GraphQLSchema
 
     if "data" in schema:
         schema = schema["data"]
 
     def build(project_config: ProjectConfig) -> GraphQLSchema:
-        instance = GraphQLSchema(schema, config=project_config)
+        instance = GraphQLSchema(schema, config=project_config, app=app)
         wfc.setup_auth(instance, project_config, LoaderErrorKind.GRAPHQL_INVALID_SCHEMA)
         return instance
 
