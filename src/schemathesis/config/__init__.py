@@ -25,6 +25,7 @@ from schemathesis.config._checks import (
 )
 from schemathesis.config._dictionaries import DictionaryDefinition, parse_dictionaries
 from schemathesis.config._diff_base import DiffBase
+from schemathesis.config._env import resolve_nested
 from schemathesis.config._error import ConfigError
 from schemathesis.config._fuzz import FuzzConfig
 from schemathesis.config._generation import GenerationConfig
@@ -103,6 +104,7 @@ class SchemathesisConfig(DiffBase):
     output: OutputConfig
     projects: ProjectsConfig
     dictionaries: dict[str, DictionaryDefinition]
+    extensions: dict[str, dict[str, object]]
     # Seed for configs without an explicit one, shared by all processes of a run (e.g. pytest-xdist workers)
     shared_seed: ClassVar[int | None] = None
 
@@ -120,6 +122,7 @@ class SchemathesisConfig(DiffBase):
         output: OutputConfig | None = None,
         projects: ProjectsConfig | None = None,
         dictionaries: dict[str, DictionaryDefinition] | None = None,
+        extensions: dict[str, dict[str, object]] | None = None,
     ):
         self.color = color
         self.suppress_health_check = suppress_health_check or []
@@ -136,6 +139,7 @@ class SchemathesisConfig(DiffBase):
         self.projects = projects or ProjectsConfig()
         self.projects._set_parent(self)
         self.dictionaries = dictionaries or {}
+        self.extensions = extensions or {}
 
     @property
     def seed(self) -> int:
@@ -247,4 +251,5 @@ class SchemathesisConfig(DiffBase):
             output=OutputConfig.from_dict(data.get("output", {})),
             projects=projects,
             dictionaries=dictionaries,
+            extensions=resolve_nested(data.get("extensions", {})),
         )._mark_source_keys(data)

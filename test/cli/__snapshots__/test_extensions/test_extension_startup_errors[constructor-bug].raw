@@ -1,0 +1,9 @@
+Exit code: 2
+---
+Stdout:
+Error: Extension `taint` failed to start
+
+Traceback (most recent call last):
+  File "/tmp/module.py", line XXX, in __init__
+    if settings.get("depth", 1) < 1:
+TypeError: '<' not supported between instances of 'str' and 'int'

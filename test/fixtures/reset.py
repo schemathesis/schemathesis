@@ -32,6 +32,7 @@ REGISTRIES = (CHECKS, METRICS)
 CLEARS = (
     CUSTOM_HANDLERS.clear,
     hooks.unregister_all,
+    hooks.EXTENSIONS.clear,
     auths.unregister,
     media_types.unregister_all,
     CUSTOM_SCALARS.clear,

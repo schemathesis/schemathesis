@@ -599,18 +599,32 @@ These settings can only be applied at the project level.
 
 !!! note ""
 
-    **Type:** `String`  
+    **Type:** `String or Array of Strings`  
     **Default:** `null`  
 
-    Specifies a Python module path where custom hooks for extending Schemathesis functionality are located. This allows you to define custom checks, adjust data generation, or extend CLI.
+    Python modules with custom hooks and [extensions](hooks.md#extensions), as module names or file paths, loaded in order. Use them to define custom checks, adjust data generation, or extend CLI.
 
     ```toml
     # Global hooks for all projects
-    hooks = "myproject.tests.hooks"
+    hooks = ["myproject.tests.hooks", "status_log"]
     
     # Or project-specific hooks
     # [[project]]
     # hooks = "myproject.payments.hooks"
+    ```
+
+#### `extensions`
+
+!!! note ""
+
+    **Type:** `Table of Tables`  
+    **Default:** `{}`  
+
+    Settings for [extensions](hooks.md#extensions), one table per extension name. `st run` and `st fuzz` pass each table to its extension at startup and stop if a table matches no loaded extension. String values support [environment variables](#environment-variable-substitution). Allowed only at the top level, not in `[[project]]`.
+
+    ```toml
+    [extensions.status-log]
+    label = "${ENVIRONMENT}"
     ```
 
 #### `workers`

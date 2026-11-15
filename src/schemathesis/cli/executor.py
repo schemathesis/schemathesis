@@ -25,12 +25,14 @@ from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.cli.json_report import JsonReportHandler
 from schemathesis.cli.pytest_report import PytestReportHandler
 from schemathesis.cli.wfc_report import WfcReportHandler
-from schemathesis.config import DEFAULT_REPORT_DIRECTORY, ReportFormat
+from schemathesis.config import DEFAULT_REPORT_DIRECTORY, ConfigError, ReportFormat
 from schemathesis.core.errors import format_exception
+from schemathesis.hooks import bind_extensions, unbind_extensions
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.config import ProjectConfig
+    from schemathesis.engine import events
     from schemathesis.engine.events import EventGenerator
 
 
@@ -150,13 +152,32 @@ def display_handler_error(handler: EventHandler, exc: Exception, config: Project
         )
     else:
         title = "CLI Handler Error"
-        intro = f"\nAn error occurred within your custom CLI handler `{click.style(handler.__class__.__name__, bold=True)}`."
+        if isinstance(handler, ExtensionHandler):
+            owner = f"the `{click.style(handler.name, bold=True)}` extension's event handler"
+        else:
+            owner = f"your custom CLI handler `{click.style(handler.__class__.__name__, bold=True)}`"
+        intro = f"\nAn error occurred within {owner}."
         message = format_exception(exc, with_traceback=True, skip_frames=1)
-        footer = f"\nFor more information on implementing extensions for Schemathesis CLI, visit {EXTENSIONS_DOCUMENTATION_URL}"
+        footer = f"\nFor more information on implementing CLI event handlers, visit {EXTENSIONS_DOCUMENTATION_URL}"
     click.secho(title, fg="red", bold=True)
     click.echo(intro)
     click.secho(f"\n{message}", fg="red")
     click.echo(footer)
+
+
+class ExtensionStartupError(click.ClickException):
+    exit_code = ExitCode.ERROR
+
+
+class ExtensionHandler(EventHandler):
+    """Passes CLI events to an extension's `handle_event`."""
+
+    def __init__(self, name: str, handle_event: Callable[[BaseExecutionContext, events.EngineEvent], None]) -> None:
+        self.name = name
+        self._handle_event = handle_event
+
+    def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
+        self._handle_event(ctx, event)
 
 
 def execute_event_loop(
@@ -168,13 +189,39 @@ def execute_event_loop(
     output_handler: EventHandler,
     context_factory: Callable[[ProjectConfig], BaseExecutionContext],
 ) -> None:
+    try:
+        extensions = bind_extensions(config.extensions)
+    except ConfigError as exc:
+        raise ExtensionStartupError(str(exc)) from None
+    try:
+        load_baseline(config)
+        handlers = [
+            *initialize_report_handlers(config=config, args=args, params=params),
+            # Ahead of the terminal output, so summary lines and reports added when the run finishes still show
+            *(
+                ExtensionHandler(name, extension.handle_event)
+                for name, extension in extensions.items()
+                if hasattr(extension, "handle_event")
+            ),
+            output_handler,
+        ]
+        _execute_event_loop(event_stream, config=config, handlers=handlers, context_factory=context_factory)
+    finally:
+        unbind_extensions(extensions)
+
+
+def _execute_event_loop(
+    event_stream: EventGenerator,
+    *,
+    config: ProjectConfig,
+    handlers: list[EventHandler],
+    context_factory: Callable[[ProjectConfig], BaseExecutionContext],
+) -> None:
     from rich.text import Text
 
     # Warm Rich's lazy emoji-codes import on the main thread; it is not concurrency-safe.
     Text.from_markup("")
 
-    load_baseline(config)
-    handlers = [*initialize_report_handlers(config=config, args=args, params=params), output_handler]
     ctx: BaseExecutionContext | None = None
     # Set when the loop ends abnormally; the process and the reports use it instead of the run's verdict.
     abnormal_exit_code: int | None = None

@@ -1,0 +1,15 @@
+Exit code: 2
+---
+Stdout:
+Unable to load Schemathesis hooks
+
+An error occurred while importing the module 'module'. Traceback:
+
+Traceback (most recent call last):
+  File "/tmp/module.py", line XXX, in <module>
+    @schemathesis.extension("taint")
+  File "/package-root/hooks.py", line XXX, in register
+    raise ValueError(f"Extension `{name}` is already registered by `{registered.__qualname__}`")
+ValueError: Extension `taint` is already registered by `First`
+
+For more information on how to work with hooks, visit https://schemathesis.readthedocs.io/en/stable/guides/extending/

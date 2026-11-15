@@ -10,7 +10,7 @@ from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.metrics import MetricContext, MetricFunction, metric
-from schemathesis.hooks import HookContext, hook
+from schemathesis.hooks import HookContext, extension, hook
 from schemathesis.schemas import APIOperation, BaseSchema
 from schemathesis.transport import SerializationContext, serializer
 
@@ -33,6 +33,7 @@ __all__ = [
     "python",
     "hook",
     "HookContext",
+    "extension",
     "check",
     "CheckContext",
     "CheckFunction",

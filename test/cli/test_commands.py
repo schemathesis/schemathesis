@@ -114,7 +114,7 @@ def test_hooks_invalid(ctx, cli):
 
     assert result.exit_code == 2, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert lines[0] == "Unable to load Schemathesis extension hooks"
+    assert lines[0] == "Unable to load Schemathesis hooks"
     assert lines[8] == "ZeroDivisionError: division by zero"
 
 

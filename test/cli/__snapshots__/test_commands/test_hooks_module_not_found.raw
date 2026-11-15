@@ -1,7 +1,7 @@
 Exit code: 2
 ---
 Stdout:
-Unable to load Schemathesis extension hooks
+Unable to load Schemathesis hooks
 
 An attempt to import the module 'hook' failed because it could not be found.
 

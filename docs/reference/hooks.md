@@ -161,3 +161,45 @@ Schema-level hooks (`before_load_schema`, `after_load_schema`, `before_process_p
 ## Execution Order
 
 When multiple hooks of the same type are registered, they execute in registration order, except `teardown` hooks, which run last-registered first. For `filter_*` hooks, the value is discarded as soon as any hook returns `False` - subsequent hooks for that event are not called. For `map_*` hooks, each hook receives the output of the previous. For `flatmap_*` hooks, each hook receives the output of the previous, as with `map_*` hooks. Schema-level hooks run before test-level hooks of the same type.
+
+## Extensions
+
+An extension is a class whose methods are hooks. Schemathesis creates one instance for each `st run` or `st fuzz` invocation and passes it the extension's settings from `schemathesis.toml`.
+
+```python
+# status_log.py
+import schemathesis
+from schemathesis.engine import events
+
+
+@schemathesis.extension("status-log")
+class StatusLog:
+    def __init__(self, settings):
+        self.label = settings.get("label", "default")
+        self.statuses = []
+
+    def after_call(self, context, case, response):
+        self.statuses.append(response.status_code)
+
+    def handle_event(self, ctx, event):
+        if isinstance(event, events.EngineFinished):
+            ctx.add_summary_line(f"{self.label}: {len(self.statuses)} responses")
+```
+
+```toml
+hooks = "status_log"
+
+[extensions.status-log]
+label = "staging"
+```
+
+The run summary gets a line like `staging: 10 responses`.
+
+- **Loading.** Schemathesis loads an extension when [`hooks`](configuration.md#hooks) lists its module. The table name is the string passed to `@schemathesis.extension`; it does not have to match the module name.
+- **Settings.** `__init__` receives the `[extensions.<name>]` table as a dict, or `{}` without one. Raise `ValueError` to reject the settings: Schemathesis prints the message and stops before testing. A table that matches no loaded extension also stops the run.
+- **Methods.** Each public method is a hook from this page with that hook's arguments, or `handle_event(self, ctx, event)`, which receives CLI events like a [custom handler](../guides/extending-cli.md). Any other public method or nested class fails when the module loads, so prefix helpers with `_`. [Filters](#conditional-application) are not available; check `context.operation` inside the method.
+- **Order.** For one hook name, `@schemathesis.hook` functions run first, then extensions in the order their modules load. `teardown` runs in the reverse order.
+- **Threads.** With more than one worker, hooks that run for each test case are called from several threads on the same instance. Guard multi-step updates of shared state with a lock.
+- **Compiled classes.** Register a class from a compiled module, such as PyO3, with a call: `schemathesis.extension("status-log")(StatusLog)`. In PyO3, hook methods take `&self`.
+- **Errors.** Errors name the extension: ``Error in `setup` hook of `status-log` extension``.
+- **Limits.** `st replay` and the pytest plugin ignore extensions: they create no instance and read no settings.

@@ -249,15 +249,19 @@ class HookExecutionError(SchemathesisError):
 
     hook_name: str
     original_error: Exception | SystemExit
+    # The extension whose method raised, if any
+    extension: str | None
 
-    __slots__ = ("hook_name", "original_error")
+    __slots__ = ("hook_name", "original_error", "extension")
 
-    def __init__(self, hook_name: str, original_error: Exception | SystemExit) -> None:
+    def __init__(self, hook_name: str, original_error: Exception | SystemExit, *, extension: str | None = None) -> None:
         self.hook_name = hook_name
         self.original_error = original_error
+        self.extension = extension
 
     def __str__(self) -> str:
-        return f"Error in `{self.hook_name}` hook: {type(self.original_error).__name__}: {self.original_error}"
+        owner = f" of `{self.extension}` extension" if self.extension is not None else ""
+        return f"Error in `{self.hook_name}` hook{owner}: {type(self.original_error).__name__}: {self.original_error}"
 
 
 class InvalidRegexType(InvalidSchema):

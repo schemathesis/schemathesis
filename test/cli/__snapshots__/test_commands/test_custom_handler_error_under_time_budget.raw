@@ -24,4 +24,4 @@ Traceback (most recent call last):
     raise AttributeError("oops")
 AttributeError: oops
 
-For more information on implementing extensions for Schemathesis CLI, visit https://schemathesis.readthedocs.io/en/stable/guides/extending/
+For more information on implementing CLI event handlers, visit https://schemathesis.readthedocs.io/en/stable/guides/extending/

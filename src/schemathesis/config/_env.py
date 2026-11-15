@@ -36,3 +36,12 @@ def resolve(value: Any) -> Any:
         names = ", ".join(f"`{name}`" for name in missing)
         raise ConfigError(f"Missing environment {noun}: {names}")
     return resolved
+
+
+def resolve_nested(value: Any) -> Any:
+    """Resolve `${NAME}` placeholders in every string inside lists and tables."""
+    if isinstance(value, dict):
+        return {key: resolve_nested(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [resolve_nested(item) for item in value]
+    return resolve(value)
