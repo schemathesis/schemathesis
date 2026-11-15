@@ -522,10 +522,14 @@ def _default_part_content_type(schema: JsonSchemaObject, root_schema: JsonSchema
         for group in _structure_groups(schema)
     ):
         return "application/json"
-    # Values of any type and encoded or binary strings are sent as bytes.
-    if "type" not in schema or "contentEncoding" in schema or schema.get("format") == "binary":
+    if _holds_bytes(schema):
         return "application/octet-stream"
     return "text/plain"
+
+
+def _holds_bytes(schema: JsonSchemaObject) -> bool:
+    """Whether a part is raw bytes: a value of any type, or an encoded or binary string."""
+    return "type" not in schema or "contentEncoding" in schema or schema.get("format") == "binary"
 
 
 def _encode_positional_parts(
@@ -652,6 +656,9 @@ def _serialize_part_value(
         return content, f"{main}/{sub}; boundary={boundary}"
     pair = REQUESTS_TRANSPORT.get_first_matching_media_type(content_type)
     if pair is None:
+        if _holds_bytes(schema):
+            # Raw bytes need no serializer, so they go out as they are under any media type, e.g. `image/jpg`.
+            return serialize_binary(value), content_type
         if not isinstance(value, list) and "array" in get_type(schema):
             # An array's media type describes its items. A value of another type, e.g. `0` for a list of files,
             # has no items to encode, so it goes out as the text it would have without `encoding`.

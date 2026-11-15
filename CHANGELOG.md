@@ -37,6 +37,7 @@
 
 #### Request serialization
 
+- Serialization error for multipart parts with `image/jpg` and other content types without a serializer.
 - Unwrapped XML arrays naming their items after the array's own `xml.name`.
 
 #### Data generation

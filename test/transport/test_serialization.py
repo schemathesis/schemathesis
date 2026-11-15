@@ -838,6 +838,8 @@ def _received_part(part):
         ("model/stl", FILE_LIST_SCHEMA, {}, [["f", "model/stl", "{}"]]),
         ("model/stl", {**FILE_LIST_SCHEMA, "type": ["array", "null"]}, 0, [["f", "model/stl", "0"]]),
         ("model/stl", {}, 0, [["f", "model/stl", "0"]]),
+        ("image/jpg", {}, [None, 1], [["f", "image/jpg", "[null, 1]"]]),
+        ("video/mp4", {"type": "string", "contentEncoding": "base64"}, None, [["f", "video/mp4", "null"]]),
         ("application/octet-stream", FILE_LIST_SCHEMA, True, [["f", "application/octet-stream", "true"]]),
     ],
     ids=[
@@ -858,6 +860,8 @@ def _received_part(part):
         "file-list-object",
         "nullable-file-list-integer",
         "untyped-integer",
+        "untyped-list-without-serializer",
+        "encoded-string-null-without-serializer",
         "octet-stream-file-list-boolean",
     ],
 )
@@ -985,8 +989,14 @@ def test_multipart_part_encoded_with_its_content_type(
             [{"x": "1"}, {"x": "2"}],
             [[None, "application/json", '{"x": "1"}'], [None, "application/json", '{"x": "2"}']],
         ),
+        (
+            "3.2.0",
+            {"schema": {"type": "array", "items": {}}, "itemEncoding": {"contentType": "image/jpg"}},
+            [[None], {"a": 1}, b"JPG"],
+            [[None, "image/jpg", "[null]"], [None, "image/jpg", '{"a": 1}'], [None, "image/jpg", "JPG"]],
+        ),
     ],
-    ids=["by-position", "nested", "defaults", "ref-items"],
+    ids=["by-position", "nested", "defaults", "ref-items", "untyped-items-without-serializer"],
 )
 def test_multipart_mixed_array_items_are_unnamed_parts(
     ctx, app_runner, transport, version, media_type_object, body, expected
