@@ -9690,6 +9690,43 @@ def test_query_parameter_beside_another_branch_has_no_negatives_read_as_valid(ct
 
 
 @pytest.mark.parametrize(
+    ("location", "path", "expected"),
+    [
+        (
+            "path",
+            "/foo/{key}",
+            [
+                (CoverageScenario.INVALID_PATTERN, "%C2%84"),
+                (CoverageScenario.INCORRECT_TYPE, "null%2Cnull"),
+                (CoverageScenario.INCORRECT_TYPE, "AAA"),
+            ],
+        ),
+        (
+            "query",
+            "/foo",
+            [
+                (CoverageScenario.MISSING_PARAMETER, None),
+                (CoverageScenario.INVALID_PATTERN, ""),
+                (CoverageScenario.INCORRECT_TYPE, "AAA"),
+            ],
+        ),
+    ],
+    ids=["path", "query"],
+)
+def test_one_of_parameter_has_no_negatives_read_as_valid(ctx, location, path, expected):
+    # `0` breaks the integer branch, yet its text matches the string branch.
+    schema = {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "string", "pattern": "^[a-z0-9_-]+$"}]}
+    parameter = {"in": location, "name": "key", "required": True, "schema": schema}
+    operation = load_schema(ctx, parameters=[parameter], method="get", path=path)[path]["GET"]
+
+    assert [
+        (case.meta.phase.data.scenario, case.get_container(ParameterLocation(location)).get("key"))
+        for case in collect_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.parameter == "key"
+    ] == expected
+
+
+@pytest.mark.parametrize(
     ("parameter", "reports_failure"),
     [(STRING_QUERY_PARAMETER_DISALLOWING_EMPTY, False), (STRING_QUERY_PARAMETER_WITH_MIN_LENGTH, True)],
     ids=["without-min-length", "with-min-length"],

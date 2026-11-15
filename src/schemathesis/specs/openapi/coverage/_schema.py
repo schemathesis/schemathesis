@@ -2601,7 +2601,7 @@ def _negative_any_of(
                 ):
                     continue
                 # A parameter value is judged as the server reads its text, e.g. `null` as null or `0.5` as a string.
-                if any(sent_text_is_valid(text, is_valid, types) for text in ctx.wire.sent_texts(generated.value)):
+                if _sent_as_valid(ctx, generated.value, is_valid, types):
                     continue
                 yield generated
 
@@ -2612,6 +2612,11 @@ def _negative_one_of(
     nctx = ctx.with_negative()
     # Validators resolve `$ref` themselves, so keywords beside it count as the operation's draft reads them.
     validators = _make_branch_validators(value, ctx)
+    types = parameter_types(schema)
+
+    def is_valid(instance: object) -> bool:
+        return any(sum(branch.is_valid(instance) for branch in judge) == 1 for judge in validators)
+
     for idx, sub_schema in _branches_to_negate(value):
         with nctx.at(idx):
             for generated in cover_schema_iter(nctx, sub_schema, seen):
@@ -2619,6 +2624,9 @@ def _negative_one_of(
                 if contains_binary(generated.value) or all(
                     is_invalid_for_oneOf(generated.value, idx, judge) for judge in validators
                 ):
+                    # A parameter value is judged as the server reads its text, e.g. `0` as a string.
+                    if _sent_as_valid(ctx, generated.value, is_valid, types):
+                        continue
                     yield generated
 
 
@@ -4217,7 +4225,12 @@ def _reads_as_valid(ctx: CoverageContext, schema: JsonSchema) -> Callable[[Any],
     def is_valid(instance: Any) -> bool:
         return any(judge.is_valid(instance) for judge in judges)
 
-    return lambda value: any(sent_text_is_valid(text, is_valid, types) for text in ctx.wire.sent_texts(value))
+    return lambda value: _sent_as_valid(ctx, value, is_valid, types)
+
+
+def _sent_as_valid(ctx: CoverageContext, value: object, is_valid: Callable[[object], bool], types: list[str]) -> bool:
+    """Whether a server reads one of the texts a parameter value travels as into a value `is_valid` accepts."""
+    return any(sent_text_is_valid(text, is_valid, types) for text in ctx.wire.sent_texts(value))
 
 
 def _negative_unique_items(
