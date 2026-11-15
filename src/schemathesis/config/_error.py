@@ -469,8 +469,8 @@ def _format_dictionary_definition_oneof(error: ValidationError) -> str:
         detail = (
             "`from-operation` needs `pointer` - a JSON Pointer to the values in the response body, e.g. `/data/*/id`."
         )
-    elif "pointer" in instance or "parameters" in instance:
-        detail = "`pointer` and `parameters` apply only to `from-operation` dictionaries."
+    elif any(key in instance for key in ("pointer", "parameters", "query")):
+        detail = "`pointer`, `parameters` and `query` apply only to `from-operation` dictionaries."
     else:
         detail = (
             "Must define one of `values` (inline entries), `from-file` (path to a libFuzzer/AFL-format file) "

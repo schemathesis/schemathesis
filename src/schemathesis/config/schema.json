@@ -855,6 +855,10 @@
         "pointer": {
           "type": "string"
         },
+        "query": {
+          "type": "string",
+          "minLength": 1
+        },
         "parameters": {
           "type": "object",
           "additionalProperties": {
@@ -900,6 +904,16 @@
                 "required": [
                   "parameters"
                 ]
+              },
+              {
+                "required": [
+                  "query"
+                ]
+              },
+              {
+                "required": [
+                  "from-operation"
+                ]
               }
             ]
           }
@@ -918,6 +932,16 @@
               {
                 "required": [
                   "parameters"
+                ]
+              },
+              {
+                "required": [
+                  "query"
+                ]
+              },
+              {
+                "required": [
+                  "from-operation"
                 ]
               }
             ]

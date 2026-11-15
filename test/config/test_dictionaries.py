@@ -6,6 +6,7 @@ import pytest
 from schemathesis.config import ConfigError, GenerationConfig, SchemathesisConfig
 from schemathesis.config._dictionaries import (
     OperationSource,
+    ParameterDictionaryBinding,
     coerce_entries_for_type,
     pair_groups,
     parse_body_path,
@@ -261,10 +262,22 @@ def test_from_operation_dictionary_is_parsed():
         ),
         (
             {"values": ["a"], "pointer": "/id"},
-            "`pointer` and `parameters` apply only to `from-operation` dictionaries.",
+            "`pointer`, `parameters` and `query` apply only to `from-operation` dictionaries.",
+        ),
+        (
+            {"values": ["a"], "query": "{ books { id } }"},
+            "`pointer`, `parameters` and `query` apply only to `from-operation` dictionaries.",
         ),
         (
             {"values": ["a"], "from-operation": "GET /x", "pointer": "/id"},
+            "`values`, `from-file` and `from-operation` are mutually exclusive - pick one.",
+        ),
+        (
+            {"values": ["a"], "from-operation": "GET /x"},
+            "`values`, `from-file` and `from-operation` are mutually exclusive - pick one.",
+        ),
+        (
+            {"from-file": "words.dict", "from-operation": "GET /x"},
             "`values`, `from-file` and `from-operation` are mutually exclusive - pick one.",
         ),
         (
@@ -275,12 +288,43 @@ def test_from_operation_dictionary_is_parsed():
             {"from-operation": "GET /x", "pointer": "/id", "parameters": {"body.id": 1}},
             "Dictionary `bad` parameter `body.id` must start with `path.`, `query.`, `header.` or `cookie.`",
         ),
+        (
+            {"from-operation": "Query.x", "pointer": "/id", "query": "{ x }", "parameters": {"$limit": 1}},
+            "Dictionary `bad` parameter `$limit` must be a GraphQL variable name, e.g. `limit` for `$limit`",
+        ),
     ],
-    ids=["no-pointer", "pointer-without-source", "two-sources", "no-location", "body-location"],
+    ids=[
+        "no-pointer",
+        "pointer-without-source",
+        "query-without-source",
+        "two-sources",
+        "values-and-operation-without-pointer",
+        "file-and-operation-without-pointer",
+        "no-location",
+        "body-location",
+        "not-a-variable",
+    ],
 )
 def test_invalid_from_operation_dictionary(payload, message):
     with pytest.raises(ConfigError, match=re.escape(message)):
         SchemathesisConfig.from_dict({"dictionaries": {"bad": payload}})
+
+
+def test_graphql_source_parameters_are_query_variables():
+    query = "query($parentId: ID!) { children(parentId: $parentId) { id } }"
+    payload = {
+        "from-operation": "Query.children",
+        "query": query,
+        "pointer": "/data/children/*/id",
+        "parameters": {"parentId": {"dictionary": "parents"}},
+    }
+    config = SchemathesisConfig.from_dict({"dictionaries": {"parents": PARENTS, "children": payload}})
+    assert config.dictionaries["children"].source == OperationSource(
+        operation="Query.children",
+        pointer="/data/children/*/id",
+        parameters={"parentId": ParameterDictionaryBinding(dictionary="parents", probability=1.0)},
+        query=query,
+    )
 
 
 # The dictionary has no entries until setup fetches them.

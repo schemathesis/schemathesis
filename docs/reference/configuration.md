@@ -130,6 +130,8 @@ Load entries from a libFuzzer/AFL-format file via `from-file = "fuzz/edge.dict"`
 
 Fill a dictionary from an API response via `from-operation = "GET /users"` with `pointer = "/data/*/id"`, a JSON Pointer into the response body where `*` matches each array item. Optional `parameters` set the request's parameters, keyed by `path.`, `query.`, `header.` or `cookie.` names, e.g. `parameters = { "query.limit" = 100 }`. A parameter set to `{ dictionary = "users" }` sends one request per value of that dictionary, up to 100 per dictionary. `st run` and `st fuzz` send the request before testing starts; see [Fuzz Dictionaries](../guides/fuzz-dictionary.md#fill-a-dictionary-from-the-api).
 
+For GraphQL, name the field as `from-operation = "Query.users"` and give the query to send in `query`, e.g. `query = "{ users { id } }"` with `pointer = "/data/users/*/id"`. Keys in `parameters` are then the query's variables, e.g. `parameters = { team = { dictionary = "teams" } }` for `$team`.
+
 For request bodies, target fields with a JSONPath subset ([RFC 9535](https://www.rfc-editor.org/rfc/rfc9535)) rooted at `body.`:
 
 ```toml
@@ -150,7 +152,7 @@ Body keys support dotted names for object properties, `[*]` for "every array ele
 Rules:
 
 - `values`, `from-file` and `from-operation` are mutually exclusive; `values` accepts strings, integers, and finite numbers.
-- `from-operation` requires `pointer`; `pointer` and `parameters` apply only to `from-operation` dictionaries.
+- `from-operation` requires `pointer`, plus `query` for GraphQL; `pointer`, `parameters` and `query` apply only to `from-operation` dictionaries.
 - Type-wide bindings filter entries by the target type (`integer` keeps base-10 ints, `number` keeps finite numbers, `string` keeps everything); a dictionary with zero eligible entries for its bound type is a config error.
 - `probability` is required for type-wide bindings (greater than 0, at most 1) and optional for parameter bindings (defaults to `1.0`).
 - Parameter bindings win over type-wide; operation-scoped wins over global. Scalar parameter overrides still force the exact value.

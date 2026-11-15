@@ -1,5 +1,6 @@
 import re
 
+import graphql
 import pytest
 
 import schemathesis
@@ -8,6 +9,9 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.dictionary_loading import DictionaryLoad
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis.examples import generate_many
+from test.apps.catalog.graphql import bookstore
+from test.apps.catalog.grpc.descriptors import load as load_grpc
 from test.apps.catalog.openapi import nested
 from test.utils import EventStream
 
@@ -107,8 +111,13 @@ def test_source_operation_outside_filters_still_loads(ctx):
             f"`{CHILDREN}` needs path parameter `parentId` - set it under `parameters`",
             0,
         ),
+        (
+            {"from-operation": "GET /api/parents", "pointer": "/data/*/id", "query": "{ parents { id } }"},
+            "`query` applies only to GraphQL operations",
+            0,
+        ),
     ],
-    ids=["unknown-operation", "no-values", "objects-only", "error-status", "missing-path-parameter"],
+    ids=["unknown-operation", "no-values", "objects-only", "error-status", "missing-path-parameter", "graphql-query"],
 )
 def test_failed_load_is_reported(ctx, source, error, sent):
     api = ctx.openapi.serve(nested.parents_with_children())
@@ -255,9 +264,90 @@ def test_parent_only_binding_draws_from_every_parent(ctx):
     assert parents == {"1", "2", "3"}
 
 
-def test_from_operation_dictionary_needs_openapi(ctx):
-    config = SchemathesisConfig.from_dict({"dictionaries": {"books": {"from-operation": "Query.books", "pointer": ""}}})
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url, config=config)
-    stream = EventStream(schema, phases=[PhaseName.FUZZING], max_examples=1).execute()
-    [load] = _setup(stream).payload.dictionaries
-    assert (load.error, load.requests) == ("`from-operation` dictionaries need an OpenAPI schema", 0)
+def test_from_operation_dictionary_needs_openapi_or_graphql(ctx):
+    schema = load_grpc(
+        ctx.grpc.apps.users(), dictionaries={"users": {"from-operation": "pkg.Users/GetUser", "pointer": "/id"}}
+    )
+    [load] = _run_setup(schema).payload.dictionaries
+    assert (load.error, load.requests) == ("`from-operation` dictionaries need an OpenAPI or GraphQL schema", 0)
+
+
+GRAPHQL_PARENTS = {"from-operation": "Query.parents", "query": "{ parents { id } }", "pointer": "/data/parents/*/id"}
+GRAPHQL_CHILDREN = {
+    "from-operation": "Query.children",
+    "query": "query($parentId: ID!) { children(parentId: $parentId) { id } }",
+    "pointer": "/data/children/*/id",
+    "parameters": {"parentId": {"dictionary": "parents"}},
+}
+
+
+def _load_graphql(ctx, *, parameters=None, **dictionaries):
+    api = ctx.graphql.serve(bookstore.parents_with_children())
+    config = SchemathesisConfig.from_dict({"dictionaries": dictionaries, "parameters": parameters or {}})
+    return schemathesis.graphql.from_url(api.schema_url, config=config)
+
+
+def test_graphql_child_entries_remember_parent(ctx):
+    schema = _load_graphql(ctx, parents=GRAPHQL_PARENTS, children=GRAPHQL_CHILDREN)
+    loads = _run_setup(schema).payload.dictionaries
+    children = schema.config.dictionaries["children"].entries
+    assert (loads, [(entry.value, entry.origin) for entry in children]) == (
+        [
+            DictionaryLoad(dictionary="parents", operation="Query.parents", requests=1, entries=3),
+            DictionaryLoad(dictionary="children", operation="Query.children", requests=3, entries=4),
+        ],
+        [("c11", {"parents": "1"}), ("c12", {"parents": "1"}), ("c21", {"parents": "2"}), ("c22", {"parents": "2"})],
+    )
+
+
+@pytest.mark.parametrize(
+    ("source", "error", "sent"),
+    [
+        (
+            {"from-operation": "Query.parents", "pointer": "/data/parents/*/id"},
+            "`Query.parents` needs `query` - the GraphQL query to send",
+            0,
+        ),
+        (
+            {"from-operation": "Query.children", "query": '{ children(parentId: "9") { id } }', "pointer": "/data"},
+            "`Query.children` returned errors: Unknown parent `9`",
+            1,
+        ),
+    ],
+    ids=["no-query", "errors"],
+)
+def test_failed_graphql_load_is_reported(ctx, source, error, sent):
+    [load] = _run_setup(_load_graphql(ctx, parents=source)).payload.dictionaries
+    assert (load.error, load.requests) == (error, sent)
+
+
+GRAPHQL_PAIRS = {("1", "c11"), ("1", "c12"), ("2", "c21"), ("2", "c22")}
+
+
+def _graphql_child_arguments(ctx, child_binding):
+    schema = _load_graphql(
+        ctx,
+        parents=GRAPHQL_PARENTS,
+        children=GRAPHQL_CHILDREN,
+        parameters={"Query.child.parentId": {"dictionary": "parents"}, "Query.child.childId": child_binding},
+    )
+    _run_setup(schema)
+    pairs = []
+    for case in generate_many(schema["Query"]["child"].as_strategy(), 30):
+        [operation] = graphql.parse(case.body).definitions
+        [field] = operation.selection_set.selections
+        arguments = {argument.name.value: argument.value.value for argument in field.arguments}
+        pairs.append((arguments["parentId"], arguments["childId"]))
+    return pairs
+
+
+def test_graphql_bound_parent_and_child_come_from_the_same_listing(ctx):
+    pairs = set(_graphql_child_arguments(ctx, {"dictionary": "children"}))
+    assert pairs <= GRAPHQL_PAIRS
+    assert len({parent for parent, _ in pairs}) == 2
+
+
+def test_graphql_child_binding_probability_decides_how_often_the_pair_is_drawn(ctx):
+    pairs = _graphql_child_arguments(ctx, {"dictionary": "children", "probability": 0.5})
+    assert any(pair in GRAPHQL_PAIRS for pair in pairs)
+    assert any(child not in {"c11", "c12", "c21", "c22"} for _, child in pairs)

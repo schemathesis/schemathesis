@@ -111,9 +111,11 @@ class OperationSource:
     operation: str
     # JSON Pointer to the values in the response body; `*` matches every array item.
     pointer: str
-    # Request parameters keyed by location-prefixed names, e.g. `query.limit`.
+    # Request parameters keyed by location-prefixed names, e.g. `query.limit`, or GraphQL variables of `query`.
     # A binding takes one request per value of the bound dictionary.
-    parameters: dict[str, object]
+    parameters: dict[str, EntryValue | bool | ParameterDictionaryBinding]
+    # GraphQL query document the request sends.
+    query: str | None = None
 
 
 @dataclass(slots=True)
@@ -232,18 +234,27 @@ _SOURCE_PARAMETER_LOCATIONS = ("path", "query", "header", "cookie")
 
 
 def _parse_operation_source(name: str, payload: dict) -> OperationSource:
-    parameters: dict[str, object] = {}
+    query = payload.get("query")
+    parameters: dict[str, EntryValue | bool | ParameterDictionaryBinding] = {}
     for key, value in payload.get("parameters", {}).items():
-        location, _, parameter = key.partition(".")
-        if location not in _SOURCE_PARAMETER_LOCATIONS or not parameter:
-            raise ConfigError(
-                f"Dictionary `{name}` parameter `{key}` must start with `path.`, `query.`, `header.` or `cookie.`"
-            )
+        if query is not None:
+            if not _is_valid_graphql_name(key):
+                raise ConfigError(
+                    f"Dictionary `{name}` parameter `{key}` must be a GraphQL variable name, e.g. `limit` for `$limit`"
+                )
+        else:
+            location, _, parameter = key.partition(".")
+            if location not in _SOURCE_PARAMETER_LOCATIONS or not parameter:
+                raise ConfigError(
+                    f"Dictionary `{name}` parameter `{key}` must start with `path.`, `query.`, `header.` or `cookie.`"
+                )
         if isinstance(value, dict):
             parameters[key] = ParameterDictionaryBinding(dictionary=value["dictionary"], probability=1.0)
         else:
             parameters[key] = resolve(value)
-    return OperationSource(operation=payload["from-operation"], pointer=payload["pointer"], parameters=parameters)
+    return OperationSource(
+        operation=payload["from-operation"], pointer=payload["pointer"], parameters=parameters, query=query
+    )
 
 
 def _resolve_dictionary_path(path: str, *, base_dir: str | None) -> str:
