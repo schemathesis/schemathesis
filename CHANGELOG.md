@@ -52,6 +52,7 @@
 
 #### Checks and response validation
 
+- False positive `ignored_auth` for operations accepting OAuth 2 or OpenID Connect tokens alongside other schemes.
 - False positive `negative_data_rejection` for empty `multipart/mixed` array bodies.
 
 #### `st replay`
