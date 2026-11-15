@@ -260,9 +260,8 @@ class ChecksConfig(DiffBase):
             if not isinstance(value, dict):
                 # Top-level non-dict values (e.g. `enabled = true`) are not custom check sections.
                 continue
-            enabled = value.get("enabled", True if default_enabled is None else default_enabled)
             kwargs = {k: v for k, v in value.items() if k != "enabled"}
-            config._unknown[name] = SimpleCheckConfig(enabled=enabled)
+            config._unknown[name] = SimpleCheckConfig.from_dict(merge(value))
             if kwargs:
                 config._custom_kwargs[name] = kwargs
         config._default_enabled = default_enabled
@@ -289,10 +288,14 @@ class ChecksConfig(DiffBase):
         )
         # `enabled = True` is the default, so the generic merge cannot tell it from "not configured";
         # without this a lower-priority `false` would win over a check named on the command line.
-        for config in configs:
-            for name, enabled in config._explicit.items():
-                if name not in merged._explicit:
-                    merged._set_enabled(name, enabled=enabled)
+        for name in {name for config in configs for name in config._explicit}:
+            for config in configs:
+                if name in config._explicit:
+                    merged._set_enabled(name, enabled=config._explicit[name])
+                    break
+                # A more specific config file section that sets `enabled` outranks the command line
+                if "enabled" in config.get_by_name(name=name)._source_keys:
+                    break
         return merged
 
     def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig | MaxResponseTimeConfig:

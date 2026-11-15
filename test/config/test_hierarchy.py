@@ -83,6 +83,59 @@ def test_headers_for_none_when_unset(operation):
     assert project.headers_for(operation=operation) == {}
 
 
+def _for_operation(settings):
+    return {"operations": [{"include-name": LABEL, **settings}]}
+
+
+@pytest.mark.parametrize(
+    ("raw", "option", "name", "expected"),
+    [
+        (
+            _for_operation({"checks": {"not_a_server_error": {"enabled": False}}}),
+            "included_check_names",
+            "not_a_server_error",
+            False,
+        ),
+        (
+            _for_operation({"checks": {"custom_check": {"enabled": False}}}),
+            "included_check_names",
+            "custom_check",
+            False,
+        ),
+        (
+            _for_operation({"phases": {"fuzzing": {"checks": {"not_a_server_error": {"enabled": False}}}}}),
+            "included_check_names",
+            "not_a_server_error",
+            False,
+        ),
+        ({"checks": {"not_a_server_error": {"enabled": False}}}, "included_check_names", "not_a_server_error", True),
+        ({"checks": {"custom_check": {"enabled": False}}}, "included_check_names", "custom_check", True),
+        ({"checks": {"enabled": False}}, "included_check_names", "not_a_server_error", True),
+        (
+            _for_operation({"checks": {"not_a_server_error": {"enabled": True}}}),
+            "excluded_check_names",
+            "not_a_server_error",
+            True,
+        ),
+    ],
+    ids=[
+        "operation-disables-selected",
+        "operation-disables-selected-custom",
+        "operation-phase-disables-selected",
+        "project-disables-selected",
+        "project-disables-selected-custom",
+        "project-disables-all",
+        "operation-enables-excluded",
+    ],
+)
+def test_command_line_check_selection_for_operation(operation, raw, option, name, expected):
+    config = SchemathesisConfig.from_dict(raw)
+    config.projects.override.checks.update(**{option: [name]})
+    project = config.projects.get_default()
+
+    assert project.checks_config_for(operation=operation, phase="fuzzing").get_by_name(name=name).enabled is expected
+
+
 @pytest.mark.parametrize(
     "db_value, expected_type, reuse_removed",
     [

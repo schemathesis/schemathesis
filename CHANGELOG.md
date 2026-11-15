@@ -58,6 +58,10 @@
 
 - Crash files deleted or replayed against the wrong schema after a run against another API.
 
+#### CLI and configuration
+
+- `--checks` re-enabling checks that the configuration disables for specific operations.
+
 ## [4.33.4](https://github.com/schemathesis/schemathesis/compare/v4.33.3...v4.33.4) - 2026-11-12
 
 ### :bug: Fixed
