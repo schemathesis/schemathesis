@@ -753,6 +753,39 @@ def test_nested_object_required_array_not_duplicated():
         pytest.param(
             {
                 "oneOf": [
+                    {"$ref": "#/components/schemas/Cat"},
+                    {"$ref": "#/components/schemas/Dog"},
+                ],
+                "discriminator": {
+                    "propertyName": "petType",
+                    "mapping": {"feline": "Cat", "canine": "#/components/schemas/Dog"},
+                },
+            },
+            {
+                "oneOf": [
+                    {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Cat"},
+                            {"properties": {"petType": {"enum": ["feline"]}}},
+                        ]
+                    },
+                    {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Dog"},
+                            {"properties": {"petType": {"enum": ["canine"]}}},
+                        ]
+                    },
+                ],
+                "discriminator": {
+                    "propertyName": "petType",
+                    "mapping": {"feline": "Cat", "canine": "#/components/schemas/Dog"},
+                },
+            },
+            id="schema-name-mapping",
+        ),
+        pytest.param(
+            {
+                "oneOf": [
                     {"$ref": "#/components/schemas/Comparison"},
                     {"$ref": "#/components/schemas/In"},
                 ],
@@ -1049,7 +1082,12 @@ def test_discriminator_pin_skipped_for_polymorphic_branch_target(ctx):
     assert not validator.is_valid({"type": "Item"})
 
 
-def test_discriminator_pin_uses_file_name_for_whole_file_ref(tmp_path):
+@pytest.mark.parametrize(
+    ("discriminator", "expected"),
+    [({"propertyName": "kind"}, {"cat"}), ({"propertyName": "kind", "mapping": {"kitty": "./cat.json"}}, {"kitty"})],
+    ids=["implicit", "mapped"],
+)
+def test_discriminator_pin_uses_file_name_for_whole_file_ref(tmp_path, discriminator, expected):
     (tmp_path / "cat.json").write_text(
         json.dumps(
             {
@@ -1073,7 +1111,7 @@ def test_discriminator_pin_uses_file_name_for_whole_file_ref(tmp_path):
                                     "application/json": {
                                         "schema": {
                                             "oneOf": [{"$ref": "cat.json"}],
-                                            "discriminator": {"propertyName": "kind"},
+                                            "discriminator": discriminator,
                                         }
                                     }
                                 },
@@ -1087,7 +1125,7 @@ def test_discriminator_pin_uses_file_name_for_whole_file_ref(tmp_path):
     )
     schema = schemathesis.openapi.from_path(tmp_path / "openapi.json")
     kinds = {case.body["kind"] for case in generate_many(schema["/pets"]["POST"].as_strategy(), 10)}
-    assert kinds == {"cat"}
+    assert kinds == expected
 
 
 def test_discriminator_pin_applies_to_boolean_branch_target(ctx):

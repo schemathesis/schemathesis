@@ -300,11 +300,13 @@ def _pin_discriminator_property(
     property_name = discriminator.get("propertyName")
     if not property_name:
         return
-    explicit_mapping: dict[str, str] = discriminator.get("mapping") or {}
-    # Several discriminator values may map to the same schema; an empty value carries no tag
-    ref_to_values: dict[str, list[str]] = {}
+    explicit_mapping: dict[str, object] = discriminator.get("mapping") or {}
+    # Several values may map to one schema, given by its name or a URI ending in it; an empty value carries no tag
+    name_to_values: dict[str, list[str]] = {}
     for value, target in explicit_mapping.items():
-        values = ref_to_values.setdefault(target, [])
+        if not isinstance(target, str):
+            continue
+        values = name_to_values.setdefault(get_implicit_discriminator_value(target), [])
         if value:
             values.append(value)
     default_mapping = discriminator.get("defaultMapping")
@@ -341,7 +343,7 @@ def _pin_discriminator_property(
             if default_name is not None:
                 routed.add(schema_name)
                 routed.update(branch_tag_values(ref, property_name, bundle) or ())
-            disc_values = ref_to_values.get(resolved_ref)
+            disc_values = name_to_values.get(schema_name)
             if disc_values is not None:
                 if disc_values:
                     items[idx] = {"allOf": [item, {"properties": {property_name: {"enum": disc_values}}}]}
