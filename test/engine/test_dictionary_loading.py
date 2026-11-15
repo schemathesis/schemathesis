@@ -214,6 +214,47 @@ def test_empty_dependency_fails_the_dependent(ctx):
     )
 
 
+def _fuzz_with_parent_and_child_bound(ctx):
+    api = ctx.openapi.serve(nested.parents_with_children())
+    config = SchemathesisConfig.from_dict(
+        {
+            "dictionaries": {"parents": PARENTS, "children": CHILDREN_SOURCE},
+            "parameters": {
+                "path.parentId": {"dictionary": "parents"},
+                "path.childId": {"dictionary": "children"},
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_url(api.schema_url, config=config)
+    EventStream(
+        schema, phases=[PhaseName.FUZZING], modes=[GenerationMode.POSITIVE], max_examples=20, deterministic=True
+    ).execute()
+    return api
+
+
+def test_bound_parent_and_child_come_from_the_same_listing(ctx):
+    api = _fuzz_with_parent_and_child_bound(ctx)
+    pairs = {
+        match.groups()
+        for request in api.requests
+        if (match := re.fullmatch(r"/api/parents/([^/]+)/children/([^/]+)", request.path))
+    }
+    assert pairs
+    assert pairs <= {("1", "c11"), ("1", "c12"), ("2", "c21"), ("2", "c22")}
+    assert len({parent for parent, _ in pairs}) == 2
+
+
+# The children listing binds only `parentId`, so it draws from every parent, including one without children.
+def test_parent_only_binding_draws_from_every_parent(ctx):
+    api = _fuzz_with_parent_and_child_bound(ctx)
+    parents = {
+        match.group(1)
+        for request in api.requests
+        if (match := re.fullmatch(r"/api/parents/([^/]+)/children", request.path))
+    }
+    assert parents == {"1", "2", "3"}
+
+
 def test_from_operation_dictionary_needs_openapi(ctx):
     config = SchemathesisConfig.from_dict({"dictionaries": {"books": {"from-operation": "Query.books", "pointer": ""}}})
     schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url, config=config)

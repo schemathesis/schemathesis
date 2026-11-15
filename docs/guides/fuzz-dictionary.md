@@ -99,6 +99,12 @@ Schemathesis loads `users` first, then sends `GET /users/{user_id}/orders` once 
 
 Every order remembers the user it was listed under. A source that binds both dictionaries, such as `GET /users/{user_id}/orders/{order_id}/items`, therefore sends one request per order with its own user, not one per user and order.
 
+## Keep Parent and Child IDs Together
+
+With both bindings from the example above, a positive-mode request to `GET /users/{user_id}/orders/{order_id}` draws an order and takes `user_id` from the user it was listed under, so the pair always exists. Operations that bind only `path.user_id`, such as `GET /users/{user_id}/orders`, keep drawing from every user.
+
+Pairing applies to parameter bindings in the same location, e.g. both in the path. Negative-mode requests, type-wide bindings, body bindings and pairs split across locations draw each value on its own. When the order binding sets `probability`, it also decides how often the pair is drawn.
+
 ## Target Body Fields
 
 For request bodies, address fields with a JSONPath subset rooted at `body.`:

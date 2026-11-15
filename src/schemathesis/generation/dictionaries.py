@@ -17,6 +17,7 @@ from schemathesis.config._dictionaries import (
     ParameterDictionaryBinding,
     coerce_entries_for_type,
     lookup_parameter,
+    pair_groups,
     parse_body_path,
 )
 from schemathesis.core.jsonschema import (
@@ -171,6 +172,52 @@ def _infer_ty(parameter_schema: JsonSchema) -> str | None:
     return next((ty for ty in get_type(parameter_schema) if ty in SUPPORTED_TYPE_KEYS), None)
 
 
+@dataclass(slots=True, frozen=True)
+class _PairedParameters:
+    # The leader parameter first, then the parameters bound to dictionaries whose values its entries remember.
+    parameters: tuple[str, ...]
+    # One `(entry index, value)` per parameter, for each leader entry whose remembered values are eligible too.
+    choices: tuple[tuple[tuple[int, EntryValue], ...], ...]
+
+
+def _pair_parameters(
+    bindings: dict[str, _ResolvedBinding],
+    eligible_per_parameter: dict[str, tuple[tuple[int, EntryValue, bool], ...]],
+) -> list[_PairedParameters]:
+    # The first parameter bound to a dictionary takes part in pairing; another one bound to it draws on its own.
+    parameter_for: dict[str, str] = {}
+    for parameter_name in eligible_per_parameter:
+        binding = bindings[parameter_name]
+        if binding.is_parameter_specific:
+            parameter_for.setdefault(binding.dictionary.name, parameter_name)
+    paired = []
+    for leader, followers in pair_groups(bindings[name].dictionary for name in parameter_for.values()):
+        if not followers:
+            continue
+        # The first eligible entry with each value, per follower.
+        lookups: list[tuple[str, dict[EntryValue, tuple[int, EntryValue]]]] = []
+        for follower in followers:
+            lookup: dict[EntryValue, tuple[int, EntryValue]] = {}
+            for entry_index, entry_value, _ in eligible_per_parameter[parameter_for[follower.name]]:
+                lookup.setdefault(follower.entries[entry_index].value, (entry_index, entry_value))
+            lookups.append((follower.name, lookup))
+        choices = []
+        for entry_index, entry_value, _ in eligible_per_parameter[parameter_for[leader.name]]:
+            origin = leader.entries[entry_index].origin
+            choice = [(entry_index, entry_value)]
+            for name, lookup in lookups:
+                match = lookup.get(origin[name])
+                if match is None:
+                    break
+                choice.append(match)
+            else:
+                choices.append(tuple(choice))
+        if choices:
+            parameters = (parameter_for[leader.name], *(parameter_for[follower.name] for follower in followers))
+            paired.append(_PairedParameters(parameters=parameters, choices=tuple(choices)))
+    return paired
+
+
 def build_dictionary_overlay_strategy(
     inner: st.SearchStrategy,
     *,
@@ -198,6 +245,23 @@ def build_dictionary_overlay_strategy(
     if not eligible_per_parameter:
         return inner
 
+    # Negative cases want values that break the schema, not pairs that belong together.
+    paired = _pair_parameters(bindings, eligible_per_parameter) if generation_mode.is_positive else []
+
+    def record(parameter_name: str, entry_index: int, entry_value: EntryValue, matches_schema: bool) -> DictionaryDraw:
+        dictionary = bindings[parameter_name].dictionary
+        return DictionaryDraw(
+            dictionary=dictionary.name,
+            source_kind=dictionary.source_kind,
+            source_path=dictionary.source_path,
+            entry_index=entry_index,
+            operation_label=operation_label,
+            parameter_location=location_value,
+            parameter_name=parameter_name,
+            value=entry_value,
+            matches_schema=matches_schema,
+        )
+
     @st.composite
     def overlay(draw: st.DrawFn) -> GeneratedValue | dict[str, JsonValue]:
         produced = draw(inner)
@@ -220,30 +284,28 @@ def build_dictionary_overlay_strategy(
 
         new_value = dict(value)
         new_draws: list[DictionaryDraw] = []
+        for pair in paired:
+            if random.random() >= bindings[pair.parameters[0]].probability:
+                continue
+            for parameter_name, (entry_index, entry_value) in zip(
+                pair.parameters, draw(st.sampled_from(pair.choices)), strict=True
+            ):
+                new_value[parameter_name] = entry_value
+                # Positive-mode eligible entries all match their schema.
+                new_draws.append(record(parameter_name, entry_index, entry_value, True))
+        drawn = {draw_.parameter_name for draw_ in new_draws}
         for parameter_name, eligible in eligible_per_parameter.items():
             binding = bindings[parameter_name]
             present = parameter_name in new_value
             # Type-wide fills only if the strategy already included the param; parameter-specific forces it.
-            if not present and not binding.is_parameter_specific:
+            if parameter_name in drawn or (not present and not binding.is_parameter_specific):
                 continue
             # A binding is explicit intent, so it overrides a value the resource pool put in the same slot.
             if random.random() >= binding.probability:
                 continue
             entry_index, entry_value, matches_schema = draw(st.sampled_from(eligible))
             new_value[parameter_name] = entry_value
-            new_draws.append(
-                DictionaryDraw(
-                    dictionary=binding.dictionary.name,
-                    source_kind=binding.dictionary.source_kind,
-                    source_path=binding.dictionary.source_path,
-                    entry_index=entry_index,
-                    operation_label=operation_label,
-                    parameter_location=location_value,
-                    parameter_name=parameter_name,
-                    value=entry_value,
-                    matches_schema=matches_schema,
-                )
-            )
+            new_draws.append(record(parameter_name, entry_index, entry_value, matches_schema))
 
         if not new_draws and not isinstance(produced, GeneratedValue):
             return produced
