@@ -293,7 +293,7 @@ def _pin_discriminator_property(
     name_to_uri: dict[str, str] | None,
     bundle: dict[str, Any] | None = None,
 ) -> None:
-    """Wrap each oneOf/anyOf branch in `allOf` with an `enum` pinning the discriminator value that names it."""
+    """Wrap each oneOf/anyOf branch in `allOf` pinning the discriminator values that select it."""
     discriminator = schema.get("discriminator")
     if not isinstance(discriminator, dict):
         return
@@ -307,11 +307,17 @@ def _pin_discriminator_property(
         values = ref_to_values.setdefault(target, [])
         if value:
             values.append(value)
+    default_mapping = discriminator.get("defaultMapping")
+    # Absent and unmapped values select the `defaultMapping` schema, given by its name or a URI ending in it
+    default_name = get_implicit_discriminator_value(default_mapping) if isinstance(default_mapping, str) else None
 
     for keyword in ("anyOf", "oneOf"):
         items = schema.get(keyword)
         if not isinstance(items, list):
             continue
+        # Values that select a branch other than the default one
+        routed: set[str] = set()
+        default_index: int | None = None
         for idx, item in enumerate(items):
             if not isinstance(item, dict):
                 continue
@@ -328,6 +334,13 @@ def _pin_discriminator_property(
                 elif original_uri:
                     # A whole-file reference is named after its file: `cat.json` names `cat`.
                     resolved_ref = get_implicit_discriminator_value(original_uri)
+            schema_name = get_implicit_discriminator_value(resolved_ref)
+            if schema_name == default_name:
+                default_index = idx
+                continue
+            if default_name is not None:
+                routed.add(schema_name)
+                routed.update(branch_tag_values(ref, property_name, bundle) or ())
             disc_values = ref_to_values.get(resolved_ref)
             if disc_values is not None:
                 if disc_values:
@@ -339,7 +352,7 @@ def _pin_discriminator_property(
                 # A polymorphic target keeps its tags on inner branches, which would all reject its schema name.
                 if _branch_is_polymorphic(ref, bundle):
                     continue
-                disc_value = get_implicit_discriminator_value(resolved_ref)
+                disc_value = schema_name
                 allowed = branch_tag_values(ref, property_name, bundle)
                 # The branch lists the values it takes and this one is not among them.
                 if allowed is not None and disc_value not in allowed:
@@ -348,6 +361,16 @@ def _pin_discriminator_property(
                 continue
             # Draft 4, used by OpenAPI 2.0 and 3.0, ignores `const`, so the pin is an `enum`.
             items[idx] = {"allOf": [item, {"properties": {property_name: {"enum": [disc_value]}}}]}
+        if default_index is not None:
+            routed.update(
+                value
+                for value, target in explicit_mapping.items()
+                if value and isinstance(target, str) and get_implicit_discriminator_value(target) != default_name
+            )
+            if routed:
+                # The default branch takes an absent tag and every value no other branch claims
+                pin = {"properties": {property_name: {"not": {"enum": sorted(routed)}}}}
+                items[default_index] = {"allOf": [items[default_index], pin]}
 
 
 def _branch_literal_tag(ref: str, property_name: str, bundle: dict[str, JsonSchema] | None) -> str | None:

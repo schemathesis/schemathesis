@@ -2955,6 +2955,70 @@ def test_discriminator_property_pinned_in_generation(ctx, discriminator, valid_v
         assert case.body["petType"] in valid_values
 
 
+def _pets_with_default_mapping(ctx, default_mapping, other_pet_tag):
+    return ctx.openapi.load_operation(
+        "POST /pets",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "oneOf": [
+                                {"$ref": "#/components/schemas/Cat"},
+                                {"$ref": "#/components/schemas/OtherPet"},
+                            ],
+                            "discriminator": {
+                                "propertyName": "petType",
+                                "mapping": {"cat": "#/components/schemas/Cat"},
+                                "defaultMapping": default_mapping,
+                            },
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.2.0",
+        components={
+            "schemas": {
+                "Cat": {
+                    "type": "object",
+                    "properties": {"petType": {"type": "string"}, "meows": {"type": "boolean"}},
+                    "required": ["petType", "meows"],
+                    "additionalProperties": False,
+                },
+                "OtherPet": {"type": "object", "properties": {"petType": other_pet_tag}, "required": ["petType"]},
+            }
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("default_mapping", "other_pet_tag", "expected"),
+    [
+        ("OtherPet", {"type": "string"}, {"petType": ""}),
+        ("#/components/schemas/OtherPet", {"type": "string"}, {"petType": ""}),
+        ("OtherPet", {"type": "string", "enum": ["cat", "fish"]}, {"petType": "fish"}),
+    ],
+    ids=["unmapped-value", "uri-reference", "mapped-value-excluded"],
+)
+def test_discriminator_default_mapping_branch_takes_unrouted_values(ctx, default_mapping, other_pet_tag, expected):
+    operation = _pets_with_default_mapping(ctx, default_mapping, other_pet_tag)
+    # Only the default branch produces bodies without `meows`.
+    assert find(operation.as_strategy(), lambda case: "meows" not in case.body).body == expected
+
+
+def test_discriminator_default_mapping_unrouted_values_not_negative(ctx):
+    operation = _pets_with_default_mapping(ctx, "OtherPet", {"type": "string"})
+
+    # Any string tag but Cat's routes to OtherPet, which accepts it; few negative draws carry such a tag.
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=50, derandomize=True)
+    def inner(case):
+        tag = case.body.get("petType") if isinstance(case.body, dict) else None
+        assert not isinstance(tag, str) or tag in ("cat", "Cat"), f"Valid body generated as negative: {case.body!r}"
+
+
 def test_hypothesis_observability_serialization(ctx):
     # Hypothesis observability serializes all dataclass fields on generated values
     operation = ctx.openapi.load_operation("GET /test", {"responses": {"200": {"description": "OK"}}})

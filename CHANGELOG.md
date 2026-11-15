@@ -38,6 +38,10 @@
 
 - Unwrapped XML arrays naming their items after the array's own `xml.name`.
 
+#### Data generation
+
+- False positive `negative_data_rejection` for unmapped discriminator values under `defaultMapping`.
+
 #### Coverage phase
 
 - Missing positive values when `minLength` exceeds what an unanchored `pattern` matches. [#6085](https://github.com/schemathesis/schemathesis/issues/6085)

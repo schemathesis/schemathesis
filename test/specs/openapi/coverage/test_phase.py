@@ -8514,6 +8514,58 @@ def test_discriminator_explicit_mapping_overrides_branch_const(ctx):
     assert tags == {"web_search"}, f"mapping must override branch const; got tags={tags}, bodies={bodies}"
 
 
+def _pets_with_default_mapping(ctx):
+    return body_operation(
+        ctx,
+        {"$ref": "#/components/schemas/Pet"},
+        path="/pets",
+        version="3.2.0",
+        components={
+            "schemas": {
+                "Pet": {
+                    "oneOf": [{"$ref": "#/components/schemas/Cat"}, {"$ref": "#/components/schemas/OtherPet"}],
+                    "discriminator": {
+                        "propertyName": "petType",
+                        "mapping": {"cat": "#/components/schemas/Cat"},
+                        "defaultMapping": "OtherPet",
+                    },
+                },
+                "Cat": {
+                    "type": "object",
+                    "properties": {"petType": {"type": "string"}, "meows": {"type": "boolean"}},
+                    "required": ["petType", "meows"],
+                    "additionalProperties": False,
+                },
+                "OtherPet": {"type": "object", "properties": {"petType": {"type": "string"}}, "required": ["petType"]},
+            }
+        },
+    )
+
+
+def test_discriminator_default_mapping_positive_covers_unmapped_tag(ctx):
+    bodies = _discriminator_positive_bodies(_pets_with_default_mapping(ctx))
+    assert bodies == [
+        {"meows": False, "petType": "cat"},
+        {"meows": True, "petType": "cat"},
+        {"petType": ""},
+        {"petType": OVERSIZED},
+        {"petType": "AAA"},
+    ]
+
+
+def test_discriminator_default_mapping_negative_skips_unmapped_tags(ctx):
+    operation = _pets_with_default_mapping(ctx)
+    # Any string tag that does not name Cat routes to OtherPet, which accepts it.
+    accepted = [
+        case.body
+        for case in iter_cases(operation, GenerationMode.NEGATIVE)
+        if isinstance(case.body, dict)
+        and isinstance(case.body.get("petType"), str)
+        and case.body["petType"] not in ("cat", "Cat")
+    ]
+    assert accepted == []
+
+
 def test_negative_coverage_violates_int64_format_bounds(ctx):
     # The range implied by `format: int64` must reach negative generation as real bounds,
     # so out-of-range integers stay covered as boundary violations instead of positive data.
