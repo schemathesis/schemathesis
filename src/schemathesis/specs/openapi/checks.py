@@ -371,10 +371,35 @@ def _body_negation_becomes_valid_after_serialization(response: Response, case: C
     if media_type is None:
         return False
 
-    if not _is_stringifying_media_type(media_type) and not _form_body_is_valid_as_sent(response, case, media_type):
+    if (
+        not _is_stringifying_media_type(media_type)
+        and not _form_body_is_valid_as_sent(response, case, media_type)
+        and not _parts_body_is_valid_as_sent(response, case, media_type)
+    ):
         return False
 
     return not _has_other_negated_location(case, ParameterLocation.BODY)
+
+
+def _parts_body_is_valid_as_sent(response: Response, case: Case, media_type: str) -> bool:
+    """Whether a body sent as unnamed parts, e.g. `multipart/mixed`, carried no parts while the schema admits none."""
+    main, sub = media_types.parse(media_type)
+    if main != "multipart" or sub in ("form-data", "*"):
+        return False
+    request = response.request
+    headers = f"Content-Type: {request.headers.get('Content-Type', '')}\r\n\r\n".encode()
+    boundary = BytesParser(policy=HTTP).parsebytes(headers).get_boundary()
+    # A document holding only its closing delimiter has no parts, which a server reads as the empty array.
+    if not isinstance(request.body, bytes) or request.body.strip() != f"--{boundary}--".encode():
+        return False
+    body = case.operation.get_body_for_media_type(media_type)
+    if body is None:
+        return False
+    try:
+        return body.is_valid([])
+    except ValueError:
+        # A schema no validator loads, e.g. one holding YAML `!!binary` values, leaves validity unknown.
+        return False
 
 
 def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str) -> bool:

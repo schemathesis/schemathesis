@@ -5,7 +5,7 @@ import threading
 
 import pytest
 import yaml
-from flask import jsonify
+from flask import Flask, jsonify
 
 import schemathesis
 from schemathesis import Case
@@ -2844,6 +2844,52 @@ def test_negative_data_rejection_accepts_optional_form_fields_not_sent(ctx, app_
         response.request.body.decode() if isinstance(response.request.body, bytes) else response.request.body
     )
     assert negative_data_rejection(check_context(), response, case) is None
+
+
+ID_ITEMS = {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "integer"}}}}
+
+
+@pytest.mark.parametrize(
+    ("declared", "schema", "version", "media_type", "body", "reported"),
+    [
+        ("multipart/mixed", ID_ITEMS, "3.0.2", "multipart/mixed", {}, False),
+        ("multipart/related", ID_ITEMS, "3.1.0", "multipart/related", {"ids": []}, False),
+        ("multipart/mixed", {**ID_ITEMS, "minItems": 1}, "3.0.2", "multipart/mixed", {}, True),
+        ("multipart/mixed", ID_ITEMS, "3.0.2", "multipart/mixed", {"id": 1}, True),
+        ("multipart/form-data", ID_ITEMS, "3.0.2", "multipart/form-data", {}, True),
+        ("application/json", ID_ITEMS, "3.0.2", "multipart/mixed", {}, True),
+        ("multipart/mixed", {"type": "array", "items": {"enum": [b"\x00", 1]}}, "3.0.2", "multipart/mixed", {}, True),
+    ],
+    ids=[
+        "empty-object",
+        "only-empty-fields",
+        "min-items",
+        "one-part",
+        "named-parts",
+        "undeclared-media-type",
+        "yaml-binary-schema",
+    ],
+)
+def test_negative_data_rejection_reads_multipart_without_parts_as_empty_array(
+    ctx, app_runner, declared, schema, version, media_type, body, reported
+):
+    # Parts of multipart types other than forms are array items, so a document with no parts is the empty array.
+    app = Flask(__name__)
+    app.add_url_rule("/items", "items", lambda: ("", 200), methods=["POST"])
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": {declared: {"schema": schema}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        version=version,
+    )
+    case = operation.Case(
+        _meta=build_metadata(body=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        body=body,
+        media_type=media_type,
+    )
+    _assert_rejection(case, case.call(base_url=app_runner.openapi_url(app, path="")), reported=reported)
 
 
 @pytest.mark.parametrize(

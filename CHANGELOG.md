@@ -49,6 +49,10 @@
 - Missing positive values when `minLength` exceeds what an unanchored `pattern` matches. [#6085](https://github.com/schemathesis/schemathesis/issues/6085)
 - False positive `positive_data_acceptance` for optional parameters whose schema admits no value. [#6085](https://github.com/schemathesis/schemathesis/issues/6085)
 
+#### Checks and response validation
+
+- False positive `negative_data_rejection` for empty `multipart/mixed` array bodies.
+
 #### `st replay`
 
 - Crash files deleted or replayed against the wrong schema after a run against another API.
