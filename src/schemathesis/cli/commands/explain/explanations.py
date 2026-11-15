@@ -87,9 +87,9 @@ EXPLANATIONS: dict[str, Explanation] = {
     "ST112": Explanation(
         summary="Response slower than the configured response time limit.",
         notes="""
-            Measured until the response headers arrive. `--checks all` turns it on with a 10s limit. Timings
-            vary, so no replay case is stored: rerun `st run`. A slow-by-design operation can get its own
-            limit, in seconds:
+            Measured until the response headers arrive. Runs only with a limit from `--max-response-time` or
+            `checks.max_response_time`. Timings vary, so no replay case is stored: rerun `st run`. A
+            slow-by-design operation can get its own limit, in seconds:
         """,
         block="""
             [[operations]]

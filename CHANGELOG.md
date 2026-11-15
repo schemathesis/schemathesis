@@ -53,6 +53,7 @@
 #### Checks and response validation
 
 - False positive `negative_data_rejection` for empty `multipart/mixed` array bodies.
+- `--checks` enabling `max_response_time` with a 10-second limit, or disabling a configured one.
 
 #### `st replay`
 
