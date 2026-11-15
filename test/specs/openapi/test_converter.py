@@ -819,6 +819,28 @@ def test_nested_object_required_array_not_duplicated():
             },
             id="boolean-schema-skipped",
         ),
+        pytest.param(
+            {
+                "oneOf": [{"$ref": "#/components/schemas/OtherPet"}],
+                "discriminator": {"propertyName": "petType", "defaultMapping": "OtherPet"},
+            },
+            {
+                "oneOf": [{"$ref": "#/components/schemas/OtherPet"}],
+                "discriminator": {"propertyName": "petType", "defaultMapping": "OtherPet"},
+            },
+            id="default-mapping-only-branch",
+        ),
+        pytest.param(
+            {
+                "oneOf": [{"$ref": "#/components/schemas/OtherPet"}],
+                "discriminator": {"propertyName": "petType", "mapping": {"cat": 5}, "defaultMapping": "OtherPet"},
+            },
+            {
+                "oneOf": [{"$ref": "#/components/schemas/OtherPet"}],
+                "discriminator": {"propertyName": "petType", "mapping": {"cat": 5}, "defaultMapping": "OtherPet"},
+            },
+            id="default-mapping-with-non-string-target",
+        ),
     ],
 )
 def test_discriminator_property_pinned(schema, expected):
