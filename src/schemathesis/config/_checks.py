@@ -322,8 +322,9 @@ class ChecksConfig(DiffBase):
         from schemathesis.checks import CHECKS
 
         # Apply the include/exclude rules to registered custom checks too, so `included_check_names` disables them.
+        # `max_response_time` is left out: its configured limit alone turns it on.
         all_names = (
-            set(_BUILTIN_CHECK_NAMES)
+            set(_BUILTIN_CHECK_CONFIGS)
             | set(CHECKS.get_all_names())
             | set(included_check_names or [])
             | set(excluded_check_names or [])

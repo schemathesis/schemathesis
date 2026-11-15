@@ -2,7 +2,7 @@ import pytest
 
 import schemathesis.checks
 from schemathesis.checks import max_response_time, not_a_server_error, run_checks
-from schemathesis.config import ChecksConfig
+from schemathesis.config import ChecksConfig, SchemathesisConfig
 from schemathesis.core.failures import CustomFailure, FailureGroup, ResponseTimeExceeded, ServerError
 from schemathesis.engine.recorder import ScenarioRecorder
 from test.utils import check_context, make_case
@@ -29,6 +29,29 @@ def test_max_response_time(ctx, swagger_20, response_factory, limit, elapsed, ex
             max_response_time(check_context(config), response, case)
         failure = exc_info.value
         assert (failure.operation, failure.message, failure.elapsed, failure.deadline) == expected
+
+
+@pytest.mark.parametrize(
+    ("source", "included_check_names", "elapsed", "expected"),
+    [
+        ("", ["all"], 11.0, None),
+        ("[checks]\nmax_response_time = 5\n", ["not_a_server_error"], 6.0, ["Actual: 6000.00ms\nLimit: 5000.00ms"]),
+    ],
+    ids=["all-checks-without-limit", "other-checks-with-limit"],
+)
+def test_check_selection_leaves_max_response_time_to_its_limit(
+    ctx, response_factory, source, included_check_names, elapsed, expected
+):
+    config = SchemathesisConfig.from_str(source)
+    config.projects.override.checks.update(included_check_names=included_check_names)
+    case = ctx.openapi.load_operation("GET /test", {"responses": {"200": {"description": "OK"}}}, config=config).Case()
+    response = response_factory.core(elapsed=elapsed)
+    if expected is None:
+        assert case.validate_response(response) is None
+    else:
+        with pytest.raises(FailureGroup) as exc_info:
+            case.validate_response(response)
+        assert [failure.message for failure in exc_info.value.exceptions] == expected
 
 
 def test_run_checks_reports_kept_failures_and_custom_assertions(ctx, response_factory):
