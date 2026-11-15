@@ -676,3 +676,40 @@ def _make_relay_connection() -> strawberry.Schema:
 
 def relay_connection() -> GraphQLApp:
     return _wrap(_make_relay_connection(), "/graphql", "flask")
+
+
+_CHILDREN_BY_PARENT = {"1": ["c11", "c12"], "2": ["c21", "c22"], "3": []}
+
+
+def _make_parents_with_children() -> strawberry.Schema:
+    @strawberry.type
+    class Child:
+        id: strawberry.ID
+
+    @strawberry.type
+    class Parent:
+        id: strawberry.ID
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def parents(self) -> list[Parent]:
+            return [Parent(id=strawberry.ID(parent_id)) for parent_id in _CHILDREN_BY_PARENT]
+
+        @strawberry.field
+        def children(self, parentId: strawberry.ID) -> list[Child]:
+            if parentId not in _CHILDREN_BY_PARENT:
+                raise ValueError(f"Unknown parent `{parentId}`")
+            return [Child(id=strawberry.ID(child_id)) for child_id in _CHILDREN_BY_PARENT[parentId]]
+
+        @strawberry.field
+        def child(self, parentId: strawberry.ID, childId: strawberry.ID) -> Child | None:
+            if childId in _CHILDREN_BY_PARENT.get(parentId, []):
+                return Child(id=childId)
+            return None
+
+    return strawberry.Schema(Query)
+
+
+def parents_with_children() -> GraphQLApp:
+    return _wrap(_make_parents_with_children(), "/graphql", "flask")

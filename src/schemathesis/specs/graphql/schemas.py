@@ -233,7 +233,8 @@ class GraphQLSchema(BaseSchema):
     @override
     def prepare_request_body(self, case: Case) -> Body:
         body = case.body
-        if isinstance(body, (NotSet, bytes)):
+        # A dict is a whole GraphQL request, e.g. a query with its variables.
+        if isinstance(body, (NotSet, bytes, dict)):
             return body
         return {"query": body}
 

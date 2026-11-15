@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -173,36 +173,35 @@ def _infer_ty(parameter_schema: JsonSchema) -> str | None:
 
 
 @dataclass(slots=True, frozen=True)
-class _PairedParameters:
+class PairedParameters:
     # The leader parameter first, then the parameters bound to dictionaries whose values its entries remember.
     parameters: tuple[str, ...]
     # One `(entry index, value)` per parameter, for each leader entry whose remembered values are eligible too.
     choices: tuple[tuple[tuple[int, EntryValue], ...], ...]
 
 
-def _pair_parameters(
-    bindings: dict[str, _ResolvedBinding],
-    eligible_per_parameter: dict[str, tuple[tuple[int, EntryValue, bool], ...]],
-) -> list[_PairedParameters]:
+def pair_parameters(
+    dictionaries: dict[str, DictionaryDefinition],
+    eligible: Mapping[str, Sequence[tuple[int, EntryValue]]],
+) -> list[PairedParameters]:
+    """Parameters whose dictionary values belong together, keyed by parameter name in both arguments."""
     # The first parameter bound to a dictionary takes part in pairing; another one bound to it draws on its own.
     parameter_for: dict[str, str] = {}
-    for parameter_name in eligible_per_parameter:
-        binding = bindings[parameter_name]
-        if binding.is_parameter_specific:
-            parameter_for.setdefault(binding.dictionary.name, parameter_name)
+    for parameter_name, dictionary in dictionaries.items():
+        parameter_for.setdefault(dictionary.name, parameter_name)
     paired = []
-    for leader, followers in pair_groups(bindings[name].dictionary for name in parameter_for.values()):
+    for leader, followers in pair_groups(dictionaries[name] for name in parameter_for.values()):
         if not followers:
             continue
         # The first eligible entry with each value, per follower.
         lookups: list[tuple[str, dict[EntryValue, tuple[int, EntryValue]]]] = []
         for follower in followers:
             lookup: dict[EntryValue, tuple[int, EntryValue]] = {}
-            for entry_index, entry_value, _ in eligible_per_parameter[parameter_for[follower.name]]:
+            for entry_index, entry_value in eligible[parameter_for[follower.name]]:
                 lookup.setdefault(follower.entries[entry_index].value, (entry_index, entry_value))
             lookups.append((follower.name, lookup))
         choices = []
-        for entry_index, entry_value, _ in eligible_per_parameter[parameter_for[leader.name]]:
+        for entry_index, entry_value in eligible[parameter_for[leader.name]]:
             origin = leader.entries[entry_index].origin
             choice = [(entry_index, entry_value)]
             for name, lookup in lookups:
@@ -214,7 +213,7 @@ def _pair_parameters(
                 choices.append(tuple(choice))
         if choices:
             parameters = (parameter_for[leader.name], *(parameter_for[follower.name] for follower in followers))
-            paired.append(_PairedParameters(parameters=parameters, choices=tuple(choices)))
+            paired.append(PairedParameters(parameters=parameters, choices=tuple(choices)))
     return paired
 
 
@@ -246,7 +245,18 @@ def build_dictionary_overlay_strategy(
         return inner
 
     # Negative cases want values that break the schema, not pairs that belong together.
-    paired = _pair_parameters(bindings, eligible_per_parameter) if generation_mode.is_positive else []
+    paired = (
+        pair_parameters(
+            {
+                name: bindings[name].dictionary
+                for name in eligible_per_parameter
+                if bindings[name].is_parameter_specific
+            },
+            {name: [(index, value) for index, value, _ in entries] for name, entries in eligible_per_parameter.items()},
+        )
+        if generation_mode.is_positive
+        else []
+    )
 
     def record(parameter_name: str, entry_index: int, entry_value: EntryValue, matches_schema: bool) -> DictionaryDraw:
         dictionary = bindings[parameter_name].dictionary

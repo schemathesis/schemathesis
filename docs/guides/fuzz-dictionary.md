@@ -103,7 +103,30 @@ Every order remembers the user it was listed under. A source that binds both dic
 
 With both bindings from the example above, a positive-mode request to `GET /users/{user_id}/orders/{order_id}` draws an order and takes `user_id` from the user it was listed under, so the pair always exists. Operations that bind only `path.user_id`, such as `GET /users/{user_id}/orders`, keep drawing from every user.
 
-Pairing applies to parameter bindings in the same location, e.g. both in the path. Negative-mode requests, type-wide bindings, body bindings and pairs split across locations draw each value on its own. When the order binding sets `probability`, it also decides how often the pair is drawn.
+Pairing applies to parameter bindings in the same location, e.g. both in the path, and to scalar arguments of one GraphQL field. Negative-mode requests, type-wide bindings, body bindings and pairs split across locations draw each value on its own. When the order binding sets `probability`, it also decides how often the pair is drawn.
+
+## Fill a Dictionary From a GraphQL API
+
+Name the field in `from-operation` and write the query to send:
+
+```toml
+[dictionaries.users]
+from-operation = "Query.users"
+query = "{ users(first: 100) { id } }"
+pointer = "/data/users/*/id"
+
+[dictionaries.orders]
+from-operation = "Query.orders"
+query = "query($userId: ID!) { orders(userId: $userId) { id } }"
+pointer = "/data/orders/*/id"
+parameters = { userId = { dictionary = "users" } }
+
+[parameters]
+"Query.order.userId" = { dictionary = "users" }
+"Query.order.orderId" = { dictionary = "orders" }
+```
+
+Keys in `parameters` are the query's variables, without `$`. A response whose `errors` come without values fails the load and reports the error messages. Values fill arguments the same way as in [Target GraphQL Arguments](#target-graphql-arguments), and `Query.order` gets an order together with the user it was listed under.
 
 ## Target Body Fields
 

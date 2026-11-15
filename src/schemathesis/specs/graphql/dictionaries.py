@@ -18,7 +18,7 @@ from schemathesis.config._dictionaries import (
     parse_graphql_path,
 )
 from schemathesis.core.transforms import format_body_path
-from schemathesis.generation.dictionaries import DictionaryDraw
+from schemathesis.generation.dictionaries import DictionaryDraw, pair_parameters
 from schemathesis.specs.graphql._helpers import (
     _root_type_for,
     _unwrap,
@@ -145,8 +145,12 @@ def _walk(
             continue
         field_path = (*path, selection.name.value)
         field = (parent_type.name, selection.name.value)
+        paired = _draw_pairs(selection, field_def, field, field_path, context)
         arguments = list(selection.arguments or ())
         for position, argument in enumerate(selection.arguments or ()):
+            if argument.name.value in paired:
+                arguments[position] = replace_node(argument, value=paired[argument.name.value])
+                continue
             argument_definition = field_def.args.get(argument.name.value)
             assert argument_definition is not None, "a generated argument exists on its field"
             replaced = _substitute_value(
@@ -231,6 +235,56 @@ def _scalar_node(
     if not eligible:
         return None
     entry_index, entry_value = context.random.choice(eligible)
+    _record(context, dictionary, entry_index, entry_value, argument_path, body_path)
+    return scalar_value_node(scalar_name, entry_value)
+
+
+def _draw_pairs(
+    selection: graphql.FieldNode,
+    field_def: graphql.GraphQLField,
+    field: tuple[str, str],
+    field_path: tuple[str, ...],
+    context: _Context,
+) -> dict[str, graphql.ValueNode]:
+    """Values for scalar arguments bound to dictionaries whose entries remember each other, drawn together."""
+    bound: dict[str, tuple[_ArgumentBinding, str]] = {}
+    for argument in selection.arguments or ():
+        name = argument.name.value
+        argument_type = graphql.get_nullable_type(field_def.args[name].type)
+        binding = _find_argument_binding(context, field, (name,))
+        if (
+            binding is not None
+            and isinstance(argument_type, graphql.GraphQLScalarType)
+            and argument_type.name in _SCALAR_TYPE_KEYS
+        ):
+            bound[name] = (binding, argument_type.name)
+    # Only a dictionary whose entries remember values of another one leads a pair.
+    if not any(binding.dictionary.origin for binding, _ in bound.values()):
+        return {}
+    eligible = {
+        name: _eligible_entries(binding.dictionary, scalar_name, _SCALAR_TYPE_KEYS[scalar_name])
+        for name, (binding, scalar_name) in bound.items()
+    }
+    values: dict[str, graphql.ValueNode] = {}
+    for pair in pair_parameters({name: binding.dictionary for name, (binding, _) in bound.items()}, eligible):
+        leader, _ = bound[pair.parameters[0]]
+        if context.random.random() >= leader.probability:
+            continue
+        for name, (entry_index, entry_value) in zip(pair.parameters, context.random.choice(pair.choices), strict=True):
+            binding, scalar_name = bound[name]
+            _record(context, binding.dictionary, entry_index, entry_value, (name,), (*field_path, name))
+            values[name] = scalar_value_node(scalar_name, entry_value)
+    return values
+
+
+def _record(
+    context: _Context,
+    dictionary: DictionaryDefinition,
+    entry_index: int,
+    entry_value: EntryValue,
+    argument_path: tuple[str, ...],
+    body_path: tuple[str, ...],
+) -> None:
     context.draws.append(
         DictionaryDraw(
             dictionary=dictionary.name,
@@ -245,12 +299,11 @@ def _scalar_node(
             body_path=format_body_path(body_path),
         )
     )
-    return scalar_value_node(scalar_name, entry_value)
 
 
-def _find_binding(
-    context: _Context, field: tuple[str, str], argument_path: tuple[str, ...], type_key: str
-) -> tuple[DictionaryDefinition, float] | None:
+def _find_argument_binding(
+    context: _Context, field: tuple[str, str], argument_path: tuple[str, ...]
+) -> _ArgumentBinding | None:
     type_name, field_name = field
     for binding in context.bindings.arguments:
         path = binding.path
@@ -259,7 +312,16 @@ def _find_binding(
             and path.field_name in (WILDCARD, field_name)
             and path.argument == argument_path
         ):
-            return binding.dictionary, binding.probability
+            return binding
+    return None
+
+
+def _find_binding(
+    context: _Context, field: tuple[str, str], argument_path: tuple[str, ...], type_key: str
+) -> tuple[DictionaryDefinition, float] | None:
+    binding = _find_argument_binding(context, field, argument_path)
+    if binding is not None:
+        return binding.dictionary, binding.probability
     return context.bindings.type_wide.get(type_key)
 
 
