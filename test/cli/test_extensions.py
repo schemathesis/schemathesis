@@ -1,6 +1,7 @@
 import re
 
 import pytest
+from flask import jsonify, request
 
 RECORDER = """
 from schemathesis.engine import events
@@ -271,3 +272,97 @@ class Native:
 """
     )
     assert cli.main("run", api.schema_url, "--max-examples=1", hooks=module) == snapshot_cli
+
+
+def _code_app(ctx, seen):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/check": {
+                "get": {
+                    "parameters": [{"name": "code", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/check")
+    def check():
+        seen.append(request.args.get("code"))
+        return jsonify({})
+
+    return app
+
+
+SUGGEST_IN_SETUP = """
+@schemathesis.extension("codes")
+class Codes:
+    def __init__(self, settings):
+        pass
+
+    def setup(self, context, schema):
+        context.suggest(["SECRET42"], parameter="query.code")
+"""
+SUGGEST_AFTER_CALL = """
+@schemathesis.extension("codes")
+class Codes:
+    def __init__(self, settings):
+        pass
+
+    def after_call(self, context, case, response):
+        context.suggest(["SECRET42"], parameter="query.code")
+"""
+
+
+@pytest.mark.parametrize("args", [("run", "--max-examples=30"), ("fuzz", "--max-time=1")], ids=["run", "fuzz"])
+def test_values_suggested_in_setup_reach_requests(ctx, cli, app_runner, args):
+    seen = []
+    url = app_runner.openapi_url(_code_app(ctx, seen))
+    cli.main(args[0], url, args[1], hooks=ctx.write_pymodule(SUGGEST_IN_SETUP))
+    assert "SECRET42" in seen
+
+
+def test_values_suggested_during_fuzzing_reach_later_requests(ctx, cli, app_runner):
+    seen = []
+    url = app_runner.openapi_url(_code_app(ctx, seen))
+    cli.main("fuzz", url, "--max-time=1", hooks=ctx.write_pymodule(SUGGEST_AFTER_CALL))
+    assert "SECRET42" in seen
+
+
+def test_suggested_value_exposes_a_failure(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/check": {
+                "get": {
+                    "parameters": [{"name": "code", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/check")
+    def check():
+        if request.args.get("code") == "SECRET42":
+            return jsonify({"error": "boom"}), 500
+        return jsonify({})
+
+    module = ctx.write_pymodule(SUGGEST_AFTER_CALL)
+    assert (
+        cli.run_openapi_app(app, "--max-examples=30", "--phases=fuzzing", "-c", "not_a_server_error", hooks=module)
+        == snapshot_cli
+    )
+
+
+def test_report_names_the_extension_that_suggested_a_value(ctx, cli, app_runner, tmp_path):
+    report = tmp_path / "report.ndjson"
+    url = app_runner.openapi_url(_code_app(ctx, []))
+    cli.main(
+        "run",
+        url,
+        "--max-examples=30",
+        "--phases=fuzzing",
+        f"--report-ndjson-path={report}",
+        hooks=ctx.write_pymodule(SUGGEST_IN_SETUP),
+    )
+    assert re.search(r'"dictionary":\s*"codes",\s*"source_kind":\s*"suggestion"', report.read_text())

@@ -45,6 +45,7 @@ from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.meta import CaseMetadata, TestPhase
+from schemathesis.generation.suggestions import Suggestions
 from schemathesis.hooks import HookDispatcherMark
 from schemathesis.transport.prepare import prepare_path, prepare_request
 
@@ -125,6 +126,7 @@ class BaseSchema(Mapping):
     hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
     auth: AuthStorage = field(default_factory=AuthStorage)
     test_function: Callable | None = None
+    suggestions: Suggestions = field(default_factory=Suggestions)
     # App identity + registry version the cached pool was built from.
     _constants_pool_cache: tuple[object, int, ConstantsPool] | None = field(
         init=False, default=None, repr=False, compare=False
@@ -478,6 +480,7 @@ class BaseSchema(Mapping):
             auth=self.auth,
             test_function=_test_function,
             filter_set=_filter_set,
+            suggestions=self.suggestions,
         )
         # Extraction imports the app and walks its modules; a clone shares the app, so it shares the result.
         cloned._constants_pool_cache = self._constants_pool_cache

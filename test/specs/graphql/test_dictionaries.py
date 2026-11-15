@@ -12,6 +12,7 @@ from schemathesis.generation.dictionaries import DictionaryDraw
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.meta import TestPhase
+from schemathesis.hooks import HookContext
 from schemathesis.python._constants.pool import ConstantEntry, ConstantsPool, Origin
 from schemathesis.specs.graphql.dictionaries import resolve_bindings, substitute_dictionaries
 from schemathesis.specs.graphql.schemas import graphql_cases
@@ -488,3 +489,16 @@ def test_invalid_binding_keys(key, expected):
         SchemathesisConfig.from_dict(
             {"dictionaries": {"d": {"values": ["x"]}}, "parameters": {key: {"dictionary": "d"}}}
         )
+
+
+def test_suggested_values_fill_arguments(ctx):
+    operation = load(ctx, {})["Query"]["bookByTitle"]
+    HookContext(operation=operation).suggest(["Dune"], parameter="Query.bookByTitle.title", probability=1.0)
+    assert collect_bodies(operation, max_examples=5, containing='title: "Dune"')
+
+
+def test_values_suggested_after_generation_started_fill_arguments(ctx):
+    operation = load(ctx, {})["Query"]["bookByTitle"]
+    before = collect_bodies(operation, max_examples=5, containing='title: "Dune"')
+    HookContext(operation=operation).suggest(["Dune"], parameter="Query.bookByTitle.title", probability=1.0)
+    assert not before and collect_bodies(operation, max_examples=5, containing='title: "Dune"')

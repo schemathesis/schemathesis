@@ -116,7 +116,7 @@ NEGATIVE_STRATEGY_PROBABILITY = 0.03
 # Generation settings a built strategy depends on: codec, `\x00`, header characters, extra parameters, dictionaries.
 GenerationCacheKey = tuple[str | None, bool, str | None, bool, frozenset[tuple[str, "DictionaryBinding"]]]
 # Feedback generation, semantic index and constants source identities, and the generation settings a strategy uses.
-StrategyCacheKey = tuple[int | None, int | None, int | None, GenerationCacheKey]
+StrategyCacheKey = tuple[int | None, int | None, int | None, int, GenerationCacheKey]
 
 # Chance to bias path integers positive: most REST APIs use positive resource IDs.
 PATH_INTEGER_POSITIVE_BIAS = 0.8
@@ -547,7 +547,7 @@ def _semantic_index(extra_data_source: ExtraDataSource | None) -> SemanticValueI
 
 
 def _strategy_cache_key(
-    generation_config: GenerationConfig, feedback: FeedbackSources, mix_examples: bool
+    operation: APIOperation, generation_config: GenerationConfig, feedback: FeedbackSources, mix_examples: bool
 ) -> StrategyCacheKey | None:
     """Identity of every live source and generation setting a built strategy closes over, or None to skip caching."""
     if not mix_examples:
@@ -558,6 +558,7 @@ def _strategy_cache_key(
         error_feedback.generation if error_feedback is not None else None,
         _semantic_cache_key(feedback.extra_data_source),
         id(constants_value_source) if constants_value_source is not None else None,
+        operation.schema.suggestions.generation(operation.label),
         (
             generation_config.codec,
             generation_config.allow_x00,
@@ -1686,7 +1687,7 @@ class OpenApiBody(OpenApiComponent):
         feedback: FeedbackSources = NO_FEEDBACK,
         mix_examples: bool = True,
     ) -> st.SearchStrategy:
-        strategy_key = _strategy_cache_key(generation_config, feedback, mix_examples)
+        strategy_key = _strategy_cache_key(operation, generation_config, feedback, mix_examples)
         # Caching the captured-variant overlay would freeze stale values; only the strategy beneath it is cached
         consumes_captured = _captured_variants_active(feedback.extra_data_source, operation)
         overlay_key = None if consumes_captured else strategy_key
@@ -2484,7 +2485,7 @@ class OpenApiParameterSet(ParameterSet):
         mix_examples: bool = True,
     ) -> st.SearchStrategy:
         exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
-        strategy_key = _strategy_cache_key(generation_config, feedback, mix_examples)
+        strategy_key = _strategy_cache_key(operation, generation_config, feedback, mix_examples)
         cache_key = (exclude_key, generation_mode, strategy_key) if strategy_key is not None else None
         # Captured variants are bound at build time, so their consumers cache only the strategy beneath them.
         consumes_captured = _captured_variants_active(feedback.extra_data_source, operation)
