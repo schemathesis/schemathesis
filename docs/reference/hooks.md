@@ -18,7 +18,7 @@ Hooks that execute during schema loading and operation initialization.
 
 ## Run-Lifecycle Hooks
 
-Hooks that run once per `st run` or `st fuzz` invocation.
+Hooks that run once per `st run` or `st fuzz` invocation, and once per schema in a pytest session.
 
 | Hook | Signature | Execution Stage | Purpose |
 |------|-----------|-----------------|---------|
@@ -40,7 +40,9 @@ def teardown(ctx, schema):
     requests.post(f"{schema.get_base_url()}/test-data/reset")
 ```
 
-An error in a `setup` hook is reported, fails the run, and testing still proceeds. Every `teardown` hook runs even when another one fails. The pytest plugin does not call these hooks.
+An error in a `setup` hook is reported, fails the run, and testing still proceeds. Every `teardown` hook runs even when another one fails.
+
+Under pytest, both hooks run as a fixture around all tests of a schema: `setup` before the first test, `teardown` after the last one and before the session fixtures those tests use are torn down. A schema from `schemathesis.pytest.from_fixture` gets them each time its fixture is created. An error in `setup` makes the tests of that schema error without running. With `pytest-xdist`, each worker runs both hooks.
 
 ## Data Generation Hooks
 
@@ -164,7 +166,7 @@ When multiple hooks of the same type are registered, they execute in registratio
 
 ## Extensions
 
-An extension is a class whose methods are hooks. Schemathesis creates one instance for each `st run` or `st fuzz` invocation and passes it the extension's settings from `schemathesis.toml`.
+An extension is a class whose methods are hooks. Schemathesis creates one instance for each `st run` or `st fuzz` invocation, or pytest session, and passes it the extension's settings from `schemathesis.toml`.
 
 ```python
 # status_log.py
@@ -202,4 +204,5 @@ The run summary gets a line like `staging: 10 responses`.
 - **Threads.** With more than one worker, hooks that run for each test case are called from several threads on the same instance. Guard multi-step updates of shared state with a lock.
 - **Compiled classes.** Register a class from a compiled module, such as PyO3, with a call: `schemathesis.extension("status-log")(StatusLog)`. In PyO3, hook methods take `&self`.
 - **Errors.** Errors name the extension: ``Error in `setup` hook of `status-log` extension``.
-- **Limits.** `st replay` and the pytest plugin ignore extensions: they create no instance and read no settings.
+- **pytest.** The pytest plugin creates one instance per session, as soon as the class registers, with settings from the nearest `schemathesis.toml`. `handle_event` is not called. With `pytest-xdist`, each worker has its own instance.
+- **Limits.** `st replay` ignores extensions: it creates no instance and reads no settings.

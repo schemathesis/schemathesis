@@ -18,6 +18,7 @@ from schemathesis.cli.output import display_header
 from schemathesis.config import ConfigError, SchemathesisConfig
 from schemathesis.core.errors import HookError, format_exception
 from schemathesis.core.version import SCHEMATHESIS_VERSION
+from schemathesis.hooks import set_extension_listener
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 ROOT_CONTEXT_SETTINGS: dict[str, Any] = {"help_option_names": []}
@@ -70,6 +71,9 @@ def schemathesis(ctx: click.Context, config_file: str | None) -> None:
     """Property-based API testing for OpenAPI, GraphQL, and gRPC."""
     # grpc's native logs repeat errors the report shows. grpc reads this on import, which hooks loaded below may do.
     os.environ.setdefault("GRPC_VERBOSITY", "NONE")
+    # A command creates its extensions itself, also when it runs inside a pytest session
+    listener = set_extension_listener(None)
+    ctx.call_on_close(lambda: set_extension_listener(listener))
     try:
         if config_file is not None:
             config = SchemathesisConfig.from_path(config_file)
