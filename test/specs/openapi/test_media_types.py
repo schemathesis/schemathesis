@@ -1,3 +1,6 @@
+import json
+from email.parser import BytesParser
+from email.policy import HTTP
 from pathlib import Path
 
 import jsonschema_rs
@@ -282,6 +285,47 @@ def test_json_sequence_body_generation(ctx, version, media_type, media_type_obje
     def test(case):
         assert validator.is_valid(case.body), f"Invalid body: {case.body!r}"
         assert parse_json_sequence(REQUESTS_TRANSPORT.serialize_case(case)["data"], media_type) == case.body
+
+
+@pytest.mark.parametrize(
+    ("media_type", "media_type_object", "part_content_type", "expected"),
+    [
+        (
+            "multipart/mixed",
+            {"itemSchema": {"$ref": "#/components/schemas/Item"}, "schema": {"maxItems": 2}},
+            "application/json",
+            {"type": "array", "items": JSON_SEQUENCE_ITEM, "maxItems": 2},
+        ),
+        (
+            "multipart/byteranges",
+            {"itemSchema": JSON_SEQUENCE_ITEM, "itemEncoding": {"contentType": "application/vnd.item+json"}},
+            "application/vnd.item+json",
+            {"type": "array", "items": JSON_SEQUENCE_ITEM},
+        ),
+    ],
+    ids=["item-schema-and-schema", "item-encoding"],
+)
+def test_multipart_item_schema_body_generation(ctx, media_type, media_type_object, part_content_type, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": {media_type: media_type_object}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.2.0",
+        components={"schemas": {"Item": JSON_SEQUENCE_ITEM}},
+    )
+    validator = jsonschema_rs.validator_for(expected)
+
+    @run_given(operation.as_strategy(), max_examples=10)
+    def test(case):
+        assert validator.is_valid(case.body), f"Invalid body: {case.body!r}"
+        kwargs = REQUESTS_TRANSPORT.serialize_case(case)
+        header = f"Content-Type: {kwargs['headers']['Content-Type']}\r\n\r\n".encode()
+        message = BytesParser(policy=HTTP).parsebytes(header + kwargs["data"])
+        assert [message.get_content_type()] + [
+            (part.get_content_type(), part.get_payload(decode=True)) for part in message.iter_parts()
+        ] == [media_type] + [(part_content_type, json.dumps(item).encode()) for item in case.body]
 
 
 def test_multipart_encoding_multiple_content_types(ctx):

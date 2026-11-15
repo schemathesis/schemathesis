@@ -496,7 +496,7 @@ def encode_non_object_multipart(ctx: SerializationContext, value: Any) -> tuple[
     """Encode a body that is not a mapping of named parts and return it with its Content-Type."""
     media_type = ctx.case.media_type or "multipart/form-data"
     main, sub = media_types.parse(media_type)
-    if isinstance(value, list) and sub not in ("form-data", "*"):
+    if isinstance(value, list) and media_types.is_positional_multipart(media_type):
         # Parts of multipart types other than forms have no names, so each array item is one part, in order.
         body = ctx.case.operation.get_body_for_media_type(media_type)
         # A media type the operation does not declare gives every part the defaults for a value of any type.

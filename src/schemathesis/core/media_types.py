@@ -181,6 +181,11 @@ def is_multipart(value: str | None) -> bool:
         return False
 
 
+def is_positional_multipart(value: str) -> bool:
+    """Detect multipart media types with unnamed, ordered parts: all but `multipart/form-data` and `multipart/*`."""
+    return is_multipart(value) and parse(value)[1] not in ("form-data", "*")
+
+
 def is_json_parts(media_type: tuple[str, str]) -> bool:
     if media_type in JSON_MEDIA_TYPES:
         return True
