@@ -59,6 +59,10 @@
 
 - Crash files deleted or replayed against the wrong schema after a run against another API.
 
+#### CLI and configuration
+
+- Command-line options losing to `[[operations]]` and `[phases]` settings in the configuration file.
+
 ## [4.33.4](https://github.com/schemathesis/schemathesis/compare/v4.33.3...v4.33.4) - 2026-11-12
 
 ### :bug: Fixed

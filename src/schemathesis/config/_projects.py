@@ -57,6 +57,8 @@ def get_workers_count() -> int:
 @dataclass(repr=False)
 class ProjectConfig(DiffBase):
     _parent: SchemathesisConfig | None
+    # Command-line options, which outrank every configuration level, operations and phases included.
+    _override: ProjectConfig | None
     baseline: str | None
     base_url: str | None
     origin: str | None
@@ -86,6 +88,7 @@ class ProjectConfig(DiffBase):
 
     __slots__ = (
         "_parent",
+        "_override",
         "baseline",
         "_baseline_cache",
         "base_url",
@@ -148,6 +151,7 @@ class ProjectConfig(DiffBase):
         operations: OperationsConfig | None = None,
     ) -> None:
         self._parent = parent
+        self._override = None
         if base_url is not None:
             _validate_base_url(base_url)
         self.baseline = baseline
@@ -347,10 +351,17 @@ class ProjectConfig(DiffBase):
             return None
         return self.operations.get_for_operation(operation=operation)
 
+    def _from_command_line(self, option: str) -> bool:
+        return self._override is not None and option in self._override._source_keys
+
     def auth_for(self, *, operation: APIOperation | None = None) -> tuple[str, str] | None:
         """Get auth credentials, prioritizing operation-specific configs."""
         config = self._operation_config(operation)
-        if config is not None and config.auth.basic is not None:
+        if (
+            config is not None
+            and config.auth.basic is not None
+            and (self._override is None or self._override.auth.basic is None)
+        ):
             return config.auth.basic
         return self.auth.basic
 
@@ -358,13 +369,13 @@ class ProjectConfig(DiffBase):
         """Get explicitly configured headers."""
         headers = self.headers.copy() if self.headers else {}
         config = self._operation_config(operation)
-        if config is not None and config.headers is not None:
+        if config is not None and config.headers is not None and not self._from_command_line("headers"):
             headers.update(config.headers)
         return headers
 
     def max_redirects_for(self, *, operation: APIOperation | None = None) -> int | None:
         config = self._operation_config(operation)
-        if config is not None and config.max_redirects is not None:
+        if config is not None and config.max_redirects is not None and not self._from_command_line("max_redirects"):
             return config.max_redirects
         return self.max_redirects
 
@@ -380,19 +391,19 @@ class ProjectConfig(DiffBase):
         return self._request_timeout(self._operation_config(operation))
 
     def _request_timeout(self, config: OperationConfig | None) -> float | int | None:
-        if config is not None and config.request_timeout is not None:
+        if config is not None and config.request_timeout is not None and not self._from_command_line("request_timeout"):
             return config.request_timeout
         return self.request_timeout
 
     def request_retries_for(self, *, operation: APIOperation | None = None) -> int | None:
         config = self._operation_config(operation)
-        if config is not None and config.request_retries is not None:
+        if config is not None and config.request_retries is not None and not self._from_command_line("request_retries"):
             return config.request_retries
         return self.request_retries
 
     def continue_on_failure_for(self, *, operation: APIOperation) -> bool:
         config = self.operations.get_for_operation(operation=operation)
-        if config.continue_on_failure is not None:
+        if config.continue_on_failure is not None and not self._from_command_line("continue_on_failure"):
             return config.continue_on_failure
         return bool(self.continue_on_failure)
 
@@ -400,7 +411,7 @@ class ProjectConfig(DiffBase):
         return self._tls_verify(self._operation_config(operation))
 
     def _tls_verify(self, config: OperationConfig | None) -> bool | str | None:
-        if config is not None and config.tls_verify is not None:
+        if config is not None and config.tls_verify is not None and not self._from_command_line("tls_verify"):
             return config.tls_verify
         return self.tls_verify
 
@@ -408,7 +419,7 @@ class ProjectConfig(DiffBase):
         return self._request_cert(self._operation_config(operation))
 
     def _request_cert(self, config: OperationConfig | None) -> str | tuple[str, str] | None:
-        if config is not None and config.request_cert is not None:
+        if config is not None and config.request_cert is not None and not self._from_command_line("request_cert"):
             if config.request_cert_key:
                 return config.request_cert, config.request_cert_key
             return config.request_cert
@@ -448,20 +459,20 @@ class ProjectConfig(DiffBase):
         return self._proxy(self._operation_config(operation))
 
     def _proxy(self, config: OperationConfig | None) -> str | None:
-        if config is not None and config.proxy is not None:
+        if config is not None and config.proxy is not None and not self._from_command_line("proxy"):
             return config.proxy
         return self.proxy
 
     def rate_limit_for(self, *, operation: APIOperation | None = None) -> Limiter | Literal["auto"] | None:
         config = self._operation_config(operation)
-        if config is not None and config.rate_limit is not None:
+        if config is not None and config.rate_limit is not None and not self._from_command_line("rate_limit"):
             return config.rate_limit
         return self.rate_limit
 
     def warnings_for(self, *, operation: APIOperation | None = None) -> WarningsConfig:
         # Some non-fatal schema parsing errors have no operation
         config = self._operation_config(operation)
-        if config is not None and config.warnings is not None:
+        if config is not None and config.warnings is not None and not self._from_command_line("warnings"):
             return config.warnings
         return self.warnings
 
@@ -474,6 +485,8 @@ class ProjectConfig(DiffBase):
         if not configs:
             return self.phases
         configs.append(self.phases)
+        if self._override is not None:
+            configs.insert(0, self._override.phases)
         return PhasesConfig.from_hierarchy(configs)
 
     def generation_for(
@@ -496,6 +509,8 @@ class ProjectConfig(DiffBase):
         if not configs:
             return self.generation
         configs.append(self.generation)
+        if self._override is not None:
+            configs.insert(0, self._override.generation)
         return GenerationConfig.from_hierarchy(configs)
 
     def checks_config_for(
@@ -518,6 +533,8 @@ class ProjectConfig(DiffBase):
         if not configs:
             return self.checks
         configs.append(self.checks)
+        if self._override is not None:
+            configs.insert(0, self._override.checks)
         return ChecksConfig.from_hierarchy(configs)
 
     def explicit_hypothesis_settings(
@@ -724,6 +741,7 @@ class ProjectsConfig(DiffBase):
     def get_default(self) -> ProjectConfig:
         config = ProjectConfig.from_hierarchy([self.override, self.default])
         config._parent = self.default._parent
+        config._override = self.override
         return config
 
     def get(self, schema: dict[str, Any]) -> ProjectConfig:
@@ -742,4 +760,6 @@ class ProjectsConfig(DiffBase):
         configs.append(self.default)
         config = ProjectConfig.from_hierarchy(configs)
         config._parent = self.default._parent
+        if not isinstance(self._override, NotSet):
+            config._override = self._override
         return config

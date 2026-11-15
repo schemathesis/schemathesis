@@ -209,10 +209,11 @@ def test_configured_authorization_headers_win_over_netrc(ctx, cli, tmp_path):
         "--phases=fuzzing",
         "--max-examples=1",
         "--checks=not_a_server_error",
-        "-H",
-        "Authorization: Bearer project",
         env={"NETRC": str(netrc)},
-        config={"operations": [{"include-name": "GET /api/text", "headers": {"Authorization": "Bearer text"}}]},
+        config={
+            "headers": {"Authorization": "Bearer project"},
+            "operations": [{"include-name": "GET /api/text", "headers": {"Authorization": "Bearer text"}}],
+        },
     )
     assert {
         (request.path, request.headers.get("Authorization"))
