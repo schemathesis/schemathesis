@@ -25,6 +25,7 @@ from schemathesis.core.jsonschema import (
     maybe_resolve_bundled,
     resolve_bundled_ref,
     schema_with_bundle,
+    try_make_validator,
 )
 from schemathesis.core.jsonschema.types import JsonSchema, as_object_schema
 from schemathesis.core.mutations import Mutation, OperatorKind, render_mutations
@@ -1039,7 +1040,9 @@ def _additional_properties_hint(case: Case, response: Response) -> str | None:
     # `format: binary` fields hold raw bytes the JSON Schema validator cannot accept.
     if contains_binary(stripped):
         return None
-    if not make_validator(alternative.optimized_schema, validator_cls).is_valid(stripped):
+    validator = try_make_validator(alternative.optimized_schema, validator_cls)
+    # Without a readable schema there is no telling whether the declared properties alone are valid.
+    if validator is None or not validator.is_valid(stripped):
         return None
 
     # The server named a declared field and none of the extras, so the extras did not cause the rejection.
