@@ -18,6 +18,7 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     ANY_VALUE_TYPES,
     NULL_ONLY,
+    SCALAR_TYPES,
     BodyPath,
     Cardinality,
     DeferredBindings,
@@ -372,11 +373,8 @@ def assigns_identifier(operation: APIOperation, resource_name: str) -> bool:
     return False
 
 
-_SCALAR_TYPES = frozenset({"string", "integer", "number"})
-
-
 def _is_scalar(schema: JsonSchema) -> bool:
-    return isinstance(schema, dict) and bool(_SCALAR_TYPES & set(get_type(schema)))
+    return isinstance(schema, dict) and bool(SCALAR_TYPES & set(get_type(schema)))
 
 
 def _takes_object(schema: object, bundled: dict[str, JsonSchema], seen: frozenset[str] = frozenset()) -> bool:
@@ -1771,7 +1769,7 @@ def _names_nested_item(input_slot: InputSlot, resource_name: str, path: str, ite
 
 
 def _fits_path_parameter(field_types: set[str], parameter: OpenApiParameter) -> bool:
-    if not field_types & _SCALAR_TYPES:
+    if not field_types & SCALAR_TYPES:
         return False
     declared_types = declared_parameter_types(parameter)
     if field_types & set(declared_types):

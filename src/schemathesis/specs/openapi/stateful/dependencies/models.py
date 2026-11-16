@@ -659,6 +659,7 @@ def holds_only_array_values(
 
 
 NULL_ONLY = frozenset({"null"})
+SCALAR_TYPES = frozenset({"string", "integer", "number"})
 
 
 def _alternatives_hold_only_arrays(
@@ -1160,11 +1161,11 @@ class InputSlot:
         """Whether this input accepts values of `value_types`: a UUID parameter takes only strings."""
         if self.takes_uuid and "string" not in value_types:
             return False
-        # Parameters travel as text, so only a body field tells a number from a string or an object.
+        # Parameters travel as text: an identifier is a string or a number, never an object or array.
         # A link sends an existing identifier, which is never `null`.
-        return self.parameter_location != ParameterLocation.BODY or types_overlap(
-            value_types, self.value_types - NULL_ONLY
-        )
+        if self.parameter_location != ParameterLocation.BODY:
+            return not SCALAR_TYPES.isdisjoint(value_types)
+        return types_overlap(value_types, self.value_types - NULL_ONLY)
 
     def takes_foreign_key(self, field: FKField | NestedFKField) -> bool:
         """Whether the values of a foreign key fit: a whole array of identifiers only fits a parameter taking one."""

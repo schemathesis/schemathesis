@@ -4083,6 +4083,43 @@ def test_key_sent_in_body_to_a_qualified_collection_feeds_the_plain_one(ctx):
 
 
 @pytest.mark.parametrize(
+    ("field", "field_schema", "expected"),
+    [
+        ("droplet_id", {"type": "integer"}, {"path.droplet_id": "$request.body#/droplet_id"}),
+        ("droplet_ids", {"type": "array", "items": {"type": "integer"}}, None),
+    ],
+    ids=["scalar", "array"],
+)
+def test_request_body_key_fills_path_parameter_only_with_a_scalar(ctx, field, field_schema, expected):
+    paths = {
+        **operation_with_body(
+            "post",
+            "/firewalls/{firewall_id}/droplets",
+            "204",
+            {"type": "object", "properties": {field: field_schema}, "required": [field]},
+            parameters=[path_param("firewall_id")],
+        ),
+        **operation("get", "/droplets/{droplet_id}", "200", parameters=[path_param("droplet_id", "integer")]),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == (
+        []
+        if expected is None
+        else [
+            [
+                "#/paths/~1firewalls~1{firewall_id}~1droplets/post",
+                "204",
+                {
+                    "operationRef": "#/paths/~1droplets~1{droplet_id}/get",
+                    "x-schemathesis": {"is_inferred": True},
+                    "parameters": expected,
+                },
+            ]
+        ]
+    )
+
+
+@pytest.mark.parametrize(
     "response_schema",
     [
         pytest.param(ref("#/info/title"), id="direct"),
@@ -5913,6 +5950,7 @@ CUSTOMER_COMPONENTS = {
         "CustomerIds": CUSTOMER_IDS,
         "RecursiveId": {"type": "integer", "allOf": [component_ref("RecursiveId")]},
         "CustomerIdsOrNull": {"anyOf": [component_ref("CustomerIds"), {"type": "null"}]},
+        "CustomerKey": {"type": "object", "properties": {"customer_id": {"type": "integer"}}},
         "RecursiveIdsOrNull": {"anyOf": [component_ref("RecursiveIdsOrNull"), {"type": "null"}]},
     }
 }
@@ -5986,6 +6024,12 @@ def order_to_customer(pointer):
             {"shipping": nested_object("customer_id", {"anyOf": [{"type": "integer"}, {"type": "null"}]})},
             [CREATED_CUSTOMER_TO_READ, order_to_customer("/shipping/customer_id")],
         ),
+        ({"customer_id": {"type": "object", "properties": {"name": {"type": "string"}}}}, [CREATED_CUSTOMER_TO_READ]),
+        (
+            {"customer_id": component_ref("CustomerKey")},
+            [CREATED_CUSTOMER_TO_READ, order_to_customer("/customer_id/customer_id")],
+        ),
+        ({"shipping": nested_object("customer_id", component_ref("CustomerKey"))}, [CREATED_CUSTOMER_TO_READ]),
     ],
     ids=[
         "array",
@@ -6010,9 +6054,12 @@ def order_to_customer(pointer):
         "any-of-integer-or-null",
         "one-of-array-or-integer",
         "nested-any-of-integer-or-null",
+        "object",
+        "object-ref",
+        "nested-object-ref",
     ],
 )
-def test_singular_fk_response_field_holding_an_array_does_not_fill_scalar_parameters(ctx, order, expected):
+def test_singular_fk_response_field_holding_an_array_or_object_does_not_fill_scalar_parameters(ctx, order, expected):
     paths = {
         **CREATE_CUSTOMER,
         **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id", "integer")]),

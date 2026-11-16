@@ -63,6 +63,10 @@
 - Internal error in `positive_data_acceptance` for rejected bodies with undeclared properties and a malformed schema. [#6118](https://github.com/schemathesis/schemathesis/issues/6118)
 - `--checks` enabling `max_response_time` with a 10-second limit, or disabling a configured one.
 
+#### Inferred links
+
+- Links filling path, query or header parameters with object or array fields, e.g. `productId: {...}`.
+
 #### `st replay`
 
 - Crash files deleted or replayed against the wrong schema after a run against another API.
