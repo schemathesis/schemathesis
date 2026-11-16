@@ -101,6 +101,7 @@
 
 - Shrink failing inputs to a minimal example in pytest, Hypothesis and stateful tests.
 - `AttributeError` in `validate_response()` for unsupported response types.
+- ASGI applications receiving requests before lifespan startup completes when tested with several workers.
 
 ## [4.33.4](https://github.com/schemathesis/schemathesis/compare/v4.33.3...v4.33.4) - 2026-11-12
 
