@@ -20,7 +20,7 @@ from schemathesis import transport
 from schemathesis.config import ConfigError, GenerationConfig, ProjectConfig, SanitizationConfig
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, curl, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
-from schemathesis.core.errors import IncorrectUsage, InvalidSchema
+from schemathesis.core.errors import IncorrectUsage, InvalidSchema, format_app_exception
 from schemathesis.core.failures import FailureGroup, ServerError
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation, SkippedParameter
@@ -133,6 +133,8 @@ class BaseSchema(Mapping):
     )
     # Check instances outside the engine; clones build their own, so `after_run` fires once per test function.
     _run_checks: RunChecks | None = field(init=False, default=None, repr=False, compare=False)
+    # Whether an exception from an in-process app propagates to the caller; the engine reports it as a failure.
+    raise_app_exceptions: bool = field(init=False, default=True, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
@@ -484,6 +486,7 @@ class BaseSchema(Mapping):
         )
         # Extraction imports the app and walks its modules; a clone shares the app, so it shares the result.
         cloned._constants_pool_cache = self._constants_pool_cache
+        cloned.raise_app_exceptions = self.raise_app_exceptions
         return cloned
 
     def get_local_hook_dispatcher(self) -> HookDispatcher | None:
@@ -745,7 +748,16 @@ class BaseSchema(Mapping):
 
     def server_error(self, case: Case, response: Response) -> ServerError:
         """The failure an error status reports; specs with status names or error origins, e.g. gRPC, override it."""
-        return ServerError(operation=case.operation.label, status_code=response.status_code)
+        # Checks also accept responses of other HTTP clients, which never carry one
+        exception = getattr(response, "app_exception", None)
+        if exception is None:
+            return ServerError(operation=case.operation.label, status_code=response.status_code)
+        return ServerError(
+            operation=case.operation.label,
+            status_code=response.status_code,
+            message=format_app_exception(exception),
+            origin=type(exception).__qualname__,
+        )
 
     def evaluate_negative_data(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
         """Raise a failure if the spec's conventions show that invalid data was accepted; the default does nothing."""

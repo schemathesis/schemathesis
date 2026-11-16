@@ -153,6 +153,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             data["headers"].update(_auth_headers(case, auth, data))
 
         client = session or wsgi.get_client(application)
+        raise_app_exceptions = case.operation.schema.raise_app_exceptions
         cookies = prepare_cookies({**(serialize_cookies(case) or {}), **(cookies or {})})
 
         config = case.operation.schema.config
@@ -164,10 +165,17 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             ratelimit(rate_limit, config.base_url),
         ):
             started_at = Instant()
-            response = client.open(**data)
+            try:
+                response = client.open(**data)
+            except Exception as exc:
+                if raise_app_exceptions:
+                    raise
+                # A server would answer with an error; the application left that to its caller
+                captured.exception = exc
+                response = wsgi.get_client(_internal_server_error).open(**data)
             elapsed = started_at.elapsed
 
-        if captured.exception is not None:
+        if captured.exception is not None and raise_app_exceptions:
             raise captured.exception
 
         requests_kwargs = REQUESTS_TRANSPORT.serialize_case(
@@ -209,7 +217,13 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             verify=False,
             stream_cut_short=stream_cut_short,
             _override=Override.from_send_kwargs(kwargs),
+            app_exception=captured.exception,
         )
+
+
+def _internal_server_error(environ: dict[str, object], start_response: Callable[..., object]) -> list[bytes]:
+    start_response("500 INTERNAL SERVER ERROR", [("Content-Type", "text/plain")])
+    return [b"Internal Server Error"]
 
 
 class _CapturedServerException:

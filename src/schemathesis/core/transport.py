@@ -58,6 +58,7 @@ _EVENT_END_RE = re.compile(rb"(?:\r\n|\r|\n)(?:\r\n|\r|\n)")
 _UTF8_BOM = b"\xef\xbb\xbf"
 # Marks a `requests.Response` whose event stream was cut short, until it becomes a `Response`
 STREAM_CUT_SHORT_ATTRIBUTE = "_schemathesis_stream_cut_short"
+APP_EXCEPTION_ATTRIBUTE = "_schemathesis_app_exception"
 
 
 def response_content_type(response: Response) -> str | None:
@@ -319,6 +320,8 @@ class Response:
     render_content: Callable[[bytes], str | None] | None
     # Replaces "[<code>] <reason>" in failure output, for responses whose status is not an HTTP status.
     status_line: str | None
+    # What an in-process application raised while it handled the request.
+    app_exception: BaseException | None
 
     __slots__ = (
         "status_code",
@@ -337,6 +340,7 @@ class Response:
         "_override",
         "render_content",
         "status_line",
+        "app_exception",
     )
 
     def __init__(
@@ -355,6 +359,7 @@ class Response:
         _override: Override | None = None,
         render_content: Callable[[bytes], str | None] | None = None,
         status_line: str | None = None,
+        app_exception: BaseException | None = None,
     ):
         self.status_code = status_code
         self.headers = {key.lower(): value for key, value in headers.items()}
@@ -373,6 +378,7 @@ class Response:
         self._override = _override
         self.render_content = render_content
         self.status_line = status_line
+        self.app_exception = app_exception
 
     @overload
     @classmethod
@@ -433,6 +439,7 @@ class Response:
             verify=verify,
             stream_cut_short=getattr(response, STREAM_CUT_SHORT_ATTRIBUTE, False),
             _override=_override,
+            app_exception=getattr(response, APP_EXCEPTION_ATTRIBUTE, None),
         )
 
     @classmethod

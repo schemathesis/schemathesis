@@ -21,6 +21,7 @@ from urllib3.exceptions import ReadTimeoutError
 
 from schemathesis.core import media_types
 from schemathesis.core.transport import (
+    APP_EXCEPTION_ATTRIBUTE,
     DEFAULT_MAX_STREAM_EVENTS,
     STREAM_CUT_SHORT_ATTRIBUTE,
     EventStreamBuffer,
@@ -243,10 +244,11 @@ class _OriginalResponse:
 
 
 class _ASGIAdapter(requests.adapters.HTTPAdapter):
-    def __init__(self, app: ASGIApp, max_stream_events: int) -> None:
+    def __init__(self, app: ASGIApp, max_stream_events: int, raise_app_exceptions: bool) -> None:
         super().__init__()
         self.app = app
         self.max_stream_events = max_stream_events
+        self.raise_app_exceptions = raise_app_exceptions
         self.entered = False
 
     def close(self) -> None:
@@ -375,6 +377,7 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
         portal = _get_portal()
         response_complete = portal.call(anyio.Event)
         cut_at_deadline = False
+        app_exception: Exception | None = None
         try:
             portal.call(run)
         except TimeoutError:
@@ -388,6 +391,22 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
                 raise requests.exceptions.ReadTimeout(error, request=request) from None
             raw_kwargs["body"] = io.BytesIO(event_stream.complete_events)
             cut_at_deadline = True
+        except Exception as exc:
+            if self.raise_app_exceptions:
+                raise
+            app_exception = exc
+            if not response_started:
+                # A server would answer with an error; the application left that to its caller
+                raw_kwargs.update(
+                    version=11,
+                    status=500,
+                    reason=_reason_phrase(500),
+                    headers=[],
+                    preload_content=False,
+                    original_response=_OriginalResponse([]),
+                )
+                response_started = True
+            raw_kwargs["body"].seek(0)
 
         assert response_started, "The application did not return a response."
 
@@ -395,15 +414,22 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
         response = self.build_response(request, raw)
         if cut_at_deadline:
             setattr(response, STREAM_CUT_SHORT_ATTRIBUTE, True)
+        if app_exception is not None:
+            setattr(response, APP_EXCEPTION_ATTRIBUTE, app_exception)
         return response
 
 
 class ASGIClient(requests.Session):
     def __init__(
-        self, app: ASGIApp, base_url: str = f"http://{HOST}", *, max_stream_events: int = DEFAULT_MAX_STREAM_EVENTS
+        self,
+        app: ASGIApp,
+        base_url: str = f"http://{HOST}",
+        *,
+        max_stream_events: int = DEFAULT_MAX_STREAM_EVENTS,
+        raise_app_exceptions: bool = True,
     ) -> None:
         super().__init__()
-        self.adapter = _ASGIAdapter(app, max_stream_events)
+        self.adapter = _ASGIAdapter(app, max_stream_events, raise_app_exceptions)
         self.mount("http://", self.adapter)
         self.mount("https://", self.adapter)
         self.headers.update({"user-agent": "testclient"})
@@ -425,5 +451,7 @@ class ASGIClient(requests.Session):
         super().__exit__(*args)
 
 
-def get_client(app: ASGIApp, *, max_stream_events: int = DEFAULT_MAX_STREAM_EVENTS) -> ASGIClient:
-    return ASGIClient(app, max_stream_events=max_stream_events)
+def get_client(
+    app: ASGIApp, *, max_stream_events: int = DEFAULT_MAX_STREAM_EVENTS, raise_app_exceptions: bool = True
+) -> ASGIClient:
+    return ASGIClient(app, max_stream_events=max_stream_events, raise_app_exceptions=raise_app_exceptions)

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import enum
+import os
 import re
+import sysconfig
 import traceback
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -752,6 +754,22 @@ def format_exception(
     if skip_frames > 0:
         trace = extract_nth_traceback(trace, skip_frames)
     lines = traceback.format_exception(type(error), error, trace)
+    return "".join(lines).strip()
+
+
+# Frames from Schemathesis itself, the standard library and installed packages are not application code.
+_FOREIGN_CODE = (
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    *(sysconfig.get_path(name) for name in ("stdlib", "purelib", "platlib")),
+)
+
+
+def format_app_exception(error: BaseException) -> str:
+    """Format an exception an application raised, with only the frames of the application's own code."""
+    frames = [
+        frame for frame in traceback.extract_tb(error.__traceback__) if not frame.filename.startswith(_FOREIGN_CODE)
+    ]
+    lines = traceback.format_list(frames) + traceback.format_exception_only(type(error), error)
     return "".join(lines).strip()
 
 

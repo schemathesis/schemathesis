@@ -5611,3 +5611,111 @@ def test_app_that_fails_to_serve_its_schema(cli, snapshot_cli):
 def test_app_without_a_schema_at_the_location(ctx, cli, snapshot_cli):
     module = _write_app(ctx, IN_PROCESS_FLASK)
     assert cli.main("run", "/missing.json", f"--app={module}:app") == snapshot_cli
+
+
+CRASHING_FLASK = """
+from flask import Flask, jsonify
+
+app = Flask("crashing")
+
+@app.route("/openapi.json")
+def spec():
+    return jsonify({schema!r})
+
+@app.route("/api/success")
+def success():
+    raise RuntimeError("boom in handler")
+"""
+CRASHING_FASTAPI = """
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/api/success")
+def success():
+    raise RuntimeError("boom in handler")
+"""
+CRASHING_WSGI = """
+import json
+
+def app(environ, start_response):
+    if environ["PATH_INFO"] == "/openapi.json":
+        start_response("200 OK", [("Content-Type", "application/json")])
+        return [json.dumps({schema!r}).encode()]
+    raise RuntimeError("boom in handler")
+"""
+CRASHING_ASGI = """
+import json
+
+async def app(scope, receive, send):
+    if scope["type"] != "http":
+        return
+    if scope["path"] != "/openapi.json":
+        raise RuntimeError("boom in handler")
+    await send({{"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json")]}})
+    await send({{"type": "http.response.body", "body": json.dumps({schema!r}).encode()}})
+"""
+
+
+@pytest.mark.parametrize(
+    "source",
+    [CRASHING_FLASK, CRASHING_FASTAPI, CRASHING_WSGI, CRASHING_ASGI],
+    ids=["flask", "fastapi", "wsgi", "asgi"],
+)
+def test_app_handler_exception_is_a_server_error(ctx, cli, snapshot_cli, source):
+    module = _write_app(ctx, source, filename="crashing_app")
+    assert (
+        cli.main(
+            "run",
+            "/openapi.json",
+            f"--app={module}:app",
+            "--phases=fuzzing",
+            "--max-examples=3",
+            "-c",
+            "not_a_server_error",
+        )
+        == snapshot_cli
+    )
+
+
+def test_app_handler_exceptions_of_different_types_are_separate_failures(ctx, cli):
+    schema = ctx.openapi.build_schema(
+        {
+            "/api/items": {
+                "get": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    module = ctx.write_pymodule(
+        f"""
+from flask import Flask, jsonify, request
+
+app = Flask("crashing")
+
+@app.route("/openapi.json")
+def spec():
+    return jsonify({schema!r})
+
+@app.route("/api/items")
+def items():
+    if len(request.args.get("q", "")) % 2:
+        raise ValueError("odd")
+    raise KeyError("even")
+""",
+        filename="two_crashes_app",
+    )
+    result = cli.main(
+        "run",
+        "/openapi.json",
+        f"--app={module}:app",
+        "--phases=fuzzing",
+        "--max-examples=20",
+        "--mode=positive",
+        "--continue-on-failure",
+        "-c",
+        "not_a_server_error",
+    )
+    assert "ST101 Server error: 2" in result.stdout, result.stdout

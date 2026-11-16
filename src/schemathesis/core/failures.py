@@ -229,7 +229,7 @@ class ServerError(Failure):
     checks = ("not_a_server_error",)
     kind_title = "Server error"
 
-    __slots__ = ("status_code",)
+    __slots__ = ("status_code", "origin")
 
     def __init__(
         self,
@@ -239,13 +239,18 @@ class ServerError(Failure):
         title: str | None = None,
         message: str = "",
         case_id: str | None = None,
+        origin: str | None = None,
     ) -> None:
         super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.CRITICAL)
         self.status_code = status_code
+        # What failed on the server, when known; different origins are different failures.
+        self.origin = origin
 
     @property
     def _unique_key(self) -> str:
-        return str(self.status_code)
+        if self.origin is None:
+            return str(self.status_code)
+        return f"{self.status_code}:{self.origin}"
 
 
 class AuthScenario(StrEnum):

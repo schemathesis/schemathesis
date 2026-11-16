@@ -113,6 +113,7 @@ class EngineContext:
         max_time: int | None = None,
     ) -> None:
         self.schema = schema
+        schema.raise_app_exceptions = False
         self.start_time = time.monotonic()
         self.control = ExecutionControl(
             stop_event=stop_event,

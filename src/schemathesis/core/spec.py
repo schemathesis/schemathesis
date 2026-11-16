@@ -44,6 +44,7 @@ class SchemaMetadata(Protocol):
     raw_schema: JsonSchemaObject
     location: str | None
     suggestions: Suggestions
+    raise_app_exceptions: bool
 
     @property
     def specification(self) -> Specification: ...  # pragma: no cover
