@@ -121,8 +121,14 @@ class RecordedScenarioHandler(BackgroundWriterHandler[RecordedScenario]):
         self.preserve_bytes = preserve_bytes
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
+        # The file is created once loading ends, so a run refused after loading its schema leaves none.
+        if self.worker is None and not isinstance(event, LoadingStarted):
+            self.open_writer(ctx)
         if isinstance(event, (events.ScenarioFinished, events.FuzzScenarioFinished)):
             self.queue.put(event.recorder)
+
+    def open_writer(self, ctx: BaseExecutionContext) -> None:
+        raise NotImplementedError
 
 
 def write_until_finished(

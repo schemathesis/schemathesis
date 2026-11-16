@@ -15,7 +15,7 @@ class HarHandler(RecordedScenarioHandler):
 
     __slots__ = ()
 
-    def start(self, ctx: BaseExecutionContext) -> None:
+    def open_writer(self, ctx: BaseExecutionContext) -> None:
         writer = HarWriter(output=self.output, config=self.config, preserve_bytes=self.preserve_bytes)
         self._start_writer(
             "SchemathesisHarWriter",

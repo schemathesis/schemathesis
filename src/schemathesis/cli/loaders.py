@@ -18,7 +18,7 @@ from schemathesis.cli.constants import MISSING_BASE_URL_MESSAGE
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.validation import validate_tls_verify
 from schemathesis.config import ProjectConfig, ReportFormat
-from schemathesis.core import SpecificationKind
+from schemathesis.core import Specification, SpecificationFeature
 from schemathesis.core.app_output import inside_application
 from schemathesis.core.errors import (
     HookExecutionError,
@@ -50,6 +50,15 @@ GRPC_REQUESTS_AUTH_MESSAGE = (
     "pass credentials as headers, basic auth or an `@schemathesis.auth()` class"
 )
 WFC_REPORT_MESSAGE = "WFC reports describe REST endpoints and are only available for Open API schemas"
+# Reports that need a specification feature, checked in order, with the refusal for a schema that lacks it.
+_REPORT_FEATURES: tuple[tuple[SpecificationFeature, tuple[ReportFormat, ...], str], ...] = (
+    (
+        SpecificationFeature.HTTP_REPORTS,
+        (ReportFormat.HAR, ReportFormat.VCR, ReportFormat.WFC, ReportFormat.PYTEST),
+        GRPC_HTTP_REPORTS_MESSAGE,
+    ),
+    (SpecificationFeature.WFC_REPORTS, (ReportFormat.WFC,), WFC_REPORT_MESSAGE),
+)
 GRPC_DESCRIPTOR_SET_EXTENSIONS = (".binpb", ".pb", ".protoset")
 TEXT_SCHEMA_EXTENSIONS = (".json", ".yaml", ".yml")
 PROTO_FILE_MESSAGE = f"Schemathesis reads descriptor sets, not `.proto` files. {BUILD_HINT} and run `schemathesis run api.binpb --url URL`"
@@ -67,11 +76,7 @@ def into_event_stream(
     if is_grpc_location(location):
         if config.app is not None:
             raise click.UsageError(GRPC_APP_MESSAGE)
-        if any(
-            config.reports.get(report_format).enabled
-            for report_format in (ReportFormat.HAR, ReportFormat.VCR, ReportFormat.WFC, ReportFormat.PYTEST)
-        ):
-            raise click.UsageError(GRPC_HTTP_REPORTS_MESSAGE)
+        _refuse_unsupported_reports(config, Specification.grpc(version=""))
         if config.auth.wfc is not None:
             raise click.UsageError(GRPC_WFC_AUTH_MESSAGE)
         if any(
@@ -88,6 +93,14 @@ def into_event_stream(
     return _event_stream(location=location, config=config, filter_set=filter_set, engine_callback=engine_callback)
 
 
+def _refuse_unsupported_reports(config: ProjectConfig, specification: Specification) -> None:
+    for feature, formats, message in _REPORT_FEATURES:
+        if not specification.supports_feature(feature) and any(
+            config.reports.get(report_format).enabled for report_format in formats
+        ):
+            raise click.UsageError(message)
+
+
 def _event_stream(
     *,
     location: str,
@@ -101,8 +114,7 @@ def _event_stream(
 
     try:
         schema = load_schema(location=location, config=config)
-        if config.reports.wfc.enabled and schema.specification.kind != SpecificationKind.OPENAPI:
-            raise click.UsageError(WFC_REPORT_MESSAGE)
+        _refuse_unsupported_reports(config, schema.specification)
         # An explicitly configured base URL carries its own path, so the origin only applies without one.
         if schema.config.origin is not None and schema.config.base_url is None:
             schema.config.base_url = schema.config.origin.rstrip("/") + schema.base_path.rstrip("/")

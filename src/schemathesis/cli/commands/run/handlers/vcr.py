@@ -21,7 +21,7 @@ class VcrHandler(RecordedScenarioHandler):
         super().__init__(output, config, preserve_bytes)
         self.command = get_command_representation(config.sanitization)
 
-    def start(self, ctx: BaseExecutionContext) -> None:
+    def open_writer(self, ctx: BaseExecutionContext) -> None:
         # Cassette writing needs `yaml`; importing it on the writer thread instead deadlocks and loses events.
         import yaml.emitter  # noqa: F401
 

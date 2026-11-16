@@ -46,6 +46,10 @@ class SpecificationFeature(enum.StrEnum):
     HTTP_PROBES = "http_probes"
     # Filling dictionaries from API responses before testing starts.
     OPERATION_DICTIONARIES = "operation_dictionaries"
+    # Recording HTTP/1.1 exchanges in HAR, VCR, WFC and pytest reports.
+    HTTP_REPORTS = "http_reports"
+    # Describing REST endpoints in Web Fuzzing Commons reports.
+    WFC_REPORTS = "wfc_reports"
 
 
 @dataclass(slots=True)
@@ -99,6 +103,8 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
             SpecificationFeature.STATUS_CODE_ANALYSIS,
             SpecificationFeature.HTTP_PROBES,
             SpecificationFeature.OPERATION_DICTIONARIES,
+            SpecificationFeature.HTTP_REPORTS,
+            SpecificationFeature.WFC_REPORTS,
         }
     ),
     SpecificationKind.GRAPHQL: frozenset(
@@ -107,6 +113,7 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
             SpecificationFeature.COVERAGE,
             SpecificationFeature.HTTP_PROBES,
             SpecificationFeature.OPERATION_DICTIONARIES,
+            SpecificationFeature.HTTP_REPORTS,
         }
     ),
     SpecificationKind.GRPC: frozenset(

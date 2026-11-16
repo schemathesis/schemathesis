@@ -27,6 +27,7 @@ from schemathesis.openapi.checks import (
     UnsupportedMethodResponse,
     UseAfterFree,
 )
+from test.utils import load_ndjson
 
 WFC_DATA = resources.files("webfuzzing_commons").joinpath("data")
 WFC_REPORT_SCHEMA = yaml.safe_load(WFC_DATA.joinpath("report.yaml").read_text(encoding="utf-8"))
@@ -400,11 +401,22 @@ def test_report_when_schema_never_loads(cli, tmp_path):
     schema.write_text("{{{ not yaml", encoding="utf-8")
     path = tmp_path / "report.json"
 
-    cli.run(str(schema), f"--report-wfc-path={path}")
+    cli.run(
+        str(schema),
+        f"--report-wfc-path={path}",
+        f"--report-har-path={tmp_path / 'report.har'}",
+        f"--report-ndjson-path={tmp_path / 'report.ndjson'}",
+    )
 
     report = load_report(path)
     jsonschema_rs.validate(WFC_REPORT_SCHEMA, report)
     assert (report["executionTimeInSeconds"], report["problemDetails"]["rest"]["endpointIds"]) == (0, [])
+    assert load_report(tmp_path / "report.har")["log"]["entries"] == []
+    assert [next(iter(event)) for event in load_ndjson(tmp_path / "report.ndjson")] == [
+        "Initialize",
+        "LoadingStarted",
+        "FatalError",
+    ]
 
 
 def test_report_when_run_stops_early(ctx, cli, tmp_path):

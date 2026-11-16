@@ -45,6 +45,7 @@
 - Crash in HAR reports when the base URL contains credentials.
 - Lost or misattributed pytest report entries for stateful tests and calls to other operations.
 - Missing Open API 3.2 `query` operations in the WFC report.
+- HAR, VCR and WFC reports created or overwritten by runs refused before testing starts.
 - `HookExecutionError` in pytest reports when tests validate responses from their own HTTP client.
 - `ModuleNotFoundError` for `allure_commons` in pytest reports when `allure-pytest` is not installed.
 - Mask credentials in `repr(case)` following `output.sanitization`, like the cURL reproduction command.
