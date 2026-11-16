@@ -45,6 +45,7 @@
 - Lost or misattributed pytest report entries for stateful tests and calls to other operations.
 - Missing Open API 3.2 `query` operations in the WFC report.
 - `HookExecutionError` in pytest reports when tests validate responses from their own HTTP client.
+- `st fuzz` counting a scenario as passed when the time limit cuts its only request.
 - `ModuleNotFoundError` for `allure_commons` in pytest reports when `allure-pytest` is not installed.
 - Mask credentials in `repr(case)` following `output.sanitization`, like the cURL reproduction command.
 - `<BINARY>` shown for text responses cut mid-character by `max-recorded-payload-size`.
