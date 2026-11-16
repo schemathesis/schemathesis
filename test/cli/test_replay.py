@@ -301,6 +301,33 @@ def test_replay_missing_path_is_errored_not_crash(cli, app_runner, ctx, crash_fa
     assert cli.main("replay", str(crash_file)) == snapshot_cli
 
 
+def test_replay_removed_method_is_resent_via_sibling_operation(
+    cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli
+):
+    # The recorded method is no longer declared, but another operation on the same path still is.
+    app, _ = ctx.openapi.make_flask_app({"/users": {"post": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/users", methods=["GET", "POST"])
+    def users():
+        if request.method == "GET":
+            return jsonify({"error": "still broken"}), 500
+        return jsonify({})
+
+    schema_url = app_runner.openapi_url(app)
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{schema_url.rsplit('/', 1)[0]}/users",
+        schema_location=schema_url,
+        path_template="/users",
+        status=500,
+        body='{"error": "still broken"}',
+    )
+
+    assert cli.main("replay", str(crash_file)) == snapshot_cli
+    assert crash_file.exists()
+
+
 def test_replay_corrupt_meta_is_errored_not_crash(cli, app_runner, ctx, tmp_path, snapshot_cli):
     # A crash file whose metadata no longer decodes is reported errored and kept, without a traceback.
     schema_url, base = _users_app(ctx, app_runner)

@@ -6328,7 +6328,7 @@ ITEM = {"type": "object", "properties": {"id": {"type": "integer"}}, "required":
 def response_validator(schema, label, status="200", media_type="application/json", validate_formats=True):
     response = schema.find_operation_by_label(label).responses.get(status)
     resolved = response.get_schema(media_type)
-    return response.get_validator(resolved.media_type, resolved.schema, validate_formats=validate_formats)
+    return response.get_validator(resolved.media_type, validate_formats=validate_formats)
 
 
 def json_ok(schema):
@@ -6478,7 +6478,7 @@ def test_concurrent_first_use_builds_one_shared_response_validator(ctx):
         barrier.wait()
         response = operation.responses.get("200")
         resolved = response.get_schema("application/json")
-        validators.append(response.get_validator(resolved.media_type, resolved.schema))
+        validators.append(response.get_validator(resolved.media_type))
 
     threads = [threading.Thread(target=validate, args=(operation,)) for operation in operations]
     for thread in threads:

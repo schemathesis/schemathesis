@@ -826,11 +826,11 @@ def test_empty_parameter_content(ctx, version, location):
     def test(case):
         pass
 
-    with pytest.raises(
-        InvalidSchema,
-        match=f"Can not generate data for {location} parameter `q`! Its `content` must contain exactly one entry",
-    ):
+    message = f"Can not generate data for {location} parameter `q`! Its `content` must contain exactly one entry"
+    with pytest.raises(InvalidSchema, match=message):
         test()
+    with pytest.raises(InvalidSchema, match=message):
+        operation.get_strategies_from_examples()
 
 
 @pytest.mark.parametrize(

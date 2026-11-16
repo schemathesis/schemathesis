@@ -363,8 +363,7 @@ def _has_other_negated_location(case: Case, *locations: ParameterLocation) -> bo
 def _body_negation_becomes_valid_after_serialization(response: Response, case: Case) -> bool:
     """Whether the body is the only negative part and turns valid once serialized, e.g. stringified as `text/plain`."""
     meta = case.meta
-    if meta is None:
-        return False
+    assert meta is not None
 
     if not meta.is_negative_at(ParameterLocation.BODY):
         return False
@@ -532,8 +531,7 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
 
     meta = case.meta
-    if meta is None:
-        return False
+    assert meta is not None
 
     location = ParameterLocation.QUERY
     if not meta.is_negative_at(location):
@@ -616,8 +614,7 @@ def _type_mutations_become_valid_after_serialization(case: Case) -> bool:
     E.g. a string `"5"`, a query object `{"5": "x"}` sent as `?param=5`, or a path `%2B1` decoded to `+1`.
     """
     meta = case.meta
-    if meta is None:
-        return False
+    assert meta is not None
 
     phase_data = meta.phase.data
     if not isinstance(phase_data, (FuzzingPhaseData, StatefulPhaseData)) or not phase_data.mutations:
@@ -671,8 +668,7 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
 
     meta = case.meta
-    if meta is None:
-        return False
+    assert meta is not None
 
     if not meta.is_negative_at(ParameterLocation.PATH):
         return False
@@ -827,11 +823,8 @@ def _headers_as_read(headers: Mapping[str, object]) -> dict[str, object]:
 
 def _non_body_negative_values_match_schema(response: Response, case: Case) -> bool:
     """Whether every negative non-body value still matches its original schema."""
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
-
     meta = case.meta
-    if meta is None or not isinstance(case.operation.schema, OpenApiSchema):
-        return False
+    assert meta is not None
 
     # If body is also negative, this guard does not apply.
     if meta.is_negative_at(ParameterLocation.BODY):
@@ -1012,12 +1005,7 @@ def _additional_properties_hint(case: Case, response: Response) -> str | None:
     if not isinstance(case.body, dict):
         return None
 
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
-
-    if not isinstance(case.operation.schema, OpenApiSchema):
-        return None
-
-    validator_cls = case.operation.schema.adapter.jsonschema_validator_cls
+    validator_cls = _get_openapi_schema(case).adapter.jsonschema_validator_cls
 
     alternative = case.operation.get_body_for_media_type(case.media_type)
     if alternative is None:

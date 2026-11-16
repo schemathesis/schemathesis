@@ -165,21 +165,19 @@ def test_from_url_missing_tls_client_certificate_keeps_details_without_retry_adv
 
 
 @pytest.mark.parametrize(
-    ("denial", "status", "details"),
+    ("denial", "kind", "status", "details"),
     [
-        ("1", "PERMISSION_DENIED", "denied"),
-        ("authentication", "UNAUTHENTICATED", "missing credentials"),
+        ("1", LoaderErrorKind.HTTP_FORBIDDEN, "PERMISSION_DENIED", "denied"),
+        ("authentication", LoaderErrorKind.HTTP_FORBIDDEN, "UNAUTHENTICATED", "missing credentials"),
+        ("quota", LoaderErrorKind.UNCLASSIFIED, "RESOURCE_EXHAUSTED", "quota exceeded"),
     ],
-    ids=["permission", "authentication"],
+    ids=["permission", "authentication", "other-status"],
 )
-def test_from_url_reports_refused_reflection(ctx, denial, status, details):
+def test_from_url_reports_refused_reflection(ctx, denial, kind, status, details):
     server = ctx.grpc.apps.users()
     with pytest.raises(LoaderError) as exc_info:
         schemathesis.grpc.from_url(server.target, headers={"x-deny": denial})
-    assert (exc_info.value.kind, exc_info.value.message) == (
-        LoaderErrorKind.HTTP_FORBIDDEN,
-        f"Reflection failed with {status}: {details}",
-    )
+    assert (exc_info.value.kind, exc_info.value.message) == (kind, f"Reflection failed with {status}: {details}")
 
 
 def test_from_url_reports_reflection_timeout(ctx):

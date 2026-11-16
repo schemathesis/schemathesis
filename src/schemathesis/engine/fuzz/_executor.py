@@ -559,9 +559,6 @@ def _run_forever_thread(
 
     from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
-    if not plan.operations:
-        return
-
     hypothesis_settings = plan.hypothesis_settings
     weighted_operations = plan.weighted_operations
     operations_by_label = plan.operations_by_label

@@ -134,6 +134,8 @@ class RecordReflection(grpc.ServerInterceptor):
                 return grpc.stream_stream_rpc_method_handler(deny_permission)
             if ("x-deny", "authentication") in metadata:
                 return grpc.stream_stream_rpc_method_handler(deny_authentication)
+            if ("x-deny", "quota") in metadata:
+                return grpc.stream_stream_rpc_method_handler(deny_quota)
             if ("x-stall", "1") in metadata:
                 return grpc.stream_stream_rpc_method_handler(stall)
         return continuation(handler_call_details)
@@ -145,6 +147,10 @@ def deny_permission(requests, context):
 
 def deny_authentication(requests, context):
     context.abort(grpc.StatusCode.UNAUTHENTICATED, "missing credentials")
+
+
+def deny_quota(requests, context):
+    context.abort(grpc.StatusCode.RESOURCE_EXHAUSTED, "quota exceeded")
 
 
 def stall(requests, context):
@@ -244,7 +250,7 @@ def users(
     `x-undeclared-field` metadata adds field 99, which `pkg.User` does not declare, to the answer.
     `pkg.Admin/Reset` answers with `u<id>` packed into `response`, or, for a negative id, with a
     `google.rpc.ErrorInfo` detail, a type clients do not know, in `error`.
-    Reflection refuses calls carrying `x-deny: 1`, and lists `undescribed_services` but answers them with NOT_FOUND.
+    Reflection refuses calls carrying `x-deny` metadata, and lists `undescribed_services` but answers them with NOT_FOUND.
     Without `reflection_imports`, a symbol lookup returns only its file, and imports come by file name.
     Reflection cannot describe `unserved_files` and leaves them out of symbol lookups; it describes `emptied_files`
     in symbol lookups as files that define nothing.

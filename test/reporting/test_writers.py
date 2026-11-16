@@ -136,6 +136,7 @@ def test_sanitize_args(args, expected):
         ("schemathesis.exe", "st -x"),
         ("/venv/lib/python/site-packages/schemathesis/__main__.py", "python -m schemathesis -x"),
         ("/venv/lib/python/site-packages/pytest/__main__.py", "python -m pytest -x"),
+        ("/venv/lib/python/site-packages/runner/__main__.py", "<unknown entrypoint>"),
         ("/venv/bin/python", "<unknown entrypoint>"),
     ],
     ids=[
@@ -150,6 +151,7 @@ def test_sanitize_args(args, expected):
         "schemathesis-exe",
         "python-m-schemathesis",
         "python-m-pytest",
+        "python-m-other-package",
         "unknown",
     ],
 )

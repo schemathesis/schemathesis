@@ -4198,8 +4198,9 @@ def test_positive_flipped_from_not_is_judged_by_the_operation_draft(pctx):
         {"type": "number", "minimum": 1e30, "multipleOf": 3.0},
         {"type": "number", "exclusiveMinimum": 1e30, "multipleOf": 0.5},
         {"type": "number", "exclusiveMaximum": -1e30, "multipleOf": 0.3},
+        {"type": "number", "minimum": 2**60, "maximum": 2**61, "multipleOf": 1 / 3},
     ],
-    ids=["maximum", "minimum", "exclusive-minimum-half-step", "exclusive-maximum-decimal-step"],
+    ids=["maximum", "minimum", "exclusive-minimum-half-step", "exclusive-maximum-decimal-step", "no-float-nearby"],
 )
 def test_positive_number_multiples_past_decimal_precision(ctx_factory, schema):
     ctx = ctx_factory(validator_cls=jsonschema_rs.Draft202012Validator, generation_modes=[GenerationMode.POSITIVE])
@@ -4323,6 +4324,18 @@ def test_negative_pattern_with_quantifier_past_the_buffer(nctx, schema):
 def test_positive_number_multiples_past_float_precision_are_exact(pctx):
     schema = {"type": "number", "multipleOf": 3, "minimum": 9996036847180748.0}
     assert cover_schema(pctx, schema) == [9996036847180749, 9996036847180752, 2**63 + 1]
+
+
+@pytest.mark.parametrize(
+    ("branch", "scenario"),
+    [
+        ({"type": "array", "maxItems": 40}, CoverageScenario.ARRAY_ABOVE_MAX_ITEMS),
+        ({"type": "integer", "multipleOf": 2}, CoverageScenario.NOT_MULTIPLE_OF),
+    ],
+    ids=["max-items", "multiple-of"],
+)
+def test_negative_shared_by_any_of_branches_is_emitted_once(nctx, branch, scenario):
+    assert len(scenario_values(nctx, {"anyOf": [branch, branch]}, scenario)) == 1
 
 
 def test_negative_boundary_past_the_largest_float_is_skipped(nctx):

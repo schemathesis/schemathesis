@@ -185,10 +185,7 @@ def _own_reference(node: JsonSchemaObject, bundle_map: JsonSchemaObject, owned: 
         return None
     if name in owned:
         return target
-    index = len(bundle_map)
-    while f"{name}-{index}" in bundle_map:
-        index += 1
-    copy_name = f"{name}-{index}"
+    copy_name = f"{name}-{len(bundle_map)}"
     copy = deepclone(target)
     bundle_map[copy_name] = copy
     owned.add(copy_name)
@@ -946,10 +943,6 @@ DEPENDENCIES = {
 }
 
 
-def ident(x: T) -> T:
-    return x
-
-
-def ordered(items: Sequence[T], unique_by: Callable[[T], Any] = ident) -> st.SearchStrategy[list[T]]:
+def ordered(items: Sequence[T], unique_by: Callable[[T], Any]) -> st.SearchStrategy[list[T]]:
     """All of `items` in random order; they must be unique under `unique_by`."""
     return st.lists(st.sampled_from(items), min_size=len(items), unique_by=unique_by)

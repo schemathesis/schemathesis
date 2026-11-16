@@ -1306,3 +1306,4 @@ def test_unreadable_pattern_rules_nothing_out(pattern):
     # A pattern Python cannot read says nothing about length, so generation keeps its own path.
     assert pattern_length_is_unreachable(pattern, 1, 5) is False
     assert pin_pattern_length(pattern, 1, 5) == pattern
+    assert pattern_length_bounds(pattern) == (0, None)

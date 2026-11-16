@@ -15,6 +15,7 @@ from schemathesis.core.deserialization import _parse_sse_events, parse_json_sequ
 from schemathesis.core.file_samples import file_extension
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
@@ -538,6 +539,66 @@ def test_multipart_encoding_with_custom_strategy_fuzzing_phase(ctx):
     def test(case):
         if case.body is not None and isinstance(case.body, dict) and "file" in case.body:
             assert case.body["file"] == b"%PDF-1.4"
+
+
+_NAMED_FILE_PROPERTIES = {"file": {"type": "string", "minLength": 3}, "name": {"type": "string", "minLength": 2}}
+
+
+@pytest.mark.parametrize(
+    ("body_schema", "components"),
+    [
+        (
+            {
+                "type": "object",
+                "properties": {"file": _NAMED_FILE_PROPERTIES["file"]},
+                "allOf": [{"required": ["file"]}, {"properties": {"name": _NAMED_FILE_PROPERTIES["name"]}}],
+            },
+            {},
+        ),
+        (
+            {"$ref": "#/components/schemas/Upload"},
+            {
+                "Upload": {
+                    "type": "object",
+                    "properties": _NAMED_FILE_PROPERTIES,
+                    "required": ["name"],
+                    "allOf": [{"$ref": "#/components/schemas/Upload"}],
+                }
+            },
+        ),
+    ],
+    ids=["branch-without-properties", "self-referencing-branch"],
+)
+@pytest.mark.parametrize("mode", list(GenerationMode), ids=lambda mode: mode.value)
+def test_multipart_encoding_with_properties_composed_through_all_of(ctx, body_schema, components, mode):
+    schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "content": {
+                    "multipart/form-data": {
+                        "schema": body_schema,
+                        "encoding": {"file": {"contentType": "application/pdf"}},
+                    }
+                },
+                "required": True,
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.1.0",
+        components={"schemas": components},
+    )
+    files = {
+        case.body["file"]
+        for case in generate_many(operation.as_strategy(generation_mode=mode), 10)
+        if isinstance(case.body, dict) and "file" in case.body
+    }
+    if mode == GenerationMode.POSITIVE:
+        assert files == {b"%PDF-1.4"}
+    else:
+        # Negative cases may leave the part out altogether.
+        assert files <= {b"%PDF-1.4"}
 
 
 def test_multipart_encoding_with_custom_strategy_in_coverage_phase(ctx):

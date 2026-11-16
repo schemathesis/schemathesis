@@ -153,16 +153,11 @@ def validate_auth(
 def validate_auth_overlap(auth: tuple[str, str] | None, headers: dict[str, str]) -> None:
     auth_is_set = auth is not None
     header_is_set = "authorization" in {header.lower() for header in headers}
-    if len([is_set for is_set in (auth_is_set, header_is_set) if is_set]) > 1:
-        message = "The "
-        used = []
-        if auth_is_set:
-            used.append("`--auth`")
-        if header_is_set:
-            used.append("`--header`")
-        message += " and ".join(used)
-        message += " options were both used to set the 'Authorization' header, which is not permitted."
-        raise click.BadParameter(message)
+    if auth_is_set and header_is_set:
+        raise click.BadParameter(
+            "The `--auth` and `--header` options were both used to set the 'Authorization' header, "
+            "which is not permitted."
+        )
 
 
 def validate_filter_expression(

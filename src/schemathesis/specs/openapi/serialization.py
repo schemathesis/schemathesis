@@ -235,10 +235,8 @@ def _build_urlencoded_serializer(media_type_object: Any) -> Callable[[Generated]
     return serializer or (lambda x: x)
 
 
-def _append_raw_query_string(item: Generated, value: Any) -> None:
-    if value is None:
-        return
-    chunk = str(value).lstrip("?")
+def _append_raw_query_string(item: Generated, value: str) -> None:
+    chunk = value.lstrip("?")
     if not chunk:
         return
     current = item.get(RAW_QUERY_STRING_KEY)
@@ -295,10 +293,7 @@ def _serialize_query_openapi3(
             yield delimited_encoded(name, delimiter=",")
 
 
-def _only_for_objects(map_function: Callable | None, name: str) -> Callable | None:
-    if map_function is None:
-        return None
-
+def _only_for_objects(map_function: Callable, name: str) -> Callable:
     def _map(item: Generated) -> Generated:
         return map_function(item) if isinstance(item.get(name), dict) else item
 
@@ -328,7 +323,7 @@ def _query_object_conversions(
     explode: bool | None,
     schema: dict[str, Any] | None,
     schema_was_top_ref: bool,
-) -> Generator[Callable | None, None, None]:
+) -> Generator[Callable, None, None]:
     # OpenAPI defines no style for nested objects, so only a bare top-level `$ref` gets recursive brackets.
     is_nested = schema_was_top_ref and _schema_has_nested_object_properties(schema)
     if style == "deepObject":

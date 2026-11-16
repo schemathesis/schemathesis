@@ -351,3 +351,39 @@ def test_graphql_child_binding_probability_decides_how_often_the_pair_is_drawn(c
     pairs = _graphql_child_arguments(ctx, {"dictionary": "children", "probability": 0.5})
     assert any(pair in GRAPHQL_PAIRS for pair in pairs)
     assert any(child not in {"c11", "c12", "c21", "c22"} for _, child in pairs)
+
+
+def _child_path_parameters(ctx, *, child_binding, parent_ids=None):
+    app = nested.parents_with_children()
+    if parent_ids is not None:
+        [parent, _] = app.spec["paths"]["/api/parents/{parentId}/children/{childId}"]["get"]["parameters"]
+        parent["schema"] = {"type": "string", "enum": parent_ids}
+    api = ctx.openapi.serve(app)
+    config = SchemathesisConfig.from_dict(
+        {
+            "dictionaries": {"parents": PARENTS, "children": CHILDREN_SOURCE},
+            "parameters": {"path.parentId": {"dictionary": "parents"}, "path.childId": child_binding},
+        }
+    )
+    schema = schemathesis.openapi.from_url(api.schema_url, config=config)
+    _run_setup(schema)
+    strategy = schema["/api/parents/{parentId}/children/{childId}"]["GET"].as_strategy()
+    return {(case.path_parameters["parentId"], case.path_parameters["childId"]) for case in generate_many(strategy, 30)}
+
+
+@pytest.mark.parametrize(
+    ("parent_ids", "expected"),
+    [
+        (["1", "3"], {("1", "c11"), ("1", "c12")}),
+        # Parent `3` has no children, so no pair is left and each parameter draws on its own.
+        (["3"], {("3", "c11"), ("3", "c12"), ("3", "c21"), ("3", "c22")}),
+    ],
+    ids=["some-parents", "childless-parent"],
+)
+def test_children_of_parents_the_schema_rejects_are_not_paired(ctx, parent_ids, expected):
+    assert _child_path_parameters(ctx, child_binding={"dictionary": "children"}, parent_ids=parent_ids) == expected
+
+
+def test_rarely_drawn_child_binding_leaves_parent_to_draw_on_its_own(ctx):
+    pairs = _child_path_parameters(ctx, child_binding={"dictionary": "children", "probability": 0.1})
+    assert {parent for parent, _ in pairs} == {"1", "2", "3"}
