@@ -4,6 +4,7 @@ import weakref
 from unittest import SkipTest
 from unittest.mock import ANY
 
+import hypothesis_graphql
 import pytest
 import requests
 import strawberry
@@ -35,6 +36,7 @@ from schemathesis.graphql.checks import (
     UnexpectedGraphQLResponse,
 )
 from schemathesis.graphql.loaders import extract_schema_from_response, get_introspection_query
+from schemathesis.specs.graphql.schemas import _query_strategy
 from schemathesis.specs.graphql.validation import is_client_error, validate_graphql_response
 from schemathesis.specs.openapi.checks import (
     ensure_resource_availability,
@@ -801,10 +803,14 @@ def test_negative_mode_fallback_to_positive(ctx):
     schema.config.generation.update(modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE])
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
-    @run_given(strategy, max_examples=1)
+    @run_given(strategy, max_examples=10)
     def test_(case):
         assert "getBooks" in case.body
         assert case.meta.generation.mode == GenerationMode.POSITIVE
+
+    generation = schema.config.generation_for(operation=operation, phase="fuzzing")
+    for mode in (hypothesis_graphql.Mode.NEGATIVE, hypothesis_graphql.Mode.POSITIVE):
+        assert _query_strategy(operation, generation, mode) is _query_strategy(operation, generation, mode)
 
 
 def _make_graphql_case_with_mode(

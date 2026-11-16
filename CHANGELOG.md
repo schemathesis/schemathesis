@@ -24,6 +24,7 @@
 
 - Up to 6x faster data generation for patterns with Unicode-wide classes like `[\P{M}\p{M}]`.
 - Up to 13% faster negative coverage phase against fast local APIs.
+- Up to 2x faster GraphQL test case generation in negative mode.
 
 ### :wrench: Changed
 
