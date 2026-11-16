@@ -50,6 +50,7 @@ from typing import Any, TypeVar, cast
 import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
+from hypothesis.strategies._internal.lazy import unwrap_strategies
 
 from schemathesis.core import (
     INTERNAL_BUFFER_SIZE,
@@ -420,7 +421,7 @@ def _character_rules_strategy(rules: CharacterRules, alphabet: Alphabet) -> st.S
         return body.fullmatch(char) is not None and not any(pattern.fullmatch(char) for pattern in forbidden)
 
     def characters(text: str) -> st.SearchStrategy[str]:
-        return _from_regex_within(re.compile(text, re.ASCII), alphabet).filter(is_allowed)
+        return _from_regex_within(re.compile(text, re.ASCII), alphabet, lambda strategy: strategy.filter(is_allowed))
 
     required = st.tuples(*(characters(text) for text in rules.required))
     count = len(rules.required)
@@ -432,14 +433,21 @@ def _character_rules_strategy(rules: CharacterRules, alphabet: Alphabet) -> st.S
     return st.tuples(required, rest).flatmap(lambda parts: st.permutations([*parts[0], *parts[1]])).map("".join)
 
 
-def _from_regex_within(compiled: re.Pattern[str], alphabet: Alphabet) -> st.SearchStrategy[str]:
-    """Full matches drawn from the alphabet, or from any character when the alphabet bars every match."""
-    strategy = st.from_regex(compiled, fullmatch=True, alphabet=alphabet.as_strategy())
+def _from_regex_within(
+    compiled: re.Pattern[str],
+    alphabet: Alphabet,
+    refine: Callable[[st.SearchStrategy[str]], st.SearchStrategy[str]],
+) -> st.SearchStrategy[str]:
+    """Refined full matches drawn from the alphabet, or from any character when the alphabet bars every match."""
+    # Unwrapped, since a lazy alphabet builds Unicode-wide regex classes twice; Hypothesis leaves this helper untyped.
+    alphabet_strategy = unwrap_strategies(alphabet.as_strategy())  # type: ignore[no-untyped-call]
+    # Validate the strategy that is drawn from, so it is built once.
+    strategy = refine(st.from_regex(compiled, fullmatch=True, alphabet=alphabet_strategy))
     try:
         strategy.validate()
     except InvalidArgument:
         # The schema outranks the alphabet.
-        return st.from_regex(compiled, fullmatch=True)
+        return refine(st.from_regex(compiled, fullmatch=True))
     return strategy
 
 
@@ -461,20 +469,24 @@ def _pattern_strategy(
     if compiled is None:
         session.pattern_strategies[key] = None
         return None
+
+    def refine(strategy: st.SearchStrategy[str]) -> st.SearchStrategy[str]:
+        strategy = strategy.filter(matches_pattern(pattern))
+        if min_length is not None and max_length is not None:
+            strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)
+        elif min_length is not None:
+            strategy = strategy.filter(lambda s: len(s) >= min_length)
+        elif max_length is not None:
+            strategy = strategy.filter(lambda s: len(s) <= max_length)
+        if fmt is not None:
+            strategy = strategy.filter(make_validator_for({"type": "string", "format": fmt}).is_valid)
+        return strategy
+
     rules = character_rules(compiled.pattern)
     if rules is None:
-        strategy = _from_regex_within(compiled, alphabet)
+        strategy = _from_regex_within(compiled, alphabet, refine)
     else:
-        strategy = _character_rules_strategy(rules, alphabet)
-    strategy = strategy.filter(matches_pattern(pattern))
-    if min_length is not None and max_length is not None:
-        strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)
-    elif min_length is not None:
-        strategy = strategy.filter(lambda s: len(s) >= min_length)
-    elif max_length is not None:
-        strategy = strategy.filter(lambda s: len(s) <= max_length)
-    if fmt is not None:
-        strategy = strategy.filter(make_validator_for({"type": "string", "format": fmt}).is_valid)
+        strategy = refine(_character_rules_strategy(rules, alphabet))
     session.pattern_strategies[key] = strategy
     return strategy
 
