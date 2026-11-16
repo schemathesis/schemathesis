@@ -373,6 +373,18 @@ def schema_with_bundle(schema: JsonSchema, root_schema: JsonSchema) -> JsonSchem
     return {**schema, BUNDLE_STORAGE_KEY: bundled}
 
 
+def property_schemas(schema: JsonSchema) -> dict[str, JsonSchema]:
+    """Property schemas by name, each keeping the bundle its references point into."""
+    if not isinstance(schema, dict):
+        return {}
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return {}
+    if BUNDLE_STORAGE_KEY not in schema:
+        return properties
+    return {name: schema_with_bundle(subschema, schema) for name, subschema in properties.items()}
+
+
 def maybe_resolve_bundled(schema: dict[str, Any]) -> dict[str, Any]:
     """Follow `$ref` into a sibling `x-bundled` map; return `schema` as-is when not a bundled-ref node."""
     return resolve_bundled_ref(schema, schema.get(BUNDLE_STORAGE_KEY))

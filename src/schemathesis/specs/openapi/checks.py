@@ -23,6 +23,7 @@ from schemathesis.core.jsonschema import (
     get_type,
     make_validator,
     maybe_resolve_bundled,
+    property_schemas,
     resolve_bundled_ref,
     schema_with_bundle,
     try_make_validator,
@@ -327,7 +328,7 @@ def _declared_parameters_are_valid(case: Case, location: ParameterLocation) -> b
     assert isinstance(value, Mapping)
     container = case.operation.get_parameter_set(location)
     schema = container.schema
-    properties = _parameter_schemas(schema)
+    properties = property_schemas(schema)
     if _has_serialization_sensitive_types(properties, container):
         # Arrays and objects are rewritten on the wire, so post-serialization validity is unknowable.
         return False
@@ -745,7 +746,7 @@ def _query_as_sent(
     sent_values = _sent_query_values(response, case)
     if sent_values is None:
         return None
-    properties: dict[str, JsonSchema] = container_schema.get("properties", {})
+    properties = property_schemas(container_schema)
     required: list[str] = container_schema.get("required", [])
     sent: dict[str, object] = {}
     # Iterating the generated query skips keys added outside of generation, e.g. query-based auth.
@@ -759,7 +760,7 @@ def _query_as_sent(
             sent[name] = texts[0] if len(texts) == 1 else texts
             continue
         # Other types keep their generated value, as the server parses the text back into it.
-        schema = schema_with_bundle(properties[name], container_schema)
+        schema = properties[name]
         is_string = _declares_type(schema, "string") or parameter_types(schema) == ["string"]
         # Frameworks read a blank non-string value as an absent one, which an optional parameter allows.
         if texts == [""] and not is_string and name not in required:
@@ -1285,7 +1286,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
         if isinstance(value, Mapping) and meta_for_location is not None and meta_for_location.mode.is_negative:
             container = case.operation.get_parameter_set(location)
             schema = container.schema
-            properties = _parameter_schemas(schema)
+            properties = property_schemas(schema)
 
             if _has_serialization_sensitive_types(properties, container):
                 # Wire-serialized arrays and objects can't be re-validated, so only mutation metadata can tell.
@@ -1372,14 +1373,6 @@ def _allows_container_type(schema: JsonSchema) -> bool:
     """Whether a parameter schema admits arrays or objects."""
     types = parameter_types(schema)
     return "array" in types or "object" in types
-
-
-def _parameter_schemas(container_schema: dict[str, Any]) -> dict[str, JsonSchema]:
-    """Parameter schemas by name, each keeping the bundle its references point into."""
-    properties = container_schema.get("properties", {})
-    if BUNDLE_STORAGE_KEY not in container_schema:
-        return properties
-    return {name: schema_with_bundle(subschema, container_schema) for name, subschema in properties.items()}
 
 
 # Methods that read, modify in place or remove, so cannot re-create a resource; POST, PUT and custom verbs can.

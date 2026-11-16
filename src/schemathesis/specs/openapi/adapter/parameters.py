@@ -25,6 +25,7 @@ from schemathesis.core.jsonschema import (
     example_is_valid,
     make_validator,
     maybe_resolve_bundled,
+    property_schemas,
     resolve_bundled_ref,
     resolve_bundled_root,
     resolve_with_root_bundle,
@@ -713,7 +714,7 @@ def _with_dictionary_values(
 ) -> st.SearchStrategy:
     from schemathesis.generation.dictionaries import build_dictionary_overlay_strategy, resolve_parameter_bindings
 
-    properties = schema.get("properties", {})
+    properties = property_schemas(schema)
     bindings = resolve_parameter_bindings(
         operation=operation, location=location, properties=properties, generation_config=generation_config
     )
@@ -724,8 +725,7 @@ def _with_dictionary_values(
         bindings=bindings,
         operation_label=operation.label,
         parameter_location=location,
-        # A parameter schema may reference shared definitions stored next to `properties`.
-        schema_properties={name: schema_with_bundle(properties[name], schema) for name in bindings},
+        schema_properties=properties,
         validator_cls=operation.schema.adapter.jsonschema_validator_cls,
         generation_mode=generation_mode,
     )
@@ -958,10 +958,10 @@ def _is_item_overlay(value: object) -> bool:
 def _integer_property_validators(schema: JsonSchemaObject, validator_cls: type) -> dict[str, jsonschema_rs.Validator]:
     """Per-property validators, used to keep the positive-ID bias within the declared schema."""
     validators: dict[str, jsonschema_rs.Validator] = {}
-    for name, prop_schema in schema.get("properties", {}).items():
+    for name, prop_schema in property_schemas(schema).items():
         if isinstance(prop_schema, dict) and prop_schema.get("type") == "integer":
             try:
-                validators[name] = make_validator(schema_with_bundle(prop_schema, schema), validator_cls)
+                validators[name] = make_validator(prop_schema, validator_cls)
             except Exception:
                 continue
     return validators
