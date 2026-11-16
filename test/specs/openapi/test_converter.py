@@ -786,6 +786,33 @@ def test_nested_object_required_array_not_duplicated():
         pytest.param(
             {
                 "oneOf": [
+                    {"$ref": "#/components/schemas/Pet.Cat"},
+                    {"$ref": "#/components/schemas/Pet.Dog"},
+                ],
+                "discriminator": {"propertyName": "petType", "mapping": {"cat": "Pet.Cat", "dog": "Pet.Dog"}},
+            },
+            {
+                "oneOf": [
+                    {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Pet.Cat"},
+                            {"properties": {"petType": {"enum": ["cat"]}}},
+                        ]
+                    },
+                    {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Pet.Dog"},
+                            {"properties": {"petType": {"enum": ["dog"]}}},
+                        ]
+                    },
+                ],
+                "discriminator": {"propertyName": "petType", "mapping": {"cat": "Pet.Cat", "dog": "Pet.Dog"}},
+            },
+            id="dotted-schema-name-mapping",
+        ),
+        pytest.param(
+            {
+                "oneOf": [
                     {"$ref": "#/components/schemas/Comparison"},
                     {"$ref": "#/components/schemas/In"},
                 ],
@@ -873,6 +900,38 @@ def test_nested_object_required_array_not_duplicated():
                 "discriminator": {"propertyName": "petType", "mapping": {"cat": 5}, "defaultMapping": "OtherPet"},
             },
             id="default-mapping-with-non-string-target",
+        ),
+        pytest.param(
+            {
+                "oneOf": [{"$ref": "#/components/schemas/Pet.Cat"}, {"$ref": "#/components/schemas/Pet.Other"}],
+                "discriminator": {
+                    "propertyName": "petType",
+                    "mapping": {"cat": "Pet.Cat"},
+                    "defaultMapping": "Pet.Other",
+                },
+            },
+            {
+                "oneOf": [
+                    {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Pet.Cat"},
+                            {"properties": {"petType": {"enum": ["cat"]}}},
+                        ]
+                    },
+                    {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Pet.Other"},
+                            {"properties": {"petType": {"not": {"enum": ["Pet.Cat", "cat"]}}}},
+                        ]
+                    },
+                ],
+                "discriminator": {
+                    "propertyName": "petType",
+                    "mapping": {"cat": "Pet.Cat"},
+                    "defaultMapping": "Pet.Other",
+                },
+            },
+            id="dotted-default-mapping",
         ),
     ],
 )
@@ -1083,12 +1142,18 @@ def test_discriminator_pin_skipped_for_polymorphic_branch_target(ctx):
 
 
 @pytest.mark.parametrize(
-    ("discriminator", "expected"),
-    [({"propertyName": "kind"}, {"cat"}), ({"propertyName": "kind", "mapping": {"kitty": "./cat.json"}}, {"kitty"})],
-    ids=["implicit", "mapped"],
+    ("file_name", "discriminator", "expected"),
+    [
+        ("cat.json", {"propertyName": "kind"}, {"cat"}),
+        ("cat.json", {"propertyName": "kind", "mapping": {"kitty": "./cat.json"}}, {"kitty"}),
+        ("cat.json", {"propertyName": "kind", "mapping": {"kitty": "cat.json"}}, {"kitty"}),
+        ("Pet.Cat.json", {"propertyName": "kind"}, {"Pet.Cat"}),
+        ("Pet.Cat.json", {"propertyName": "kind", "mapping": {"kitty": "./Pet.Cat.json"}}, {"kitty"}),
+    ],
+    ids=["implicit", "mapped", "mapped-bare-file-name", "dotted-implicit", "dotted-mapped"],
 )
-def test_discriminator_pin_uses_file_name_for_whole_file_ref(tmp_path, discriminator, expected):
-    (tmp_path / "cat.json").write_text(
+def test_discriminator_pin_uses_file_name_for_whole_file_ref(tmp_path, file_name, discriminator, expected):
+    (tmp_path / file_name).write_text(
         json.dumps(
             {
                 "type": "object",
@@ -1110,7 +1175,7 @@ def test_discriminator_pin_uses_file_name_for_whole_file_ref(tmp_path, discrimin
                                 "content": {
                                     "application/json": {
                                         "schema": {
-                                            "oneOf": [{"$ref": "cat.json"}],
+                                            "oneOf": [{"$ref": file_name}],
                                             "discriminator": discriminator,
                                         }
                                     }
