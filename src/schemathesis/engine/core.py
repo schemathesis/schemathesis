@@ -347,7 +347,7 @@ class ExecutionPlan:
         completed = ctx.stop_reason in (StopReason.COMPLETED, StopReason.MAX_TIME) or any(
             phase.name is PhaseName.CONTINUOUS_FUZZING for phase in self.phases
         )
-        failures = run_after_run_checks(ctx) if completed else []
+        failures, skipped_checks = run_after_run_checks(ctx, completed=completed)
         if defines_teardown(ctx.schema):
             teardown = Phase(PhaseName.TEARDOWN)
             yield events.PhaseStarted(phase=teardown, payload=None)
@@ -358,6 +358,7 @@ class ExecutionPlan:
             stop_reason=ctx.stop_reason,
             payload=summary,
             failures=failures,
+            skipped_checks=skipped_checks,
         )
 
     def _adapt_execution(self, engine: EngineContext, phase: Phase) -> StatefulPhasePayload | None:
