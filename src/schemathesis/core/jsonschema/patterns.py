@@ -670,7 +670,7 @@ def update_quantifier(pattern: str, min_length: int | None, max_length: int | No
         return pattern
 
 
-_REGEX_META = set(r"\.^$*+?{[|()")
+_REGEX_META = set(r"\.^$*+?{}[]|()")
 
 
 def _serialize(nodes: list[_Node], *, global_flags: int = 0) -> str:
@@ -738,7 +738,6 @@ def _serialize_literal(charcode: int) -> str:
             return f"\\x{charcode:02x}"
         if charcode <= 0xFFFF:
             return f"\\u{charcode:04x}"
-        return f"\\U{charcode:08x}"
     return ch
 
 
@@ -793,7 +792,6 @@ def _serialize_literal_in_class(charcode: int) -> str:
             return f"\\x{charcode:02x}"
         if charcode <= 0xFFFF:
             return f"\\u{charcode:04x}"
-        return f"\\U{charcode:08x}"
     return ch
 
 

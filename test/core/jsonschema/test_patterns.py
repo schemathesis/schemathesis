@@ -41,7 +41,7 @@ from schemathesis.core.jsonschema.patterns import (
         ("a", None, 3, "^a{1,3}$"),
         ("a", 3, 3, "^a{3}$"),
         ("a", 0, 3, "^a{1,3}$"),
-        ("}?", 1, None, "}{1}"),
+        ("}?", 1, None, r"\}{1}"),
         (".*", None, 3, "^.{0,3}$"),
         (".*", 0, 3, "^.{0,3}$"),
         (".*", 1, None, ".{1,}"),
@@ -276,9 +276,9 @@ from schemathesis.core.jsonschema.patterns import (
         ("^(a)$", None, 4096, "^(a{1})$"),
         ("^(a?)+b+$", 7, 12, "^(a?)+b+$"),
         ("^(?:(?:a|bb){2}){1,3}$", 4, None, "^(?:(?:a|bb){2}){1,3}$"),
-        ("}", None, 1, "^}{1}$"),
+        ("}", None, 1, r"^\}{1}$"),
         ("^", None, 4096, "^"),
-        ("}?", 0, 0, "^}{0}$"),
+        ("}?", 0, 0, r"^\}{0}$"),
         ("a+b", 0, 10, "a+b"),
         ("(ab)*", None, 1, "(ab)*"),
         ("^a+()+$", 1, None, "^a+()+$"),
@@ -1012,6 +1012,7 @@ def test_serialize_char_class_range(pattern, samples_in, samples_out):
         (r"a\?b", "a?b"),
         (r"\(x\)", "(x)"),
         (r"\[x\]", "[x]"),
+        (r"\{x\}", "{x}"),
         (r"a\\b", "a\\b"),
         (r"\^\$", "^$"),
     ],
@@ -1020,6 +1021,7 @@ def test_serialize_escaped_literal(pattern, should_match):
     parsed = sre_parse.parse(pattern)
     serialized = _serialize(list(parsed))
     assert re.compile(serialized).fullmatch(should_match)
+    assert jsonschema_rs.validator_for({"format": "regex"}, validate_formats=True).is_valid(serialized), serialized
 
 
 @given(pattern=st.text(min_size=1, max_size=80).filter(is_valid_regex))
