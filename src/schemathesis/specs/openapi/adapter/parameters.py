@@ -707,12 +707,13 @@ def _with_dictionary_values(
     strategy: st.SearchStrategy,
     operation: APIOperation,
     location: ParameterLocation,
-    properties: dict[str, Any],
+    schema: JsonSchemaObject,
     generation_config: GenerationConfig,
     generation_mode: GenerationMode,
 ) -> st.SearchStrategy:
     from schemathesis.generation.dictionaries import build_dictionary_overlay_strategy, resolve_parameter_bindings
 
+    properties = schema.get("properties", {})
     bindings = resolve_parameter_bindings(
         operation=operation, location=location, properties=properties, generation_config=generation_config
     )
@@ -723,7 +724,8 @@ def _with_dictionary_values(
         bindings=bindings,
         operation_label=operation.label,
         parameter_location=location,
-        schema_properties=properties,
+        # A parameter schema may reference shared definitions stored next to `properties`.
+        schema_properties={name: schema_with_bundle(properties[name], schema) for name in bindings},
         validator_cls=operation.schema.adapter.jsonschema_validator_cls,
         generation_mode=generation_mode,
     )
@@ -2671,9 +2673,7 @@ class OpenApiParameterSet(ParameterSet):
                 validator_cls,
                 name_only=self.location == ParameterLocation.PATH,
             )
-        return _with_dictionary_values(
-            strategy, operation, self.location, properties, generation_config, generation_mode
-        )
+        return _with_dictionary_values(strategy, operation, self.location, schema, generation_config, generation_mode)
 
     def _build_negative_aware_strategy(
         self,
