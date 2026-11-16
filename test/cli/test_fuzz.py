@@ -3,6 +3,7 @@ from __future__ import annotations
 import _thread
 import json
 import re
+import threading
 import time
 import uuid
 from io import StringIO
@@ -331,6 +332,22 @@ def crashes_once(ctx, response, case):
         cli.main("fuzz", url, f"--max-time={max_time}", "--workers=1", "--checks=crashes_once", hooks=module)
         == snapshot_cli
     )
+
+
+def test_fuzz_request_cut_by_time_limit_is_not_a_passed_scenario(cli, app_runner, ctx, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
+    release = threading.Event()
+
+    @app.route("/users")
+    def users():
+        release.wait()
+        return jsonify([])
+
+    try:
+        result = cli.main("fuzz", app_runner.openapi_url(app), "--max-time=1", "--request-timeout=30", "--workers=1")
+    finally:
+        release.set()
+    assert result == snapshot_cli
 
 
 def test_fuzz_single_scenario_is_singular(cli, app_runner, ctx):

@@ -647,6 +647,9 @@ def _run_forever_thread(
             hypothesis.reject()
         # A draw Hypothesis rejects must not spend the one scenario allowed past the time limit.
         scenario_started.set()
+        if not recorder.cases and ctx.has_to_stop:
+            # The run stopped before any request was answered, so there is no scenario to report.
+            raise _StopFuzzing
         _start_scenario(
             scenario_cell,
             started_at=scenario_started_at,
