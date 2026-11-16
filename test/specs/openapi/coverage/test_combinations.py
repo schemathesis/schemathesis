@@ -4301,8 +4301,9 @@ QUANTIFIERS_PAST_THE_BUFFER = pytest.mark.parametrize(
         {"type": "string", "pattern": "^[a-z]{100000,200000}$"},
         {"type": "string", "pattern": "^(a{40000})?$"},
         {"type": "object", "patternProperties": {"^a{40000}$": {"type": "integer"}}},
+        {"type": "string", "pattern": "^a{100000}$", "format": "date"},
     ],
-    ids=["quantifier", "optional-group", "pattern-properties"],
+    ids=["quantifier", "optional-group", "pattern-properties", "with-format"],
 )
 
 

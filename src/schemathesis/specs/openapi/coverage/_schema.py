@@ -4403,7 +4403,7 @@ def _negative_format(
         strategy = ctx.build_strategy(without_format)
         if strategy is None:
             raise Unsatisfiable
-        value: str = examples.generate_one(strategy.filter(filter_fn))
+        value: str = cached_draw(ctx.session, strategy.filter(filter_fn))
     except Unsatisfiable:
         if cache_key is not None:
             ctx.session.values[cache_key] = UNSATISFIABLE_RESULT
