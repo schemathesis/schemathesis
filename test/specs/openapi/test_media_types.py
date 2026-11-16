@@ -11,7 +11,7 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.core import NOT_SET
-from schemathesis.core.deserialization import parse_json_sequence
+from schemathesis.core.deserialization import _parse_sse_events, parse_json_sequence
 from schemathesis.core.file_samples import file_extension
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
 from schemathesis.generation import GenerationMode
@@ -326,6 +326,58 @@ def test_multipart_item_schema_body_generation(ctx, media_type, media_type_objec
         assert [message.get_content_type()] + [
             (part.get_content_type(), part.get_payload(decode=True)) for part in message.iter_parts()
         ] == [media_type] + [(part_content_type, json.dumps(item).encode()) for item in case.body]
+
+
+# Event stream readers turn CR and CRLF into LF, so only LF line breaks survive the round trip.
+SSE_EVENT = {
+    "type": "object",
+    "properties": {
+        "event": {"enum": ["add", "remove"]},
+        "data": {"type": "string", "not": {"pattern": "\r"}},
+        "retry": {"type": "integer", "minimum": 0},
+    },
+    "required": ["event", "data"],
+    "additionalProperties": False,
+}
+
+
+@pytest.mark.parametrize(
+    ("version", "media_type_object", "expected"),
+    [
+        (
+            "3.2.0",
+            {"itemSchema": {"$ref": "#/components/schemas/Event"}},
+            {"type": "array", "items": SSE_EVENT},
+        ),
+        (
+            "3.2.0",
+            {"itemSchema": SSE_EVENT, "schema": {"maxItems": 2}},
+            {"type": "array", "items": SSE_EVENT, "maxItems": 2},
+        ),
+        (
+            "3.1.0",
+            {"schema": {"type": "array", "items": SSE_EVENT}},
+            {"type": "array", "items": SSE_EVENT},
+        ),
+    ],
+    ids=["item-schema", "item-schema-and-schema", "schema-before-3.2"],
+)
+def test_event_stream_body_generation(ctx, version, media_type_object, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /events",
+        {
+            "requestBody": {"required": True, "content": {"text/event-stream": media_type_object}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        version=version,
+        components={"schemas": {"Event": SSE_EVENT}},
+    )
+    validator = jsonschema_rs.validator_for(expected)
+
+    @run_given(operation.as_strategy(), max_examples=10)
+    def test(case):
+        assert validator.is_valid(case.body), f"Invalid body: {case.body!r}"
+        assert _parse_sse_events(REQUESTS_TRANSPORT.serialize_case(case)["data"]) == case.body
 
 
 def test_multipart_encoding_multiple_content_types(ctx):

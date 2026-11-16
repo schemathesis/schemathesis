@@ -8,6 +8,7 @@ from unicodedata import normalize
 from urllib.parse import quote, unquote
 
 from schemathesis.core import Body
+from schemathesis.core.deserialization import SSE_LINE_RE
 from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference_with_uri
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue
@@ -124,6 +125,25 @@ def serialize_json_sequence(value: Body, record_start: str) -> bytes:
         return value
     records = value if isinstance(value, list) else [value]
     return "".join(f"{record_start}{json.dumps(record, separators=(',', ':'))}\n" for record in records).encode()
+
+
+def serialize_event_stream(value: Body) -> bytes:
+    """Encode a list as one server-sent event per item and a mapping as a single event; send other values as text."""
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, dict):
+        return _serialize_event(value).encode()
+    if isinstance(value, list):
+        return "".join(_serialize_event(item) for item in value).encode()
+    return to_wire_text(value).encode()
+
+
+def _serialize_event(event: object) -> str:
+    # An item that is not a mapping of fields travels as the event's payload
+    fields = event.items() if isinstance(event, dict) else [("data", event)]
+    # One line per line of a value: readers join repeated `data` lines with line feeds
+    lines = [f"{name}: {line}\n" for name, value in fields for line in SSE_LINE_RE.split(to_wire_text(value))]
+    return "".join(lines) + "\n"
 
 
 def json_sequence_readings(value: object) -> list[object]:

@@ -34,7 +34,7 @@ from schemathesis.core.jsonschema import (
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, as_object_schema, get_type
-from schemathesis.core.media_types import FORM_MEDIA_TYPES, is_json_sequence, is_positional_multipart
+from schemathesis.core.media_types import FORM_MEDIA_TYPES, is_json_sequence, is_positional_multipart, is_sse
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation, SkippedParameter
 from schemathesis.core.transforms import deepclone, format_body_path, jsonify_python_specific_types
 from schemathesis.core.validation import check_header_name
@@ -2256,8 +2256,10 @@ def iter_parameters_v3(
                 skipped.append(_skipped_body(exc, required=required))
                 continue
             item_schema = content.get("itemSchema")
-            if item_schema is not None and (is_json_sequence(media_type) or is_positional_multipart(media_type)):
-                # The body is the array of the records or parts `itemSchema` describes
+            if item_schema is not None and (
+                is_json_sequence(media_type) or is_sse(media_type) or is_positional_multipart(media_type)
+            ):
+                # The body is the array of the records, events or parts `itemSchema` describes
                 content = {**content, "schema": json_sequence_schema(item_schema, content.get("schema"))}
             resource_name = None
             schema = content.get("schema")
