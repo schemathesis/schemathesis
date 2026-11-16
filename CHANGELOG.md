@@ -22,7 +22,7 @@
 
 ### :racing_car: Performance
 
-- Up to 2x faster coverage phase for patterns with wide character classes like `\p{L}`.
+- Up to 6x faster data generation for patterns with Unicode-wide classes like `[\P{M}\p{M}]`.
 - Up to 13% faster negative coverage phase against fast local APIs.
 
 ### :wrench: Changed
