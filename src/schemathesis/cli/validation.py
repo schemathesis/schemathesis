@@ -62,6 +62,10 @@ def validate_schema_location(ctx: click.core.Context, param: click.core.Paramete
     if "\x00" in location or not location:
         raise click.UsageError(INVALID_SCHEMA_MESSAGE)
     exists = file_exists(location)
+    # With an in-process app, anything that is not a file is a path the app serves its schema at
+    config = ctx.find_object(SchemathesisConfig)
+    if not exists and (ctx.params.get("app") is not None or (config is not None and config.app is not None)):
+        return location
     if exists or bool(pathlib.Path(location).suffix):
         if not exists:
             raise click.UsageError(FILE_DOES_NOT_EXIST_MESSAGE)

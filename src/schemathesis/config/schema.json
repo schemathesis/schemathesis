@@ -170,6 +170,9 @@
       "type": "number",
       "minimum": 1
     },
+    "app": {
+      "type": "string"
+    },
     "continue-on-failure": {
       "type": "boolean"
     },

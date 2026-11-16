@@ -1,0 +1,10 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: Invalid `--app` value `in_process_app`: expected `module:attribute`, e.g. `project.asgi:app`

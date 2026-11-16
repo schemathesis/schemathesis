@@ -1,0 +1,10 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: The application failed while serving its schema at `/openapi.json`: TypeError: dict expected at most 1 argument, got 2

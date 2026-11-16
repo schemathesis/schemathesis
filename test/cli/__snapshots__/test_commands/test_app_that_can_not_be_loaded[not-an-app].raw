@@ -1,0 +1,10 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: `CALLS` from `--app=in_process_app:CALLS` is not an ASGI or WSGI application, got `list`

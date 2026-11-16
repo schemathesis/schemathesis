@@ -156,6 +156,12 @@ def from_path(
         ```
 
     """
+    return _from_path(path, config=config, encoding=encoding)
+
+
+def _from_path(
+    path: PathLike | str, *, config: SchemathesisConfig | None = None, encoding: str = "utf-8", app: Any = None
+) -> OpenApiSchema:
     with open(path, encoding=encoding) as file:
         content_type = detect_content_type(headers=None, path=str(path))
         try:
@@ -163,7 +169,7 @@ def from_path(
         except UnicodeDecodeError as exc:
             raise LoaderError(LoaderErrorKind.SYNTAX_ERROR, SCHEMA_SYNTAX_ERROR, extras=[str(exc)]) from exc
         schema = load_content(content, content_type)
-    loaded = _from_dict(schema, config=config, stringify=False)
+    loaded = _from_dict(schema, config=config, stringify=False, app=app)
     loaded.location = Path(path).absolute().as_uri()
     return loaded
 

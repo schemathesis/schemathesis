@@ -1,0 +1,15 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: `create_app` from `--app=factory_app:create_app` failed to create the app:
+
+Traceback (most recent call last):
+  File "/tmp/factory_app.py", line XXX, in create_app
+    raise ValueError('no database')
+ValueError: no database

@@ -1,0 +1,10 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: Module `in_process_app` from `--app=in_process_app:missing` has no attribute `missing`

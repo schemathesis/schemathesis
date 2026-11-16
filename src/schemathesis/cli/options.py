@@ -55,6 +55,17 @@ WAIT_FOR_SCHEMA = OptionSpec(
     envvar="SCHEMATHESIS_WAIT_FOR_SCHEMA",
 )
 
+APP = OptionSpec(
+    "--app",
+    help="Python ASGI or WSGI application to test without a server, as `module:attribute`",
+    type=str,
+    default=None,
+    metavar="MODULE:ATTRIBUTE",
+    envvar="SCHEMATHESIS_APP",
+    # The schema location is validated against it
+    is_eager=True,
+)
+
 BASE_URL = OptionSpec(
     "--url",
     "-u",

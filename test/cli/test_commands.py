@@ -1,3 +1,4 @@
+import importlib
 import json
 import os
 import pathlib
@@ -5475,3 +5476,138 @@ def test_additional_operations_are_tested(ctx, cli, snapshot_cli):
         return "", 204
 
     assert cli.run_openapi_app(app, "--max-examples=10") == snapshot_cli
+
+
+IN_PROCESS_PATHS = {"/api/success": {"get": {"responses": {"200": {"description": "OK"}}}}}
+IN_PROCESS_FLASK = """
+from flask import Flask, jsonify
+
+CALLS = []
+app = Flask("in_process")
+
+@app.route("/openapi.json")
+def spec():
+    return jsonify({schema!r})
+
+@app.route("/api/success")
+def success():
+    CALLS.append("success")
+    return jsonify({{"success": True}})
+"""
+IN_PROCESS_FASTAPI = """
+from fastapi import FastAPI
+
+CALLS = []
+app = FastAPI()
+
+@app.get("/api/success")
+def success():
+    CALLS.append("success")
+    return {{"success": True}}
+"""
+
+
+def _write_app(ctx, source, filename="in_process_app"):
+    return ctx.write_pymodule(source.format(schema=ctx.openapi.build_schema(IN_PROCESS_PATHS)), filename=filename)
+
+
+@pytest.mark.parametrize("source", [IN_PROCESS_FLASK, IN_PROCESS_FASTAPI], ids=["flask", "fastapi"])
+def test_app_is_tested_in_process(ctx, cli, snapshot_cli, source):
+    module = _write_app(ctx, source)
+    assert cli.main("run", "/openapi.json", f"--app={module}:app", "--max-examples=3") == snapshot_cli
+
+
+@pytest.mark.parametrize("command", [("run", "--max-examples=3"), ("fuzz", "--max-time=1")], ids=["run", "fuzz"])
+def test_app_from_config_file_receives_requests(ctx, cli, command):
+    module = _write_app(ctx, IN_PROCESS_FLASK)
+    cli.main(command[0], "/openapi.json", command[1], config={"app": f"{module}:app"})
+    assert importlib.import_module(module).CALLS
+
+
+def test_app_with_schema_from_file(ctx, cli):
+    module = _write_app(ctx, IN_PROCESS_FLASK)
+    schema_path = ctx.openapi.write_schema(IN_PROCESS_PATHS)
+    hooks = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def after_load_schema(context, schema):
+    note(f"APP {type(schema.app).__name__}")
+""",
+        filename="app_hooks",
+    )
+    result = cli.main("run", str(schema_path), f"--app={module}:app", "--max-examples=3", hooks=hooks)
+    assert ("APP Flask" in result.stdout, bool(importlib.import_module(module).CALLS)) == (True, True), result.stdout
+
+
+def test_in_app_schema_path_needs_an_app(cli, snapshot_cli):
+    assert cli.main("run", "/openapi.json") == snapshot_cli
+
+
+@pytest.mark.parametrize(
+    "app",
+    ["missing_module:app", "in_process_app:missing", "in_process_app:CALLS", "in_process_app"],
+    ids=["missing-module", "missing-attribute", "not-an-app", "no-attribute"],
+)
+def test_app_that_can_not_be_loaded(ctx, cli, snapshot_cli, app):
+    _write_app(ctx, IN_PROCESS_FLASK)
+    assert cli.main("run", "/openapi.json", f"--app={app}") == snapshot_cli
+
+
+def test_app_that_fails_on_import(ctx, cli, snapshot_cli):
+    ctx.write_pymodule("import missing_dependency\napp = None", filename="broken_app")
+    assert cli.main("run", "/openapi.json", "--app=broken_app:app") == snapshot_cli
+
+
+IN_PROCESS_GRAPHQL = """
+from test.apps.catalog.graphql import bookstore
+
+app = bookstore.books().server
+"""
+
+
+def test_graphql_app_is_tested_in_process(ctx, cli):
+    module = ctx.write_pymodule(IN_PROCESS_GRAPHQL, filename="graphql_app")
+    result = cli.main("run", "/graphql", f"--app={module}:app", "--max-examples=3", "--phases=fuzzing")
+    assert "Specification:    GraphQL" in result.stdout and "passed" in result.stdout, result.stdout
+
+
+def test_graphql_app_with_schema_from_file(ctx, cli, snapshot_cli):
+    module = ctx.write_pymodule(IN_PROCESS_GRAPHQL, filename="graphql_app")
+    path = ctx.graphql.write_sdl("type Query { hello: String }")
+    assert cli.main("run", str(path), f"--app={module}:app") == snapshot_cli
+
+
+def test_app_with_grpc_location(ctx, cli, snapshot_cli):
+    module = _write_app(ctx, IN_PROCESS_FLASK)
+    assert cli.main("run", "grpc://127.0.0.1:1", f"--app={module}:app") == snapshot_cli
+
+
+def test_app_is_imported_from_the_working_directory(ctx, cli, testdir):
+    testdir.makepyfile(cwd_app=IN_PROCESS_FLASK.format(schema=ctx.openapi.build_schema(IN_PROCESS_PATHS)))
+    cli.main("run", "/openapi.json", "--app=cwd_app:app", "--max-examples=3")
+    assert importlib.import_module("cwd_app").CALLS
+
+
+def test_app_factory_is_called(ctx, cli):
+    module = _write_app(ctx, IN_PROCESS_FLASK + "\ndef create_app():\n    return app\n")
+    cli.main("run", "/openapi.json", f"--app={module}:create_app", "--max-examples=3")
+    assert importlib.import_module(module).CALLS
+
+
+@pytest.mark.parametrize(
+    "factory",
+    ["def create_app():\n    raise ValueError('no database')", "def create_app():\n    return 42"],
+    ids=["raises", "returns-no-app"],
+)
+def test_app_factory_that_gives_no_app(ctx, cli, snapshot_cli, factory):
+    ctx.write_pymodule(factory, filename="factory_app")
+    assert cli.main("run", "/openapi.json", "--app=factory_app:create_app") == snapshot_cli
+
+
+def test_app_that_fails_to_serve_its_schema(cli, snapshot_cli):
+    assert cli.main("run", "/openapi.json", "--app=builtins:dict") == snapshot_cli
+
+
+def test_app_without_a_schema_at_the_location(ctx, cli, snapshot_cli):
+    module = _write_app(ctx, IN_PROCESS_FLASK)
+    assert cli.main("run", "/missing.json", f"--app={module}:app") == snapshot_cli
