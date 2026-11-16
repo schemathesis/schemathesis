@@ -12,8 +12,10 @@ if TYPE_CHECKING:
 MAPPING_TYPES = (dict, MutableMapping)
 
 
-def is_sensitive_key(key: str, keys_to_sanitize: Sequence[str], sensitive_markers: Sequence[str]) -> bool:
+def is_sensitive_key(key: object, keys_to_sanitize: Sequence[str], sensitive_markers: Sequence[str]) -> bool:
     """Whether `key` matches the configured sensitivity rules (exact-in-list or substring marker)."""
+    if not isinstance(key, str):
+        return False
     lowered = key.lower()
     if lowered in keys_to_sanitize:
         return True
