@@ -628,6 +628,8 @@ def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | No
     __tracebackhide__ = True
     # 1. Programmatic auth
     if auth_storage is not None:
+        # Credentials re-applied later must come from the same source.
+        case._auth_storage = auth_storage
         if not case.operation.schema.is_security_param_negated(case):
             auth_storage.set(case, context)
         return

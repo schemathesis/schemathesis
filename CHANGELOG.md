@@ -17,6 +17,7 @@
 - `setup` and `teardown` hooks run once around testing in `st run`, `st fuzz` and pytest.
 - `@schemathesis.extension` registers a hook class with its own `[extensions.<name>]` settings.
 - `hooks` config option accepts a list of modules, loaded in order.
+- `Case.reapply_auth()` refreshes expired auth tokens on cases generated earlier, honoring `refresh_interval`.
 
 ### :racing_car: Performance
 

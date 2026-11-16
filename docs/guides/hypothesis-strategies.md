@@ -36,6 +36,8 @@ all_operations = schema.as_strategy()
 
 A `Case` holds the method, path, headers, query parameters and request body needed to make a request. The strategies behave like any other Hypothesis strategy; see the [Hypothesis documentation](https://hypothesis.readthedocs.io/en/latest/data.html).
 
+A case carries the credentials from [configured authentication](auth.md) at the time it was generated. To send a stored case later, call `case.reapply_auth()` first; see [Sending Stored Cases](auth.md#sending-stored-cases).
+
 The snippets below assume these imports and the `schema` defined above:
 
 ```python

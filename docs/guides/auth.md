@@ -363,6 +363,8 @@ class RefreshableAuth:
 - `refresh_interval=None` - Disable caching entirely
 - Default: 300 seconds
 
+A case keeps the token it was generated with. To send a case later, see [Sending Stored Cases](#sending-stored-cases).
+
 ## Cache Key Management
 
 Cache different tokens based on specific criteria like OAuth scopes:
@@ -555,7 +557,7 @@ class APITokenAuth:
 
 @schema.parametrize()
 def test_api(case: schemathesis.Case) -> None:
-    # Auth applied automatically
+    # Auth applied when the case is generated
     case.call_and_validate()
 ```
 
@@ -606,6 +608,34 @@ def test_with_session(case: schemathesis.Case) -> None:
 
 !!! tip ""
     Custom auth classes support the same features in pytest as in the CLI (refresh intervals, cache keys, selective application) with identical syntax.
+
+### Sending Stored Cases
+
+Schemathesis sets credentials when it generates a case. If you generate cases first and send them later, their tokens can expire in between. With an auth class registered as above, call `reapply_auth()` before sending each case:
+
+```python
+from hypothesis import given, settings
+
+import schemathesis
+
+schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
+cases = []
+
+
+@given(case=schema["/users"]["GET"].as_strategy())
+@settings(max_examples=50)
+def collect(case: schemathesis.Case) -> None:
+    cases.append(case)
+
+
+collect()
+
+for case in cases:
+    case.reapply_auth()
+    case.call_and_validate()
+```
+
+`reapply_auth()` reuses the cached token until it is older than `refresh_interval`, then fetches a new one. It covers credentials from auth classes (`@schemathesis.auth()`, `@schema.auth()` or a provider passed to `as_strategy()`) and from `[auth]` settings in `schemathesis.toml`. Static `headers` and cases built by hand stay unchanged. Credentials you pass to `call` or `call_and_validate` override the re-applied ones. `reapply_auth()` overwrites your own edits to configured credentials, so edit after calling it.
 
 ## Troubleshooting
 
