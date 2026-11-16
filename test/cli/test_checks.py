@@ -885,7 +885,10 @@ def test_ignored_auth_with_credentials_in_undeclared_authorization_header(
             return jsonify({"detail": "unauthorized"}), 401
         return jsonify([])
 
-    assert cli.run_openapi_app(app, "-c ignored_auth", "--phases=fuzzing", "--max-examples=3", *args) == snapshot_cli
+    assert (
+        cli.run_openapi_app(app, "-c ignored_auth", "--phases=fuzzing", "--max-examples=3", "--no-shrink", *args)
+        == snapshot_cli
+    )
 
 
 @pytest.mark.parametrize(

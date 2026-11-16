@@ -261,6 +261,63 @@ def test_explicit_seed_takes_precedence_over_deterministic_mode(ctx, cli):
     )
 
 
+def failing_items_app(ctx, received):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        value = int(request.args["id"])
+        received.append(value)
+        if value < 0:
+            return jsonify({}), 500
+        if value > 100:
+            return jsonify({}), 418
+        return jsonify({})
+
+    return app
+
+
+@pytest.mark.parametrize("shrink", [True, False], ids=["shrink", "no-shrink"])
+def test_reported_failing_input(ctx, cli, shrink):
+    received = []
+    app = failing_items_app(ctx, received)
+    args = () if shrink else ("--no-shrink",)
+    result = cli.run_openapi_app(
+        app,
+        "--phases=fuzzing",
+        "--mode=positive",
+        "--checks=not_a_server_error",
+        "--max-examples=30",
+        "--seed=1",
+        *args,
+    )
+    # Without shrinking, the first failing input is reported and sent only once
+    expected = [-1] if shrink else [value for value in received if value < 0]
+    assert [int(value) for value in re.findall(r"/items\?id=(-?\d+)'", result.stdout)] == expected
+
+
+def test_distinct_failures_shrink_separately(ctx, cli):
+    app = failing_items_app(ctx, [])
+    result = cli.run_openapi_app(
+        app,
+        "--phases=fuzzing",
+        "--mode=positive",
+        "--checks=not_a_server_error,status_code_conformance",
+        "--max-examples=100",
+        "--seed=1",
+    )
+    assert re.findall(r"/items\?id=(-?\d+)'", result.stdout) == ["101", "-1"]
+
+
 def test_hypothesis_parameters(ctx, cli):
     api = ctx.openapi.apps.success()
     cli.run_and_assert(
@@ -1416,7 +1473,8 @@ def test_no_useless_traceback(ctx, cli, snapshot_cli):
             }
         }
     )
-    assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--mode=positive") == snapshot_cli
+    # Shrinking adds a random number of `405` responses, which may cross the skip threshold
+    assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--mode=positive", "--no-shrink") == snapshot_cli
 
 
 def test_negative_mode_with_unsupported_regex_in_body(cli, ctx, snapshot_cli):

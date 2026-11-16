@@ -91,6 +91,9 @@ def _run(
             if not item.success:
                 failing_case_ids = item.recorder.failing_case_ids()
                 failed |= _operation_labels(item.recorder, failing_case_ids)
+                # The writer keeps the first crash per failure, and the output reports the latest case of a shrunk one
+                if item.recorder.shrinks_failures:
+                    failing_case_ids.reverse()
                 for failing_case_id in failing_case_ids:
                     for crash in build_crashes_from_recorder(
                         recorder=item.recorder,

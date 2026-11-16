@@ -40,6 +40,8 @@ def run_test(
     recorder = scenario.recorder
     state = scenario.state
     generation = scenario.generation
+    # Without `continue-on-failure`, Hypothesis stops at a failure and shrinks it, replaying the minimal input last
+    recorder.shrinks_failures = not scenario.continue_on_failure and not generation.no_shrink
     non_fatal_error = scenario.non_fatal_error
 
     pending_events: list[events.EngineEvent] = []

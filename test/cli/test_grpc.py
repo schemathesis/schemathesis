@@ -128,6 +128,7 @@ def test_ignored_auth(ctx, cli, snapshot_cli, phase, user_id, sent):
             "--include-name=pkg.Users/GetUser",
             "--max-examples=3",
             f"--phases={phase}",
+            "--no-shrink",
             "-H",
             "Authorization: Bearer secret",
             hooks=module,

@@ -86,6 +86,7 @@
 #### CLI and configuration
 
 - Command-line options losing to `[[operations]]` and `[phases]` settings in the configuration file.
+- Shrink `st run` failures to a minimal example, so `--no-shrink` takes effect.
 
 #### pytest and Python API
 

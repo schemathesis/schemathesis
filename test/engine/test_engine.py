@@ -94,7 +94,7 @@ def test_interactions(ctx, workers):
 
     assert stream.finished.stop_reason == StopReason.COMPLETED
     api_calls = _api_requests(api)
-    assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
+    assert sorted({r.path for r in api_calls}) == ["/api/failure", "/api/success"]
     for request in api_calls:
         assert (request.method, request.headers["User-Agent"]) == ("GET", USER_AGENT)
 
@@ -104,8 +104,9 @@ def test_interactions(ctx, workers):
         encoding = ["gzip, deflate"]
 
     interactions = _scenario_interactions(stream, status=Status.FAILURE)
-    assert len(interactions) == 1
-    failure = interactions[0]
+    # Hypothesis tries to shrink the failing input, then replays the minimal one
+    assert len(interactions) == 3
+    failure = interactions[-1]
     assert asdict(failure.request) == {
         "uri": f"{api.base_url}/api/failure",
         "method": "GET",
@@ -263,7 +264,7 @@ def test_auth(ctx):
     execute(schema, auth=("test", "test"))
 
     api_calls = _api_requests(api)
-    assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
+    assert sorted({r.path for r in api_calls}) == ["/api/failure", "/api/success"]
     for request in api_calls:
         assert request.headers["Authorization"] == "Basic dGVzdDp0ZXN0"
 
@@ -277,7 +278,7 @@ def test_base_url(ctx, converter):
     execute(schema)
 
     api_calls = _api_requests(api)
-    assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
+    assert sorted({r.path for r in api_calls}) == ["/api/failure", "/api/success"]
 
 
 def test_root_url():
@@ -306,7 +307,7 @@ def test_execute_with_headers(ctx):
     execute(schema, headers=headers)
 
     api_calls = _api_requests(api)
-    assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
+    assert sorted({r.path for r in api_calls}) == ["/api/failure", "/api/success"]
     for request in api_calls:
         assert request.headers["Authorization"] == "Bearer 123"
 
