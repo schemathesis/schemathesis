@@ -17,6 +17,10 @@
 - `@schemathesis.extension` registers a hook class with its own `[extensions.<name>]` settings.
 - `hooks` config option accepts a list of modules, loaded in order.
 
+### :racing_car: Performance
+
+- Up to 2x faster coverage phase for patterns with wide character classes like `\p{L}`.
+
 ### :wrench: Changed
 
 - `st fuzz` probes API capabilities and runs sign-up before fuzzing, like `st run`.
