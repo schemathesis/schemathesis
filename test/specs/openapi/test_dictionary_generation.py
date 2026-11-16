@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 from hypothesis import strategies as st
 
@@ -1642,6 +1644,22 @@ def test_suggested_values_fill_body_fields(ctx):
 def test_suggest_needs_a_loaded_schema():
     with pytest.raises(RuntimeError, match="`suggest` needs a loaded schema"):
         HookContext().suggest(["payload"])
+
+
+@pytest.mark.parametrize(
+    ("parameter", "message"),
+    [
+        ("body.", "Body binding key has empty path: `body.`"),
+        ("body..name", "Empty segment in path: `body..name`"),
+        ("body.na me", "Invalid segment `na me` in path: `body.na me`"),
+        ("form.name", "Parameter `form.name` uses unknown location prefix `form`"),
+    ],
+    ids=["empty-body-path", "empty-segment", "invalid-segment", "unknown-location"],
+)
+def test_suggest_rejects_invalid_parameter(ctx, parameter, message):
+    operation = ctx.openapi.load_operation("GET /items", _PATHS_ONE_STRING["/items"]["get"])
+    with pytest.raises(ValueError, match=re.escape(message)):
+        HookContext(operation=operation).suggest(["payload"], parameter=parameter)
 
 
 @pytest.mark.parametrize(("schema_type", "value"), [("integer", 42), ("number", 42), ("number", 1.5)])

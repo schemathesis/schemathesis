@@ -26,11 +26,7 @@ def load_parameters(
     parameters: dict[str, Any] = {}
     for key, value in data.get("parameters", {}).items():
         if isinstance(value, dict) and "dictionary" in value:
-            _validate_dictionary_location_prefix(key)
-            if key.startswith(BODY_PREFIX):
-                parse_body_path(key)
-            elif is_graphql_binding_key(key):
-                parse_graphql_path(key)
+            validate_binding_key(key)
             name: str = value["dictionary"]
             require_known_dictionary(f"Parameter `{key}`", name, dictionaries)
             parameters[key] = ParameterDictionaryBinding(
@@ -41,6 +37,15 @@ def load_parameters(
         else:
             parameters[key] = value
     return parameters
+
+
+def validate_binding_key(key: str) -> None:
+    """Reject a key that can never address a parameter."""
+    _validate_dictionary_location_prefix(key)
+    if key.startswith(BODY_PREFIX):
+        parse_body_path(key)
+    elif is_graphql_binding_key(key):
+        parse_graphql_path(key)
 
 
 def _validate_dictionary_location_prefix(key: str) -> None:

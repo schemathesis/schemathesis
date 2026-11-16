@@ -10,6 +10,7 @@ from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeVar, cast
 
 from schemathesis.config import ConfigError, SchemathesisConfig
+from schemathesis.config._parameters import validate_binding_key
 from schemathesis.core.errors import HookExecutionError, format_exception
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.marks import Mark
@@ -75,6 +76,11 @@ class HookContext:
         # a matching type. `operation` is a label, by default the operation this hook runs for, or every operation.
         if self._schema is None:
             raise RuntimeError("`suggest` needs a loaded schema; `before_load_schema` runs before there is one")
+        if parameter is not None:
+            try:
+                validate_binding_key(parameter)
+            except ConfigError as error:
+                raise ValueError(str(error)) from None
         if operation is None and self.operation is not None:
             operation = self.operation.label
         source = _extension_name(self._hook) if self._hook is not None else None
