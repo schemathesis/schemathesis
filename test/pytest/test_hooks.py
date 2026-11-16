@@ -575,6 +575,22 @@ def test_a(case):
     assert (result.ret != 0, _events(result)) == (True, [])
 
 
+def test_usage_error_raised_before_schemathesis_configures_stays_a_usage_error(testdir):
+    testdir.makepyfile(
+        early="""
+import pytest
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_configure(config):
+    raise pytest.UsageError("bad option from another plugin")
+""",
+        test_a="def test_a():\n    pass\n",
+    )
+    testdir.syspathinsert()
+    result = testdir.runpytest("-p", "early")
+    assert (result.ret, "bad option from another plugin" in result.stderr.str()) == (pytest.ExitCode.USAGE_ERROR, True)
+
+
 def test_two_failing_teardown_hooks_are_both_reported(ctx, testdir):
     testdir.make_test(
         """
