@@ -679,6 +679,24 @@ def _serialize_part_value(
     return data, content_type
 
 
+def _serialize_form_field(
+    ctx: SerializationContext, value: object, schema: JsonSchemaObject, name: str, content_type: str
+) -> tuple[object, str]:
+    """Serialize a named form field, whose array items are separate parts under the field's media type."""
+    items = schema.get("items", {})
+    if (
+        isinstance(value, list)
+        and "type" in schema
+        and "array" in get_type(schema)
+        and isinstance(items, dict)
+        and _holds_bytes(items)
+        and REQUESTS_TRANSPORT.get_first_matching_media_type(content_type) is None
+    ):
+        # Raw bytes need no serializer, so each item goes out as it is under any media type, e.g. `image/jpg`.
+        return [serialize_binary(item) for item in value], content_type
+    return _serialize_part_value(ctx, value, schema, name, content_type)
+
+
 def prepare_multipart_parts(
     ctx: SerializationContext, value: dict[str, Any]
 ) -> tuple[list | None, dict[str, Any] | None]:
@@ -690,7 +708,7 @@ def prepare_multipart_parts(
     for name, content_type in encoded_fields.items():
         if name in value:
             schema = properties.get(name)
-            value[name], encoded_fields[name] = _serialize_part_value(
+            value[name], encoded_fields[name] = _serialize_form_field(
                 ctx, value[name], schema if isinstance(schema, dict) else {}, name, content_type
             )
     multipart = _prepare_form_data(value)
