@@ -4,6 +4,13 @@ on:
   schedule:
     # Every day at 00:00
     - cron: "0 0 * * *"
+  # PRs that change dependency inference run the inference job; the other jobs run nightly only.
+  pull_request:
+    paths:
+      - "src/schemathesis/specs/openapi/stateful/dependencies/**"
+      - "test-corpus/test_inference.py"
+      - "test-corpus/__snapshots__/test_inference/**"
+      - "tools/corpus/metrics.py"
   workflow_dispatch:
 
 permissions:
@@ -13,6 +20,7 @@ jobs:
 
   corpus-default:
     name: Default corpus tests
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,6 +41,7 @@ jobs:
 
   corpus-coverage:
     name: Corpus tests for the coverage phase (${{ matrix.mode }})
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -77,6 +86,7 @@ jobs:
 
   corpus-stateful:
     name: Corpus tests for stateful testing
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -97,6 +107,7 @@ jobs:
 
   corpus-graphql:
     name: GraphQL corpus tests
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -117,6 +128,7 @@ jobs:
 
   corpus-schemastore:
     name: Schemastore conformance probe
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
