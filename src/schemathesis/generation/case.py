@@ -20,7 +20,9 @@ from schemathesis.core import NOT_SET, Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
 from schemathesis.core.jsonschema import make_validator
+from schemathesis.core.output.sanitization import sanitize_value
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation, plain_str_values
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import HttpMethod, Response, prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.engine.run import PhaseName
@@ -192,6 +194,8 @@ class Case(Generic[OperationT]):
         return Override.from_components(self._components, self)
 
     def __repr__(self) -> str:
+        # Test runners log cases via `repr`; mask credentials like the reproduction command.
+        sanitization = self.operation.schema.config.output.sanitization
         output = f"{self.__class__.__name__}("
         first = True
         for name in ("path_parameters", "headers", "cookies", "query", "body"):
@@ -199,6 +203,9 @@ class Case(Generic[OperationT]):
             if name != "body" and not value:
                 continue
             if value is not None and not isinstance(value, NotSet):
+                if sanitization.enabled and isinstance(value, (Mapping, list)):
+                    value = deepclone(dict(value) if isinstance(value, Mapping) else value)
+                    sanitize_value(value, config=sanitization)
                 if first:
                     first = False
                 else:

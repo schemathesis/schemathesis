@@ -19,7 +19,7 @@ from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import merge_at
+from schemathesis.core.transforms import deepclone, merge_at
 from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.examples import generate_many
@@ -96,6 +96,7 @@ def test_make_case_missing_media_type(ctx):
         schema["/data"]["POST"].Case(body="foo")
 
 
+# Masking works on copies; the case keeps the values it sends.
 @pytest.mark.parametrize(
     ("kwargs", "expected"),
     [
@@ -104,12 +105,82 @@ def test_make_case_missing_media_type(ctx):
             {"path_parameters": {"name": "test"}, "query": {"q": 1}},
             "Case(path_parameters={'name': 'test'}, query={'q': 1})",
         ),
+        (
+            {"path_parameters": {"name": "test", "token": "abc"}},
+            "Case(path_parameters={'name': 'test', 'token': '[Filtered]'})",
+        ),
+        (
+            {"headers": {"Authorization": "Basic dXNlcjpwYXNz", "X-Trace": "1"}},
+            "Case(headers={'Authorization': '[Filtered]', 'X-Trace': '1'})",
+        ),
+        (
+            {"cookies": {"session": "abc", "theme": "dark"}},
+            "Case(cookies={'session': '[Filtered]', 'theme': 'dark'})",
+        ),
+        (
+            {"query": {"api_key": "abc", "ids": [1, 2]}},
+            "Case(query={'api_key': '[Filtered]', 'ids': [1, 2]})",
+        ),
+        (
+            {"body": {"user": {"password": "abc", "name": "x"}, "tags": [{"secret": "abc"}]}},
+            "Case(body={'user': {'password': '[Filtered]', 'name': 'x'}, 'tags': [{'secret': '[Filtered]'}]})",
+        ),
+        ({"body": [{"password": "abc"}]}, "Case(body=[{'password': '[Filtered]'}])"),
+        ({"body": "password=abc"}, "Case(body='password=abc')"),
+        ({"body": {1: "x", "token": "s"}}, "Case(body={1: 'x', 'token': '[Filtered]'})"),
+    ],
+    ids=[
+        "path",
+        "path-and-query",
+        "sensitive-path",
+        "sensitive-header",
+        "sensitive-cookie",
+        "sensitive-query",
+        "nested-object-body",
+        "array-body",
+        "string-body",
+        "non-string-key-body",
     ],
 )
 def test_case_repr(ctx, kwargs, expected):
-    operation = ctx.openapi.load_operation("GET /users/{name}", {"responses": {"200": {"description": "OK"}}})
-    case = operation.Case(**kwargs)
-    assert repr(case) == expected
+    operation = ctx.openapi.load_operation(
+        "POST /users/{name}",
+        {
+            "requestBody": {"content": {"application/json": {"schema": {}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(**deepclone(kwargs))
+    assert (repr(case), {name: getattr(case, name) for name in kwargs}) == (expected, kwargs)
+
+
+@pytest.mark.parametrize(
+    ("config", "expected"),
+    [
+        (
+            {"auth": {"basic": {"username": "user", "password": "pass"}}},
+            "Case(headers={'Authorization': '[Filtered]'})",
+        ),
+        ({"headers": {"X-API-Key": "abc"}}, "Case(headers={'X-API-Key': '[Filtered]'})"),
+        (
+            {"headers": {"X-API-Key": "abc"}, "output": {"sanitization": {"replacement": "***"}}},
+            "Case(headers={'X-API-Key': '***'})",
+        ),
+        (
+            {
+                "auth": {"basic": {"username": "user", "password": "pass"}},
+                "output": {"sanitization": {"enabled": False}},
+            },
+            "Case(headers={'Authorization': 'Basic dXNlcjpwYXNz'})",
+        ),
+    ],
+    ids=["auth-basic", "headers", "custom-replacement", "sanitization-disabled"],
+)
+def test_generated_case_repr_follows_output_sanitization(ctx, config, expected):
+    operation = ctx.openapi.load_operation(
+        "GET /users", {"responses": {"200": {"description": "OK"}}}, config=schemathesis.Config.from_dict(config)
+    )
+    assert [repr(case) for case in generate_many(operation.as_strategy(), 1)] == [expected]
 
 
 @pytest.mark.parametrize("override", [False, True])
