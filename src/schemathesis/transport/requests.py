@@ -702,16 +702,9 @@ def _serialize_form_field(
 ) -> tuple[object, str]:
     """Serialize a named form field, whose array items are separate parts under the field's media type."""
     items = schema.get("items", {})
-    if (
-        isinstance(value, list)
-        and "type" in schema
-        and "array" in get_type(schema)
-        and isinstance(items, dict)
-        and _holds_bytes(items)
-        and REQUESTS_TRANSPORT.get_first_matching_media_type(content_type) is None
-    ):
-        # Raw bytes need no serializer, so each item goes out as it is under any media type, e.g. `image/jpg`.
-        return [serialize_binary(item) for item in value], content_type
+    if isinstance(value, list) and "type" in schema and "array" in get_type(schema) and isinstance(items, dict):
+        # The field's media type describes each item, e.g. one JSON document per item.
+        return [_serialize_part_value(ctx, item, items, name, content_type)[0] for item in value], content_type
     return _serialize_part_value(ctx, value, schema, name, content_type)
 
 
