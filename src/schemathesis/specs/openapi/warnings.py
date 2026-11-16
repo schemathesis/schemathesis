@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
-from schemathesis.core.jsonschema import make_validator
+from schemathesis.core.jsonschema import make_validator, schema_with_bundle
 from schemathesis.core.jsonschema.patterns import enforced_pattern, is_valid_python_regex, normalize_regex
 from schemathesis.core.jsonschema.resolver import find_unresolvable_reference
 from schemathesis.core.jsonschema.types import get_type
@@ -133,14 +133,15 @@ def check_dictionary_bindings(
     validator_cls = operation.schema.adapter.jsonschema_validator_cls
     for location in CONCRETE_LOCATIONS:
         try:
-            properties = cast("OpenApiParameterSet", operation.get_parameter_set(location)).schema.get("properties", {})
+            schema = cast("OpenApiParameterSet", operation.get_parameter_set(location)).schema
         except InvalidSchema:
             continue
+        properties = schema.get("properties", {})
         bindings = resolve_parameter_bindings(
             operation=operation, location=location, properties=properties, generation_config=generation_config
         )
         for parameter_name, binding in bindings.items():
-            validator = make_validator(properties[parameter_name], validator_cls)
+            validator = make_validator(schema_with_bundle(properties[parameter_name], schema), validator_cls)
             failing = [value for _, value in binding.entries if not validator.is_valid(value)]
             parameter = f"{location.value}.{parameter_name}"
             mismatch = None

@@ -47,6 +47,7 @@
 
 #### Data generation
 
+- Internal error for dictionaries bound to parameters whose schema references a shared component.
 - False positive `negative_data_rejection` for unmapped discriminator values under `defaultMapping`.
 - Missing discriminator `mapping` values written as schema names in generated data.
 

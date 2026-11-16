@@ -234,3 +234,42 @@ def test_examples_phase_fill_missing_uses_examples_phase_dictionaries(ctx, cli):
     assert {request.path for request in app.config["captured_requests"] if request.path.startswith("/items/")} == {
         "/items/222"
     }
+
+
+def test_dictionary_for_parameter_referencing_shared_schema(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/reports": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "kind",
+                            "in": "query",
+                            "schema": {"anyOf": [{"$ref": "#/components/schemas/Kind"}, {"type": "null"}]},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={"schemas": {"Kind": {"type": "string", "enum": ["backup", "restore"]}}},
+    )
+
+    @app.route("/reports")
+    def reports():
+        return jsonify({})
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=fuzzing",
+            "--mode=positive",
+            "--max-examples=10",
+            config={
+                "dictionaries": {"kinds": {"values": ["backup"]}},
+                "parameters": {"query.kind": {"dictionary": "kinds"}},
+            },
+        )
+        == snapshot_cli
+    )
