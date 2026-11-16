@@ -936,6 +936,110 @@ def test_multipart_part_encoded_with_its_content_type(
 
 @pytest.mark.parametrize("transport", ["wsgi", "http"])
 @pytest.mark.parametrize(
+    ("version", "definition", "body", "expected"),
+    [
+        (
+            "3.1.0",
+            {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "encoded": {"type": "string", "contentEncoding": "base64"},
+                                    "optional": {
+                                        "anyOf": [{"type": "string", "contentEncoding": "base64"}, {"type": "null"}]
+                                    },
+                                    "declared": {"type": "string", "contentEncoding": "base64"},
+                                    "media": {"type": "string", "contentMediaType": "application/octet-stream"},
+                                    "text": {"type": "string"},
+                                    "number": {"type": "number"},
+                                },
+                            },
+                            "encoding": {"declared": {"contentType": "image/png"}},
+                        }
+                    },
+                },
+            },
+            {"encoded": "aGk=", "optional": "aGk=", "declared": "PNG", "media": b"raw", "text": "plain", "number": 1.5},
+            [
+                ["declared", "image/png", "PNG"],
+                ["encoded", "application/octet-stream", "aGk="],
+                ["media", "text/plain", "raw"],
+                ["number", "text/plain", "1.5"],
+                ["optional", "application/octet-stream", "aGk="],
+                ["text", "text/plain", "plain"],
+            ],
+        ),
+        (
+            "3.0.2",
+            {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "binary": {"type": "string", "format": "binary"},
+                                    "files": FILE_LIST_SCHEMA,
+                                    "byte": {"type": "string", "format": "byte"},
+                                    "untyped": {},
+                                },
+                            }
+                        }
+                    },
+                },
+            },
+            {"binary": b"bin", "files": [b"a", b"b"], "byte": "aGk=", "untyped": "raw"},
+            [
+                ["binary", "application/octet-stream", "bin"],
+                ["byte", "text/plain", "aGk="],
+                ["files", "application/octet-stream", "a"],
+                ["files", "application/octet-stream", "b"],
+                ["untyped", "text/plain", "raw"],
+            ],
+        ),
+        (
+            "2.0",
+            {
+                "consumes": ["multipart/form-data"],
+                "parameters": [
+                    {"name": "file", "in": "formData", "type": "file", "required": True},
+                    {"name": "number", "in": "formData", "type": "number", "required": True},
+                ],
+            },
+            {"file": b"PNG", "number": 1.5},
+            [["file", "application/octet-stream", "PNG"], ["number", "text/plain", "1.5"]],
+        ),
+    ],
+    ids=["openapi-3.1", "openapi-3.0", "swagger-2.0"],
+)
+def test_multipart_form_fields_default_content_types(ctx, app_runner, transport, version, definition, body, expected):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/upload": {"post": {**definition, "responses": {"200": {"description": "OK"}}}}}, version=version
+    )
+
+    # Swagger 2.0 schemas are served under `/api`.
+    @app.route("/upload", methods=["POST"])
+    @app.route("/api/upload", methods=["POST"])
+    def upload():
+        header = f"Content-Type: {request.content_type}\r\n\r\n".encode()
+        message = BytesParser(policy=HTTP).parsebytes(header + request.get_data())
+        return jsonify(sorted(_received_part(part) for part in message.iter_parts()))
+
+    if transport == "wsgi":
+        loaded = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    else:
+        loaded = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    case = loaded["/upload"]["POST"].Case(body=body, media_type="multipart/form-data")
+    assert case.call().json() == expected
+
+
+@pytest.mark.parametrize("transport", ["wsgi", "http"])
+@pytest.mark.parametrize(
     ("version", "media_type_object", "body", "expected"),
     [
         (
@@ -1326,13 +1430,17 @@ def test_multipart_ref_to_scalar_is_not_json_encoded(ctx, case_factory):
             {"file": {"type": "string", "format": "binary"}},
             {},
             {"file": b"abc", "kind": "a"},
-            [("file", ("file", b"abc")), ("kind", (None, "a"))],
+            [("file", ("file", b"abc", "application/octet-stream")), ("kind", (None, "a"))],
         ),
         (
             {"files": {"type": "array", "items": {"type": "string", "format": "binary"}}},
             {},
             {"files": [b"a", b"b"], "kind": "a"},
-            [("files", ("files", b"a")), ("files", ("files", b"b")), ("kind", (None, "a"))],
+            [
+                ("files", ("files", b"a", "application/octet-stream")),
+                ("files", ("files", b"b", "application/octet-stream")),
+                ("kind", (None, "a")),
+            ],
         ),
         (
             {"meta": {"type": "object", "properties": {"x": {"type": "integer"}}}},
@@ -1424,7 +1532,7 @@ def test_multipart_swagger2_body_parameter_behind_ref(ctx, declared):
     )
     case = operation.Case(body={"file": b"abc", "kind": "a"}, media_type="multipart/form-data")
     assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == [
-        ("file", ("file", b"abc")),
+        ("file", ("file", b"abc", "application/octet-stream")),
         ("kind", (None, "a")),
     ]
 
@@ -1655,7 +1763,7 @@ _SWAGGER2_BINARY_ARRAY_SCHEMA = {
             _SWAGGER2_BINARY_ARRAY_SCHEMA,
             {"files": [b"\x01", b"\x02"]},
             "files",
-            None,
+            "application/octet-stream",
             {},
         ),
         (
@@ -1675,7 +1783,7 @@ _SWAGGER2_BINARY_ARRAY_SCHEMA = {
     ],
 )
 def test_multipart_part_content_type(ctx, case_factory, load_kwargs, body, field, expected, case_kwargs):
-    # Tagging only fires for JSON-encoded parts; primitives must stay untagged or the wire JSON-quotes them.
+    # Text values get no JSON content type, which would wrap them in quotes on the wire.
     schema = ctx.openapi.load_schema(**load_kwargs)
     case = case_factory(
         operation=schema["/upload"]["POST"],
@@ -1769,7 +1877,9 @@ def test_multipart_binary_filename_behind_alias_body_ref(ctx, version):
         },
     )
     case = operation.Case(body={"file": b"abc"}, media_type="multipart/form-data")
-    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == [("file", ("file", b"abc"))]
+    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == [
+        ("file", ("file", b"abc", "application/octet-stream"))
+    ]
 
 
 @pytest.mark.parametrize(
@@ -1917,7 +2027,7 @@ def test_unknown_multipart_fields_openapi3(ctx):
     )
     serialized = REQUESTS_TRANSPORT.serialize_case(case)
     assert serialized["files"] == [
-        ("data", ("data", b"\x92B")),
+        ("data", ("data", b"\x92B", "application/octet-stream")),
         ("note", (None, "foo")),
         ("unknown", (None, "seen")),
     ]
@@ -1992,7 +2102,7 @@ def test_multipart_binary_part_filename(ctx, encoding, expected_filename, proper
     )
     case = operation.Case(body={"attachment": value}, media_type="multipart/form-data")
     assert REQUESTS_TRANSPORT.serialize_case(case)["files"] == [
-        ("attachment", (expected_filename, part)) for part in sent
+        ("attachment", (expected_filename, part, "application/octet-stream")) for part in sent
     ]
 
 
@@ -2021,23 +2131,31 @@ def test_multipart_binary_field_filename_extension(ctx, value, expected_filename
         },
     )
     case = operation.Case(body={"attachment": value}, media_type="multipart/form-data")
-    assert REQUESTS_TRANSPORT.serialize_case(case)["files"] == [("attachment", (expected_filename, value))]
+    assert REQUESTS_TRANSPORT.serialize_case(case)["files"] == [
+        ("attachment", (expected_filename, value, "application/octet-stream"))
+    ]
 
 
 @pytest.mark.parametrize(
     "property_schema, value, expected",
     [
-        ({"type": "string", "format": "binary"}, b"abc", [("file", ("file", b"abc"))]),
-        ({"$ref": "#/components/schemas/File"}, b"abc", [("file", ("file", b"abc"))]),
+        ({"type": "string", "format": "binary"}, b"abc", [("file", ("file", b"abc", "application/octet-stream"))]),
+        ({"$ref": "#/components/schemas/File"}, b"abc", [("file", ("file", b"abc", "application/octet-stream"))]),
         (
             {"type": "array", "items": {"$ref": "#/components/schemas/File"}},
             [b"a", b"b"],
-            [("file", ("file", b"a")), ("file", ("file", b"b"))],
+            [
+                ("file", ("file", b"a", "application/octet-stream")),
+                ("file", ("file", b"b", "application/octet-stream")),
+            ],
         ),
         (
             {"$ref": "#/components/schemas/Files"},
             [b"a", b"b"],
-            [("file", ("file", b"a")), ("file", ("file", b"b"))],
+            [
+                ("file", ("file", b"a", "application/octet-stream")),
+                ("file", ("file", b"b", "application/octet-stream")),
+            ],
         ),
     ],
     ids=["inline", "ref", "ref-items", "ref-array"],
@@ -2077,22 +2195,35 @@ NULL = {"type": "null"}
 @pytest.mark.parametrize(
     "property_schema, value, expected",
     [
-        ({"anyOf": [BINARY, NULL]}, b"abc", [("file", ("file", b"abc"))]),
+        ({"anyOf": [BINARY, NULL]}, b"abc", [("file", ("file", b"abc", "application/octet-stream"))]),
         (
             {"anyOf": [{"type": "array", "items": BINARY}, NULL]},
             [b"a", b"b"],
-            [("file", ("file", b"a")), ("file", ("file", b"b"))],
+            [
+                ("file", ("file", b"a", "application/octet-stream")),
+                ("file", ("file", b"b", "application/octet-stream")),
+            ],
         ),
         (
             {"oneOf": [{"type": "array", "items": BINARY}, NULL]},
             [b"a", b"b"],
-            [("file", ("file", b"a")), ("file", ("file", b"b"))],
+            [
+                ("file", ("file", b"a", "application/octet-stream")),
+                ("file", ("file", b"b", "application/octet-stream")),
+            ],
         ),
-        ({"anyOf": [{"$ref": "#/components/schemas/File"}, NULL]}, b"abc", [("file", ("file", b"abc"))]),
+        (
+            {"anyOf": [{"$ref": "#/components/schemas/File"}, NULL]},
+            b"abc",
+            [("file", ("file", b"abc", "application/octet-stream"))],
+        ),
         (
             {"anyOf": [{"$ref": "#/components/schemas/Files"}, NULL]},
             [b"a", b"b"],
-            [("file", ("file", b"a")), ("file", ("file", b"b"))],
+            [
+                ("file", ("file", b"a", "application/octet-stream")),
+                ("file", ("file", b"b", "application/octet-stream")),
+            ],
         ),
         (
             {"anyOf": [{"type": "array", "items": {"contentMediaType": "application/octet-stream"}}, NULL]},
@@ -2102,7 +2233,7 @@ NULL = {"type": "null"}
         (
             {"allOf": [{"$ref": "#/components/schemas/File"}], "description": "Avatar"},
             b"abc",
-            [("file", ("file", b"abc"))],
+            [("file", ("file", b"abc", "application/octet-stream"))],
         ),
         ({"anyOf": [{"type": "string"}, NULL]}, "text", [("file", (None, "text"))]),
     ],
@@ -3792,7 +3923,9 @@ def test_multipart_parts_follow_body_for_case_media_type(ctx):
         },
     )
     case = operation.Case(body={"file": b"data"}, media_type="multipart/form-data")
-    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == [("file", ("file", b"data"))]
+    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == [
+        ("file", ("file", b"data", "application/octet-stream"))
+    ]
 
 
 @pytest.mark.parametrize(

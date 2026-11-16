@@ -52,6 +52,8 @@ from schemathesis.transport.serialization import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from schemathesis.generation.case import Case
 
 
@@ -526,7 +528,7 @@ def _default_part_content_type(schema: JsonSchemaObject, root_schema: JsonSchema
     # An array item is one part, so an array of primitives is JSON too, unlike a named field sent as repeated parts.
     if any(
         all(_declares_structure(resolve_with_root_bundle(branch, root_schema)) for branch in group)
-        for group in _structure_groups(schema)
+        for group in _alternative_groups(schema)
     ):
         return "application/json"
     if _holds_bytes(schema):
@@ -536,7 +538,12 @@ def _default_part_content_type(schema: JsonSchemaObject, root_schema: JsonSchema
 
 def _holds_bytes(schema: JsonSchemaObject) -> bool:
     """Whether a part is raw bytes: a value of any type, or an encoded or binary string."""
-    return "type" not in schema or "contentEncoding" in schema or schema.get("format") == "binary"
+    return "type" not in schema or _declares_binary(schema)
+
+
+def _declares_binary(schema: JsonSchemaObject) -> bool:
+    """Whether the schema describes bytes: a `contentEncoding` or `format: binary` string, or a Swagger 2.0 file."""
+    return "contentEncoding" in schema or schema.get("format") == "binary" or schema.get("type") == "file"
 
 
 def _encode_positional_parts(
@@ -586,14 +593,13 @@ def _declares_structure(schema: dict[str, Any]) -> bool:
     return "properties" in schema or "items" in schema or "additionalProperties" in schema
 
 
-def _is_structured_part(schema: dict[str, Any]) -> bool:
-    return any(
-        all(_declares_structure(_part_schema(branch)) for branch in group) for group in _structure_groups(schema)
-    )
+def _part_declares(schema: dict[str, Any], declares: Callable[[dict[str, Any]], bool]) -> bool:
+    """Whether every schema in at least one of the part's alternative groups passes `declares`."""
+    return any(all(declares(_part_schema(branch)) for branch in group) for group in _alternative_groups(schema))
 
 
-def _structure_groups(schema: dict[str, Any]) -> list[list[dict[str, Any]]]:
-    """Schemas whose members all declaring structure make a part structured."""
+def _alternative_groups(schema: dict[str, Any]) -> list[list[dict[str, Any]]]:
+    """Groups to test: the schema alone, each `allOf` member alone, the non-null `anyOf`/`oneOf` branches together."""
     groups = [[schema]]
     all_of = schema.get("allOf")
     if isinstance(all_of, list):
@@ -621,10 +627,15 @@ def _collect_encoded_fields(ctx: SerializationContext, properties: Mapping[str, 
         content_type = selected.get(name) or next(iter(body.get_property_content_types(name)), None)
         if content_type is not None:
             result[name] = content_type
-    # Default nested-object / array form-parts to JSON so the wire payload is parsable.
     for name, prop in properties.items():
-        if name not in result and isinstance(prop, dict) and _is_structured_part(prop):
+        if name in result or not isinstance(prop, dict):
+            continue
+        # Default nested-object / array form-parts to JSON so the wire payload is parsable.
+        if _part_declares(prop, _declares_structure):
             result[name] = "application/json"
+        # Receivers read a part without a media type as text.
+        elif _part_declares(prop, _declares_binary):
+            result[name] = "application/octet-stream"
     return result
 
 
