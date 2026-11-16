@@ -14,6 +14,7 @@ from itertools import chain, product
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeGuard, get_args, overload
 
 from schemathesis.core import NOT_SET
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 
 # Lowercased header name -> values; a list keeps repeated headers like Set-Cookie.
@@ -421,8 +422,10 @@ class Response:
         else:
             if isinstance(response, httpx2.Response):
                 return Response.from_httpx2(response, verify=True)
-        # Unknown response types pass through unchanged.
-        return response  # type: ignore[return-value]
+        raise IncorrectUsage(
+            f"Unsupported response type: `{type(response).__name__}`. Expected one of: `requests.Response`, "
+            "`httpx.Response`, `httpx2.Response`, `werkzeug.test.TestResponse` or `schemathesis.Response`."
+        )
 
     @classmethod
     def from_requests(
