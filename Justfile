@@ -29,6 +29,13 @@ test-cov-html *ARGS:
     uv run python -m coverage html
     @xdg-open htmlcov/index.html
 
+# Run tests (or the given test paths) and report coverage of lines changed against origin/master
+diff-cov *ARGS:
+    git fetch -q origin master
+    @just test-cov {{ARGS}}
+    uv run python -m coverage xml -q
+    uvx diff-cover coverage.xml --compare-branch=origin/master --include-untracked --branch-coverage
+
 # Run tests matching pattern
 test-k PATTERN *ARGS:
     python -m pytest -k "{{PATTERN}}" {{ARGS}}
