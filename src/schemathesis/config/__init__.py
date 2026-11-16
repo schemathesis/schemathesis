@@ -19,6 +19,7 @@ from schemathesis.config._cache import CacheConfig
 from schemathesis.config._checks import (
     CheckConfig,
     ChecksConfig,
+    MassAssignmentConfig,
     NotAServerErrorConfig,
     PositiveDataAcceptanceConfig,
     SimpleCheckConfig,
@@ -62,6 +63,7 @@ __all__ = [
     "SanitizationConfig",
     "TruncationConfig",
     "ChecksConfig",
+    "MassAssignmentConfig",
     "CheckConfig",
     "NotAServerErrorConfig",
     "PositiveDataAcceptanceConfig",

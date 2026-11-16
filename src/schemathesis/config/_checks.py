@@ -83,6 +83,73 @@ class SimpleCheckConfig(DiffBase):
         return cls(enabled=data.get("enabled", True))._mark_source_keys(data)
 
 
+MASS_ASSIGNMENT_DEFAULT_MAX_ATTEMPTS = 3
+
+
+@dataclass(repr=False, slots=True)
+class MassAssignmentConfig(DiffBase):
+    """Settings for the `mass_assignment` check. Off by default because it sends extra writes."""
+
+    enabled: bool
+    fields: dict[str, Any]
+    exclude_fields: list[str]
+    privilege_fields: bool
+    request_envelope: str | None
+    response_envelope: str | None
+    read: str | None
+    id_field: str | None
+    max_attempts: int
+    cleanup: bool
+
+    def __init__(
+        self,
+        *,
+        enabled: bool = False,
+        fields: dict[str, Any] | None = None,
+        exclude_fields: list[str] | None = None,
+        privilege_fields: bool = True,
+        request_envelope: str | None = None,
+        response_envelope: str | None = None,
+        read: str | None = None,
+        id_field: str | None = None,
+        max_attempts: int = MASS_ASSIGNMENT_DEFAULT_MAX_ATTEMPTS,
+        cleanup: bool = True,
+    ) -> None:
+        if max_attempts < 1:
+            raise ConfigError("`checks.mass_assignment.max-attempts` must be at least 1")
+        if read is not None:
+            method = read.split(" ", 1)[0]
+            if method.upper() != "GET" or " " not in read:
+                raise ConfigError(
+                    f"`checks.mass_assignment.read` must name a `GET` operation like `GET /users/{{id}}`, got `{read}`"
+                )
+        self.enabled = enabled
+        self.fields = dict(fields or {})
+        self.exclude_fields = list(exclude_fields or [])
+        self.privilege_fields = privilege_fields
+        self.request_envelope = request_envelope
+        self.response_envelope = response_envelope
+        self.read = read
+        self.id_field = id_field
+        self.max_attempts = max_attempts
+        self.cleanup = cleanup
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> MassAssignmentConfig:
+        return cls(
+            enabled=data.get("enabled", False),
+            fields=data.get("fields"),
+            exclude_fields=data.get("exclude-fields"),
+            privilege_fields=data.get("privilege-fields", True),
+            request_envelope=data.get("request-envelope"),
+            response_envelope=data.get("response-envelope"),
+            read=data.get("read"),
+            id_field=data.get("id-field"),
+            max_attempts=data.get("max-attempts", MASS_ASSIGNMENT_DEFAULT_MAX_ATTEMPTS),
+            cleanup=data.get("cleanup", True),
+        )._mark_source_keys(data)
+
+
 @dataclass(repr=False, slots=True)
 class ResponseSchemaConformanceConfig(DiffBase):
     enabled: bool
@@ -152,7 +219,7 @@ class MissingRequiredHeaderConfig(CheckConfig):
 # Built-in checks with a section of their own; `max_response_time` takes a bare number instead.
 _BUILTIN_CHECK_CONFIGS: dict[
     str,
-    type[SimpleCheckConfig] | type[ResponseSchemaConformanceConfig] | type[CheckConfig],
+    type[SimpleCheckConfig] | type[ResponseSchemaConformanceConfig] | type[CheckConfig] | type[MassAssignmentConfig],
 ] = {
     "not_a_server_error": NotAServerErrorConfig,
     "status_code_conformance": SimpleCheckConfig,
@@ -166,6 +233,7 @@ _BUILTIN_CHECK_CONFIGS: dict[
     "missing_required_header": MissingRequiredHeaderConfig,
     "ignored_auth": SimpleCheckConfig,
     "object_level_authorization": SimpleCheckConfig,
+    "mass_assignment": MassAssignmentConfig,
     "unsupported_method": SimpleCheckConfig,
     "allow_header_conformance": SimpleCheckConfig,
 }
@@ -186,6 +254,7 @@ class ChecksConfig(DiffBase):
     missing_required_header: MissingRequiredHeaderConfig
     ignored_auth: SimpleCheckConfig
     object_level_authorization: SimpleCheckConfig
+    mass_assignment: MassAssignmentConfig
     unsupported_method: SimpleCheckConfig
     allow_header_conformance: SimpleCheckConfig
     max_response_time: MaxResponseTimeConfig
@@ -212,6 +281,7 @@ class ChecksConfig(DiffBase):
         missing_required_header: MissingRequiredHeaderConfig | None = None,
         ignored_auth: SimpleCheckConfig | None = None,
         object_level_authorization: SimpleCheckConfig | None = None,
+        mass_assignment: MassAssignmentConfig | None = None,
         unsupported_method: SimpleCheckConfig | None = None,
         allow_header_conformance: SimpleCheckConfig | None = None,
         max_response_time: MaxResponseTimeConfig | None = None,
@@ -228,6 +298,7 @@ class ChecksConfig(DiffBase):
         self.missing_required_header = missing_required_header or MissingRequiredHeaderConfig()
         self.ignored_auth = ignored_auth or SimpleCheckConfig()
         self.object_level_authorization = object_level_authorization or SimpleCheckConfig()
+        self.mass_assignment = mass_assignment or MassAssignmentConfig()
         self.unsupported_method = unsupported_method or SimpleCheckConfig()
         self.allow_header_conformance = allow_header_conformance or SimpleCheckConfig()
         self.max_response_time = max_response_time or MaxResponseTimeConfig()
@@ -295,7 +366,9 @@ class ChecksConfig(DiffBase):
                     merged._set_enabled(name, enabled=enabled)
         return merged
 
-    def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig | MaxResponseTimeConfig:
+    def get_by_name(
+        self, *, name: str
+    ) -> CheckConfig | SimpleCheckConfig | MaxResponseTimeConfig | MassAssignmentConfig:
         try:
             return getattr(self, name)
         except AttributeError:

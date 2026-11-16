@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation, BaseSchema
+    from schemathesis.specs.openapi.mass_assignment import MassAssignmentProbe
 
 
 all_scopes = HookDispatcher.register_spec(list(HookScope))
@@ -256,6 +257,14 @@ def after_network_error(context: HookContext, case: Case, request: requests.Prep
     Use cases:
      - Recording failed network interactions alongside successful ones.
      - Logging connection failures.
+    """
+
+
+@HookDispatcher.register_spec([HookScope.GLOBAL, HookScope.SCHEMA])
+def before_mass_assignment_probe(context: HookContext, probe: MassAssignmentProbe) -> None:
+    """Called before the `mass_assignment` check sends a probe.
+
+    Edit `probe.fields`, `probe.case`, or set `probe.skip = True`.
     """
 
 

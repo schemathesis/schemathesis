@@ -543,6 +543,7 @@ class Case(Generic[OperationT]):
             response_checks=run_checks.for_responses(),
             phase=phase,
             auth_enforced_operations=run_checks.auth_enforced_operations,
+            mass_assignment_attempts=run_checks.mass_assignment_attempts,
         )
         if not checks:
             # Default set: built-ins enabled in config + max_response_time + response checks.

@@ -245,6 +245,23 @@ EXPLANATIONS: dict[str, Explanation] = {
             checks.object_level_authorization.enabled = false
         """,
     ),
+    "ST403": Explanation(
+        summary="Write stored a field that clients must not set, such as a `readOnly` or privilege field.",
+        scenario="""
+            POST  /users     201  {"id": 7, "name": "a", "role": "user"}
+            POST  /users     201  {"id": 8, "name": "a", "role": "admin"}   # sent with "role": "admin"
+            GET   /users/8   200  {"id": 8, "name": "a", "role": "admin"}
+        """,
+        notes="""
+            Bind request bodies to an allowlist of writable fields, and ignore or reject the rest with `400` or
+            `422`. A field clients may set belongs in the request schema without `readOnly`. The check is off
+            unless enabled:
+        """,
+        block="""
+            [checks]
+            mass_assignment.enabled = true
+        """,
+    ),
     "ST901": Explanation(
         summary="Response that breaks a rule a custom `@schemathesis.check` enforces.",
         notes="The failure title names the check.",

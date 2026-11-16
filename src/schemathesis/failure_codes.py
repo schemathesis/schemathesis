@@ -25,6 +25,7 @@ from schemathesis.openapi.checks import (
     EnsureResourceAvailability,
     JsonSchemaError,
     MalformedMediaType,
+    MassAssignment,
     MissingContentType,
     MissingHeaderNotRejected,
     MissingHeaders,
@@ -67,6 +68,7 @@ FAILURE_CLASSES: tuple[type[Failure], ...] = (
     EnsureResourceAvailability,
     IgnoredAuth,
     ObjectLevelAuthorizationViolation,
+    MassAssignment,
     CustomFailure,
 )
 _BY_CODE = {cls.code: cls for cls in FAILURE_CLASSES}

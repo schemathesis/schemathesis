@@ -49,7 +49,8 @@ API validation options:
                                 missing_required_header, unsupported_method,
                                 allow_header_conformance, use_after_free,
                                 ensure_resource_availability, ignored_auth,
-                                object_level_authorization, all]
+                                object_level_authorization, mass_assignment,
+                                all]
   --exclude-checks              Comma-separated list of checks to skip during
                                 testing [possible values: not_a_server_error,
                                 status_code_conformance,
@@ -61,7 +62,8 @@ API validation options:
                                 missing_required_header, unsupported_method,
                                 allow_header_conformance, use_after_free,
                                 ensure_resource_availability, ignored_auth,
-                                object_level_authorization, all]
+                                object_level_authorization, mass_assignment,
+                                all]
   --max-failures INTEGER RANGE  Terminate the test suite after reaching a
                                 specified number of failures or errors  [x>=1]
   --continue-on-failure         Continue executing all test cases within a

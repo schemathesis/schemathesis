@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from schemathesis.core.spec import SchemaMetadata
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation, BaseSchema
+    from schemathesis.specs.openapi.mass_assignment import MassAssignmentProbe
 
 
 HookDispatcherMark = Mark["HookDispatcher"](attr_name="hook_dispatcher")
@@ -473,6 +474,12 @@ def dispatch_after_network_error(
     *dispatchers: HookDispatcher, context: HookContext, case: Case, request: requests.PreparedRequest
 ) -> None:
     _dispatch_to_all("after_network_error", dispatchers, context, case, request)
+
+
+def dispatch_before_mass_assignment_probe(
+    *dispatchers: HookDispatcher, context: HookContext, probe: MassAssignmentProbe
+) -> None:
+    _dispatch_to_all("before_mass_assignment_probe", dispatchers, context, probe)
 
 
 def should_keep_failure(failure: Failure, case: Case, response: Response) -> bool:

@@ -45,6 +45,7 @@ class CheckContextData:
             response_checks=ctx.checks.for_responses(),
             phase=phase,
             auth_enforced_operations=ctx.checks.auth_enforced_operations,
+            mass_assignment_attempts=ctx.checks.mass_assignment_attempts,
         )
 
 

@@ -1632,6 +1632,17 @@ def object_level_authorization(ctx: CheckContext, response: Response, case: Case
     return None
 
 
+@schemathesis.check
+@requires_openapi_schema
+@skips_on_unexpected_http_status
+def mass_assignment(ctx: CheckContext, response: Response, case: Case) -> bool | None:
+    """Check that writes do not store fields clients must not set."""
+    from schemathesis.specs.openapi.mass_assignment import check_mass_assignment
+
+    check_mass_assignment(ctx, response, case)
+    return None
+
+
 def _has_undeclared_explicit_authorization(
     ctx: CheckContext, response: Response, security_parameters: list[SecurityParameter]
 ) -> bool:

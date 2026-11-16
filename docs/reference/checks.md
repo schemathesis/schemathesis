@@ -48,6 +48,9 @@ See [CLI reference](../reference/cli.md#-c-checks-checks) and [configuration ref
 !!! note "Exception: max_response_time"
     The `max_response_time` check is **disabled by default**. Enable it with `--max-response-time <seconds>` or `max_response_time = <seconds>` under `[checks]` in configuration. It is independent from `--checks`/`--exclude-checks`.
 
+!!! note "Exception: mass_assignment"
+    The [`mass_assignment`](#mass_assignment) check is **disabled by default**, because it sends extra writes that try to set privileged fields. Enable it with `--checks mass_assignment` (or `--checks all`), or with `mass_assignment.enabled = true` under `[checks]`.
+
 ## Response timing
 
 ### `max_response_time`
@@ -406,3 +409,41 @@ The check passes when the other peer gets:
 
 !!! warning "Additional requests"
     For each operation and resource, this check sends one request per other peer, plus one unauthenticated request when a peer receives the object.
+
+### `mass_assignment`
+
+Failure codes: [ST403](failures.md#st403).
+
+Verifies that a write ignores or rejects fields clients must not set (OWASP API3, Broken Object Property Level Authorization). **Disabled by default**; enable it with `--checks mass_assignment`. See [Testing for Mass Assignment](../guides/mass-assignment.md) for a walkthrough.
+
+After a `2xx` response to a `POST`, `PUT` or `PATCH` with a JSON object body, Schemathesis resends the request with these fields added:
+
+- properties the request schema marks `readOnly`
+- properties the response schema declares but the request schema does not
+- common privilege fields the schema does not mention at all, such as `is_admin`, `role` or `balance`
+
+Identifier fields (`id`, `*_id`, `*Id` and path parameters) are left out, and so are fields the request already sets. Each field gets a value the server would not pick by itself: the opposite of a boolean, a privileged enum member such as `admin`, or a distinctive number, string or timestamp. On a `POST`, values of fields that usually must be unique, such as `email` or `username`, are changed so the copy does not collide with the original.
+
+When the copy succeeds, Schemathesis reads the resource back with the `GET` on the same item path (for a `POST` to a collection, the item path below it, with the identifier from the `Location` header or the response body). The check fails when the read returns an injected value that differs from what the server stored for the original request, or that no server would choose (a distinctive string or number). Without a `GET` operation, the write response counts only when the same response to the original request held a different value for the field, so an API that echoes the request body does not fail.
+
+The check passes when the API:
+
+- rejects the copy with any non-`2xx` status
+- accepts the copy but stores the server's own value, or drops the field
+
+```text
+- ST403 Mass assignment
+
+    The API stored `role`, `is_admin`, which clients must not set
+
+    Write: POST /users
+    Read:  GET /users/8
+
+    role      "admin"  (read-only, seen in GET /users/8)
+    is_admin  true     (read-only, seen in GET /users/8)
+```
+
+!!! warning "Additional requests"
+    For each write operation, this check sends one copy of a successful request, plus up to two `GET` requests: one before the copy for the baseline value, one after it. A resource the copy created is deleted afterwards when the schema has a `DELETE` on its item path. A `PUT` or `PATCH` copy changes the same resource as the original request and is not undone. Once a copy is accepted, the operation is not probed again in the run; after three rejected copies (`max-attempts`), it is not probed again either.
+
+The [`[checks.mass_assignment]`](configuration.md#checksmass_assignment) options add your own fields, skip fields, describe nested bodies and name the read operation; a [`before_mass_assignment_probe`](hooks.md) hook can change or skip each probe.

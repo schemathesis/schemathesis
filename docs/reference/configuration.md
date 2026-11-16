@@ -1140,12 +1140,39 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
       - `missing_required_header`
       - `ignored_auth`
       - `object_level_authorization`
+      - `mass_assignment` (default: `false`)
       - `unsupported_method`
       - `allow_header_conformance`
 
     ```toml
     [checks]
     response_schema_conformance.enabled = false
+    ```
+
+#### `checks.mass_assignment`
+
+!!! note ""
+
+    Settings for the [`mass_assignment`](checks.md#mass_assignment) check. Each can also be set per operation under `[[operations]]`; see [Testing for Mass Assignment](../guides/mass-assignment.md#adapting-the-check-to-your-api).
+
+    | Option | Type | Default | Description |
+    |---|---|---|---|
+    | `enabled` | `Boolean` | `false` | Runs the check. `--checks mass_assignment` or `--checks all` also turn it on |
+    | `fields` | `Table` | `{}` | Extra fields to inject, with the values to send |
+    | `exclude-fields` | `List[String]` | `[]` | Fields never to inject |
+    | `privilege-fields` | `Boolean` | `true` | Injects built-in privilege fields like `is_admin` and `role` that the schema does not mention |
+    | `request-envelope` | `String` | none | Dotted path of the object the request body wraps the resource in, e.g. `data.attributes` |
+    | `response-envelope` | `String` | detected | Dotted path of the resource in responses; `""` compares top-level fields |
+    | `read` | `String` | detected | The `GET` operation that reads the written resource back, e.g. `GET /accounts/{account_id}` |
+    | `id-field` | `String` | detected | Dotted path of the created resource's identifier in the write response |
+    | `max-attempts` | `Integer` | `3` | Rejected probes per operation before the check stops probing it |
+    | `cleanup` | `Boolean` | `true` | Deletes resources the probes created, when the schema has a `DELETE` for them |
+
+    ```toml
+    [checks.mass_assignment]
+    enabled = true
+    fields = { plan = "enterprise" }
+    exclude-fields = ["nickname"]
     ```
 
 #### `checks.response_schema_conformance.validate-formats`

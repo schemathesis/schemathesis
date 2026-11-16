@@ -60,6 +60,7 @@ Schemathesis sends real requests that create, change and delete data. Point it a
 - 🔗 **Integration failures** when responses don't match client expectations
 - 🔄 **Stateful bugs** where operations work individually but fail in realistic workflows
 - 🕵️ **Broken object-level authorization** where one user can read another user's objects
+- 🛡️ **Mass assignment** where an API stores fields like `role` or `is_admin` that clients must not set
 
 
 ## What can it do?
