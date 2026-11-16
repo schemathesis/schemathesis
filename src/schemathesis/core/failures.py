@@ -4,11 +4,12 @@ import http.client
 import itertools
 import textwrap
 import traceback
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Generator, Sequence
+from contextlib import contextmanager
 from enum import StrEnum
 from json import JSONDecodeError
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from schemathesis.core.output import (
     BINARY_PAYLOAD,
@@ -390,14 +391,44 @@ class FailureGroup(BaseExceptionGroup[Failure]):
 
 
 class _ReportedFailureGroup(FailureGroup, AssertionError):
-    """FailureGroup as reported to pytest so reporters classify it as a failed test."""
+    """FailureGroup that test runners and Hypothesis treat as a failed test, not as an interrupt."""
 
 
 _ReportedFailureGroup.__name__ = _ReportedFailureGroup.__qualname__ = "FailureGroup"
 
 
-def as_reported_failure(exc: FailureGroup) -> FailureGroup:
-    reported = _ReportedFailureGroup(list(exc.exceptions), exc.message)
+class _ReportedExceptionGroup(ExceptionGroup, AssertionError):
+    """Distinct check failures Hypothesis found in one test, which test runners treat as a failed test."""
+
+
+# Shown as the group Hypothesis raised
+_ReportedExceptionGroup.__name__ = _ReportedExceptionGroup.__qualname__ = "ExceptionGroup"
+_ReportedExceptionGroup.__module__ = "builtins"
+
+
+@contextmanager
+def reported_failures() -> Generator[None, None, None]:
+    """Re-raise check failures, alone or grouped by Hypothesis, as `AssertionError`s that reporters count as failed."""
+    __tracebackhide__ = True
+    try:
+        yield
+    except BaseExceptionGroup as exc:
+        if exc.split((FailureGroup, Failure))[1] is not None:
+            raise
+        raise as_reported_failure(exc) from None
+
+
+def as_reported_failure(exc: BaseExceptionGroup) -> BaseExceptionGroup:
+    """Copy of a group made of check failures that is also an `AssertionError`."""
+    reported: BaseExceptionGroup
+    if isinstance(exc, FailureGroup):
+        reported = _ReportedFailureGroup(list(exc.exceptions), exc.message)
+    else:
+        children = [
+            as_reported_failure(child) if isinstance(child, BaseExceptionGroup) else child for child in exc.exceptions
+        ]
+        # Reported groups are `AssertionError`s, and the other children are failures
+        reported = _ReportedExceptionGroup(exc.message, cast("list[Exception]", children))
     reported.__notes__ = list(getattr(exc, "__notes__", []))
     return reported.with_traceback(exc.__traceback__)
 

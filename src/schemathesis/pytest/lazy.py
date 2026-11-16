@@ -11,7 +11,7 @@ from hypothesis.core import HypothesisHandle
 
 from schemathesis.auths import AuthStorage
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.failures import FailureGroup, as_reported_failure
+from schemathesis.core.failures import reported_failures
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue
 from schemathesis.generation.feedback import FeedbackSources
@@ -291,9 +291,8 @@ def run_subtest(
 
     with subtests.test(label=operation.label):
         try:
-            sub_test(**fixtures)
-        except FailureGroup as exc:
-            raise as_reported_failure(exc) from None
+            with reported_failures():
+                sub_test(**fixtures)
         except SkipTest as exc:
             raise pytest.skip.Exception(str(exc)).with_traceback(exc.__traceback__) from None
 

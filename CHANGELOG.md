@@ -28,6 +28,7 @@
 
 - `st fuzz` probes API capabilities and runs sign-up before fuzzing, like `st run`.
 - One `setup` phase replaces `probing`, `schema_analysis` and `auth_bootstrap` in NDJSON reports.
+- Check failures from `call_and_validate()` and `validate_response()` are `AssertionError`s, so `except Exception` catches them.
 
 ### :bug: Fixed
 
@@ -85,6 +86,10 @@
 #### CLI and configuration
 
 - Command-line options losing to `[[operations]]` and `[phases]` settings in the configuration file.
+
+#### pytest and Python API
+
+- Shrink failing inputs to a minimal example in pytest, Hypothesis and stateful tests.
 
 ## [4.33.4](https://github.com/schemathesis/schemathesis/compare/v4.33.3...v4.33.4) - 2026-11-12
 

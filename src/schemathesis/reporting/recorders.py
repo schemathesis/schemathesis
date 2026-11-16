@@ -6,8 +6,10 @@ from typing import TYPE_CHECKING
 from schemathesis.core.failures import RUN_CHECKS_LABEL
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
+from schemathesis.generation.meta import TestPhase
 
 if TYPE_CHECKING:
+    from schemathesis.core.failures import Failure
     from schemathesis.engine.recorder import RecordedScenario
     from schemathesis.engine.statistic import GroupedFailures, Statistic
 
@@ -46,12 +48,33 @@ def scenario_elapsed(recorder: RecordedScenario, label: str) -> float:
 
 
 def grouped_failures_from_recorder(recorder: RecordedScenario) -> list[GroupedFailures]:
-    """Group check failures by case ID, attaching the case's response and curl sample."""
+    """Group check failures by case ID, attaching the case's response and curl sample.
+
+    Each failure is listed under the case Hypothesis reports: the first failing explicit example, or the
+    latest generated one, as Hypothesis replays the minimal failing example last.
+    """
     from schemathesis.engine.statistic import GroupedFailures
 
+    latest_case_ids: dict[Failure, str] = {}
+    first_explicit_case_ids: dict[Failure, str] = {}
+    for case_id, checks in recorder.checks.items():
+        node = recorder.cases.get(case_id)
+        meta = node.value.meta if node is not None else None
+        explicit = meta is not None and meta.phase.name in (TestPhase.EXAMPLES, TestPhase.COVERAGE)
+        for check in checks:
+            if check.failure_info is None:
+                continue
+            latest_case_ids[check.failure_info.failure] = case_id
+            if explicit:
+                first_explicit_case_ids.setdefault(check.failure_info.failure, case_id)
+    reported_case_ids = {**latest_case_ids, **first_explicit_case_ids}
     grouped = []
     for case_id, checks in recorder.checks.items():
-        failed = [check.failure_info for check in checks if check.failure_info is not None]
+        failed = [
+            check.failure_info
+            for check in checks
+            if check.failure_info is not None and reported_case_ids[check.failure_info.failure] == case_id
+        ]
         if not failed:
             continue
         interaction = recorder.interactions.get(case_id)

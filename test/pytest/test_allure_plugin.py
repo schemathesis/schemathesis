@@ -176,6 +176,35 @@ def test_failing(case):
     ]
 
 
+def test_allure_keeps_attachments_when_hypothesis_does_not_replay_failure(testdir, tmp_path, ctx):
+    api = ctx.openapi.apps.failure()
+    allure_dir = tmp_path / "allure-results"
+    testdir.makepyfile(
+        f"""
+import allure
+import schemathesis
+from hypothesis import Phase, settings
+
+schema = schemathesis.openapi.from_url("{api.schema_url}")
+schema.config.reports.update(allure_path=r"{allure_dir}")
+
+# Hypothesis does not catch it, so it does not replay the example
+class Interrupted(BaseException):
+    pass
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    allure.attach("interrupted", name="interrupted test", attachment_type=allure.attachment_type.TEXT)
+    raise Interrupted
+"""
+    )
+
+    testdir.runpytest().assert_outcomes(failed=1)
+
+    assert _allure_result_summaries(allure_dir) == [("GET /api/failure", "broken", ["interrupted test"], [])]
+
+
 @pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
 def test_allure_keeps_results_from_different_schema_sources_separate(testdir, tmp_path, ctx, xdist):
     api = ctx.openapi.apps.success()

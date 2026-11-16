@@ -711,7 +711,9 @@ def test_passing_transport_kwargs(ctx):
     except FailureGroup:
         pass
 
-    assert [request.query for request in api.requests if "token" not in request.query] == [{"trace": "1"}]
+    assert {tuple(request.query.items()) for request in api.requests if "token" not in request.query} == {
+        (("trace", "1"),)
+    }
 
 
 # Each expired token draws one 401, after which the step re-authenticates and later steps use the new token.

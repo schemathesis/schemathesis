@@ -8,7 +8,7 @@ import jsonschema_rs
 
 from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, SchemaLocation
-from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
+from schemathesis.core.failures import Failure, FailureGroup, MalformedJson, as_reported_failure
 from schemathesis.core.jsonschema import bundled_name
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, unbundle_path
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
@@ -370,4 +370,5 @@ def maybe_raise_one_or_more(failures: list[Failure]) -> None:
         return
     if len(failures) == 1:
         raise failures[0] from None
-    raise FailureGroup(failures) from None
+    group = as_reported_failure(FailureGroup(failures))
+    raise group from None

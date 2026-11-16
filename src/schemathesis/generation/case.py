@@ -18,7 +18,13 @@ from schemathesis.checks import (
 )
 from schemathesis.core import NOT_SET, Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage
-from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
+from schemathesis.core.failures import (
+    Failure,
+    FailureGroup,
+    as_reported_failure,
+    failure_report_title,
+    format_failures,
+)
 from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.output.sanitization import sanitize_value
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation, plain_str_values
@@ -605,7 +611,9 @@ class Case(Generic[OperationT]):
                 config=self.operation.schema.config.output,
             )
             message += "\n\n"
-            raise FailureGroup(_failures, message) from None
+            # An `AssertionError`, so Hypothesis shrinks the input instead of stopping at the first failure
+            group = as_reported_failure(FailureGroup(_failures, message))
+            raise group from None
 
     def call_and_validate(
         self,

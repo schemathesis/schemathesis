@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import itertools
 import re
-from collections.abc import Container
+from collections.abc import Callable, Container
 from dataclasses import dataclass
 from random import Random
 from typing import TYPE_CHECKING, Any, ClassVar, Final
@@ -15,7 +16,7 @@ from schemathesis.auths import reauth_and_replay
 from schemathesis.checks import CheckFunction
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 from schemathesis.core.errors import STATEFUL_TESTING_GUIDE_URL, NoLinksFound
-from schemathesis.core.failures import FailureGroup, as_reported_failure
+from schemathesis.core.failures import Failure, reported_failures
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.timing import Instant
@@ -47,6 +48,45 @@ DEFAULT_STATE_MACHINE_SETTINGS = hypothesis.settings(
 
 # Chance a rule generates a fresh id-typed argument instead of drawing from the bundle, to find bugs with unknown ids.
 BASE_EXPLORATION_RATE: Final = 0.15
+
+
+def _hidden_unless_pytest_8(excinfo: object) -> bool:
+    # pytest 8 crashes rendering a check failure group whose traceback entries are all hidden
+    import pytest
+
+    return pytest.version_tuple >= (9,)
+
+
+class _ScenarioReports:
+    """Hands finished scenarios to the report writers, holding failing ones back until Hypothesis finishes.
+
+    Hypothesis replays the minimal failing scenario last, so only the latest scenario of each failure is reported.
+    """
+
+    __slots__ = ("_callback", "_failing", "_numbers")
+
+    def __init__(self, callback: Callable[[ScenarioRecorder, float], None]) -> None:
+        self._callback = callback
+        self._failing: dict[Failure, tuple[int, ScenarioRecorder, float]] = {}
+        self._numbers = itertools.count()
+
+    def add(self, recorder: ScenarioRecorder, elapsed: float) -> None:
+        number = next(self._numbers)
+        failures = [
+            check.failure_info.failure
+            for checks in recorder.checks.values()
+            for check in checks
+            if check.failure_info is not None
+        ]
+        for failure in failures:
+            self._failing[failure] = (number, recorder, elapsed)
+        if not failures:
+            self._callback(recorder, elapsed)
+
+    def flush(self) -> None:
+        scenarios = {number: (recorder, elapsed) for number, recorder, elapsed in self._failing.values()}
+        for number in sorted(scenarios):
+            self._callback(*scenarios[number])
 
 
 @dataclass
@@ -286,7 +326,7 @@ class APIStateMachine(RuleBasedStateMachine):
                 # The pytest plugin attaches a callback that connects this class to configured report writers
                 callback = StatefulCallbackMark.get(self.__class__)
                 if callback is not None:
-                    _callback = callback
+                    reports = _ScenarioReports(callback)
 
                     # Captures interactions into the recorder, then hands it to the report writers' callback
                     # via schema-scoped hooks.
@@ -310,18 +350,18 @@ class APIStateMachine(RuleBasedStateMachine):
                         def teardown(self) -> None:
                             self.schema.hooks.unregister(self._on_after_validate)
                             elapsed = self._started_at.elapsed
-                            _callback(self.recorder, elapsed)
+                            reports.add(self.recorder, elapsed)
                             super().teardown()
 
                     machine: type[APIStateMachine] = _Capturing
                 else:
                     machine = cls
                 try:
-                    run_state_machine_as_test(machine, settings=self.settings)
-                except FailureGroup as exc:
-                    raise as_reported_failure(exc) from None
+                    with reported_failures():
+                        run_state_machine_as_test(machine, settings=self.settings)
                 finally:
                     if machine is not cls:
+                        reports.flush()
                         release_state_machines(machine)
 
             runTest.is_hypothesis_test = True  # type: ignore[attr-defined]
@@ -471,7 +511,7 @@ class RecordingStateMachine(APIStateMachine):
         additional_checks: list[CheckFunction] | None = None,
         **kwargs: Any,
     ) -> None:
-        __tracebackhide__ = True
+        __tracebackhide__ = _hidden_unless_pytest_8
         case.validate_response(
             response,
             additional_checks=additional_checks,
