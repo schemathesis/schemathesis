@@ -54,6 +54,8 @@ Failures:
 
 For more information, run `st explain ST101`.
 
+  ⏭  Skipped EnsureReachability.after_run (Failure limit reached)
+
 Test cases:
   N generated, N found N unique failures
 

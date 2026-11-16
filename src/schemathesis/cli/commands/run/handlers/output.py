@@ -603,6 +603,14 @@ def extraction_failure_steps(failure: ExtractionFailure) -> list[tuple[int, str]
     ]
 
 
+def skipped_checks_lines(event: events.EngineFinished) -> list[str]:
+    """Name the checks whose `after_run` an early stop left unrun, and why the run stopped."""
+    if not event.skipped_checks:
+        return []
+    methods = ", ".join(f"{name}.after_run" for name in event.skipped_checks)
+    return [style(f"  ⏭  Skipped {methods} ({event.stop_reason.skip_explanation})", fg="yellow")]
+
+
 def display_setup(console: Console, payload: SetupPayload) -> None:
     """Print what setup learned about the API: probed capabilities, the cache, and sign-up."""
     from rich.style import Style
@@ -1637,5 +1645,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self.display_warnings_summary(ctx)
 
         ctx.summary_lines.extend(reauth_summary_lines(event.payload))
+        ctx.summary_lines.extend(skipped_checks_lines(event))
         display_summary_footer(ctx, summary)
         self.display_final_line(ctx, event)

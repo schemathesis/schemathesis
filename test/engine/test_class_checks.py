@@ -60,19 +60,23 @@ def test_after_run_skipped_when_run_aborts(ctx):
         def after_response(self, ctx, response, case):
             raise AssertionError("response boom")
 
+    @schemathesis.check
+    class Summarize:
         def after_run(self, ctx):
             raise AssertionError("after_run should not run")
 
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = EventStream(
-        schema, checks=[FailFast], phases=[PhaseName.FUZZING], max_examples=5, max_failures=1
-    ).execute()
+    finished = (
+        EventStream(schema, checks=[FailFast, Summarize], phases=[PhaseName.FUZZING], max_examples=5, max_failures=1)
+        .execute()
+        .finished
+    )
 
-    finished = stream.finished
-    assert finished is not None
-    assert not any("after_run should not run" in (failure.message or "") for failure in finished.failures), (
-        finished.failures
+    assert (finished.stop_reason, finished.failures, finished.skipped_checks) == (
+        StopReason.FAILURE_LIMIT,
+        [],
+        ["Summarize"],
     )
 
 
@@ -161,5 +165,5 @@ def test_after_run_runs_when_the_clock_ends_the_run(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(schema, checks=[Tracked], phases=[PhaseName.FUZZING], max_examples=2000, max_time=1).execute()
 
-    assert stream.finished.stop_reason == StopReason.MAX_TIME
+    assert (stream.finished.stop_reason, stream.finished.skipped_checks) == (StopReason.MAX_TIME, [])
     assert called

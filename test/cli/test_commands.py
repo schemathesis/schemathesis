@@ -2252,10 +2252,17 @@ def test_timeout_units_warning_can_be_disabled(ctx, cli, args, config):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=False, remove_last_line=True)
-def test_exit_first(ctx, cli, snapshot_cli):
+def test_exit_first(ctx, cli, snapshot_cli, ensure_reachability_module):
     api = ctx.openapi.apps.success_and_failure()
     assert (
-        cli.run(api.schema_url, "--max-failures=1", "--phases=fuzzing", "--checks=not_a_server_error") == snapshot_cli
+        cli.run(
+            api.schema_url,
+            "--max-failures=1",
+            "--phases=fuzzing",
+            "--checks=not_a_server_error,EnsureReachability",
+            hooks=ensure_reachability_module,
+        )
+        == snapshot_cli
     )
 
 

@@ -429,8 +429,10 @@ class EngineFinished(EngineEvent):
     payload: RunSummary | None
     # Failures from class-based `after_run`.
     failures: list[Failure]
+    # Class-based checks whose `after_run` did not run because the run stopped early.
+    skipped_checks: list[str]
 
-    __slots__ = ("id", "timestamp", "running_time", "stop_reason", "payload", "failures")
+    __slots__ = ("id", "timestamp", "running_time", "stop_reason", "payload", "failures", "skipped_checks")
 
     def __init__(
         self,
@@ -439,6 +441,7 @@ class EngineFinished(EngineEvent):
         stop_reason: StopReason,
         payload: RunSummary | None = None,
         failures: list[Failure] | None = None,
+        skipped_checks: list[str] | None = None,
     ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
@@ -446,6 +449,7 @@ class EngineFinished(EngineEvent):
         self.stop_reason = stop_reason
         self.payload = payload
         self.failures = failures if failures is not None else []
+        self.skipped_checks = skipped_checks if skipped_checks is not None else []
 
 
 @dataclass
