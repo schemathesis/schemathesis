@@ -374,6 +374,7 @@ def test_serialization_not_possible_manual(ctx):
         "multipart/form-data",
         "application/jsonl",
         "application/json-seq",
+        "text/event-stream",
     ],
 )
 def test_binary_data(ctx, media_type):
@@ -416,10 +417,30 @@ def test_binary_data(ctx, media_type):
         ("application/jsonl", [], b""),
         ("application/jsonl", {"id": 1}, b'{"id":1}\n'),
         ("application/json-seq", "a\nb", b'\x1e"a\\nb"\n'),
+        (
+            "text/event-stream",
+            [{"event": "add", "data": "a\nb", "id": "1", "retry": 5}, {"data": {"foo": 42}}],
+            b'event: add\ndata: a\ndata: b\nid: 1\nretry: 5\n\ndata: {"foo": 42}\n\n',
+        ),
+        ("text/event-stream", {"data": "a\r\nb\r"}, b"data: a\ndata: b\ndata: \n\n"),
+        ("text/event-stream", [5, None], b"data: 5\n\ndata: null\n\n"),
+        ("text/event-stream", "data: a\n\n", b"data: a\n\n"),
     ],
-    ids=["jsonl", "ndjson", "json-seq", "json-seq-suffix", "empty", "jsonl-non-list", "json-seq-non-list"],
+    ids=[
+        "jsonl",
+        "ndjson",
+        "json-seq",
+        "json-seq-suffix",
+        "empty",
+        "jsonl-non-list",
+        "json-seq-non-list",
+        "event-stream",
+        "event-stream-non-list",
+        "event-stream-non-object-items",
+        "event-stream-text",
+    ],
 )
-def test_json_sequence_body(ctx, media_type, body, expected):
+def test_sequential_body(ctx, media_type, body, expected):
     operation = ctx.openapi.load_operation(
         "POST /items",
         {

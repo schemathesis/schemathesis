@@ -9,6 +9,7 @@
 - Request bodies for `application/jsonl`, `x-ndjson` and `json-seq`, sent as one JSON record per line.
 - Array bodies for `multipart/mixed` and other non-form multipart types sent as ordered parts.
 - Open API 3.2 `itemSchema` for `multipart/mixed` and other non-form multipart request bodies.
+- Request bodies for `text/event-stream`, sent as one event per item, including Open API 3.2 `itemSchema`.
 - XML request bodies place children of `nodeType: none` objects directly in the parent element.
 - Error feedback learns integer, hex and ObjectId formats from Java and MongoDB parse errors.
 - `--app` option and `app` config key test Python ASGI and WSGI applications without a server.

@@ -43,6 +43,7 @@ from schemathesis.transport.prepare import (
 from schemathesis.transport.serialization import (
     Binary,
     serialize_binary,
+    serialize_event_stream,
     serialize_json,
     serialize_json_sequence,
     serialize_xml,
@@ -433,6 +434,11 @@ def json_lines_serializer(ctx: SerializationContext, value: Body) -> dict[str, A
 def json_text_sequence_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     # RFC 7464 starts every record with the ASCII record separator
     return {"data": serialize_json_sequence(value, record_start="\x1e")}
+
+
+@REQUESTS_TRANSPORT.serializer("text/event-stream")
+def event_stream_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
+    return {"data": serialize_event_stream(value)}
 
 
 @REQUESTS_TRANSPORT.serializer(
