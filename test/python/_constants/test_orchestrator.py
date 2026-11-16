@@ -8,7 +8,6 @@ from flask import Flask, jsonify
 from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.python import constants
 from schemathesis.python._constants import orchestrator
-from schemathesis.python._constants.adapters.flask import FlaskAdapter
 from schemathesis.python._constants.orchestrator import extract_all
 from schemathesis.python._constants.pool import ConstantsPool
 from schemathesis.python._constants.registry import SourceRegistry
@@ -38,7 +37,7 @@ def test_orchestrator_survives_module_that_exits_on_import():
     def from_modules():
         return ["exit_at_import", "sample_pkg.values"]
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert "active" in pool_values(result, "string")
 
 
@@ -50,7 +49,7 @@ def test_orchestrator_survives_subpackage_that_exits_during_walk():
     def from_pkg():
         return ["exit_pkg"]
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert "exitpkg_ok" in pool_values(result, "string")
 
 
@@ -69,7 +68,7 @@ def test_orchestrator_extracts_from_packages_with_and_without_submodules(tmp_pat
     def from_packages():
         return ["bare_pkg", "nested_pkg"]
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert sorted(pool_values(result, "string")) == ["bare_value", "child_value"]
 
 
@@ -80,7 +79,7 @@ def test_orchestrator_runs_sources_and_builds_pool():
     def from_sample():
         return ["sample_pkg.values"]
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert isinstance(result, ConstantsPool)
     assert not result.is_empty()
     assert 12345 in pool_values(result, "integer")
@@ -98,7 +97,7 @@ def test_orchestrator_isolates_source_errors():
     def good():
         return ["sample_pkg.values"]
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert not result.is_empty()
     # The raising source is recorded so its silent failure can be surfaced to the user.
     assert [(f.source, "intentional" in f.reason) for f in result.failures] == [("boom", True)]
@@ -111,7 +110,7 @@ def test_registered_source_resolving_to_no_modules_is_recorded():
     def empty():
         return []
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert [f.source for f in result.failures] == ["empty"]
 
 
@@ -123,7 +122,7 @@ def test_registered_source_scanning_a_literal_free_module_is_not_recorded():
     def no_literals():
         return ["empty_module"]
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert result.failures == ()
 
 
@@ -132,7 +131,7 @@ def test_app_source_failure_is_not_recorded():
     def failing_app():
         raise RuntimeError("boom")
 
-    result = extract_all(registry=SourceRegistry(), adapters=[], extra_sources=[failing_app])
+    result = extract_all(registry=SourceRegistry(), extra_sources=[failing_app])
     assert result.failures == ()
 
 
@@ -143,7 +142,7 @@ def test_pool_failures_convert_to_schema_warnings():
     def boom():
         raise RuntimeError("bad")
 
-    pool = extract_all(registry=registry, adapters=[])
+    pool = extract_all(registry=registry)
     warnings = iter_constants_warnings(pool)
     assert [(w.kind, w.operation_label) for w in warnings] == [(SchemathesisWarning.CONSTANTS_EXTRACTION, None)]
     assert "boom" in warnings[0].message
@@ -156,7 +155,7 @@ def test_constants_extraction_warning_is_not_grouped():
     def boom():
         raise RuntimeError("bad")
 
-    pool = extract_all(registry=registry, adapters=[])
+    pool = extract_all(registry=registry)
     assert iter_constants_warnings(pool)[0].group is None
 
 
@@ -173,7 +172,7 @@ def test_orchestrator_falls_back_to_app_module():
     def from_niche_app():
         return NicheApp()
 
-    assert "active" in pool_values(extract_all(registry=registry, adapters=[]), "string")
+    assert "active" in pool_values(extract_all(registry=registry), "string")
 
 
 def test_adapter_failing_to_list_handlers_is_recorded():
@@ -185,7 +184,7 @@ def test_adapter_failing_to_list_handlers_is_recorded():
     def from_app():
         return app
 
-    result = extract_all(registry=registry, adapters=[FlaskAdapter()])
+    result = extract_all(registry=registry)
     assert result.is_empty()
     assert [f.source for f in result.failures] == ["from_app"]
 
@@ -197,7 +196,7 @@ def test_orchestrator_fallback_does_not_walk_the_apps_package():
 
     NicheApp.__module__ = "test.python._constants.fixtures.dep_pkg.flask_app"
 
-    modules, _ = orchestrator._resolve_with_adapters(NicheApp(), adapters=[])
+    modules, _ = orchestrator._resolve_with_adapters(NicheApp())
     assert "test.python._constants.fixtures.dep_pkg.optional" not in modules
 
 
@@ -217,7 +216,7 @@ def test_orchestrator_isolates_generator_iteration_error():
     def from_sample():
         return ["sample_pkg.values"]
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert "active" in pool_values(result, "string")
     assert [f.source for f in result.failures] == ["from_faulty"]
 
@@ -226,7 +225,7 @@ def test_source_without_name_is_handled():
     # A `functools.partial` (or callable instance) has no `__name__`; extraction must not crash on it.
     registry = SourceRegistry()
     registry.register(functools.partial(lambda: ["sample_pkg.values"]))
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert "active" in pool_values(result, "string")
 
 
@@ -252,7 +251,7 @@ def test_module_object_source_is_harvested():
     def from_module():
         return shared
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert shared.UNLOCK_TOKEN in pool_values(result, "string")
 
 
@@ -274,7 +273,7 @@ def test_app_from_non_user_package_yields_no_constants(app_module):
     def from_app():
         return App()
 
-    assert extract_all(registry=registry, adapters=[]).is_empty()
+    assert extract_all(registry=registry).is_empty()
 
 
 def test_orchestrator_ignores_source_returning_none():
@@ -288,7 +287,7 @@ def test_orchestrator_ignores_source_returning_none():
     def good():
         return ["sample_pkg.values"]
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert "active" in pool_values(result, "string")
 
 
@@ -300,7 +299,7 @@ def test_orchestrator_reraises_keyboard_interrupt_from_source():
         raise KeyboardInterrupt
 
     with pytest.raises(KeyboardInterrupt):
-        extract_all(registry=registry, adapters=[])
+        extract_all(registry=registry)
 
 
 def test_orchestrator_keeps_partial_results_when_source_raises_base_exception():
@@ -315,7 +314,7 @@ def test_orchestrator_keeps_partial_results_when_source_raises_base_exception():
     def exits():
         raise SystemExit("boom")
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
     assert "active" in pool_values(result, "string")
     assert [f.source for f in result.failures] == ["exits"]
 
@@ -328,7 +327,7 @@ def test_orchestrator_follows_handler_module_local_imports():
     def from_app():
         return flask_app.app
 
-    result = extract_all(registry=registry, adapters=[FlaskAdapter()])
+    result = extract_all(registry=registry)
     assert "zx9secreta3f9c1e7" in pool_values(result, "string")
 
 
@@ -350,7 +349,7 @@ def test_constants_extracted_from_a_list_of_apps(tmp_path):
             namespace_app.add_url_rule("/x", "x", HandlerWithoutModule())
             return [namespace_app, flask_app.app]
 
-        result = extract_all(registry=registry, adapters=[FlaskAdapter()])
+        result = extract_all(registry=registry)
     finally:
         sys.path.remove(str(tmp_path))
     assert "zx9secreta3f9c1e7" in pool_values(result, "string")
@@ -359,9 +358,7 @@ def test_constants_extracted_from_a_list_of_apps(tmp_path):
 
 def test_orchestrator_does_not_walk_package_named_by_flask_import_name():
     # Walking the app's whole package imports modules the app never touches, firing their import side effects.
-    modules, _ = orchestrator._resolve_with_adapters(
-        Flask("test.python._constants.fixtures.dep_pkg"), adapters=[FlaskAdapter()]
-    )
+    modules, _ = orchestrator._resolve_with_adapters(Flask("test.python._constants.fixtures.dep_pkg"))
     assert "test.python._constants.fixtures.dep_pkg.optional" not in modules
 
 
@@ -370,13 +367,13 @@ def test_orchestrator_does_not_scan_installed_module_of_a_library_view():
     app = Flask("test.python._constants.fixtures.dep_pkg.flask_app")
     app.add_url_rule("/x", "x", jsonify)
 
-    modules, _ = orchestrator._resolve_with_adapters(app, adapters=[FlaskAdapter()])
+    modules, _ = orchestrator._resolve_with_adapters(app)
     assert not [name for name in modules if name == "flask" or name.startswith("flask.")]
 
 
 def test_orchestrator_does_not_scan_installed_package_named_by_flask_import_name():
     # A library-built app points `import_name` at site-packages, whose constants are third-party anyway.
-    modules, _ = orchestrator._resolve_with_adapters(Flask("hypothesis"), adapters=[FlaskAdapter()])
+    modules, _ = orchestrator._resolve_with_adapters(Flask("hypothesis"))
     assert not [name for name in modules if name == "hypothesis" or name.startswith("hypothesis.")]
 
 
@@ -391,7 +388,7 @@ def test_orchestrator_merges_origins_for_overlapping_sources():
     def second_source():
         return ["sample_pkg.values"]
 
-    result = extract_all(registry=registry, adapters=[])
+    result = extract_all(registry=registry)
 
     entry = next(entry for entry in result.entries_for("string") if entry.value == "active")
     assert {origin.source for origin in entry.origins} == {"first_source", "second_source"}

@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
-import inspect
 import os
 import sys
 from collections.abc import Iterable
 from types import ModuleType
 from typing import TYPE_CHECKING
 
-from schemathesis.python._constants.adapters import FrameworkAdapter, default_adapters, select_adapter
 from schemathesis.python._constants.extract import _THIRD_PARTY_ROOTS, extract_from_module, local_imports_of
 from schemathesis.python._constants.filter import is_kept
 from schemathesis.python._constants.pool import ConstantsPool, Origin
 from schemathesis.python._constants.registry import Source, SourceRegistry, default_registry
 from schemathesis.python._constants.walk import _NON_SEQUENCE_BYTES_TYPES, resolve_modules
+from schemathesis.python.application import application_code
 
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
@@ -32,7 +31,7 @@ def extract_registered() -> ConstantsPool:
     if not registry.get_all():
         pool = ConstantsPool()
     else:
-        pool = extract_all(registry=registry, adapters=default_adapters())
+        pool = extract_all(registry=registry)
     _extraction_cache = (version, pool)
     return pool
 
@@ -50,7 +49,7 @@ def build_constants_pool(schema: BaseSchema) -> ConstantsPool:
     cached = schema._constants_pool_cache
     if cached is not None and cached[0] is app and cached[1] == version:
         return cached[2]
-    pool = extract_all(registry=registry, adapters=default_adapters(), extra_sources=[_application_source(app)])
+    pool = extract_all(registry=registry, extra_sources=[_application_source(app)])
     schema._constants_pool_cache = app, version, pool
     return pool
 
@@ -67,25 +66,14 @@ def _application_source(app: object) -> Source:
     return application
 
 
-def extract_all(
-    *,
-    registry: SourceRegistry,
-    adapters: Iterable[FrameworkAdapter],
-    extra_sources: Iterable[Source] = (),
-) -> ConstantsPool:
+def extract_all(*, registry: SourceRegistry, extra_sources: Iterable[Source] = ()) -> ConstantsPool:
     """Run every registered source and pool the constants of the modules they resolve to."""
     pool = ConstantsPool()
-    _extract_all(registry=registry, adapters=list(adapters), pool=pool, extra_sources=extra_sources)
+    _extract_all(registry=registry, pool=pool, extra_sources=extra_sources)
     return pool
 
 
-def _extract_all(
-    *,
-    registry: SourceRegistry,
-    adapters: list[FrameworkAdapter],
-    pool: ConstantsPool,
-    extra_sources: Iterable[Source] = (),
-) -> None:
+def _extract_all(*, registry: SourceRegistry, pool: ConstantsPool, extra_sources: Iterable[Source] = ()) -> None:
     # Failures of registered sources are recorded; the best-effort app source stays quiet without reusable literals.
     sources = [(source, True) for source in registry.get_all()] + [(source, False) for source in extra_sources]
     for source, registered in sources:
@@ -102,7 +90,7 @@ def _extract_all(
             continue
 
         try:
-            modules, adapter_name = _resolve_with_adapters(raw, adapters=adapters)
+            modules, adapter_name = _resolve_with_adapters(raw)
         except KeyboardInterrupt:
             raise
         except BaseException as exc:
@@ -130,7 +118,7 @@ def _failure_reason(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {first}" if first else type(exc).__name__
 
 
-def _resolve_with_adapters(raw: object, *, adapters: list[FrameworkAdapter]) -> tuple[set[str], str | None]:
+def _resolve_with_adapters(raw: object) -> tuple[set[str], str | None]:
     """Resolve a discovery input to (modules, adapter name); objects no adapter knows use their top-level package."""
     if isinstance(raw, (str, ModuleType)):
         return resolve_modules([raw]), None
@@ -141,22 +129,17 @@ def _resolve_with_adapters(raw: object, *, adapters: list[FrameworkAdapter]) -> 
         aggregated_modules: set[str] = set()
         aggregated_adapter: str | None = None
         for item in raw:
-            item_modules, item_adapter = _resolve_with_adapters(item, adapters=adapters)
+            item_modules, item_adapter = _resolve_with_adapters(item)
             aggregated_modules.update(item_modules)
             if aggregated_adapter is None:
                 aggregated_adapter = item_adapter
         return aggregated_modules, aggregated_adapter
 
-    adapter = select_adapter(raw, adapters=adapters)
-    if adapter is not None:
-        try:
-            handlers = list(adapter.handlers(raw))
-            declared = set(adapter.modules(raw))
-        except Exception:
-            return set(), None
+    code = application_code(raw)
+    if code is not None:
         # Neither is known to be user code: a library view or library-built app would harvest its framework's internals.
-        modules = {name for name in _modules_for_handlers(handlers) | declared if _is_likely_user_package(name)}
-        return resolve_modules(_expand_with_local_imports(modules), walk=False), adapter.name
+        modules = {name for name in code.modules if _is_likely_user_package(name)}
+        return resolve_modules(_expand_with_local_imports(modules), walk=False), code.framework
 
     # Unknown framework: use the module defining the app if it looks like user code, not a framework's internals.
     module_name = getattr(raw, "__module__", None)
@@ -186,15 +169,6 @@ def _is_likely_user_package(name: str) -> bool:
                 return False
     # No origin (namespace package): accept; the walker discovers its submodules.
     return True
-
-
-def _modules_for_handlers(handlers: Iterable[object]) -> set[str]:
-    modules: set[str] = set()
-    for handler in handlers:
-        module = inspect.getmodule(handler)
-        if module is not None:
-            modules.add(module.__name__)
-    return modules
 
 
 def _expand_with_local_imports(module_names: set[str]) -> set[str]:
