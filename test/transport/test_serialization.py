@@ -1023,7 +1023,50 @@ def test_multipart_part_encoded_with_its_content_type(
                 ["byte", "text/plain", "aGk="],
                 ["files", "application/octet-stream", "a"],
                 ["files", "application/octet-stream", "b"],
-                ["untyped", "text/plain", "raw"],
+                ["untyped", "application/octet-stream", "raw"],
+            ],
+        ),
+        (
+            "3.1.0",
+            {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "object": {},
+                                    "list": {},
+                                    "choice": {"enum": ["a", "b"]},
+                                    "image": {"contentMediaType": "image/png"},
+                                    "optional": {"anyOf": [{}, {"type": "null"}]},
+                                    "optional_text": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                    "items": {"type": "array", "items": {}},
+                                },
+                            }
+                        }
+                    },
+                },
+            },
+            {
+                "object": {"a": 1},
+                "list": ["x", 1],
+                "choice": "a",
+                "image": b"PNG",
+                "optional": 1,
+                "optional_text": "text",
+                "items": ["x", 1],
+            },
+            [
+                ["choice", "application/octet-stream", "a"],
+                ["image", "application/octet-stream", "PNG"],
+                ["items", "application/octet-stream", "1"],
+                ["items", "application/octet-stream", "x"],
+                ["list", "application/octet-stream", '["x", 1]'],
+                ["object", "application/octet-stream", '{"a": 1}'],
+                ["optional", "application/octet-stream", "1"],
+                ["optional_text", "text/plain", "text"],
             ],
         ),
         (
@@ -1039,7 +1082,7 @@ def test_multipart_part_encoded_with_its_content_type(
             [["file", "application/octet-stream", "PNG"], ["number", "text/plain", "1.5"]],
         ),
     ],
-    ids=["openapi-3.1", "openapi-3.0", "swagger-2.0"],
+    ids=["openapi-3.1", "openapi-3.0", "openapi-3.1-untyped", "swagger-2.0"],
 )
 def test_multipart_form_fields_default_content_types(ctx, app_runner, transport, version, definition, body, expected):
     app, _ = ctx.openapi.make_flask_app(
@@ -1489,8 +1532,8 @@ def test_multipart_ref_to_scalar_is_not_json_encoded(ctx, case_factory):
             {},
             {"tags": [1, "x"], "kind": "a"},
             [
-                ("tags", (None, b"1", "application/json")),
-                ("tags", (None, "x", "application/json")),
+                ("tags", (None, b"1", "application/octet-stream")),
+                ("tags", (None, "x", "application/octet-stream")),
                 ("kind", (None, "a")),
             ],
         ),
@@ -1499,8 +1542,8 @@ def test_multipart_ref_to_scalar_is_not_json_encoded(ctx, case_factory):
             {},
             {"tags": [1, "x"], "kind": "a"},
             [
-                ("tags", (None, b"1", "application/json")),
-                ("tags", (None, "x", "application/json")),
+                ("tags", (None, b"1", "application/octet-stream")),
+                ("tags", (None, "x", "application/octet-stream")),
                 ("kind", (None, "a")),
             ],
         ),
@@ -1835,8 +1878,8 @@ def test_multipart_part_content_type(ctx, case_factory, load_kwargs, body, field
         ({"type": ["array", "null"]}, "application/json"),
         ({"type": ["string", "null"]}, None),
         ({"additionalProperties": {"type": "string"}}, "application/json"),
-        ({"items": {}}, "application/json"),
-        ({}, None),
+        ({"items": {}}, "application/octet-stream"),
+        ({}, "application/octet-stream"),
     ],
     ids=["object", "type-list-array", "type-list-scalar", "untyped-additional-properties", "untyped-items", "empty"],
 )
@@ -2264,7 +2307,7 @@ NULL = {"type": "null"}
         (
             {"anyOf": [{"type": "array", "items": {"contentMediaType": "application/octet-stream"}}, NULL]},
             [b"a"],
-            [("file", ("file", b"a"))],
+            [("file", ("file", b"a", "application/octet-stream"))],
         ),
         (
             {"allOf": [{"$ref": "#/components/schemas/File"}], "description": "Avatar"},
