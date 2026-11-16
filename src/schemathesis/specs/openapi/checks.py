@@ -384,8 +384,7 @@ def _body_negation_becomes_valid_after_serialization(response: Response, case: C
 
 def _parts_body_is_valid_as_sent(response: Response, case: Case, media_type: str) -> bool:
     """Whether a body sent as unnamed parts, e.g. `multipart/mixed`, carried no parts while the schema admits none."""
-    main, sub = media_types.parse(media_type)
-    if main != "multipart" or sub in ("form-data", "*"):
+    if not media_types.is_positional_multipart(media_type):
         return False
     request = response.request
     headers = f"Content-Type: {request.headers.get('Content-Type', '')}\r\n\r\n".encode()
