@@ -269,6 +269,54 @@ def test_lifespan_starts_once_under_concurrent_access():
     assert startups == [1]
 
 
+@pytest.mark.parametrize("fails", [False, True], ids=["success", "failure"])
+def test_concurrent_callers_wait_for_startup(fails):
+    startup_began = threading.Event()
+    release = threading.Event()
+    ready = threading.Event()
+    outcomes = []
+
+    async def app(scope, receive, send):
+        if scope["type"] == "lifespan":
+            await receive()
+            startup_began.set()
+            await anyio.to_thread.run_sync(release.wait)
+            if fails:
+                await send({"type": "lifespan.startup.failed", "message": "nope"})
+                return
+            ready.set()
+            await send({"type": "lifespan.startup.complete"})
+            await receive()
+            await send({"type": "lifespan.shutdown.complete"})
+            return
+        await send({"type": "http.response.start", "status": 200 if ready.is_set() else 503, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    def worker(entering):
+        entering.set()
+        try:
+            with ASGIClient(app) as client:
+                started = ready.is_set()
+                outcomes.append((started, client.get("/x").status_code))
+        except RuntimeError as exc:
+            outcomes.append(str(exc))
+
+    signals = [threading.Event() for _ in range(4)]
+    threads = [threading.Thread(target=worker, args=(entering,)) for entering in signals]
+    threads[0].start()
+    startup_began.wait()
+    for thread in threads[1:]:
+        thread.start()
+    for entering in signals:
+        entering.wait()
+    release.set()
+    for thread in threads:
+        thread.join()
+    shutdown_lifespans()
+
+    assert outcomes == (["nope"] * 4 if fails else [(True, 200)] * 4)
+
+
 def test_lifespan_task_ending_after_startup_shuts_down_cleanly():
     async def app(scope, receive, send):
         message = await receive()

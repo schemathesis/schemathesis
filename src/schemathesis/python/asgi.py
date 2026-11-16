@@ -97,7 +97,17 @@ def _shutdown() -> None:
 
 
 class _Lifespan:
-    __slots__ = ("app", "portal", "receive_stream", "send_stream", "task", "error", "state", "asked_for_message")
+    __slots__ = (
+        "app",
+        "portal",
+        "receive_stream",
+        "send_stream",
+        "task",
+        "error",
+        "startup_finished",
+        "state",
+        "asked_for_message",
+    )
 
     def __init__(self, app: ASGIApp, portal: BlockingPortal) -> None:
         self.app = app
@@ -107,6 +117,8 @@ class _Lifespan:
         self.send_stream: StapledObjectStream = StapledObjectStream(*anyio.create_memory_object_stream(math.inf))
         self.task: Future[None] | None = None
         self.error: BaseException | None = None
+        # Set once startup succeeded or failed; callers arriving during startup wait for it.
+        self.startup_finished = threading.Event()
         # Filled in by the application during startup; each request gets a shallow copy.
         self.state: dict[str, Any] = {}
         # Set when the application asks for its first lifespan message.
@@ -189,6 +201,7 @@ def _start_lifespan(app: ASGIApp) -> None:
             # Startup runs outside `_LOCK` so a slow application does not block requests to other ones.
             startup_lock = _STARTUP_LOCKS.setdefault(key, threading.Lock())
     if started is not None:
+        started.startup_finished.wait()
         if started.error is not None:
             raise started.error
         return
@@ -207,6 +220,8 @@ def _start_lifespan(app: ASGIApp) -> None:
         except BaseException as exc:
             lifespan.error = exc
             raise
+        finally:
+            lifespan.startup_finished.set()
 
 
 def _reason_phrase(status_code: int) -> str:
