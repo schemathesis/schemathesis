@@ -32,6 +32,7 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     rebind_body_fields_to_unique_producers,
     rebind_inherited_suffix_matches,
     rebind_orphan_synthetics,
+    rebind_suffix_matches_to_other_resources,
     unbind_mistyped_values,
     update_input_field_bindings,
 )
@@ -224,6 +225,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
             taken.add((location, name))
 
     rebind_inherited_suffix_matches(operations, resources)
+    rebind_suffix_matches_to_other_resources(operations, resources, state.item_collections)
 
     # Refresh bindings with resource fields found later in the scan (`User.userId` -> `User.id`)
     update_input_field_bindings(state.updated_resources, operations)

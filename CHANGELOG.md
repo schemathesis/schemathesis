@@ -84,6 +84,7 @@
 #### Inferred links
 
 - Links filling path, query or header parameters with object or array fields, e.g. `productId: {...}`.
+- Links filling `runner_id` with the id of another resource named after it, like a runner group.
 
 #### `st replay`
 

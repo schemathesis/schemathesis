@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
@@ -959,6 +959,202 @@ def rebind_inherited_suffix_matches(operations: OperationMap, resources: Resourc
                     input_slot.resource = candidate
                     input_slot.resource_field = field
                     break
+
+
+def rebind_suffix_matches_to_other_resources(
+    operations: OperationMap, resources: ResourceMap, item_collections: frozenset[str]
+) -> None:
+    """Re-resolve suffix matches keyed by the identifier of a resource the API serves from another collection.
+
+    `runner_id` finds no `Runner`; `runner-groups-enterprise` starts with it, but `/runner-groups/{runner_group_id}`
+    serves it, so its `id` keys a runner group and the slot takes a resource the API serves as a runner.
+    """
+    served = _Served.from_operations(operations, item_collections)
+    for operation in operations.values():
+        for input_slot in operation.inputs:
+            if not input_slot.is_suffix_matched or not isinstance(input_slot.parameter_name, str):
+                continue
+            replacement = _replacement_for_other_resource(
+                operation, input_slot, input_slot.parameter_name, resources, served
+            )
+            if replacement is None:
+                continue
+            resource, field, is_suffix_matched = replacement
+            confirmed = [
+                output
+                for output in operation.outputs
+                if output.path_parameter == input_slot.parameter_name and output.resource is input_slot.resource
+            ]
+            # Values reaching a key whose parent other scopes key too would carry that parent across scopes; the key
+            # stays, and a bodyless `PUT` to it confirms the new resource as well
+            if input_slot.parameter_location == ParameterLocation.PATH and served.crosses_scopes(
+                operation.path, input_slot.parameter_name
+            ):
+                operation.outputs.extend(replace(output, resource=resource) for output in confirmed)
+                continue
+            # A bodyless `PUT /runners/{runner_id}` confirms the resource its trailing parameter keys
+            for output in confirmed:
+                output.resource = resource
+            input_slot.resource, input_slot.resource_field, input_slot.is_suffix_matched = (
+                resource,
+                field,
+                is_suffix_matched,
+            )
+
+
+@dataclass
+class _Served:
+    """Where the API serves each object from, and the single object each path returns."""
+
+    # `runnergroup` for what `/runner-groups/{runner_group_id}` returns, `share` and `download` for
+    # `/shares/downloads/{share_id}`
+    collections: dict[str, set[str]]
+    # A list under `/users/{id}/offline-sessions/{clientId}` holds sessions, not the client its path keys
+    items: dict[str, set[str]]
+    # Collections the API keys items of: `run` for `/runs/{run_id}`
+    keyed: frozenset[str]
+    item_collections: frozenset[str]
+    # Keys owning each keyed collection: `{org}` and `{enterprise}` for `runner-groups/{runner_group_id}`
+    scopes: dict[tuple[str, str], set[str | None]]
+
+    @classmethod
+    def from_operations(cls, operations: OperationMap, item_collections: frozenset[str]) -> _Served:
+        collections: dict[str, set[str]] = {}
+        for path, names in _returned_by_path(operations).items():
+            words = naming.collection_words(path, item_collections)
+            for name in names:
+                collections.setdefault(name, set()).update(words)
+        return cls(
+            collections=collections,
+            items=_returned_by_path(operations, single=True),
+            keyed=frozenset(
+                naming.normalize_for_matching(naming.to_singular(collection.rsplit("/", 1)[-1]))
+                for collection in item_collections
+                if "{" not in collection.rsplit("/", 1)[-1]
+            ),
+            item_collections=item_collections,
+            scopes=_parent_keys_by_parameter(operation.path for operation in operations.values()),
+        )
+
+    def crosses_scopes(self, path: str, parameter: str) -> bool:
+        """Whether a parent key of `{parameter}` in `path` sits under other parent keys elsewhere.
+
+        A runner listed under `/orgs/{org}/runner-groups/{runner_group_id}` would carry an org's group into
+        `/enterprises/{enterprise}/runner-groups/{runner_group_id}/runners/{runner_id}`.
+        """
+        parents = path.split(f"{{{parameter}}}", 1)[0].split("/")
+        return any(
+            scope is not None and any(other is not None and other != scope for other in self.scopes.get(key, ()))
+            for key, scope in _collection_keys(parents)
+        )
+
+    def as_other_resource(self, candidate: str, field: str | None, resource_name: str, accepted: set[str]) -> bool:
+        """Whether `field` is the identifier of an object the API serves as another resource.
+
+        `party-role` from `/roles/{roleId}` is a role; `runner` from `/runners/{runner_id}` is not a run when the API
+        also keys `/runs/{run_id}`; `Application` from `/applications/{id}` may still be an app when nothing is served
+        as one.
+        """
+        resource_normalized = naming.normalize_for_matching(resource_name)
+        collections = self.collections.get(candidate, set())
+        return (
+            field is not None
+            and field.lower() in _BARE_KEYS
+            and naming.normalize_for_matching(candidate) != resource_normalized
+            and bool(collections)
+            # `GetServices` in `/$/GetServices/{serviceId}` serves services
+            and not any(
+                collection in accepted or collection.endswith(resource_normalized) for collection in collections
+            )
+            and (
+                resource_normalized in self.keyed
+                or not any(collection.startswith(resource_normalized) for collection in collections)
+            )
+        )
+
+    def as_resource(self, candidate: str, resource_name: str, accepted: set[str], item_returns: set[str]) -> bool:
+        """Whether the API serves `candidate` as the parameter's resource: by its item path, name or collection."""
+        if item_returns:
+            return candidate in item_returns
+        return naming.normalize_for_matching(candidate) == naming.normalize_for_matching(
+            resource_name
+        ) or not self.collections.get(candidate, set()).isdisjoint(accepted)
+
+
+def _parent_keys_by_parameter(paths: Iterable[str]) -> dict[tuple[str, str], set[str | None]]:
+    scopes: dict[tuple[str, str], set[str | None]] = {}
+    for path in paths:
+        for key, scope in _collection_keys(path.split("/")):
+            scopes.setdefault(key, set()).add(scope)
+    return scopes
+
+
+def _collection_keys(segments: list[str]) -> Iterator[tuple[tuple[str, str], str | None]]:
+    """Each `collection/{key}` pair in `segments` with the nearest key before it: `{org}` for `runner-groups`."""
+    for index in range(1, len(segments)):
+        collection, key = segments[index - 1], segments[index]
+        if "{" in key and collection and "{" not in collection:
+            yield (
+                (collection, key),
+                next((segment for segment in reversed(segments[: index - 1]) if "{" in segment), None),
+            )
+
+
+def _replacement_for_other_resource(
+    operation: OperationNode, input_slot: InputSlot, parameter_name: str, resources: ResourceMap, served: _Served
+) -> tuple[ResourceDefinition, str, bool] | None:
+    """What a slot suffix-matched to another resource takes instead, with whether that is still a suffix match."""
+    resource_name = naming.from_parameter(
+        parameter=parameter_name,
+        path=operation.path,
+        query=input_slot.parameter_location == ParameterLocation.QUERY,
+    )
+    # The suffix match started from this same name
+    assert resource_name is not None
+    # Collections naming the parameter's resource: its own name and, for an item key, the collection keying it
+    accepted = {naming.normalize_for_matching(resource_name)}
+    item_returns: set[str] = set()
+    if input_slot.parameter_location == ParameterLocation.PATH:
+        placeholder = f"{{{parameter_name}}}"
+        item_path = operation.path[: operation.path.find(placeholder) + len(placeholder)]
+        item_returns = served.items.get(item_path, set())
+        # `runner` keys `/actions/runners/{runner_id}`; `actions` names no item
+        accepted.update(naming.collection_words(item_path, served.item_collections)[:1])
+    if not served.as_other_resource(input_slot.resource.name, input_slot.resource_field, resource_name, accepted):
+        return None
+    nested_items = _nested_items(parameter_name, resource_name, operation.path, served.item_collections)
+    for candidate, field in _iter_suffix_matches(
+        resource_name=resource_name, parameter_name=parameter_name, resources=resources
+    ):
+        if (
+            not naming.normalize_for_matching(candidate.name).endswith(nested_items)
+            and not served.as_other_resource(candidate.name, field, resource_name, accepted)
+            and served.as_resource(candidate.name, resource_name, accepted, item_returns)
+        ):
+            return candidate, field, True
+    if item_returns:
+        # The item path returns an object no name match finds (`RetirementExpenseWithIdModel`); later passes bind it
+        return None
+    resource = resources.setdefault(
+        resource_name, ResourceDefinition.inferred_from_parameter(name=resource_name, parameter_name=parameter_name)
+    )
+    return resource, _match_field(parameter_name, resource_name, resource), False
+
+
+def _returned_by_path(operations: OperationMap, *, single: bool = False) -> dict[str, set[str]]:
+    """Objects each path returns at the top of its responses, apart from what a bodyless response confirms."""
+    returned: dict[str, set[str]] = {}
+    for operation in operations.values():
+        returned.setdefault(operation.path, set()).update(
+            output.resource.name
+            for output in operation.outputs
+            if output.path_parameter is None
+            and (not single or output.cardinality == Cardinality.ONE)
+            and not any(
+                output.pointer.rstrip("/").startswith(other.pointer.rstrip("/") + "/") for other in operation.outputs
+            )
+        )
+    return returned
 
 
 def _match_field(parameter_name: str, resource_name: str, resource: ResourceDefinition) -> str:
