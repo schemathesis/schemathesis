@@ -105,6 +105,7 @@ Reference for Schemathesis public Python API.
       - HookContext
       - hook
       - extension
+      - scoped_extensions
 
 ## Checks
 
