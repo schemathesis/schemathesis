@@ -57,7 +57,7 @@
 #### Data generation
 
 - Internal error for dictionaries bound to parameters whose schema references a shared component.
-- Schema error for `pattern` with escaped `}` or `]` combined with `minLength` or `maxLength`. [#6137](https://github.com/schemathesis/schemathesis/issues/6137)
+- Schema error for `pattern` with escaped `}`/`]` or classes like `[\P{M}\p{M}]`, combined with `minLength`/`maxLength`. [#6137](https://github.com/schemathesis/schemathesis/issues/6137)
 - False positive `negative_data_rejection` for unmapped discriminator values under `defaultMapping`.
 - Missing discriminator `mapping` values written as schema names in generated data.
 - Truncated discriminator values for whole-file `$ref` branches with dotted names, like `Pet.Cat.json`.
