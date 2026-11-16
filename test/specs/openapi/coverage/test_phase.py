@@ -6569,6 +6569,24 @@ def test_coverage_boolean_property_key_malformed_keyword(ctx, location):
     assert (exc.value.path, exc.value.method) == ("/hooks", "post")
 
 
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"], ids=["openapi-3.0", "openapi-3.1"])
+@pytest.mark.parametrize("referenced", [True, False], ids=["referenced", "inline"])
+def test_non_array_examples_are_ignored(ctx, version, referenced):
+    malformed = {"type": "integer", "examples": 5}
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "properties": {"a": {"$ref": "#/components/schemas/A"} if referenced else malformed},
+            "required": ["a"],
+        },
+        version=version,
+        components={"schemas": {"A": malformed}},
+    )
+    bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE) if case.body is not NOT_SET]
+    assert bodies == [{"a": 0}, {"a": 2**63}]
+
+
 def test_coverage_negative_max_length_preserved_in_optimized_schema(ctx):
     # When a pattern's outer '?' is rewritten to '{0,1}' without encoding maxLength
     # into the inner quantifiers, maxLength must survive in optimized_schema so the

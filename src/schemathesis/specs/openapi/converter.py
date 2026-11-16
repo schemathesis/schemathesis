@@ -147,6 +147,9 @@ def _to_json_schema(
     elif pattern is not None:
         # E.g. YAML reads an unquoted `00:00:00.00` as a float; no regex is left to enforce.
         del schema["pattern"]
+    if not isinstance(schema.get("examples", []), list):
+        # Anything but a list holds no examples to read.
+        del schema["examples"]
     if update_quantifiers:
         update_pattern_in_schema(schema)
     # Some schemas put a boolean `required` on the property itself
