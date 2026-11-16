@@ -587,6 +587,8 @@ def test_protected_endpoints(case: schemathesis.Case) -> None:
     case.call_and_validate()
 ```
 
+`@schemathesis.auth()` applies to every schema in the process. To apply a provider to one schema, use `@schema.auth()`. To remove a global provider after a test suite, register it inside [`schemathesis.scoped_extensions()`](../reference/hooks.md#limiting-global-registrations-to-a-block).
+
 ### Session Management
 
 For persistent sessions or custom client configuration:

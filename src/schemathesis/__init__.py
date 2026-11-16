@@ -11,6 +11,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.metrics import MetricContext, MetricFunction, metric
 from schemathesis.hooks import HookContext, extension, hook
+from schemathesis.registrations import scoped_extensions
 from schemathesis.schemas import APIOperation, BaseSchema
 from schemathesis.transport import SerializationContext, serializer
 
@@ -34,6 +35,7 @@ __all__ = [
     "hook",
     "HookContext",
     "extension",
+    "scoped_extensions",
     "check",
     "CheckContext",
     "CheckFunction",

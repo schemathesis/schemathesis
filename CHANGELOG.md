@@ -16,6 +16,7 @@
 - `from-operation` dictionaries fill from Open API and GraphQL responses, keeping parent and child IDs paired. [#5751](https://github.com/schemathesis/schemathesis/issues/5751)
 - `setup` and `teardown` hooks run once around testing in `st run`, `st fuzz` and pytest.
 - `@schemathesis.extension` registers a hook class with its own `[extensions.<name>]` settings.
+- `schemathesis.scoped_extensions()` removes hooks, auth providers and other extensions registered inside a block.
 - `hooks` config option accepts a list of modules, loaded in order.
 - `Case.reapply_auth()` refreshes expired auth tokens on cases generated earlier, honoring `refresh_interval`.
 

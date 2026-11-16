@@ -34,6 +34,18 @@ def test_state_machine_importable_from_stateful_module():
     subprocess.run([sys.executable, "-c", code], check=True, env={**os.environ, "PYTHONPATH": SRC})
 
 
+def test_builtin_checks_outlive_scoped_extensions():
+    # The first schema load registers the built-in checks, and here it happens inside the scope
+    code = (
+        "import schemathesis\n"
+        "from schemathesis.checks import CHECKS\n"
+        "with schemathesis.scoped_extensions():\n"
+        "    schemathesis.openapi.from_dict({'openapi': '3.0.2', 'info': {'title': 'T', 'version': '1'}, 'paths': {}})\n"
+        "assert 'status_code_conformance' in {check.__name__ for check in CHECKS.get_all()}\n"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True, env={**os.environ, "PYTHONPATH": SRC})
+
+
 def test_openapi_checks_registered_without_cli():
     # Library users load schemas without importing the CLI or the pytest plugin
     code = (

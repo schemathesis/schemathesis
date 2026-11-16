@@ -100,6 +100,37 @@ Use it for failures that depend on the response rather than on which operation w
 
 **Hook Name Detection:** If not specified, uses function name (must match hook name exactly).
 
+### Limiting Global Registrations to a Block
+
+`@schemathesis.hook`, `@schemathesis.auth()` and the other global decorators register for the whole process. A process that tests several APIs, or loads a hooks module per test suite, can limit those registrations to a block with `schemathesis.scoped_extensions()`:
+
+```python
+import schemathesis
+
+with schemathesis.scoped_extensions():
+    import suite_hooks
+
+    schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json")
+    ...
+```
+
+When the block exits, Schemathesis removes every global registration made while it was open: hooks, auth providers, extensions, checks, serializers, deserializers, Open API formats and media types, GraphQL scalars and constant sources. It does so on an exception too, and scopes nest. Registrations from before the block stay. The registries are process-wide, so the block also removes registrations other threads make while it is open.
+
+Entering the block loads the `SCHEMATHESIS_HOOKS` module and the built-in checks, so they outlive every scope; a broken `SCHEMATHESIS_HOOKS` module raises at the `with` line. Hook files given by path in the `hooks` config option load again in each scope.
+
+To open the scope in a suite's setup and close it in its teardown, use `contextlib.ExitStack`:
+
+```python
+from contextlib import ExitStack
+
+extensions = ExitStack()
+extensions.enter_context(schemathesis.scoped_extensions())  # setup
+...
+extensions.close()  # teardown
+```
+
+Python runs a module's code once per process, so importing `suite_hooks` again in a later scope registers nothing. Remove it from `sys.modules` before importing it again.
+
 ## Conditional Application
 
 Apply hooks selectively using filters.

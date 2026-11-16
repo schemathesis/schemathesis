@@ -236,13 +236,18 @@ class SerializerRegistry:
         register_serializer(serializer_func, *targets)
 
 
-def register_serializer(func: Serializer, *media_types: str) -> None:
-    """Register `func` for `media_types` on every built-in transport."""
+def http_transports() -> tuple[BaseTransport, ...]:
+    """Built-in transports that share registered serializers."""
     from schemathesis.transport.asgi import ASGI_TRANSPORT
     from schemathesis.transport.requests import REQUESTS_TRANSPORT
     from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
-    for transport in (ASGI_TRANSPORT, REQUESTS_TRANSPORT, WSGI_TRANSPORT):
+    return (ASGI_TRANSPORT, REQUESTS_TRANSPORT, WSGI_TRANSPORT)
+
+
+def register_serializer(func: Serializer, *media_types: str) -> None:
+    """Register `func` for `media_types` on every built-in transport."""
+    for transport in http_transports():
         transport.serializer(*media_types)(func)
 
 
