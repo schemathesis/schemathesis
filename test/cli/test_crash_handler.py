@@ -284,7 +284,8 @@ def test_crash_file_stores_structured_case(cli, ctx, tmp_path):
             return jsonify({"error": "boom"}), 500
         return jsonify({}), 200
 
-    cli.run_openapi_app(app, "--max-examples=5", "--phases=fuzzing")
+    # One check, so the run writes one crash file
+    cli.run_openapi_app(app, "--max-examples=5", "--phases=fuzzing", "--checks=not_a_server_error")
 
     crash = json.loads(_crash_files(crash_cache_dir(tmp_path))[0].read_text())
     step = crash["sequence"][0]

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
-from schemathesis.core.failures import Failure
+from schemathesis.core.failures import Failure, FailureGroup, as_reported_failure
 from schemathesis.engine import StopReason, events
 from schemathesis.engine._rate_limit_retry import (
     TRANSPORT_ERRORS,
@@ -93,6 +93,11 @@ def run_one_case(
                 scenario=scenario,
                 pending_events=pending_events,
             )
+    except FailureGroup as exc:
+        # Hypothesis only shrinks and replays inputs that raise an ordinary exception
+        if scenario.recorder.shrinks_failures:
+            raise as_reported_failure(exc) from None
+        raise
     except (KeyboardInterrupt, Failure):
         raise
     except Exception as exc:

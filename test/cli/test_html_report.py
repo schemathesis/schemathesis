@@ -1136,6 +1136,7 @@ def test_html_report_ignored_auth(ctx, cli, app_runner, report_dir, snapshot_htm
         app_runner.openapi_url(app),
         "-c",
         "ignored_auth",
+        "--no-shrink",
         "-H",
         "Authorization: Bearer secret",
         exit_code=ExitCode.FAILURES,

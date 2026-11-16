@@ -192,6 +192,7 @@ def test_only_anonymous_modifications_are_308(ctx, cli, tmp_path, accepts_anonym
         "--max-examples=1",
         "--phases=fuzzing",
         "--checks=ignored_auth",
+        "--no-shrink",
     )
 
     report = load_report(path)

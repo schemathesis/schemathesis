@@ -115,6 +115,16 @@ def _extraction_failures(recorder: RecordedScenario, case_id: str, node: CaseNod
         )
 
 
+def _latest_failing_case_ids(recorder: RecordedScenario) -> dict[Failure, str]:
+    # Hypothesis replays the minimal failing input last, so the latest case of each failure is the one to report.
+    return {
+        check.failure_info.failure: case_id
+        for case_id in recorder.cases
+        for check in recorder.checks.get(case_id, [])
+        if check.failure_info is not None
+    }
+
+
 @dataclass(slots=True)
 class Statistic:
     failures: dict[str, dict[str, GroupedFailures]]
@@ -192,6 +202,7 @@ class Statistic:
                 probe_checks.setdefault(case.parent_id, []).extend(
                     (case_id, check) for check in recorder.checks.get(case_id, [])
                 )
+        latest_case_ids = _latest_failing_case_ids(recorder) if recorder.shrinks_failures else {}
 
         for case_id, case in recorder.cases.items():
             if case.is_probe:
@@ -228,6 +239,8 @@ class Statistic:
             for recorded_id, check in checks:
                 if check.failure_info is not None:
                     failure = check.failure_info.failure
+                    if latest_case_ids.get(failure, recorded_id) != recorded_id:
+                        continue
 
                     identity = failure_identity(failure, check.name)
                     if failure not in self.unique_failures_map and identity not in self.known_failures:

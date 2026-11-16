@@ -45,6 +45,9 @@ class RecordedScenario(Protocol):
     @property
     def interactions(self) -> Mapping[str, Interaction]: ...  # pragma: no cover
 
+    @property
+    def shrinks_failures(self) -> bool: ...  # pragma: no cover
+
     def find_failure_data(self, *, parent_id: str, failure: Failure) -> FailureData: ...  # pragma: no cover
 
     def find_parent(self, *, case_id: str) -> Case | None: ...  # pragma: no cover
@@ -75,6 +78,8 @@ class ScenarioRecorder:
     filtered_failures: dict[str, int]
     # Network interactions by test case ID
     interactions: dict[str, Interaction]
+    # Whether a failure repeats only while Hypothesis shrinks it, so its latest case is the minimal one
+    shrinks_failures: bool
     __slots__ = (
         "label",
         "status",
@@ -83,6 +88,7 @@ class ScenarioRecorder:
         "checks",
         "filtered_failures",
         "interactions",
+        "shrinks_failures",
         "max_recorded_payload_size",
     )
 
@@ -92,6 +98,7 @@ class ScenarioRecorder:
         self.checks = {}
         self.filtered_failures = {}
         self.interactions = {}
+        self.shrinks_failures = False
         self.max_recorded_payload_size = (
             config.truncation.max_recorded_payload_size if config is not None else MAX_RECORDED_PAYLOAD_SIZE
         )

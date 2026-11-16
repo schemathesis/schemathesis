@@ -320,17 +320,17 @@ def test_response_header_validation_only_complains_about_headers(ctx, app_runner
 
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     stream = EventStream(schema, checks=[response_headers_conformance], max_examples=1).execute()
-    failures = [
+    failures = {
         str(check.failure_info.failure)
         for finished in stream.find_all(events.ScenarioFinished)
         for checks in finished.recorder.checks.values()
         for check in checks
         if check.status == Status.FAILURE
-    ]
-    assert failures == [
+    }
+    assert failures == {
         'Response header does not conform to the schema\n\n"not-a-number" is not of type "integer"\n\n'
         'Schema:\n\n    {\n        "type": "integer"\n    }\n\nValue:\n\n    "not-a-number"'
-    ]
+    }
 
 
 def test_default_response_used_when_status_undocumented(ctx):
