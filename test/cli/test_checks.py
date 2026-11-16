@@ -1877,6 +1877,33 @@ def test_positive_data_acceptance_no_additional_properties_hint_for_nul(
     )
 
 
+def test_positive_data_acceptance_extra_properties_with_malformed_schema(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "exclusiveMinimum": True},
+                                "example": {"name": "widget"},
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "Created"}, "400": {"description": "Bad request"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"error": "unknown field"}), 400
+
+    assert cli.run_openapi_app(app, "--checks=positive_data_acceptance", "--phases=examples") == snapshot_cli
+
+
 def test_positive_data_acceptance_body_list_examples_verbatim(ctx, cli, app_runner):
     example = {
         "request": {
