@@ -57,7 +57,7 @@
 - Serialization error for multipart parts with `image/jpg` and other content types without a serializer.
 - `multipart/form-data` array properties with non-string items sent as a single part.
 - Unwrapped XML arrays naming their items after the array's own `xml.name`.
-- Missing `application/octet-stream` part `Content-Type` for binary and `contentEncoding` multipart fields.
+- Missing `application/octet-stream` part `Content-Type` for binary, `contentEncoding` and untyped multipart fields.
 
 #### Data generation
 

@@ -577,9 +577,9 @@ def _encode_positional_parts(
 
 
 def _part_schema(schema: dict[str, Any]) -> dict[str, Any]:
-    # An array part takes the default of its items: JSON for nested structures, plain text for primitives and files.
+    # An array part takes the default of its items; `{}` items default to bytes like any untyped part.
     items = schema.get("items")
-    if isinstance(items, dict) and items:
+    if isinstance(items, dict):
         return items
     return schema
 
@@ -633,8 +633,8 @@ def _collect_encoded_fields(ctx: SerializationContext, properties: Mapping[str, 
         # Default nested-object / array form-parts to JSON so the wire payload is parsable.
         if _part_declares(prop, _declares_structure):
             result[name] = "application/json"
-        # Receivers read a part without a media type as text.
-        elif _part_declares(prop, _declares_binary):
+        # Binary and untyped parts default to bytes; receivers read a part without a media type as text.
+        elif _part_declares(prop, _declares_binary) or not _part_declares(prop, lambda part: "type" in part):
             result[name] = "application/octet-stream"
     return result
 
