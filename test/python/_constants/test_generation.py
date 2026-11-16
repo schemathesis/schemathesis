@@ -19,7 +19,6 @@ from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.meta import CaseMetadata, CoverageScenario, GenerationInfo, PhaseInfo
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.value import GeneratedValue, prune_overwritten_body_constants
-from schemathesis.python._constants.adapters import default_adapters
 from schemathesis.python._constants.orchestrator import extract_all, extract_registered
 from schemathesis.python._constants.pool import ConstantDraw, ConstantEntry, ConstantsPool, Origin
 from schemathesis.python._constants.registry import SourceRegistry
@@ -56,7 +55,7 @@ def _app_constants(source, *, name="provider"):
     provider.__name__ = name
     registry = SourceRegistry()
     registry.register(provider)
-    return extract_all(registry=registry, adapters=default_adapters())
+    return extract_all(registry=registry)
 
 
 def _harvested(source, type_):

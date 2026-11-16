@@ -768,13 +768,20 @@ _FOREIGN_CODE = (
 )
 
 
-def format_app_exception(error: BaseException) -> str:
-    """Format an exception an application raised, with only the frames of the application's own code."""
-    frames = [
-        frame for frame in traceback.extract_tb(error.__traceback__) if not frame.filename.startswith(_FOREIGN_CODE)
-    ]
+def format_app_exception(error: BaseException, *, roots: tuple[str, ...]) -> str:
+    """Format an exception an application raised, with only the frames of the application's own code.
+
+    Frames under `roots`, the application's package directories or module files, are its own even when installed.
+    """
+    frames = [frame for frame in traceback.extract_tb(error.__traceback__) if _is_app_frame(frame.filename, roots)]
     lines = traceback.format_list(frames) + traceback.format_exception_only(type(error), error)
     return "".join(lines).strip()
+
+
+def _is_app_frame(filename: str, roots: tuple[str, ...]) -> bool:
+    if any(filename == root or filename.startswith(root + os.sep) for root in roots):
+        return True
+    return not filename.startswith(_FOREIGN_CODE)
 
 
 def extract_nth_traceback(trace: TracebackType | None, n: int) -> TracebackType | None:

@@ -205,6 +205,9 @@ def _mask_environment(data: str) -> str:
     data = data.replace(f"Schemathesis v{SCHEMATHESIS_VERSION}", version_line)
     data = re.sub("━+", "━" * len(version_line), data)
     data = data.replace(str(SITE_PACKAGES), "/site-packages/")
+    if IS_WINDOWS:
+        # Paths of installed modules keep native separators after the masked prefix.
+        data = re.sub(r"/site-packages/[^\"\n]+", lambda match: match.group(0).replace("\\", "/"), data)
     data = re.sub(", line [0-9]+,", ", line XXX,", data)
     return re.sub(r"Scenarios:.*\d+", r"Scenarios:    N", data)
 

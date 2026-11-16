@@ -22,6 +22,7 @@ from schemathesis.engine.events import EventGenerator, StatefulPhasePayload
 from schemathesis.engine.observations import Observations
 from schemathesis.engine.run import ELASTIC_PHASES, TESTING_PHASES, Phase, PhaseName, PhaseSkipReason
 from schemathesis.hooks import defines_teardown
+from schemathesis.python.application import application_roots
 
 if TYPE_CHECKING:
     from schemathesis.core.spec import ApiSchema
@@ -148,7 +149,7 @@ def preflight_error(engine: EngineContext) -> events.NonFatalError | None:
 MAX_COVERAGE_CATCHUP_PASSES = 3
 
 
-def _shutdown_applications() -> EventGenerator:
+def _shutdown_applications(app: object) -> EventGenerator:
     """End the lifespans of in-process ASGI applications while their shutdown errors can still be reported."""
     # Only the ASGI client starts lifespans, so while it is not loaded there is nothing to end
     if "schemathesis.python.asgi" in sys.modules:
@@ -161,7 +162,7 @@ def _shutdown_applications() -> EventGenerator:
             errors = exc.exceptions if isinstance(exc, BaseExceptionGroup) else (exc,)
             for error in errors:
                 yield events.NonFatalError(
-                    error=ApplicationShutdownError(format_app_exception(error)),
+                    error=ApplicationShutdownError(format_app_exception(error, roots=application_roots(app))),
                     phase=PhaseName.TEARDOWN,
                     label="Application shutdown",
                     related_to_operation=False,
@@ -352,7 +353,7 @@ class ExecutionPlan:
             teardown = Phase(PhaseName.TEARDOWN)
             yield events.PhaseStarted(phase=teardown, payload=None)
             yield from run.execute(ctx, teardown)
-        yield from _shutdown_applications()
+        yield from _shutdown_applications(ctx.schema.app)
         yield events.EngineFinished(
             running_time=ctx.running_time,
             stop_reason=ctx.stop_reason,

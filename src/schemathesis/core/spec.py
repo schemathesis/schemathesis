@@ -44,6 +44,7 @@ class SchemaMetadata(Protocol):
     raw_schema: JsonSchemaObject
     location: str | None
     suggestions: Suggestions
+    app: object
     raise_app_exceptions: bool
 
     @property

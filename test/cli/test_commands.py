@@ -9,6 +9,7 @@ import socket
 import ssl
 import subprocess
 import sys
+import sysconfig
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -5669,6 +5670,34 @@ def test_app_handler_exception_is_a_server_error(ctx, cli, snapshot_cli, source)
             "run",
             "/openapi.json",
             f"--app={module}:app",
+            "--phases=fuzzing",
+            "--max-examples=3",
+            "-c",
+            "not_a_server_error",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.fixture
+def installed_crashing_app():
+    package = pathlib.Path(sysconfig.get_path("purelib")) / "installed_crashing_app"
+    package.mkdir()
+    (package / "__init__.py").touch()
+    (package / "main.py").write_text(CRASHING_FASTAPI)
+    importlib.invalidate_caches()
+    yield "installed_crashing_app.main"
+    shutil.rmtree(package)
+    for name in [name for name in sys.modules if name.partition(".")[0] == package.name]:
+        del sys.modules[name]
+
+
+def test_installed_app_handler_exception_keeps_app_frames(cli, snapshot_cli, installed_crashing_app):
+    assert (
+        cli.main(
+            "run",
+            "/openapi.json",
+            f"--app={installed_crashing_app}:app",
             "--phases=fuzzing",
             "--max-examples=3",
             "-c",

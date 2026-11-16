@@ -1,0 +1,64 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from /openapi.json (in 0.00s)
+
+     Application:      installed_crashing_app.main:app
+     Specification:    Open API 3.1.0
+     Operations:       1 selected / 1 total
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ⊘
+     Accepts backslash and control characters in URL paths:    ⊘
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+_______________________________ GET /api/success _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- ST101 Server error
+
+    File "/site-packages/installed_crashing_app/main.py", line XXX, in success
+        raise RuntimeError("boom in handler")
+    RuntimeError: boom in handler
+
+[500] Internal Server Error:
+
+    `Internal Server Error`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ❌ Fuzzing
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ ST101 Server error: 1
+
+For more information, run `st explain ST101`.
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

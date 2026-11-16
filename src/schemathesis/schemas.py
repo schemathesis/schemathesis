@@ -47,6 +47,7 @@ from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.meta import CaseMetadata, TestPhase
 from schemathesis.generation.suggestions import Suggestions
 from schemathesis.hooks import HookDispatcherMark
+from schemathesis.python.application import application_roots
 from schemathesis.transport.prepare import prepare_path, prepare_request
 
 from .auths import AuthStorage, ReauthState, compute_retry_on_statuses
@@ -755,7 +756,7 @@ class BaseSchema(Mapping):
         return ServerError(
             operation=case.operation.label,
             status_code=response.status_code,
-            message=format_app_exception(exception),
+            message=format_app_exception(exception, roots=application_roots(self.app)),
             origin=type(exception).__qualname__,
         )
 
