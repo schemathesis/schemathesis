@@ -26,7 +26,11 @@ class ASGITransport(RequestsTransport):
             return super().send(case, session=session, **kwargs)
 
         max_stream_events = case.operation.schema.config.max_stream_events_for(operation=case.operation)
-        with asgi.get_client(application, max_stream_events=max_stream_events) as client:
+        with asgi.get_client(
+            application,
+            max_stream_events=max_stream_events,
+            raise_app_exceptions=case.operation.schema.raise_app_exceptions,
+        ) as client:
             if session is not None:
                 # A network session still configures the call, but the application is reached in-process.
                 client.headers.update(session.headers)

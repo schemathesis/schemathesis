@@ -12,6 +12,15 @@ from schemathesis.core.transforms import to_wire_string
 from test.utils import run_given
 
 
+def test_plain_wsgi_app_exception_reaches_the_caller(ctx):
+    def app(environ, start_response):
+        raise ValueError("something broke")
+
+    operation = ctx.openapi.load_operation("GET /api/crash", {"responses": {"200": {"description": "OK"}}})
+    with pytest.raises(ValueError, match="something broke"):
+        operation.Case().call(app=app)
+
+
 @pytest.mark.hypothesis_nested
 def test_wsgi_reraises_server_exception(ctx):
     app = Flask(__name__)
