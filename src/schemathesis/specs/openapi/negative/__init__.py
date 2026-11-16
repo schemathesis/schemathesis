@@ -20,7 +20,7 @@ from schemathesis.core.jsonschema import (
     FANCY_REGEX_OPTIONS,
     STANDARD_FORMATS,
     VALIDATED_FORMATS_BY_DRAFT,
-    schema_with_bundle,
+    property_schemas,
 )
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue
 from schemathesis.core.media_types import is_json, is_json_sequence
@@ -283,8 +283,7 @@ def negative_schema(
             frozenset(custom_formats),
         )
         types_by_parameter = {
-            name: parameter_types(schema_with_bundle(subschema, container))
-            for name, subschema in container.get("properties", {}).items()
+            name: parameter_types(subschema) for name, subschema in property_schemas(container).items()
         }
 
     def parameter_reads_as_valid(name: str | int, item: object, validator: jsonschema_rs.Validator) -> bool:
