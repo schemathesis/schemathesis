@@ -2496,10 +2496,11 @@ def test_graphql_auth_wfc(ctx, cli, tmp_path):
     assert set(headers) == {"static"}
 
 
-def test_graphql_wfc_report_refused(ctx, cli, snapshot_cli):
+def test_graphql_wfc_report_refused(ctx, cli, tmp_path, snapshot_cli):
     api = ctx.graphql.apps.books()
 
-    assert cli.run(api.schema_url, "--report=wfc", "--max-examples=1") == snapshot_cli
+    assert cli.run(api.schema_url, "--report=wfc,har,vcr", "--max-examples=1") == snapshot_cli
+    assert list(tmp_path.glob("schemathesis-report/*")) == []
 
 
 def test_graphql_schema_violation(ctx, cli, snapshot_cli):

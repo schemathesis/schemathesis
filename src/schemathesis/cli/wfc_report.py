@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.cli.events import LoadingFinished
+from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.core.failures import (
     AcceptedNegativeData,
     AuthScenario,
@@ -226,6 +226,7 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
 
     __slots__ = (
         "output",
+        "loading_ended",
         "started_at",
         "finished",
         "endpoint_ids",
@@ -237,6 +238,8 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
 
     def __init__(self, output: Path) -> None:
         self.output = output
+        # A run refused after loading its schema sees nothing past `LoadingStarted` and writes no report.
+        self.loading_ended = False
         self.started_at: float | None = None
         self.finished: events.EngineFinished | None = None
         self.endpoint_ids: set[str] = set()
@@ -247,6 +250,8 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
         self.evaluated_calls = 0
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
+        if not isinstance(event, LoadingStarted):
+            self.loading_ended = True
         if isinstance(event, LoadingFinished):
             from schemathesis.specs.openapi.operations import iter_path_item_operations
 
@@ -276,6 +281,8 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
             self.failing_endpoints[case_id] = (_case_operation_id(case), f"{case.method.upper()} {case.path}")
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
+        if not self.loading_ended:
+            return
         elapsed = running_time(self.started_at, self.finished) or 0.0
         script_path = self.output.with_suffix(".sh")
         exported = export_failures(ctx.statistic, self.failing_endpoints, ctx.config.output, script_path.name)
