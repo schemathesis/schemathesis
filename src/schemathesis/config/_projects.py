@@ -634,6 +634,10 @@ class ProjectConfig(DiffBase):
         return self._get_parent().wait_for_schema
 
     @property
+    def app(self) -> str | None:
+        return self._get_parent().app
+
+    @property
     def max_failures(self) -> int | None:
         return self._get_parent().max_failures
 

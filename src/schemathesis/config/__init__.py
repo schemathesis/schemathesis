@@ -25,7 +25,7 @@ from schemathesis.config._checks import (
 )
 from schemathesis.config._dictionaries import DictionaryDefinition, parse_dictionaries
 from schemathesis.config._diff_base import DiffBase
-from schemathesis.config._env import resolve_nested
+from schemathesis.config._env import resolve, resolve_nested
 from schemathesis.config._error import ConfigError
 from schemathesis.config._fuzz import FuzzConfig
 from schemathesis.config._generation import GenerationConfig
@@ -97,6 +97,8 @@ class SchemathesisConfig(DiffBase):
     _seed: int | None
     _config_path: str | None
     wait_for_schema: float | int | None
+    # In-process application to test, as `module:attribute`.
+    app: str | None
     max_failures: int | None
     max_time: int | None
     reports: ReportsConfig
@@ -115,6 +117,7 @@ class SchemathesisConfig(DiffBase):
         suppress_health_check: list[HealthCheck] | None = None,
         seed: int | None = None,
         wait_for_schema: float | int | None = None,
+        app: str | None = None,
         max_failures: int | None = None,
         max_time: int | None = None,
         reports: ReportsConfig | None = None,
@@ -131,6 +134,7 @@ class SchemathesisConfig(DiffBase):
             self._mark_source_keys(("seed",))
         self._config_path = None
         self.wait_for_schema = wait_for_schema
+        self.app = app
         self.max_failures = max_failures
         self.max_time = max_time
         self.reports = reports or ReportsConfig()
@@ -189,6 +193,7 @@ class SchemathesisConfig(DiffBase):
         suppress_health_check: list[HealthCheck] | None = None,
         seed: int | None = None,
         wait_for_schema: float | int | None = None,
+        app: str | None = None,
         max_failures: int | None,
         max_time: int | None = None,
     ) -> None:
@@ -200,6 +205,7 @@ class SchemathesisConfig(DiffBase):
             color=color,
             suppress_health_check=suppress_health_check,
             wait_for_schema=wait_for_schema,
+            app=app,
             max_failures=max_failures,
             max_time=max_time,
         )
@@ -244,6 +250,7 @@ class SchemathesisConfig(DiffBase):
             suppress_health_check=[HealthCheck(name) for name in data.get("suppress-health-check", [])],
             seed=data.get("seed"),
             wait_for_schema=data.get("wait-for-schema"),
+            app=resolve(data.get("app")),
             max_failures=data.get("max-failures"),
             max_time=data.get("max-time"),
             reports=ReportsConfig.from_dict(data.get("reports", {})),

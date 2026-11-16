@@ -1,0 +1,15 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: Can not import `broken_app` from `--app=broken_app:app`:
+
+Traceback (most recent call last):
+  File "/tmp/broken_app.py", line XXX, in <module>
+    import missing_dependency
+ModuleNotFoundError: No module named 'missing_dependency'

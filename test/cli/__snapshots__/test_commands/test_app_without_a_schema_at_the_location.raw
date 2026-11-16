@@ -1,0 +1,13 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ❌  Failed to load specification from /missing.json after 0.00s
+
+ Schema Loading Error
+
+ Failed to load schema due to client error (HTTP 404 Not Found)
+
+Tip: Verify that the URL points directly to the Open API schema or GraphQL endpoint

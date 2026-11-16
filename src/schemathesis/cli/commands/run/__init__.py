@@ -14,6 +14,7 @@ from schemathesis.cli.core import ensure_color, resolve_color
 from schemathesis.cli.ext.groups import group, grouped_option
 from schemathesis.cli.ext.options import CsvChoice
 from schemathesis.cli.options import (
+    APP,
     AUTH,
     AUTH_WFC,
     AUTH_WFC_USER,
@@ -106,6 +107,7 @@ OBJECT_LEVEL_AUTHORIZATION_GUIDE = "https://schemathesis.readthedocs.io/en/stabl
 )
 @grouped_option(*SUPPRESS_HEALTH_CHECK.args, **SUPPRESS_HEALTH_CHECK.kwargs)
 @grouped_option(*WAIT_FOR_SCHEMA.args, **WAIT_FOR_SCHEMA.kwargs)
+@grouped_option(*APP.args, **APP.kwargs)
 @grouped_option(*WARNINGS.args, **WARNINGS.kwargs)
 @group("API validation options")
 @grouped_option(*CHECKS_OPTION.args, **CHECKS_OPTION.kwargs)
@@ -203,6 +205,7 @@ def run(
     base_url: str | None,
     origin: str | None,
     wait_for_schema: float | None = None,
+    app: str | None = None,
     suppress_health_check: list[HealthCheck] | None,
     warnings: bool | list[SchemathesisWarning] | None,
     rate_limit: str | None = None,
@@ -261,6 +264,7 @@ def run(
         suppress_health_check=suppress_health_check,
         seed=generation_seed,
         wait_for_schema=wait_for_schema,
+        app=app,
         max_failures=max_failures,
         max_time=max_time,
     )

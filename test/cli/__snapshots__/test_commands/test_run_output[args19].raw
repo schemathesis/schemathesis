@@ -32,6 +32,8 @@ Options:
   --wait-for-schema FLOAT RANGE  Maximum duration, in seconds, to wait for the
                                  API schema to become available. Disabled by
                                  default  [x>=1.0]
+  --app MODULE:ATTRIBUTE         Python ASGI or WSGI application to test without
+                                 a server, as `module:attribute`
   --warnings WARNINGS            Control warning display: 'off' to disable all,
                                  or comma-separated list of warning types to
                                  enable. Set `warnings.fail-on` in the config
