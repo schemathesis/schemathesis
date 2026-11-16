@@ -69,13 +69,16 @@ def resolve_bindings(operation: APIOperation, generation: GenerationConfig) -> O
     # Precedence mirrors OpenAPI: op-specific argument > global argument > type-wide. Among argument
     # bindings, naming both the type and the field beats a `*` in either position.
     config = operation.schema.config
-    dictionaries = config.dictionaries
+    suggestions = operation.schema.suggestions
+    dictionaries = {**suggestions.dictionaries, **config.dictionaries}
     if not dictionaries:
         return _NO_BINDINGS
     operation_config = config.operations.get_for_operation(operation)
     ranked: list[tuple[tuple[int, int], _ArgumentBinding]] = []
     seen: set[str] = set()
-    for scope, source in ((1, operation_config.parameters), (0, config.parameters)):
+    sources = (operation_config.parameters, config.parameters, *suggestions.parameters(operation.label))
+    # The user's bindings rank above suggested values.
+    for scope, source in zip(range(1, 1 - len(sources), -1), sources, strict=True):
         for key, binding in source.items():
             if key in seen or not isinstance(binding, ParameterDictionaryBinding) or not is_graphql_binding_key(key):
                 continue
@@ -95,7 +98,7 @@ def resolve_bindings(operation: APIOperation, generation: GenerationConfig) -> O
     ranked.sort(key=lambda item: item[0], reverse=True)
     type_wide = {
         type_key: (dictionaries[binding.dictionary], binding.probability)
-        for type_key, binding in generation.dictionaries.items()
+        for type_key, binding in {**suggestions.types(operation.label), **generation.dictionaries}.items()
     }
     return OperationBindings(arguments=tuple(binding for _, binding in ranked), type_wide=type_wide)
 

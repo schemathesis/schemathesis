@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.feedback import FeedbackSources
     from schemathesis.generation.meta import CaseMetadata, TestPhase
     from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput
+    from schemathesis.generation.suggestions import Suggestions
     from schemathesis.hooks import HookDispatcher
     from schemathesis.resources import ExtraDataSource, ResourcePool
     from schemathesis.schemas import APIOperation
@@ -42,6 +43,7 @@ class SchemaMetadata(Protocol):
     auth: AuthStorage
     raw_schema: JsonSchemaObject
     location: str | None
+    suggestions: Suggestions
 
     @property
     def specification(self) -> Specification: ...  # pragma: no cover

@@ -9,7 +9,7 @@ import pytest
 import requests
 from _pytest.main import ExitCode
 from flask import jsonify
-from hypothesis import HealthCheck, Phase, given, settings
+from hypothesis import HealthCheck, Phase, assume, given, settings
 from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
 from jsonschema_rs import canonical
@@ -245,6 +245,9 @@ def test_successful_mutations(data, mutation, schema):
     assert metadata is not None
     validate_schema(schema)
     new_instance = data.draw(from_schema(schema))
+    # An undeclared key can spell the removed property again; negative generation filters such values out.
+    if mutation is remove_required_property and isinstance(new_instance, dict):
+        assume(metadata.mutations[0].parameter not in new_instance)
     assert not validator.is_valid(new_instance)
 
 

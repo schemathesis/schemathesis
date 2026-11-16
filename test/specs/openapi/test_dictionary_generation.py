@@ -15,6 +15,7 @@ from schemathesis.generation.dictionaries import (
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.value import GeneratedValue
+from schemathesis.hooks import HookContext
 from schemathesis.resources import SemanticDraw
 from schemathesis.transport.serialization import contains_binary
 from test.utils import run_given
@@ -1552,3 +1553,113 @@ def test_body_binding_skipped_for_self_referencing_schema(ctx):
             leaks += 1
 
     assert leaks == 0
+
+
+def _queries(operation, max_examples=10):
+    return [case.query.get("q") for case in generate_many(operation.as_strategy(), max_examples)]
+
+
+@pytest.mark.parametrize("parameter", ["query.q", None], ids=["parameter", "type-wide"])
+def test_suggested_values_fill_parameters(ctx, parameter):
+    operation = ctx.openapi.load_operation("GET /items", _PATHS_ONE_STRING["/items"]["get"])
+    HookContext(operation=operation).suggest(["payload"], parameter=parameter, probability=1.0)
+    assert set(_queries(operation)) <= {"payload", None} and "payload" in _queries(operation)
+
+
+def test_suggested_value_draws_name_their_source(ctx):
+    operation = ctx.openapi.load_operation("GET /items", _PATHS_ONE_STRING["/items"]["get"])
+    HookContext(operation=operation).suggest(["payload"], parameter="query.q", probability=1.0)
+    draws = {draw for case in generate_many(operation.as_strategy(), 5) for draw in case._meta.dictionary_draws}
+    assert draws == {
+        DictionaryDraw(
+            dictionary="hooks",
+            source_kind="suggestion",
+            source_path=None,
+            entry_index=0,
+            operation_label="GET /items",
+            parameter_location="query",
+            parameter_name="q",
+            value="payload",
+            matches_schema=True,
+        )
+    }
+
+
+def test_configured_binding_wins_over_suggested_values(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {"dictionaries": {"mine": {"values": ["configured"]}}, "parameters": {"query.q": {"dictionary": "mine"}}},
+        _PATHS_ONE_STRING,
+    )
+    operation = schema["/items"]["GET"]
+    HookContext(operation=operation).suggest(["payload"], parameter="query.q", probability=1.0)
+    assert "payload" not in _queries(operation) and "configured" in _queries(operation)
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected"),
+    [(None, True), ("GET /items", True), ("GET /other", False)],
+    ids=["every-operation", "this-operation", "another-operation"],
+)
+def test_suggested_values_apply_to_the_named_operation(ctx, operation, expected):
+    schema = ctx.openapi.load_schema(_PATHS_ONE_STRING)
+    HookContext(schema=schema).suggest(["payload"], parameter="query.q", operation=operation, probability=1.0)
+    assert ("payload" in _queries(schema["/items"]["GET"])) is expected
+
+
+def test_values_suggested_after_generation_started_are_used(ctx):
+    operation = ctx.openapi.load_operation("GET /items", _PATHS_ONE_STRING["/items"]["get"])
+    before = _queries(operation)
+    HookContext(operation=operation).suggest(["payload"], parameter="query.q", probability=1.0)
+    HookContext(operation=operation).suggest(["another"], parameter="query.q", probability=1.0)
+    assert "payload" not in before and {"payload", "another"} <= set(_queries(operation, 30))
+
+
+def test_suggested_values_fill_body_fields(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"name": {"type": "string"}},
+                            "required": ["name"],
+                            "additionalProperties": False,
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    HookContext(operation=operation).suggest(["payload"], parameter="body.name", probability=1.0)
+    assert [case.body for case in generate_many(operation.as_strategy(), 5)] == [{"name": "payload"}] * 5
+
+
+def test_suggest_needs_a_loaded_schema():
+    with pytest.raises(RuntimeError, match="`suggest` needs a loaded schema"):
+        HookContext().suggest(["payload"])
+
+
+@pytest.mark.parametrize(("schema_type", "value"), [("integer", 42), ("number", 42), ("number", 1.5)])
+def test_suggested_numbers_fill_parameters_of_their_type(ctx, schema_type, value):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": schema_type}}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    HookContext(operation=operation).suggest([value], probability=1.0)
+    assert _queries(operation, 5) == [value] * 5
+
+
+def test_oldest_suggested_values_are_dropped(ctx):
+    operation = ctx.openapi.load_operation("GET /items", _PATHS_ONE_STRING["/items"]["get"])
+    context = HookContext(operation=operation)
+    context.suggest([f"old-{index}" for index in range(1000)], parameter="query.q", probability=1.0)
+    context.suggest([f"new-{index}" for index in range(1000)], parameter="query.q", probability=1.0)
+    assert all(value.startswith("new-") for value in _queries(operation, 30) if value is not None)
