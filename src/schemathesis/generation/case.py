@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import jsonschema_rs
 from jsonschema_rs import Validator
 
-from schemathesis.auths import reauth_and_replay
+from schemathesis.auths import AuthContext, reauth_and_replay, set_on_case
 from schemathesis.checks import (
     CheckContext,
     CheckFunction,
@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
     from werkzeug.test import TestResponse
 
+    from schemathesis.auths import AuthStorage
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.schemas import APIOperation
 
@@ -94,6 +95,8 @@ class Case(Generic[OperationT]):
 
     _auth: requests.auth.AuthBase | None
     _has_explicit_auth: bool
+    # Auth passed to the strategy that generated this case; `reapply_auth()` prefers it over global sources.
+    _auth_storage: AuthStorage | None
     # WFC auth entry this case ran under, when several are in play.
     _auth_identity: str | None
     # Base URL the latest `call` sent this case to; `None` means the operation's own.
@@ -116,6 +119,7 @@ class Case(Generic[OperationT]):
         "_meta",
         "_auth",
         "_has_explicit_auth",
+        "_auth_storage",
         "_auth_identity",
         "_base_url",
         "_components",
@@ -155,6 +159,7 @@ class Case(Generic[OperationT]):
         object.__setattr__(self, "_meta", meta)
         object.__setattr__(self, "_auth", _auth)
         object.__setattr__(self, "_has_explicit_auth", _has_explicit_auth)
+        object.__setattr__(self, "_auth_storage", None)
         object.__setattr__(self, "_auth_identity", None)
         object.__setattr__(self, "_base_url", None)
         object.__setattr__(self, "_components", store_components(self))
@@ -388,6 +393,7 @@ class Case(Generic[OperationT]):
         if keep_auth:
             derived._auth = self._auth
             derived._has_explicit_auth = self._has_explicit_auth
+            derived._auth_storage = self._auth_storage
             derived._auth_identity = self._auth_identity
         return derived
 
@@ -395,6 +401,15 @@ class Case(Generic[OperationT]):
     def auth_identity(self) -> str | None:
         """Name of the auth entry this case was sent with, when several are configured."""
         return self._auth_identity
+
+    def reapply_auth(self) -> None:
+        """Re-apply the configured auth that set this case's credentials.
+
+        Call it before sending a case generated earlier. Schemathesis reuses the cached token until it is older
+        than `refresh_interval`, then fetches a new one. Cases without configured auth stay unchanged.
+        """
+        if self._has_explicit_auth:
+            set_on_case(self, AuthContext(operation=self.operation, app=self.operation.app), self._auth_storage)
 
     @property
     def formatted_path(self) -> str:

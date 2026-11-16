@@ -360,3 +360,76 @@ def test_set_from_requests_reaches_in_process_app(ctx, load_schema):
     schema.auth.set_from_requests(HTTPBasicAuth("user", "pass"))
     (case,) = generate_many(schema["/echo"]["GET"].as_strategy(), 1)
     assert case.call().json() == {"authorization": "Basic dXNlcjpwYXNz"}
+
+
+def _register_on_schema(schema, provider_class, refresh_interval):
+    schema.auth(refresh_interval=refresh_interval)(provider_class)
+
+
+def _register_globally(schema, provider_class, refresh_interval):
+    schemathesis.auth(refresh_interval=refresh_interval)(provider_class)
+
+
+def _register_for_strategy(schema, provider_class, refresh_interval):
+    auth_storage = AuthStorage()
+    auth_storage.auth(refresh_interval=refresh_interval)(provider_class)
+    return auth_storage
+
+
+# A zero `refresh_interval` expires the cached token before the next use.
+@pytest.mark.parametrize(
+    "register",
+    [_register_on_schema, _register_globally, _register_for_strategy],
+    ids=["schema-auth", "global-auth", "strategy-auth"],
+)
+@pytest.mark.parametrize(("refresh_interval", "refetches"), [(0, 1), (300, 0)], ids=["expired", "cached"])
+def test_reapply_auth_refetches_only_expired_tokens(ctx, register, refresh_interval, refetches):
+    schema = _wsgi_echo_authorization(ctx)
+    tokens = []
+
+    class Counting:
+        def get(self, case, context):
+            tokens.append(f"token-{len(tokens) + 1}")
+            return tokens[-1]
+
+        def set(self, case, data, context):
+            case.headers["Authorization"] = f"Bearer {data}"
+
+    auth_storage = register(schema, Counting, refresh_interval)
+    (case,) = generate_many(schema["/echo"]["GET"].as_strategy(auth_storage=auth_storage), 1)
+    generated = len(tokens)
+    case.reapply_auth()
+    assert (case.call().json(), len(tokens) - generated) == ({"authorization": f"Bearer {tokens[-1]}"}, refetches)
+
+
+def test_reapply_auth_keeps_credentials_it_did_not_set(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/echo": {"get": {"security": [{"ApiKey": []}], "responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": {"ApiKey": {"type": "apiKey", "in": "header", "name": "X-API-Key"}}},
+    )
+
+    @app.route("/echo")
+    def echo():
+        return jsonify({"key": request.headers.get("X-API-Key")})
+
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+    @schema.auth(refresh_interval=0)
+    class Configured:
+        def get(self, case, context):
+            return "configured"
+
+        def set(self, case, data, context):
+            case.headers["X-API-Key"] = data
+
+    operation = schema["/echo"]["GET"]
+    by_hand = operation.Case(headers={"X-API-Key": "by-hand"})
+    (generated,) = generate_many(operation.as_strategy(), 1)
+    (negated,) = generate_many(operation.as_strategy(generation_mode=schemathesis.GenerationMode.NEGATIVE), 1)
+    for case in (by_hand, generated, negated):
+        case.reapply_auth()
+    assert [
+        by_hand.call().json(),
+        generated.call(headers={"X-API-Key": "call-time"}).json(),
+        negated.call().json(),
+    ] == [{"key": "by-hand"}, {"key": "call-time"}, {"key": None}]
