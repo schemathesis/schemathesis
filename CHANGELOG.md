@@ -49,6 +49,7 @@
 
 - False positive `negative_data_rejection` for unmapped discriminator values under `defaultMapping`.
 - Missing discriminator `mapping` values written as schema names in generated data.
+- Truncated discriminator values for whole-file `$ref` branches with dotted names, like `Pet.Cat.json`.
 
 #### Coverage phase
 

@@ -2909,21 +2909,27 @@ def test_large_minimum_array_size(ctx, cli, snapshot_cli, min_items):
 
 
 @pytest.mark.parametrize(
-    ("discriminator", "valid_values"),
+    ("cat_name", "discriminator", "valid_values"),
     [
-        ({"propertyName": "petType"}, {"Cat", "Dog"}),
+        ("Cat", {"propertyName": "petType"}, {"Cat", "Dog"}),
         (
+            "Cat",
             {
                 "propertyName": "petType",
                 "mapping": {"feline": "#/components/schemas/Cat", "canine": "#/components/schemas/Dog"},
             },
             {"feline", "canine", "Cat", "Dog"},
         ),
-        ({"propertyName": "petType", "mapping": {"feline": "Cat", "canine": "Dog"}}, {"feline", "canine"}),
+        ("Cat", {"propertyName": "petType", "mapping": {"feline": "Cat", "canine": "Dog"}}, {"feline", "canine"}),
+        (
+            "Pet.Cat",
+            {"propertyName": "petType", "mapping": {"feline": "Pet.Cat", "canine": "Dog"}},
+            {"feline", "canine"},
+        ),
     ],
-    ids=["implicit", "explicit", "schema-name"],
+    ids=["implicit", "explicit", "schema-name", "dotted-schema-name"],
 )
-def test_discriminator_property_pinned_in_generation(ctx, discriminator, valid_values):
+def test_discriminator_property_pinned_in_generation(ctx, cat_name, discriminator, valid_values):
     operation = ctx.openapi.load_operation(
         "POST /pets",
         {
@@ -2933,7 +2939,7 @@ def test_discriminator_property_pinned_in_generation(ctx, discriminator, valid_v
                     "application/json": {
                         "schema": {
                             "oneOf": [
-                                {"$ref": "#/components/schemas/Cat"},
+                                {"$ref": f"#/components/schemas/{cat_name}"},
                                 {"$ref": "#/components/schemas/Dog"},
                             ],
                             "discriminator": discriminator,
@@ -2945,7 +2951,7 @@ def test_discriminator_property_pinned_in_generation(ctx, discriminator, valid_v
         },
         components={
             "schemas": {
-                "Cat": {"type": "object", "properties": {"petType": {"type": "string"}}, "required": ["petType"]},
+                cat_name: {"type": "object", "properties": {"petType": {"type": "string"}}, "required": ["petType"]},
                 "Dog": {"type": "object", "properties": {"petType": {"type": "string"}}, "required": ["petType"]},
             }
         },
