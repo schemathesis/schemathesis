@@ -15,6 +15,7 @@ import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument
 from hypothesis.strategies._internal.deferred import DeferredStrategy
+from hypothesis.strategies._internal.lazy import unwrap_strategies
 from jsonschema_rs import canonical
 
 from schemathesis.config import OutputConfig
@@ -1721,13 +1722,15 @@ def _content_check(ctx: StrategyContext, keyword: str, value: str) -> Callable[[
 
 def _from_pattern(compiled: re.Pattern[str], ctx: StrategyContext) -> SearchStrategy[str]:
     """Values a pattern matches, drawn from as much of the alphabet as the pattern leaves."""
-    characters = ctx.alphabet.as_strategy()
+    # Unwrap the lazy alphabet, which builds Unicode-wide regex classes twice; Hypothesis leaves this helper untyped.
+    characters = unwrap_strategies(ctx.alphabet.as_strategy())  # type: ignore[no-untyped-call]
     # A pattern is a search, so the value may carry anything around the match; full matches only
     # would leave `^x` spelling a single string, starving `propertyNames` of distinct keys.
     strategy = st.from_regex(compiled, alphabet=characters)
     try:
         strategy.validate()
-        return strategy
+        # Return the built strategy, so filters added on top reuse its regex instead of building it again.
+        return unwrap_strategies(strategy)  # type: ignore[no-untyped-call]
     except InvalidArgument:
         pass
     # ASCII is the validator's reading, but it leaves characters spelled above that range
@@ -1736,7 +1739,7 @@ def _from_pattern(compiled: re.Pattern[str], ctx: StrategyContext) -> SearchStra
     strategy = st.from_regex(wider, alphabet=characters)
     try:
         strategy.validate()
-        return strategy.filter(compiled.search)
+        return unwrap_strategies(strategy).filter(compiled.search)  # type: ignore[no-untyped-call]
     except InvalidArgument:
         pass
     # The alphabet bars every character a class in the pattern names. The schema outranks the
