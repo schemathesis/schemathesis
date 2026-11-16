@@ -289,6 +289,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 response,
                 verify=verify,
                 _override=Override.from_send_kwargs(kwargs),
+                _explicit_auth=kwargs.get("auth") is not None or session.auth is not None,
             )
         finally:
             session.headers = current_session_headers

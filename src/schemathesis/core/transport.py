@@ -316,6 +316,8 @@ class Response:
     stream_cut_short: bool
     """Whether an event stream was read only up to `max-stream-events` or the request timeout."""
     _override: Override | None
+    # Whether the request carried credentials the caller passed as `auth` or `session.auth`.
+    _explicit_auth: bool
     # Turns `content` into display text for failure output, for bodies that are not text.
     render_content: Callable[[bytes], str | None] | None
     # Replaces "[<code>] <reason>" in failure output, for responses whose status is not an HTTP status.
@@ -338,6 +340,7 @@ class Response:
         "stream_cut_short",
         "_encoded_body",
         "_override",
+        "_explicit_auth",
         "render_content",
         "status_line",
         "app_exception",
@@ -357,6 +360,7 @@ class Response:
         content_size: int | None = None,
         stream_cut_short: bool = False,
         _override: Override | None = None,
+        _explicit_auth: bool = False,
         render_content: Callable[[bytes], str | None] | None = None,
         status_line: str | None = None,
         app_exception: BaseException | None = None,
@@ -376,6 +380,7 @@ class Response:
         self.encoding = encoding
         self.stream_cut_short = stream_cut_short
         self._override = _override
+        self._explicit_auth = _explicit_auth
         self.render_content = render_content
         self.status_line = status_line
         self.app_exception = app_exception
@@ -420,7 +425,13 @@ class Response:
         return response  # type: ignore[return-value]
 
     @classmethod
-    def from_requests(cls, response: requests.Response, verify: bool, _override: Override | None = None) -> Response:
+    def from_requests(
+        cls,
+        response: requests.Response,
+        verify: bool,
+        _override: Override | None = None,
+        _explicit_auth: bool = False,
+    ) -> Response:
         raw = response.raw
         raw_headers = raw.headers if raw is not None else {}
         headers = {name: response.raw.headers.getlist(name) for name in raw_headers}
@@ -439,6 +450,7 @@ class Response:
             verify=verify,
             stream_cut_short=getattr(response, STREAM_CUT_SHORT_ATTRIBUTE, False),
             _override=_override,
+            _explicit_auth=_explicit_auth,
             app_exception=getattr(response, APP_EXCEPTION_ATTRIBUTE, None),
         )
 

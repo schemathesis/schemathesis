@@ -23,6 +23,7 @@ from schemathesis.schemas import BaseSchema
 from schemathesis.specs.openapi._auth_retry import build_retry_transport_kwargs
 from schemathesis.specs.openapi.adapter.security import SecurityParameter
 from schemathesis.specs.openapi.checks import AuthKind, _contains_auth, ignored_auth, remove_auth
+from test.apps.catalog.openapi import basic
 from test.utils import EventStream, check_context, run_given
 
 
@@ -871,14 +872,105 @@ async def data(api_key: str = Depends(get_api_key)):
         """
 
 
-def test_explicit_auth_tuple_in_call_and_validate():
-    # GH-3386: `auth` kwarg passed to `call_and_validate` is not forwarded to CheckContext
+def _session_with_auth(auth):
+    session = requests.Session()
+    session.auth = auth
+    return session
+
+
+def _call_and_validate_with_auth(case, auth):
+    case.call_and_validate(auth=auth, checks=[ignored_auth])
+
+
+def _call_and_validate_with_session_auth(case, auth):
+    case.call_and_validate(session=_session_with_auth(auth), checks=[ignored_auth])
+
+
+def _validate_call_with_auth(case, auth):
+    case.validate_response(case.call(auth=auth), checks=[ignored_auth])
+
+
+def _validate_call_with_session_auth(case, auth):
+    case.validate_response(case.call(session=_session_with_auth(auth)), checks=[ignored_auth])
+
+
+SEND_WITH_AUTH = pytest.mark.parametrize(
+    "send",
+    [
+        _call_and_validate_with_auth,
+        _call_and_validate_with_session_auth,
+        _validate_call_with_auth,
+        _validate_call_with_session_auth,
+    ],
+    ids=["call-and-validate-auth", "call-and-validate-session-auth", "call-auth", "call-session-auth"],
+)
+
+
+def _load_over_network(ctx, app):
+    return schemathesis.openapi.from_url(ctx.openapi.serve(app).schema_url)
+
+
+def _load_wsgi(ctx, app):
+    return schemathesis.openapi.from_wsgi("/openapi.json", app.server)
+
+
+ENFORCEMENT = pytest.mark.parametrize(
+    ("factory", "expected"),
+    [
+        (basic.basic, []),
+        (
+            basic.ignored_auth,
+            [
+                "API accepts requests without authentication\n\nExpected 401 or 403, got `200 OK` for `GET /api/ignored_auth`"
+            ],
+        ),
+    ],
+    ids=["enforces-auth", "ignores-auth"],
+)
+
+
+@SEND_WITH_AUTH
+@pytest.mark.parametrize("load", [_load_over_network, _load_wsgi], ids=["network", "wsgi"])
+@ENFORCEMENT
+def test_credentials_passed_at_send_time(ctx, factory, expected, load, send):
+    app = factory()
+    schema = load(ctx, app)
+    (path,) = app.spec["paths"]
+    failures = []
+
+    @run_given(schema[path]["GET"].as_strategy(), max_examples=1)
+    def test(case):
+        try:
+            send(case, ("test", "test"))
+        except FailureGroup as exc:
+            failures.extend(str(error) for error in exc.exceptions)
+
+    assert failures == expected
+
+
+@ENFORCEMENT
+def test_credentials_in_session_of_validated_response(ctx, factory, expected):
+    api = ctx.openapi.serve(factory())
+    (path,) = api.spec["paths"]
+    case = schemathesis.openapi.from_url(api.schema_url)[path]["GET"].Case()
+    session = _session_with_auth(("test", "test"))
+    response = session.get(f"{api.base_url}{path}")
+    failures = []
+    try:
+        case.validate_response(response, checks=[ignored_auth], transport_kwargs={"session": session})
+    except FailureGroup as exc:
+        failures.extend(str(error) for error in exc.exceptions)
+    assert failures == expected
+
+
+@pytest.mark.parametrize(
+    "auth", [("test", "test"), requests.auth.HTTPBasicAuth("test", "test")], ids=["tuple", "auth-object"]
+)
+@SEND_WITH_AUTH
+def test_credentials_passed_at_send_time_asgi(send, auth):
     app = _api_with_basic_auth()
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
-    case = schema["/"]["GET"].Case()
-    client = ASGIClient(app)
-    # Valid auth as a tuple must not raise `IgnoredAuth`
-    case.call_and_validate(session=client, auth=("test", "test"), checks=[ignored_auth])
+    send(schema["/"]["GET"].Case(), auth)
 
 
 @pytest.mark.parametrize("location", ["query", "cookie", "header"])
