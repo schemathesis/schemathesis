@@ -535,6 +535,7 @@ class Case(Generic[OperationT]):
 
         """
         __tracebackhide__ = True
+        import requests
         from requests.structures import CaseInsensitiveDict
 
         # Checks may not be loaded yet, e.g. in non-Schemathesis tests that construct `Case` by hand
@@ -555,9 +556,16 @@ class Case(Generic[OperationT]):
             and not (transport_kwargs and "app" in transport_kwargs)
         ):
             transport_kwargs = {**(transport_kwargs or {}), "base_url": sent_base_url}
+        auth = None
+        if transport_kwargs:
+            auth = transport_kwargs.get("auth")
+            session = transport_kwargs.get("session")
+            # A session sends its own credentials with every request.
+            if auth is None and isinstance(session, requests.Session):
+                auth = session.auth
         ctx = CheckContext(
             override=self._override,
-            auth=transport_kwargs.get("auth") if transport_kwargs else None,
+            auth=auth,
             headers=CaseInsensitiveDict(headers) if headers else None,
             config=config,
             transport_kwargs=transport_kwargs,

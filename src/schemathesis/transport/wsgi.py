@@ -228,6 +228,8 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             verify=False,
             stream_cut_short=stream_cut_short,
             _override=Override.from_send_kwargs(kwargs),
+            _explicit_auth=kwargs.get("auth") is not None
+            or (auth is not None and "Authorization" not in excluded_headers),
             app_exception=captured.exception,
         )
 

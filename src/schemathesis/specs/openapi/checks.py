@@ -1686,8 +1686,8 @@ def _contains_auth(
     from requests.cookies import RequestsCookieJar
 
     internals = ctx.internals
-    # If auth comes from explicit `auth` option or a custom auth, it is always explicit
-    if internals.auth is not None or case._has_explicit_auth:
+    # Auth from the `auth` option, a custom auth, or passed to the call (`auth` or `session.auth`) is always explicit
+    if internals.auth is not None or case._has_explicit_auth or response._explicit_auth:
         return AuthKind.EXPLICIT
     request = response.request
     parsed = urlparse(request.url)
