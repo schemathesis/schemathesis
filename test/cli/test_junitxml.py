@@ -6,6 +6,7 @@ import pytest
 from _pytest.main import ExitCode
 from flask import Response, jsonify
 
+from schemathesis.cli.commands.run import executor
 from test.apps.catalog.openapi import basic
 from test.utils import allure_results
 
@@ -165,24 +166,86 @@ def test_operation_error_reported_once_across_phases(ctx, cli, tmp_path, snapsho
     platform.system() == "Windows",
     reason="Cover only tracebacks that highlight error positions in every line",
 )
-def test_error_with_traceback(ctx, with_error, cli, tmp_path):
+@pytest.mark.parametrize(
+    ("hooks", "args", "name", "text"),
+    [
+        (
+            "@schemathesis.check\ndef with_error(ctx, response, case):\n    1 / 0\n",
+            ("-c", "with_error"),
+            "GET /api/success",
+            "Runtime Error  division by zero      Traceback (most recent call last): ",
+        ),
+        (
+            "@schemathesis.hook\ndef before_load_schema(context, raw_schema):\n    1 / 0\n",
+            (),
+            "Hook Error",
+            "Hook Error  Error in `before_load_schema` hook: ZeroDivisionError: division by zero      Traceback (most recent call last): ",
+        ),
+    ],
+    ids=["check", "schema-loading-hook"],
+)
+def test_error_with_traceback(ctx, cli, tmp_path, hooks, args, name, text):
     api = ctx.openapi.apps.success()
     xml_path = tmp_path / "junit.xml"
-    cli.main(
-        "run",
-        api.schema_url,
-        "-c",
-        "with_error",
-        f"--report-junit-path={xml_path}",
-        hooks=with_error,
+    cli.main("run", api.schema_url, *args, f"--report-junit-path={xml_path}", hooks=ctx.write_pymodule(hooks))
+    testsuite = ElementTree.parse(xml_path).getroot()[0]
+    testcase = testsuite[0]
+    assert (testsuite.attrib["errors"], testcase.attrib["name"], testcase[0].tag) == ("1", name, "error")
+    assert testcase[0].text.replace("\n", " ").startswith(text)
+
+
+def test_internal_error(ctx, cli, tmp_path, monkeypatch):
+    def crash(schema):
+        raise RuntimeError("Engine crashed")
+
+    monkeypatch.setattr(executor, "from_schema", crash)
+    xml_path = tmp_path / "junit.xml"
+    cli.main("run", ctx.openapi.apps.success().schema_url, f"--report-junit-path={xml_path}")
+    testsuite = ElementTree.parse(xml_path).getroot()[0]
+    testcase = testsuite[0]
+    assert (testsuite.attrib["errors"], testcase.attrib["name"], testcase[0].tag) == (
+        "1",
+        "Test Execution Error",
+        "error",
     )
-    tree = ElementTree.parse(xml_path)
-    root = tree.getroot()
-    testcases = list(root[0])
-    assert (
-        testcases[0][0]
-        .text.replace("\n", " ")
-        .startswith("Runtime Error  division by zero      Traceback (most recent call last): ")
+    # The traceback below carries machine-specific paths
+    assert testcase[0].text.startswith("Runtime Error\n\nEngine crashed\n\n    Traceback (most recent call last):\n")
+
+
+@pytest.mark.parametrize("command", ["run", "fuzz"])
+@pytest.mark.parametrize(
+    ("location", "error"),
+    [
+        (
+            "{malformed}",
+            "API schema does not appear syntactically valid\n\n"
+            "    Expecting property name enclosed in double quotes: line 1 column 31 (char 30)",
+        ),
+        (
+            "{base_url}/missing.json",
+            "Failed to load schema due to client error (HTTP 404 Not Found)\n\n"
+            "Tip: Verify that the URL points directly to the Open API schema or GraphQL endpoint",
+        ),
+    ],
+    ids=["malformed-schema", "missing-schema"],
+)
+def test_schema_loading_error(ctx, cli, tmp_path, command, location, error):
+    api = ctx.openapi.apps.success()
+    malformed = tmp_path / "broken.json"
+    malformed.write_text('{"openapi": "3.0.0", "info": {', encoding="utf-8")
+    xml_path = tmp_path / "junit.xml"
+    location = location.format(malformed=malformed, base_url=api.base_url)
+    cli.main(command, location, f"--report-junit-path={xml_path}")
+    counts = 'errors="1" failures="0" skipped="0" tests="1" time="0.000000"'
+    assert xml_path.read_text(encoding="utf-8") == (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        f"<testsuites {counts}>\n"
+        f'  <testsuite name="schemathesis" hostname="{platform.node()}" {counts}>\n'
+        '    <testcase name="Schema Loading Error" time="0.000000">\n'
+        f'      <error type="error">{error}</error>\n'
+        "    </testcase>\n"
+        "  </testsuite>\n"
+        "</testsuites>"
     )
 
 
