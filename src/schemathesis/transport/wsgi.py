@@ -311,8 +311,8 @@ def _to_werkzeug_parts(files: list | None, data: dict[str, Any] | None) -> dict[
         if filename is None and content_type is None and not isinstance(content, (bytes, Binary)):
             parts.setdefault(name, []).append(content)
         else:
-            # Only a file-like part keeps its bytes intact and can carry a filename
-            storage = FileStorage(BytesIO(serialize_binary(content)), filename, name, content_type)
+            # Only a file-like part keeps its bytes and filename; receivers read a part with no type as text
+            storage = FileStorage(BytesIO(serialize_binary(content)), filename, name, content_type or "text/plain")
             parts.setdefault(name, []).append(storage)
     return parts
 

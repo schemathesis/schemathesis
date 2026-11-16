@@ -9929,7 +9929,7 @@ def test_positive_multipart_upload_sends_a_named_real_file(ctx):
         for case in iter_cases(operation, GenerationMode.POSITIVE)
         if case.meta.phase.data.parameter_location == ParameterLocation.BODY
     ]
-    assert [("image", ("image.png", ANY))] in files, files
+    assert [("image", ("image.png", ANY, "application/octet-stream"))] in files, files
     assert any(part[1][1].startswith(b"\x89PNG\r\n\x1a\n") for parts in files for part in parts), files
 
 
