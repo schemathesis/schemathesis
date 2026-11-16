@@ -116,6 +116,12 @@ def wrap_test_function(func: Callable) -> Callable:
     return test_wrapper
 
 
+# Checks validate every response against the same few status lists.
+@lru_cache(maxsize=64)
+def _invalid_status_values(statuses: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(status for status in statuses if not expand_status_code(status))
+
+
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: JsonSchemaObject
@@ -781,9 +787,9 @@ class BaseSchema(Mapping):
 
     def is_response_status_expected(self, response: Response, expected_statuses: list[str]) -> bool:
         """Whether the response has a status described by one of the specification's configured status entries."""
-        invalid = [status for status in expected_statuses if not expand_status_code(status)]
+        invalid = _invalid_status_values(tuple(expected_statuses))
         if invalid:
-            self._raise_invalid_status_values(invalid)
+            self._raise_invalid_status_values(list(invalid))
         return response.status_code in expand_status_codes(expected_statuses)
 
     def _raise_invalid_status_values(self, invalid: list[str]) -> NoReturn:
