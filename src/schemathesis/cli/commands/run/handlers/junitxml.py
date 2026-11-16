@@ -4,7 +4,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler, TextOutput
+from schemathesis.cli.output import fatal_error_title, loader_error_tip
+from schemathesis.core.errors import LoaderError
 from schemathesis.engine import events
+from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.reporting.junitxml import JunitXmlWriter
 from schemathesis.reporting.recorders import scenario_records
 
@@ -36,7 +39,25 @@ class JunitXMLHandler(EventHandler):
         if isinstance(event, events.NonFatalError) and event not in self.errors:
             self.errors.add(event)
             self.writer.record_error(label=event.label, message=event.info.format(base_url_is_set=ctx.base_url_is_set))
+        elif isinstance(event, events.FatalError):
+            # A run stopped before testing, e.g. by a schema that fails to load, must not read as an empty passing report
+            self.writer.record_error(
+                label=fatal_error_title(event),
+                message=_fatal_error_text(event.exception, wait_for_schema=ctx.config.wait_for_schema),
+            )
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.writer.unskip(ctx.statistic.tested_operations)
         self.writer.close()
+
+
+def _fatal_error_text(exception: Exception, *, wait_for_schema: float | int | None) -> str:
+    if not isinstance(exception, LoaderError):
+        return EngineErrorInfo(error=exception).format()
+    lines = [exception.message]
+    if exception.extras:
+        lines.extend(["", *(f"    {extra}" for extra in exception.extras)])
+    tip = loader_error_tip(exception, wait_for_schema=wait_for_schema)
+    if tip is not None:
+        lines.append(f"\nTip: {tip}")
+    return "\n".join(lines)

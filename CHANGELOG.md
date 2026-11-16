@@ -47,6 +47,7 @@
 - Lost or misattributed pytest report entries for stateful tests and calls to other operations.
 - Missing Open API 3.2 `query` operations in the WFC report.
 - HAR, VCR and WFC reports created or overwritten by runs refused before testing starts.
+- Record schema loading errors in JUnit reports as an errored test case.
 - `HookExecutionError` in pytest reports when tests validate responses from their own HTTP client.
 - `st fuzz` counting a scenario as passed when the time limit cuts its only request.
 - `ModuleNotFoundError` for `allure_commons` in pytest reports when `allure-pytest` is not installed.

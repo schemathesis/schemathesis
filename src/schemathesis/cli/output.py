@@ -14,7 +14,7 @@ import click
 
 from schemathesis.cli.constants import DISCORD_LINK, EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL, ExitCode
 from schemathesis.cli.core import get_terminal_width
-from schemathesis.core.errors import LoaderError, LoaderErrorKind
+from schemathesis.core.errors import HookExecutionError, LoaderError, LoaderErrorKind
 from schemathesis.core.failures import (
     CustomFailure,
     MessageBlock,
@@ -539,6 +539,15 @@ def loader_error_tip(exception: LoaderError, *, wait_for_schema: float | int | N
 DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run"
 
 
+def fatal_error_title(event: events.FatalError) -> str:
+    # Matches the title the terminal prints for the same error.
+    if isinstance(event.exception, LoaderError):
+        return "Schema Loading Error"
+    if isinstance(event.exception, HookExecutionError):
+        return "Hook Error"
+    return "Test Execution Error"
+
+
 def _display_extras(extras: list[str]) -> None:
     if extras:
         click.echo()
@@ -611,7 +620,7 @@ def display_fatal_error(
     """Display a fatal error, either a schema loading failure or an internal error, and raise `click.Abort`."""
     from rich.text import Text
 
-    from schemathesis.core.errors import HookExecutionError, format_exception, split_traceback
+    from schemathesis.core.errors import format_exception, split_traceback
     from schemathesis.engine.errors import EngineErrorInfo
 
     if isinstance(event.exception, LoaderError):

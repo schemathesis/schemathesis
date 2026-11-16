@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.constants import ExitCode
-from schemathesis.core.errors import HookExecutionError, LoaderError
+from schemathesis.cli.output import fatal_error_title
 from schemathesis.core.timing import format_timestamp
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import StopReason
@@ -27,15 +27,6 @@ def _stop_reason(finished: events.EngineFinished | None, exit_code: int) -> str:
         return StopReason.INTERRUPTED.value
     # The engine never decides this one: it did not get to stop on its own.
     return "error"
-
-
-def _fatal_error_title(event: events.FatalError) -> str:
-    # Matches the title the terminal prints for the same error.
-    if isinstance(event.exception, LoaderError):
-        return "Schema Loading Error"
-    if isinstance(event.exception, HookExecutionError):
-        return "Hook Error"
-    return "Test Execution Error"
 
 
 def build_document(
@@ -95,7 +86,7 @@ def build_document(
             for group in summary.failures
         ],
         "errors": [{"title": group.title, "count": group.count} for group in summary.errors]
-        + ([{"title": _fatal_error_title(fatal_error), "count": 1}] if fatal_error is not None else []),
+        + ([{"title": fatal_error_title(fatal_error), "count": 1}] if fatal_error is not None else []),
         "baseline": {
             "known": summary.baseline.known,
             "new": summary.baseline.new,
