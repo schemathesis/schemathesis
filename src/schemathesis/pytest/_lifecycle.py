@@ -60,7 +60,10 @@ def start_extensions(config: pytest.Config) -> None:
 
 
 def stop_extensions(config: pytest.Config) -> None:
-    config.stash[_EXTENSIONS_KEY].close()
+    # Another plugin's failing `pytest_configure` can end the session before extensions start
+    extensions = config.stash.get(_EXTENSIONS_KEY, None)
+    if extensions is not None:
+        extensions.close()
 
 
 def check_extension_settings(config: pytest.Config) -> None:
