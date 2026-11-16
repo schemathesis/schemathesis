@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from schemathesis import errors
 from schemathesis.config import ConfigError
 from schemathesis.core.errors import (
+    ApplicationShutdownError,
     AuthenticationError,
     DictionaryLoadingError,
     HookExecutionError,
@@ -96,6 +97,9 @@ class EngineErrorInfo:
         if isinstance(self._error, DictionaryLoadingError):
             return "Dictionary Loading Error"
 
+        if isinstance(self._error, ApplicationShutdownError):
+            return "Application Shutdown Error"
+
         if isinstance(self._error, requests.RequestException):
             return "Network Error"
 
@@ -169,7 +173,7 @@ class EngineErrorInfo:
     def has_useful_traceback(self) -> bool:
         if isinstance(self._error, AuthenticationError):
             return self._error.show_traceback
-        if isinstance(self._error, DictionaryLoadingError):
+        if isinstance(self._error, (DictionaryLoadingError, ApplicationShutdownError)):
             return False
         return self._kind not in (
             RuntimeErrorKind.CONFIG_ERROR,

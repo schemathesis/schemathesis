@@ -9,6 +9,7 @@ from urllib.parse import urlsplit, urlunsplit
 from typing_extensions import override
 
 from schemathesis.core import Body, NotSet, media_types
+from schemathesis.core.app_output import inside_application
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import to_wire_text
@@ -121,6 +122,16 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         case: Case,
         *,
         session: werkzeug.Client | requests.Session | None = None,
+        **kwargs: Any,
+    ) -> Response:
+        with inside_application():
+            return self._send(case, session=session, **kwargs)
+
+    def _send(
+        self,
+        case: Case,
+        *,
+        session: werkzeug.Client | requests.Session | None,
         **kwargs: Any,
     ) -> Response:
         import requests

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
+from schemathesis.core.app_output import inside_application
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.python import asgi
@@ -17,6 +18,10 @@ if TYPE_CHECKING:
 class ASGITransport(RequestsTransport):
     @override
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
+        with inside_application():
+            return self._send(case, session=session, **kwargs)
+
+    def _send(self, case: Case, *, session: requests.Session | None, **kwargs: Any) -> Response:
         if kwargs.get("base_url") is None:
             # The same host the schema was fetched with, so a `Host`-validating app sees one host per run.
             kwargs["base_url"] = normalize_base_url(case.operation.base_url, host=asgi.HOST)

@@ -9,6 +9,7 @@ from typing import IO, TYPE_CHECKING, Any, NoReturn, TypeVar, cast
 
 from schemathesis import wfc
 from schemathesis.config import SchemathesisConfig
+from schemathesis.core.app_output import inside_application
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
 from schemathesis.core.transport import load_json_lossy
@@ -44,7 +45,7 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     from schemathesis.python import asgi
 
     require_relative_url(path)
-    with asgi.get_client(app) as client, django.explain_disallowed_host(app, host=asgi.HOST):
+    with inside_application(), asgi.get_client(app) as client, django.explain_disallowed_host(app, host=asgi.HOST):
 
         def fetch(request_kwargs: dict[str, Any]) -> Any:
             response = load_from_url(client.post, url=path, **request_kwargs)
@@ -87,7 +88,8 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
             response, lambda r: load_json_lossy(r.get_data(), r.mimetype_params.get("charset", "utf-8"))
         )
 
-    schema = _introspect(fetch, kwargs)
+    with inside_application():
+        schema = _introspect(fetch, kwargs)
     loaded = _from_dict(schema, config=config, app=app)
     loaded.location = path
     return loaded

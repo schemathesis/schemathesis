@@ -2693,3 +2693,28 @@ def test_replay_attempts_rejected_for_credentials_do_not_count_as_passes(
     assert result.exit_code == exit_code, result.output
     assert verdict in result.output
     assert crash_file.exists()
+
+
+def test_replay_failure_of_in_process_app(ctx, cli, snapshot_cli):
+    schema = ctx.openapi.build_schema({"/api/crash": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    module = ctx.write_pymodule(
+        f"""
+from flask import Flask, jsonify
+
+app = Flask("crashing")
+
+@app.route("/openapi.json")
+def spec():
+    return jsonify({schema!r})
+
+@app.route("/api/crash")
+def crash():
+    raise RuntimeError("boom in handler")
+""",
+        filename="crashing_app",
+    )
+    run = cli.run(
+        "/openapi.json", f"--app={module}:app", "--max-examples=1", "--phases=fuzzing", "-c", "not_a_server_error"
+    )
+    case_id = re.search(r"st replay (\S+)", run.stdout).group(1)
+    assert cli.main("replay", case_id, f"--app={module}:app") == snapshot_cli

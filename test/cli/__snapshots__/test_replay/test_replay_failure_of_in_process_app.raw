@@ -1,0 +1,33 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from <PLACEHOLDER>
+
+  x FAILED GET /api/crash
+
+=================================== FAILURES ===================================
+________________________________ GET /api/crash ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- ST101 Server error
+
+    File "/tmp/crashing_app.py", line XXX, in crash
+        raise RuntimeError("boom in handler")
+    RuntimeError: boom in handler
+
+[500] Internal Server Error:
+
+    `<!doctype html>
+    <html lang=en>
+    <title>500 Internal Server Error</title>
+    <h1>Internal Server Error</h1>
+    <p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+============================== 1 failed in 1.00s ===============================

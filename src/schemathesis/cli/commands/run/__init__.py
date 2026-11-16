@@ -81,6 +81,7 @@ from schemathesis.config import (
     SchemathesisConfig,
     SchemathesisWarning,
 )
+from schemathesis.core.app_output import hidden_application_output
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.metrics import MetricFunction
 
@@ -268,6 +269,8 @@ def run(
         max_failures=max_failures,
         max_time=max_time,
     )
+    if config.app is not None:
+        ctx.with_resource(hidden_application_output())
     config.output.sanitization.update(enabled=output_sanitize)
     config.output.truncation.update(enabled=output_truncate)
     apply_report_options(config.reports, ctx.params)

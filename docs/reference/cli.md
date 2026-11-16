@@ -135,6 +135,19 @@ $ st run [OPTIONS] LOCATION
     $ st run https://api.example.com/openapi.json --wait-for-schema 5.0
     ```
 
+#### `--app MODULE:ATTRIBUTE`
+
+!!! note ""
+
+    **Type**: `String`  
+    **Default**: `null`  
+
+    Python ASGI or WSGI application to test in the same process, without a server. `LOCATION` is then the path the application serves its schema at, or an Open API file. A function that takes no arguments is called to create the application. See [Testing Python Apps](../guides/python-apps.md#from-the-command-line).
+
+    ```console
+    $ st run /openapi.json --app project.asgi:app
+    ```
+
 #### `--warnings WARNINGS`
 
 !!! note ""
@@ -916,6 +929,19 @@ $ st replay [OPTIONS] [PATH]
 
     ```console
     $ st replay --schema-location ./openapi.json
+    ```
+
+#### `--app MODULE:ATTRIBUTE`
+
+!!! note ""
+
+    **Type**: `String`  
+    **Default**: `null`  
+
+    Python ASGI or WSGI application to replay against in the same process, as in `st run`.
+
+    ```console
+    $ st replay Xt9Kp2 --app project.asgi:app
     ```
 
 #### `--keep`

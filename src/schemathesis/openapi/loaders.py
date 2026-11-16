@@ -11,6 +11,7 @@ from typing import IO, TYPE_CHECKING, Any
 from schemathesis import wfc
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core import media_types
+from schemathesis.core.app_output import inside_application
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
@@ -48,7 +49,7 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     from schemathesis.python import asgi
 
     require_relative_url(path)
-    with asgi.get_client(app) as client, django.explain_disallowed_host(app, host=asgi.HOST):
+    with inside_application(), asgi.get_client(app) as client, django.explain_disallowed_host(app, host=asgi.HOST):
         response = load_from_url(client.get, url=path, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=path)
     schema = load_content(decode_lossy(response.content, response.encoding), content_type)
@@ -79,7 +80,8 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     require_relative_url(path)
     prepare_request_kwargs(kwargs)
     client = wsgi.get_client(app)
-    response = client.get(path=path, **kwargs)
+    with inside_application():
+        response = client.get(path=path, **kwargs)
     with django.explain_disallowed_host(app, host=wsgi.HOST):
         raise_for_status(response)
     content_type = detect_content_type(headers=response.headers, path=path)

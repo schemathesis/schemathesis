@@ -19,6 +19,7 @@ from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.validation import validate_tls_verify
 from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core import SpecificationKind
+from schemathesis.core.app_output import inside_application
 from schemathesis.core.errors import (
     HookExecutionError,
     IncorrectUsage,
@@ -143,7 +144,10 @@ def _event_stream(
 
 def load_schema(location: str, config: ProjectConfig) -> BaseSchema:
     """Load API schema automatically based on the provided configuration."""
-    app = load_app(config.app) if config.app is not None else None
+    if config.app is None:
+        return _try_load_schema(location, config, _candidate_modules(location))
+    with inside_application():
+        app = load_app(config.app)
     return _try_load_schema(location, config, _candidate_modules(location), app)
 
 

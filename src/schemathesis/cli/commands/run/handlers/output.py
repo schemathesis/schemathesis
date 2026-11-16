@@ -1185,7 +1185,11 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         table.add_column("Field", style=Style(color="bright_white", bold=True))
         table.add_column("Value", style="cyan", overflow="fold")
 
-        table.add_row("Base URL:", sanitized(event.base_url, ctx.config.output.sanitization))
+        if event.config.app is not None:
+            # Requests go to the application directly; there is no address to show
+            table.add_row("Application:", event.config.app)
+        else:
+            table.add_row("Base URL:", sanitized(event.base_url, ctx.config.output.sanitization))
         table.add_row("Specification:", event.specification.name)
         statistic = event.statistic.operations
         table.add_row("Operations:", f"{statistic.selected} selected / {statistic.total} total")
