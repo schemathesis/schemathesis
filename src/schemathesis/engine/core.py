@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -7,7 +8,13 @@ from typing import TYPE_CHECKING
 from schemathesis import auths
 from schemathesis.config import ConfigError, FuzzConfig, InferenceAlgorithm
 from schemathesis.core import SpecificationFeature
-from schemathesis.core.errors import HookExecutionError, InvalidSchema
+from schemathesis.core.app_output import inside_application
+from schemathesis.core.errors import (
+    ApplicationShutdownError,
+    HookExecutionError,
+    InvalidSchema,
+    format_app_exception,
+)
 from schemathesis.engine import Status, StopReason, events, run
 from schemathesis.engine._check_context import run_after_run_checks
 from schemathesis.engine.context import EngineContext
@@ -139,6 +146,26 @@ def preflight_error(engine: EngineContext) -> events.NonFatalError | None:
 # An API whose rejections keep naming something new never stops teaching; without a cap it would
 # keep coverage regenerating until the budget is gone and leave the other phases nothing.
 MAX_COVERAGE_CATCHUP_PASSES = 3
+
+
+def _shutdown_applications() -> EventGenerator:
+    """End the lifespans of in-process ASGI applications while their shutdown errors can still be reported."""
+    # Only the ASGI client starts lifespans, so while it is not loaded there is nothing to end
+    if "schemathesis.python.asgi" in sys.modules:
+        from schemathesis.python.asgi import shutdown_lifespans
+
+        try:
+            with inside_application():
+                shutdown_lifespans()
+        except (Exception, BaseExceptionGroup) as exc:
+            errors = exc.exceptions if isinstance(exc, BaseExceptionGroup) else (exc,)
+            for error in errors:
+                yield events.NonFatalError(
+                    error=ApplicationShutdownError(format_app_exception(error)),
+                    phase=PhaseName.TEARDOWN,
+                    label="Application shutdown",
+                    related_to_operation=False,
+                )
 
 
 @dataclass(slots=True)
@@ -325,6 +352,7 @@ class ExecutionPlan:
             teardown = Phase(PhaseName.TEARDOWN)
             yield events.PhaseStarted(phase=teardown, payload=None)
             yield from run.execute(ctx, teardown)
+        yield from _shutdown_applications()
         yield events.EngineFinished(
             running_time=ctx.running_time,
             stop_reason=ctx.stop_reason,

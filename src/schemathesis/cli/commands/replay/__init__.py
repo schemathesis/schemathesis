@@ -10,10 +10,11 @@ import click
 
 from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.core import get_terminal_width
-from schemathesis.cli.options import AUTH, AUTH_WFC, AUTH_WFC_USER, HEADER
+from schemathesis.cli.options import APP, AUTH, AUTH_WFC, AUTH_WFC_USER, HEADER
 from schemathesis.cli.output import make_console, make_progress_bar
 from schemathesis.cli.validation import validate_auth_overlap, validate_wfc_user
 from schemathesis.core import storage
+from schemathesis.core.app_output import hidden_application_output
 from schemathesis.core.timing import Instant
 
 if TYPE_CHECKING:
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
 @click.option("--url", "base_url", default=None, help="Override base URL for replay.")
 @click.option("--schema-location", default=None, help="Override schema location for loading.")
 @click.option("--keep", is_flag=True, default=False, help="Retain fixed crashes instead of removing them.")
+@click.option(*APP.args, **APP.kwargs)
 @click.option(*HEADER.args, **HEADER.kwargs)
 @click.option(*AUTH.args, **AUTH.kwargs)
 @click.option(*AUTH_WFC.args, **AUTH_WFC.kwargs)
@@ -44,6 +46,7 @@ def replay(
     base_url: str | None,
     schema_location: str | None,
     keep: bool,
+    app: str | None,
     headers: dict[str, str],
     auth: tuple[str, str] | None,
     auth_wfc: str | None,
@@ -52,6 +55,10 @@ def replay(
     """Replay stored crash files."""
     validate_auth_overlap(auth, headers)
     validate_wfc_user(ctx.obj, auth_wfc, auth_wfc_user)
+    if app is not None:
+        ctx.obj.app = app
+    if ctx.obj.app is not None:
+        ctx.with_resource(hidden_application_output())
     # Credentials override every project's config, as in `st run`.
     ctx.obj.projects.override.update(
         headers=headers or None, basic_auth=auth, wfc_auth=auth_wfc, wfc_user=auth_wfc_user
@@ -280,9 +287,12 @@ def _load_schema(ctx: click.Context, location: str) -> BaseSchema | None:
 
     project_config = ctx.obj.projects.get_default()
     try:
-        return load_schema(location, project_config)
+        schema = load_schema(location, project_config)
     except Exception:
         return None
+    # An in-process application that raises fails its checks, as it did in the run that recorded the crash
+    schema.raise_app_exceptions = False
+    return schema
 
 
 def _find_by_case_id(ctx: click.Context, case_id: str) -> tuple[Path, list[Path]] | None:

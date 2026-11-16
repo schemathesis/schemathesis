@@ -662,6 +662,19 @@ These settings can only be applied at the project level.
     wait-for-schema = 5.0
     ```
 
+#### `app`
+
+!!! note ""
+
+    **Type:** `String`  
+    **Default:** `null`  
+
+    Python ASGI or WSGI application to test in the same process, as `module:attribute`. `st run` and `st fuzz` then take the path the application serves its schema at, or an Open API file, as the schema location.
+
+    ```toml
+    app = "project.asgi:app"
+    ```
+
 #### `continue-on-failure`
 
 !!! note ""

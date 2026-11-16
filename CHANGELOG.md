@@ -11,6 +11,7 @@
 - Open API 3.2 `itemSchema` for `multipart/mixed` and other non-form multipart request bodies.
 - XML request bodies place children of `nodeType: none` objects directly in the parent element.
 - Error feedback learns integer, hex and ObjectId formats from Java and MongoDB parse errors.
+- `--app` option and `app` config key test Python ASGI and WSGI applications without a server.
 - `from-operation` dictionaries fill from Open API and GraphQL responses, keeping parent and child IDs paired. [#5751](https://github.com/schemathesis/schemathesis/issues/5751)
 - `setup` and `teardown` hooks run once around testing in `st run`, `st fuzz` and pytest.
 - `@schemathesis.extension` registers a hook class with its own `[extensions.<name>]` settings.

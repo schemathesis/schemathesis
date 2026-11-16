@@ -452,6 +452,10 @@ class DictionaryLoadingError(SchemathesisError):
     """A `from-operation` dictionary could not be filled from its source operation."""
 
 
+class ApplicationShutdownError(SchemathesisError):
+    """An in-process application failed while it was shutting down."""
+
+
 class NoLinksFound(IncorrectUsage):
     """Raised when no valid links are available for stateful testing."""
 

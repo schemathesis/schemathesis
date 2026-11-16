@@ -130,6 +130,20 @@ test_api.py .                                                            [100%]
 ============================== 1 passed in 0.23s ===============================
 ```
 
+## From the Command Line
+
+`st run` and `st fuzz` test an application in the same process when you name it with `--app`:
+
+```bash
+uvx --with fastapi schemathesis run /openapi.json --app project.asgi:app
+```
+
+- `--app` is `module:attribute`, importable from the working directory. A function that takes no arguments, such as `create_app`, is called to create the application.
+- The location is the path the application serves its schema at, or an Open API file: `st run openapi.yaml --app project.wsgi:app`.
+- An exception raised by a handler is reported as a `Server error` failure with the traceback of your code.
+- `st replay <id> --app project.asgi:app` replays a recorded failure against the application.
+- Put `app = "project.asgi:app"` in `schemathesis.toml` to avoid repeating the option.
+
 ## Django and Django REST Framework
 
 Point the loader at whatever URL serves your schema - with drf-spectacular that is wherever you routed `SpectacularAPIView`. Either callable works; the WSGI one is shown here:

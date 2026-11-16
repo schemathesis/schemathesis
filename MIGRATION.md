@@ -31,7 +31,6 @@ To replay a v3-style cassette, re-run the operations from the schema instead. Se
 
 The following CLI options were removed without replacement:
 
-- `--app`. Removed to simplify the core engine architecture.
 - `-A` / `--auth-type`. HTTP Digest authentication was removed. Use `--auth` for HTTP Basic authentication.
 - `--contrib-openapi-formats-uuid`. The `uuid` format is now enabled by default.
 - `--code-sample-style`. Only cURL code samples are now supported.

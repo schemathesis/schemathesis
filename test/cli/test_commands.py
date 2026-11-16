@@ -5719,3 +5719,116 @@ def items():
         "not_a_server_error",
     )
     assert "ST101 Server error: 2" in result.stdout, result.stdout
+
+
+LIFESPAN_FASTAPI = """
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+@asynccontextmanager
+async def lifespan(app):
+    yield
+    {shutdown}
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/api/success")
+def success():
+    return {{"success": True}}
+"""
+
+
+def test_app_lifespan_ends_with_the_run(ctx, cli):
+    module = ctx.write_pymodule(
+        "EVENTS = []\n" + LIFESPAN_FASTAPI.format(shutdown='EVENTS.append("shutdown")'), filename="lifespan_app"
+    )
+    cli.main("run", "/openapi.json", f"--app={module}:app", "--max-examples=3")
+    assert importlib.import_module(module).EVENTS == ["shutdown"]
+
+
+def test_app_lifespan_shutdown_error_is_reported(ctx, cli, snapshot_cli):
+    module = ctx.write_pymodule(
+        LIFESPAN_FASTAPI.format(shutdown='raise RuntimeError("shutdown failed")'), filename="lifespan_app"
+    )
+    assert (
+        cli.main("run", "/openapi.json", f"--app={module}:app", "--max-examples=3", "--phases=fuzzing") == snapshot_cli
+    )
+
+
+def test_app_handler_exception_is_a_server_error_in_fuzz(ctx, cli):
+    module = _write_app(ctx, CRASHING_FLASK, filename="crashing_app")
+    stdout = cli.main("fuzz", "/openapi.json", f"--app={module}:app", "--max-time=1", "-c", "not_a_server_error").stdout
+    assert "ST101 Server error: 1" in stdout and "Runtime Error" not in stdout, stdout
+
+
+NOISY_FLASK = """
+import logging
+import sys
+from flask import Flask, jsonify
+
+print("APP OUTPUT at import")
+app = Flask("noisy")
+
+@app.route("/openapi.json")
+def spec():
+    print("APP OUTPUT in schema")
+    return jsonify({schema!r})
+
+@app.route("/api/success")
+def success():
+    print("APP OUTPUT in handler")
+    print("APP OUTPUT on stderr", file=sys.stderr)
+    sys.stdout.writelines(["APP OUTPUT in several lines"])
+    logging.getLogger("noisy").warning("APP OUTPUT in logging")
+    raise RuntimeError("boom in handler")
+"""
+NOISY_FASTAPI = """
+import logging
+import sys
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+print("APP OUTPUT at import")
+
+@asynccontextmanager
+async def lifespan(app):
+    print("APP OUTPUT at startup")
+    yield
+    print("APP OUTPUT at shutdown")
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/api/success")
+def success():
+    print("APP OUTPUT in handler")
+    print("APP OUTPUT on stderr", file=sys.stderr)
+    logging.getLogger("noisy").warning("APP OUTPUT in logging")
+    raise RuntimeError("boom in handler")
+
+@app.get("/api/async")
+async def asynchronous():
+    print("APP OUTPUT in async handler")
+    return {{}}
+"""
+
+
+@pytest.mark.parametrize("source", [NOISY_FLASK, NOISY_FASTAPI], ids=["flask", "fastapi"])
+@pytest.mark.parametrize("command", [("run", "--max-examples=3", "--phases=fuzzing"), ("fuzz", "--max-time=1")])
+def test_app_output_is_hidden(ctx, cli, source, command):
+    module = _write_app(ctx, source, filename="noisy_app")
+    hooks = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def after_call(context, case, response):
+    note("HOOK OUTPUT")
+""",
+        filename="noisy_hooks",
+    )
+    result = cli.main(command[0], "/openapi.json", f"--app={module}:app", *command[1:], hooks=hooks)
+    output = result.output + result.stderr
+    assert ("APP OUTPUT" in output, "ERROR in app" in output, "HOOK OUTPUT" in output, "ST101" in output) == (
+        False,
+        False,
+        True,
+        True,
+    ), output
