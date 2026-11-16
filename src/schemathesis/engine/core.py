@@ -21,9 +21,12 @@ from schemathesis.engine.context import EngineContext
 from schemathesis.engine.events import EventGenerator, StatefulPhasePayload
 from schemathesis.engine.observations import Observations
 from schemathesis.engine.run import ELASTIC_PHASES, TESTING_PHASES, Phase, PhaseName, PhaseSkipReason
+from schemathesis.engine.run.outcomes import OperationRequests
 from schemathesis.hooks import defines_teardown
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from schemathesis.core.spec import ApiSchema
 
 
@@ -178,6 +181,9 @@ class ExecutionPlan:
     elastic: list[Phase] = field(default_factory=list)
     # Title and message of errors already reported on an operation.
     operation_errors: set[tuple[str, str]] = field(default_factory=set)
+    # Error-feedback observation counts per operation that coverage has already generated with.
+    taught: dict[str, int] = field(default_factory=dict)
+    requests: OperationRequests = field(default_factory=OperationRequests)
 
     def execute(self, engine: EngineContext) -> EventGenerator:
         """Execute all phases in sequence."""
@@ -193,53 +199,11 @@ class ExecutionPlan:
                 return
 
             self._settle_stateful(engine)
-
-            taught: dict[str, int] = {}
-            bounded = [phase for phase in self.phases if phase.name not in ELASTIC_PHASES]
-            self.elastic = [phase for phase in self.phases if phase.name in ELASTIC_PHASES]
-
-            for phase in bounded:
-                is_coverage = phase.name == PhaseName.COVERAGE
-                if is_coverage:
-                    # Feedback recorded before the pass is already folded into what it generates.
-                    taught.update(self._feedback_counts(engine))
-                yield from self._run_phase(engine, phase)
-                if engine.is_interrupted:
-                    break  # type: ignore[unreachable]
-                if is_coverage:
-                    yield from self._coverage_catchup(engine, taught)
-
             # Examples and coverage enumerate the schema once; repeating them re-sends the same cases.
             # Fuzzing and stateful keep drawing new ones, so only they are worth another turn.
-            cycle = 0
-            while not engine.is_interrupted:
-                engine.cycle_index = cycle
-                executed = 0
-                idle = []
-                for phase in self.elastic:
-                    if engine.is_interrupted:
-                        break  # type: ignore[unreachable]
-                    for event in self._run_phase(engine, phase):
-                        # A scenario that sent no request, e.g. one whose inputs were all sent before, explores nothing.
-                        if isinstance(event, events.ScenarioFinished) and event.recorder.interactions:
-                            executed += 1
-                        elif (
-                            isinstance(event, events.PhaseFinished)
-                            and event.status == Status.SKIP
-                            # Requests went out; a later cycle may still reach operations its checks apply to.
-                            and phase.skip_reason is not PhaseSkipReason.NO_CHECKS_RAN
-                        ):
-                            idle.append(phase)
-                        yield event
-                    if not engine.is_interrupted:
-                        yield from self._coverage_catchup(engine, taught)
-                # A phase that skipped has nothing to run; holding budget back for it starves the rest.
-                self.elastic = [phase for phase in self.elastic if phase not in idle]
-                # A cycle that ran nothing will run nothing next time either.
-                if engine.has_to_stop or engine.control.max_time is None or not executed:
-                    break
-                cycle += 1
-
+            self.elastic = [phase for phase in self.phases if phase.name in ELASTIC_PHASES]
+            yield from self._run_bounded(engine)
+            yield from self._run_cycles(engine)
         except KeyboardInterrupt:
             engine.stop()
             yield events.Interrupted(phase=None)
@@ -247,7 +211,61 @@ class ExecutionPlan:
         # Always finish
         yield from self._finish(engine)
 
-    def _coverage_catchup(self, engine: EngineContext, taught: dict[str, int]) -> EventGenerator:
+    def _run_bounded(self, engine: EngineContext) -> EventGenerator:
+        """Run each phase that enumerates the schema, once."""
+        for phase in self.phases:
+            if phase.name in ELASTIC_PHASES:
+                continue
+            yield from self._run_once(engine, phase)
+            if engine.is_interrupted:
+                break
+
+    def _run_once(self, engine: EngineContext, phase: Phase) -> EventGenerator:
+        """Run a bounded phase; coverage then regenerates what feedback has taught it since."""
+        if phase.name != PhaseName.COVERAGE:
+            yield from self._run_phase(engine, phase)
+            return
+        # Feedback recorded before the pass is already folded into what it generates.
+        self.taught.update(self._feedback_counts(engine))
+        yield from self._run_phase(engine, phase)
+        if not engine.is_interrupted:
+            yield from self._coverage_catchup(engine)
+
+    def _run_cycles(self, engine: EngineContext) -> EventGenerator:
+        """Give the elastic phases another turn until the time budget runs out or a turn sends nothing."""
+        cycle = 0
+        while not engine.is_interrupted:
+            engine.cycle_index = cycle
+            sent = yield from self._run_cycle(engine)
+            # A cycle that sent nothing, e.g. because every input was sent before, will send nothing next time either.
+            if engine.has_to_stop or engine.control.max_time is None or not sent:
+                break
+            cycle += 1
+
+    def _run_cycle(self, engine: EngineContext) -> Generator[events.EngineEvent, None, bool]:
+        """Give each elastic phase one turn; whether any of them sent a request."""
+        before = self.requests.total(ELASTIC_PHASES)
+        idle = []
+        for phase in self.elastic:
+            if engine.is_interrupted:
+                break
+            if (yield from self._take_turn(engine, phase)):
+                idle.append(phase)
+        # A phase that skipped has nothing to run; holding budget back for it starves the rest.
+        self.elastic = [phase for phase in self.elastic if phase not in idle]
+        return self.requests.total(ELASTIC_PHASES) > before
+
+    def _take_turn(self, engine: EngineContext, phase: Phase) -> Generator[events.EngineEvent, None, bool]:
+        """Run an elastic phase, then catch coverage up; whether the phase proved idle."""
+        idle = False
+        for event in self._run_phase(engine, phase):
+            idle = idle or _is_idle(phase, event)
+            yield event
+        if not engine.is_interrupted:
+            yield from self._coverage_catchup(engine)
+        return idle
+
+    def _coverage_catchup(self, engine: EngineContext) -> EventGenerator:
         """Regenerate coverage for operations that have started explaining their rejections."""
         if engine.control.max_time is None or engine.has_to_stop:
             return
@@ -257,10 +275,10 @@ class ExecutionPlan:
         # Satisfying one constraint can reveal the next, so keep going while the pass keeps teaching.
         while self.catchup_passes < MAX_COVERAGE_CATCHUP_PASSES and not engine.has_to_stop:
             counts = self._feedback_counts(engine)
-            learned = {label for label, count in counts.items() if count > taught.get(label, 0)}
+            learned = {label for label, count in counts.items() if count > self.taught.get(label, 0)}
             if not learned:
                 return
-            taught.update(counts)
+            self.taught.update(counts)
             self.catchup_passes += 1
             yield from self._run_phase(engine, coverage, only=frozenset(learned))
 
@@ -285,6 +303,7 @@ class ExecutionPlan:
                     # Skip run-level errors already shown on an operation.
                     elif key in self.operation_errors:
                         continue
+                self.requests.fold(event)
                 yield event
         else:
             if engine.has_reached_the_failure_limit:
@@ -375,6 +394,16 @@ class ExecutionPlan:
                 transitions_selected=inference.selected,
             )
         return None
+
+
+def _is_idle(phase: Phase, event: events.EngineEvent) -> bool:
+    """Whether the event ends a phase that had nothing to run."""
+    return (
+        isinstance(event, events.PhaseFinished)
+        and event.status == Status.SKIP
+        # Requests went out; a later cycle may still reach operations its checks apply to.
+        and phase.skip_reason is not PhaseSkipReason.NO_CHECKS_RAN
+    )
 
 
 @dataclass(slots=True)

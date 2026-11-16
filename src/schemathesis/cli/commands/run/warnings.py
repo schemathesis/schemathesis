@@ -14,10 +14,11 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transport import CallOutcome, StatusClass
 from schemathesis.engine import Status, events
-from schemathesis.engine.recorder import CaseNode, RecordedScenario
+from schemathesis.engine.recorder import RecordedScenario
 from schemathesis.engine.run import UNIT_PHASES, PhaseName
-from schemathesis.engine.summary import ValidRate, WarningData
-from schemathesis.generation.meta import REQUEST_SHAPE_PROBES, CoveragePhaseData, CoverageScenario, coverage_scenario
+from schemathesis.engine.run.outcomes import aggregate_status_codes, is_positive, positive_call_outcomes
+from schemathesis.engine.summary import WarningData
+from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
 
 if TYPE_CHECKING:
@@ -33,6 +34,13 @@ class StatusCodeStatistic:
     counts: dict[int, int]
     total: int
     classify_status: Callable[[int], StatusClass]
+
+    @classmethod
+    def from_recorder(
+        cls, recorder: RecordedScenario, classify_status: Callable[[int], StatusClass], *, positive_only: bool = False
+    ) -> StatusCodeStatistic:
+        counts = aggregate_status_codes(recorder, classify_status, positive_only=positive_only)
+        return cls(counts=counts, total=sum(counts.values()), classify_status=classify_status)
 
     def ratio_for(self, status_class: StatusClass) -> float:
         if self.total == 0:
@@ -95,60 +103,6 @@ RATE_LIMITED_THRESHOLD = 0.9
 OTHER_CLIENT_ERRORS_THRESHOLD = 0.1
 # Fewer calls than this and the share accepted is noise rather than a rate.
 MIN_CALLS_FOR_VALID_RATE = 10
-
-
-def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
-    """Classify every positive case by what the API did with it; auth rejections and server errors are not counted."""
-    outcomes = ValidRate()
-    for case in recorder.cases.values():
-        if not _is_positive(case):
-            continue
-        interaction = recorder.interactions.get(case.value.id)
-        if interaction is None or interaction.response is None:
-            continue
-        outcome = case.value.operation.schema.classify_call_outcome(case.value, interaction.response)
-        if outcome is CallOutcome.ACCEPTED:
-            outcomes.accepted += 1
-        elif outcome is CallOutcome.UNREACHABLE:
-            outcomes.unreachable += 1
-        elif outcome is CallOutcome.CONFLICT:
-            outcomes.conflicts += 1
-        elif outcome is CallOutcome.REJECTED:
-            outcomes.rejected += 1
-    return outcomes
-
-
-def aggregate_status_codes(
-    recorder: RecordedScenario, classify_status: Callable[[int], StatusClass], *, positive_only: bool = False
-) -> StatusCodeStatistic:
-    """Count the status codes the operation answered with, skipping requests with an undeclared method.
-
-    Those reach another operation or none. With `positive_only`, responses to cases meant to be rejected are left out.
-    """
-    counts: dict[int, int] = {}
-    total = 0
-
-    for case_id, interaction in recorder.interactions.items():
-        case = recorder.cases.get(case_id)
-        if case is not None and _is_request_shape_probe(case):
-            continue
-        if positive_only and (case is None or not _is_positive(case)):
-            continue
-        if interaction.response is not None:
-            status = interaction.response.status_code
-            # A client error that says nothing about the data, e.g. a cancelled gRPC call, is no rejection of it.
-            if (
-                positive_only
-                and case is not None
-                and classify_status(status).is_client_error
-                and case.value.operation.schema.classify_call_outcome(case.value, interaction.response)
-                is CallOutcome.UNINFORMATIVE
-            ):
-                continue
-            counts[status] = counts.get(status, 0) + 1
-            total += 1
-
-    return StatusCodeStatistic(counts=counts, total=total, classify_status=classify_status)
 
 
 def auth_error_codes(statistic: StatusCodeStatistic, recorder: RecordedScenario) -> tuple[int, ...]:
@@ -241,18 +195,10 @@ def _add_by_group(messages: dict[str, dict[str, set[str]]], group: str | None, l
     _add_by_label(messages.setdefault(group, {}), label, message)
 
 
-def _is_request_shape_probe(case: CaseNode) -> bool:
-    return coverage_scenario(case.value) in REQUEST_SHAPE_PROBES
-
-
-def _is_positive(case: CaseNode) -> bool:
-    return case.value.meta is not None and case.value.meta.generation.mode == GenerationMode.POSITIVE
-
-
 def any_positive_is_accepted(recorder: RecordedScenario) -> bool:
     """Whether the API served any positive test case; an undocumented method may be served when the operation is not."""
     for case in recorder.cases.values():
-        if not _is_positive(case):
+        if not is_positive(case):
             continue
         interaction = recorder.interactions.get(case.value.id)
         if interaction is None or interaction.response is None:
@@ -277,7 +223,7 @@ def none_served(recorder: RecordedScenario) -> bool:
 
 def all_positive_are_rejected(recorder: RecordedScenario) -> bool:
     """Whether the scenario generated positive test cases and the API served none of them."""
-    return any(_is_positive(case) for case in recorder.cases.values()) and not any_positive_is_accepted(recorder)
+    return any(is_positive(case) for case in recorder.cases.values()) and not any_positive_is_accepted(recorder)
 
 
 class WarningCollector:
@@ -332,13 +278,13 @@ class WarningCollector:
             # Synthetic skip scenarios carry no interactions to inspect.
             return
 
-        statistic = aggregate_status_codes(event.recorder, ctx.classify_status)
+        statistic = StatusCodeStatistic.from_recorder(event.recorder, ctx.classify_status)
 
         if statistic.total == 0:
             return
 
         # Warnings that explain why valid input was rejected look only at valid input.
-        positive = aggregate_status_codes(event.recorder, ctx.classify_status, positive_only=True)
+        positive = StatusCodeStatistic.from_recorder(event.recorder, ctx.classify_status, positive_only=True)
 
         assert event.label is not None
         try:
