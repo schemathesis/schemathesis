@@ -944,11 +944,20 @@ def test_split_file_schema_with_uri_reserved_path_chars(tmp_path):
     assert [(p.name, p.location) for p in operation.iter_parameters()] == [("id", "path")]
 
 
-def test_unsupported_type():
-    with pytest.raises(
-        LoaderError, match="Unable to determine the Open API version as it's not specified in the document."
-    ):
-        schemathesis.openapi.from_dict({})
+@pytest.mark.parametrize(
+    ("raw_schema", "expected"),
+    [
+        ({}, "Unable to determine the Open API version as it's not specified in the document."),
+        (
+            {"asyncapi": "3.0.0", "info": {"title": "Orders", "version": "1.0.0"}, "channels": {}},
+            "The provided schema uses AsyncAPI 3.0.0. Schemathesis does not test AsyncAPI documents.",
+        ),
+    ],
+    ids=["no-version", "asyncapi"],
+)
+def test_unsupported_type(raw_schema, expected):
+    with pytest.raises(LoaderError, match=expected):
+        schemathesis.openapi.from_dict(raw_schema)
 
 
 if platform.python_implementation() == "PyPy":

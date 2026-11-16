@@ -233,6 +233,7 @@ def should_try_more(exc: LoaderError) -> bool:
         LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
         LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION,
         LoaderErrorKind.OPEN_API_UNSUPPORTED_VERSION,
+        LoaderErrorKind.ASYNCAPI_UNSUPPORTED,
     )
 
 

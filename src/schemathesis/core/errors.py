@@ -638,6 +638,9 @@ class LoaderErrorKind(enum.StrEnum):
     OPEN_API_UNSPECIFIED_VERSION = "open_api_unspecified_version"
     OPEN_API_UNSUPPORTED_VERSION = "open_api_unsupported_version"
 
+    # Specifications Schemathesis does not test
+    ASYNCAPI_UNSUPPORTED = "asyncapi_unsupported"
+
     # GraphQL validation
     GRAPHQL_INVALID_SCHEMA = "graphql_invalid_schema"
 

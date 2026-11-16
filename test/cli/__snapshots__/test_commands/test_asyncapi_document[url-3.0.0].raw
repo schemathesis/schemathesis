@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ❌  Failed to load specification from http://127.0.0.1/openapi.json after 0.00s
+
+ Schema Loading Error
+
+ The provided schema uses AsyncAPI 3.0.0. Schemathesis does not test AsyncAPI documents.

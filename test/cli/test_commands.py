@@ -144,6 +144,27 @@ def test_empty_schema_file(testdir, cli, snapshot_cli):
     assert cli.run(str(filename), "--url=http://127.0.0.1:1") == snapshot_cli
 
 
+ASYNCAPI_2_6 = {"asyncapi": "2.6.0", "info": {"title": "Orders", "version": "1.0.0"}, "channels": {}}
+ASYNCAPI_3_0 = {"asyncapi": "3.0.0", "info": {"title": "Orders", "version": "1.0.0"}, "channels": {}}
+
+
+def _asyncapi_path(ctx, app_runner, document):
+    return str(ctx.makefile(document, format="yaml", filename="asyncapi"))
+
+
+def _asyncapi_url(ctx, app_runner, document):
+    return app_runner.openapi_url(ctx.openapi.make_flask_app_from_schema(document))
+
+
+@pytest.mark.parametrize(
+    ("make_location", "document"),
+    [(_asyncapi_path, ASYNCAPI_2_6), (_asyncapi_url, ASYNCAPI_3_0)],
+    ids=["path-2.6.0", "url-3.0.0"],
+)
+def test_asyncapi_document(ctx, cli, app_runner, snapshot_cli, make_location, document):
+    assert cli.run(make_location(ctx, app_runner, document)) == snapshot_cli
+
+
 def _malformed_schema_file(tmp_path):
     path = tmp_path / "schema.json"
     path.write_text("{broken")

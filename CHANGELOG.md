@@ -35,6 +35,7 @@
 #### Schema loading
 
 - Path parameter names containing `.`, `:`, `!` or `[` failing to load.
+- Report AsyncAPI documents as unsupported, naming their AsyncAPI version.
 - Unresolvable remote references written as relative paths reported as missing files.
 - `schema.app` unset in `after_load_schema` hooks for `from_asgi` and `from_wsgi` schemas.
 - Open API 3.2 references to the `$self` URI, or relative to it, failing to resolve.

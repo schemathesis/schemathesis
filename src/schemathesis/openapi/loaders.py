@@ -256,6 +256,12 @@ def _from_dict(
                 f"The provided schema uses Open API {version}, which is currently not supported.",
             )
         if version is None and "swagger" not in schema:
+            if "asyncapi" in schema:
+                raise LoaderError(
+                    LoaderErrorKind.ASYNCAPI_UNSUPPORTED,
+                    f"The provided schema uses AsyncAPI {schema['asyncapi']}. "
+                    "Schemathesis does not test AsyncAPI documents.",
+                )
             raise LoaderError(
                 LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION,
                 "Unable to determine the Open API version as it's not specified in the document.",
