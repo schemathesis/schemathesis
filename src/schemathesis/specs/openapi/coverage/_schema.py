@@ -1500,9 +1500,6 @@ class HashSet:
     def __bool__(self) -> bool:
         return bool(self._data)
 
-    def __contains__(self, value: Any) -> bool:
-        return _to_hashable_key(value) in self._data
-
     def insert(self, value: Any, *, key: tuple | None = None) -> bool:
         return self._insert_key(_to_hashable_key(value) if key is None else key)
 
@@ -1582,19 +1579,7 @@ def _prepared_by_name(schemas: dict[str, Any], *, draft4: bool, drop: frozenset[
 def _without_conditionals(schema: JsonSchemaObject) -> JsonSchemaObject | None:
     """A wider schema without the keywords generation cannot follow, or `None` if there are none."""
     base = _prepared(schema, drop=_CONDITIONAL_KEYS)
-    if base is schema:
-        return None
-    condition = schema.get("if")
-    if condition is None:
-        return base
-    # Each conditional branch on its own, so the constrained shapes stay reachable.
-    branches: list[JsonSchema] = []
-    if "then" in schema:
-        branches.append({"allOf": [base, condition, schema["then"]]})
-    if "else" in schema:
-        branches.append({"allOf": [base, schema["else"]]})
-    branches.append(base)
-    return {"anyOf": branches}
+    return None if base is schema else base
 
 
 # Single-subschema keywords whose two copies fold into one; two `contains` each need their own item, so they stay out.

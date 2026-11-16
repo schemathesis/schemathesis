@@ -1641,6 +1641,17 @@ def test_suggested_values_fill_body_fields(ctx):
     assert [case.body for case in generate_many(operation.as_strategy(), 5)] == [{"name": "payload"}] * 5
 
 
+def test_configured_body_binding_wins_over_suggested_values(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {"dictionaries": {"mine": {"values": ["configured"]}}, "parameters": {"body.name": {"dictionary": "mine"}}},
+        _path_with_body(_name_body(additionalProperties=False)),
+    )
+    operation = schema["/items"]["POST"]
+    HookContext(operation=operation).suggest(["payload"], parameter="body.name", probability=1.0)
+    assert [case.body for case in generate_many(operation.as_strategy(), 5)] == [{"name": "configured"}] * 5
+
+
 def test_suggest_needs_a_loaded_schema():
     with pytest.raises(RuntimeError, match="`suggest` needs a loaded schema"):
         HookContext().suggest(["payload"])

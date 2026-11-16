@@ -87,9 +87,7 @@ def validate_documented_response(
             operation=operation
         ).response_schema_conformance.validate_formats
         try:
-            validator = definition.get_validator(
-                resolved.media_type, resolved.schema, validate_formats=validate_formats
-            )
+            validator = definition.get_validator(resolved.media_type, validate_formats=validate_formats)
         except jsonschema_rs.ValidationError as exc:
             raise InvalidSchema.from_jsonschema_error(
                 exc,
@@ -99,8 +97,7 @@ def validate_documented_response(
                 location=SchemaLocation.response_schema(schema.specification.version),
                 location_path=unbundle_path(exc.instance_path, resolved.name_to_uri),
             ) from exc
-        if validator is None:
-            return None
+        assert validator is not None
 
     if resolved_content_type is None:
         formatted_content_types = [f"\n- `{content_type}`" for content_type in documented_media_types]

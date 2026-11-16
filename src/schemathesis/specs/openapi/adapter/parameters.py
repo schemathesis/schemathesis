@@ -2741,8 +2741,6 @@ def _merge_parameters_to_object_schema(
     properties: dict[str, Any] = {}
     required: list[str] = []
     bundled: dict[str, Any] = {}
-    # Header names are case-insensitive; duplicates collapse onto the first-seen casing.
-    canonical_by_lower: dict[str, str] = {}
 
     for name, subschema, is_required in parameters:
         if isinstance(subschema, dict) and BUNDLE_STORAGE_KEY in subschema:
@@ -2762,15 +2760,6 @@ def _merge_parameters_to_object_schema(
                 and "minLength" not in subschema
             ):
                 subschema = {**subschema, "minLength": 1}
-
-        if location == ParameterLocation.HEADER:
-            canonical = canonical_by_lower.setdefault(name.lower(), name)
-            if canonical != name:
-                # Same header in another case; the first definition wins
-                if is_required and canonical not in required:
-                    required.append(canonical)
-                continue
-            name = canonical
 
         properties[name] = subschema
 

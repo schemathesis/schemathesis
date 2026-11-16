@@ -6,6 +6,7 @@ from unittest.mock import ANY
 
 import jsonschema_rs
 import pytest
+import requests
 from flask import Flask, Response, jsonify, request
 from hypothesis import strategies as st
 from hypothesis.statistics import collector
@@ -3655,6 +3656,19 @@ def test_content_type_probe_ignores_non_server_errors(ctx, cli, snapshot_cli):
     assert cli.run_openapi_app(app, "--phases=coverage", "--mode=negative", "--max-examples=1") == snapshot_cli
 
 
+def test_boolean_branch_in_draft4_component_generates_values(ctx):
+    # OpenAPI 3.0 has no boolean schemas, but documents use them and validators read them as usual.
+    operation = body_operation(
+        ctx,
+        {"type": "object", "properties": {"a": {"$ref": "#/components/schemas/A"}}, "required": ["a"]},
+        components={"schemas": {"A": {"oneOf": [False, {"type": "integer"}]}}},
+    )
+
+    bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE) if case.body is not NOT_SET]
+
+    assert bodies == [{"a": 0}, {"a": 2**63}]
+
+
 def test_avoid_testing_unexpected_methods(ctx):
     raw_schema = {
         "/foo": {
@@ -4003,6 +4017,24 @@ def filter_case(ctx, case):
     # `--generation-unique-inputs`, or a hook) used to take them for an edit and relabel the
     # "Missing `Authorization`" case as positive, so it went out with the header and failed ST203.
     assert result.exit_code == 0, result.output
+
+
+def test_missing_authorization_is_sent_without_session_credentials(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/items": {"get": {"security": [{"basic": []}], "responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": {"basic": {"type": "http", "scheme": "basic"}}},
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify(request.headers.get("Authorization"))
+
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(app))["/items"]["GET"]
+    (case,) = scenario_cases(iter_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.MISSING_PARAMETER)
+    with requests.Session() as session:
+        session.auth = ("user", "secret")
+        assert case.call(session=session).json() is None
+        assert session.auth == ("user", "secret")
 
 
 @pytest.mark.snapshot(replace_reproduce_with=False)

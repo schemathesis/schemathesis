@@ -1273,3 +1273,19 @@ def test_missing_auth_warning_keeps_generic_tip_when_credentials_are_supplied(ct
 
 def test_auth_flow_suggestion_skips_graphql(ctx):
     assert auth_flow_suggestion(ctx.graphql.load_sdl("type Query { ping: Int }")) is None
+
+
+def test_method_not_allowed_warning_with_fail_on(cli, ctx):
+    api = ctx.openapi.apps.unimplemented_method()
+
+    result = cli.run(
+        api.schema_url,
+        "--max-examples=10",
+        "--phases=examples,coverage,fuzzing",
+        "--mode=positive",
+        "--checks=not_a_server_error",
+        config={"warnings": {"fail-on": ["method_not_allowed"]}},
+    )
+
+    final_line = result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0]
+    assert (result.exit_code, final_line) == (ExitCode.TESTS_FAILED, "Warnings fail the run")

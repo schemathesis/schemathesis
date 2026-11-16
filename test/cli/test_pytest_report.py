@@ -545,3 +545,51 @@ def test_network_error_is_not_rendered(ctx, cli, tmp_path):
 
     content = path.read_text(encoding="utf-8")
     assert "def test_" not in content
+
+
+def test_reused_response_value_names_the_operation_that_returned_it(ctx, cli, tmp_path, pytester):
+    order = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/orders": {
+                "post": {
+                    "responses": {"201": {"description": "Created", "content": {"application/json": {"schema": order}}}}
+                }
+            },
+            "/orders/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": order}}},
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+        }
+    )
+
+    @app.route("/orders", methods=["POST"])
+    def create_order():
+        return jsonify({"id": 987654321}), 201
+
+    @app.route("/orders/<int:id>")
+    def get_order(id):
+        if id == 987654321:
+            return jsonify({"error": "boom"}), 500
+        return jsonify({}), 404
+
+    path = tmp_path / "test_regressions.py"
+    cli.run_openapi_app(
+        app,
+        f"--report-pytest-path={path}",
+        "--max-examples=10",
+        "--phases=fuzzing",
+        "--checks=not_a_server_error",
+    )
+
+    content = path.read_text(encoding="utf-8")
+    assert re.findall(r"^    (#.*)$", content, flags=re.MULTILINE) == [
+        "# Needs the `Order` that `POST /orders` returned"
+    ]
+    pytester.makepyfile(test_regressions=content)
+    pytester.runpytest().assert_outcomes(passed=1)

@@ -943,6 +943,18 @@ def test_scoped_extensions_keep_registrations_made_before(
     assert generated_headers(ctx, response_factory) == {"X-Before": "1"}
 
 
+def test_scoped_extensions_keep_constants_registered_before(ctx, response_factory):
+    register_constants()
+    with schemathesis.scoped_extensions():
+
+        @schemathesis.python.constants
+        def scoped():
+            return buggy_app
+
+        assert draws_constant(ctx, response_factory)
+    assert draws_constant(ctx, response_factory)
+
+
 def test_scoped_extensions_keep_hooks_module_from_environment(ctx, response_factory, tmp_path, monkeypatch):
     # Python imports the module once, so it must not load for the first time inside the scope
     (tmp_path / "scoped_environment_hooks.py").write_text(BEFORE_HOOKS)

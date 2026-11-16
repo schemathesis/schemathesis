@@ -138,6 +138,7 @@ def test_get_extracts_cookie_over_wsgi(ctx, name):
     @app.route("/api/auth", methods=["POST"])
     def auth():
         response = jsonify({})
+        response.headers.add("Set-Cookie", "valueless; Path=/")
         response.headers.add("Set-Cookie", f"{name}=s3ss10nt0k3n; Path=/; Priority=High")
         return response
 

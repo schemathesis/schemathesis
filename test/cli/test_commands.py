@@ -1,3 +1,4 @@
+import _thread
 import importlib
 import json
 import os
@@ -681,6 +682,24 @@ def test_max_time_cuts_hanging_request(ctx, cli, snapshot_cli, stall):
     assert result == snapshot_cli
 
 
+def test_max_time_cuts_hanging_request_in_coverage_phase(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app({"/hanging": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    release = threading.Event()
+
+    @app.route("/hanging")
+    def hanging():
+        release.wait()
+        return jsonify({})
+
+    try:
+        result = cli.run_openapi_app(
+            app, "--max-time=1", "--request-timeout=30", "--phases=coverage", "--checks=not_a_server_error"
+        )
+    finally:
+        release.set()
+    assert result == snapshot_cli
+
+
 def test_max_time_reports_unreached_operations(ctx, cli, snapshot_cli):
     operation = {
         "get": {
@@ -1251,6 +1270,24 @@ def test_keyboard_interrupt_in_custom_handler_during_stateful(ctx, cli, snapshot
 
     api = ctx.openapi.apps.users_crud()
     assert cli.run(api.schema_url, "--phases=stateful", "--max-examples=1") == snapshot_cli
+    assert [thread.name for thread in threading.enumerate() if thread.name == "schemathesis_stateful_tests"] == []
+
+
+# Ctrl-C lands while the stateful phase waits for a response.
+def test_keyboard_interrupt_while_stateful_phase_waits_for_a_response(ctx, cli):
+    app, _ = ctx.openapi.make_flask_app(linked_users())
+    interrupted = []
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        if not interrupted:
+            interrupted.append(True)
+            _thread.interrupt_main()
+        return jsonify({"id": 1}), 201
+
+    result = cli.run_openapi_app(app, "--phases=stateful", "--max-examples=1")
+    assert result.exit_code == 130, result.stdout
+    assert re.fullmatch(r"=+ Interrupted after \d+\.\d{2}s =+", result.stdout.strip().splitlines()[-1])
     assert [thread.name for thread in threading.enumerate() if thread.name == "schemathesis_stateful_tests"] == []
 
 

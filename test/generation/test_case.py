@@ -647,7 +647,8 @@ def test_method_suggestion_without_parameters(swagger_20):
         swagger_20["/users"]["PUT"]
 
 
-def test_method_suggestion_lists_additional_operations(ctx):
+@pytest.mark.parametrize("method", ["PUT", "MOVE"], ids=["standard", "non-standard"])
+def test_method_suggestion_lists_additional_operations(ctx, method):
     schema = ctx.openapi.load_schema(
         {
             "/files": {
@@ -657,8 +658,8 @@ def test_method_suggestion_lists_additional_operations(ctx):
         },
         version="3.2.0",
     )
-    with pytest.raises(LookupError, match="Method `PUT` not found. Available methods: GET, COPY$"):
-        schema["/files"]["PUT"]
+    with pytest.raises(LookupError, match=f"Method `{method}` not found. Available methods: GET, COPY$"):
+        schema["/files"][method]
 
 
 def test_method_lookup_on_path_without_operations(ctx):

@@ -627,6 +627,31 @@ def test_fuzz_reports_operations_with_schema_errors(cli, app_runner, ctx, snapsh
     assert cli.main("fuzz", url, "--max-time=30") == snapshot_cli
 
 
+def test_fuzz_reports_malformed_media_type_beside_usable_one(cli, app_runner, ctx, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "": {"schema": {"type": "object"}},
+                            "application/json": {"schema": {"type": "object"}},
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/users", methods=["POST"])
+    def users():
+        return jsonify({})
+
+    assert cli.main("fuzz", app_runner.openapi_url(app), "--max-time=0", "--workers=1") == snapshot_cli
+
+
 def test_fuzz_all_operations_have_schema_errors(cli, app_runner, ctx, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(BAD_PARAMETERS_PATHS)
     url = app_runner.openapi_url(app)
@@ -1023,6 +1048,45 @@ def after_call(context, case, response):
     )
     result = cli.main("fuzz", api.schema_url, "--max-time=30", hooks=module)
     assert re.fullmatch(r"=+ Interrupted after \d+\.\d{2}s =+", result.stdout.strip().splitlines()[-1])
+
+
+# Ctrl-C lands while the run waits for a response.
+def test_fuzz_interrupted_while_waiting_for_a_response(cli, app_runner, ctx):
+    app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
+    interrupted = []
+
+    @app.route("/users")
+    def users():
+        if not interrupted:
+            interrupted.append(True)
+            _thread.interrupt_main()
+        return jsonify([])
+
+    result = cli.main("fuzz", app_runner.openapi_url(app), "--max-time=30", "--workers=1")
+    assert result.exit_code == 130, result.stdout
+    assert re.fullmatch(r"=+ Interrupted after \d+\.\d{2}s =+", result.stdout.strip().splitlines()[-1])
+
+
+def test_fuzz_time_limit_cuts_hanging_request(cli, app_runner, ctx):
+    app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
+    release = threading.Event()
+
+    @app.route("/users")
+    def users():
+        release.wait()
+        return jsonify([])
+
+    started = time.monotonic()
+    try:
+        result = cli.main("fuzz", app_runner.openapi_url(app), "--max-time=1", "--request-timeout=30", "--workers=1")
+    finally:
+        release.set()
+    assert time.monotonic() - started < 15
+    assert "Network Error" not in result.stdout, result.stdout
+    assert _parse_operations_summary(result.stdout) == (
+        {"selected": 1, "tested": 0, "skipped": 1},
+        {"Time limit reached"},
+    ), result.stdout
 
 
 PING_PATHS = {"/ping": {"get": {"responses": {"200": {"description": "OK"}}}}}

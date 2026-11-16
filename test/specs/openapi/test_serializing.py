@@ -1630,6 +1630,8 @@ def test_nested_object_recursive_brackets(value, expected):
     [
         pytest.param("oops", {"request": "oops"}, id="non-dict-string"),
         pytest.param(42, {"request": 42}, id="non-dict-int"),
+        pytest.param([], {"request": ""}, id="empty-list"),
+        pytest.param(0, {"request": ""}, id="zero"),
         pytest.param({"meta": {}}, {"request[meta]": ""}, id="empty-nested-dict"),
         pytest.param({"items": []}, {"request[items]": ""}, id="empty-nested-list"),
         pytest.param({"items": ()}, {"request[items]": ""}, id="empty-tuple"),

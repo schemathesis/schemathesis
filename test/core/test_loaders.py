@@ -140,6 +140,23 @@ def test_loader_user_agent(ctx, headers, expected):
     assert api.schema_requests[0].headers["User-Agent"] == expected
 
 
+@pytest.mark.parametrize("option", ["verify", "cert"], ids=["ca-bundle", "client-certificate"])
+@pytest.mark.parametrize(
+    ("loader", "url"),
+    [
+        (schemathesis.openapi.from_url, "https://127.0.0.1:1/openapi.json"),
+        (schemathesis.graphql.from_url, "https://127.0.0.1:1/graphql"),
+    ],
+    ids=["openapi", "graphql"],
+)
+def test_missing_certificate_file_reported_as_loader_error(tmp_path, loader, url, option):
+    path = str(tmp_path / "missing.pem")
+    with pytest.raises(LoaderError) as exc_info:
+        loader(url, **{option: path})
+    assert (exc_info.value.kind, exc_info.value.url) == (LoaderErrorKind.INVALID_CERTIFICATE, url)
+    assert exc_info.value.message.endswith(f"invalid path: {path}")
+
+
 def test_redirect_loop_reported_as_loader_error(app_runner):
     app = Flask(__name__)
 

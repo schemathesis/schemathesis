@@ -254,27 +254,16 @@ class OpenApiResponse:
             self._stream_schemas[cache_key] = resolved
         return resolved
 
-    def _build_validator(self, schema: JsonSchema, validate_formats: bool) -> jsonschema_rs.Validator:
-        return _build_response_validator(schema, self.adapter.jsonschema_validator_cls, validate_formats)
-
     def get_validator(
-        self, resolved_media_type: str | None, schema: JsonSchema, *, validate_formats: bool = True
+        self, resolved_media_type: str | None, *, validate_formats: bool = True
     ) -> jsonschema_rs.Validator | None:
-        """Cached validator for a non-SSE media type."""
-        cache_key = self._get_cache_key(resolved_media_type)
+        """Cached validator for a non-SSE media type that `get_schema` resolved."""
+        cached = self._validation_cache[self._get_cache_key(resolved_media_type)]
 
-        if cache_key not in self._validation_cache:
-            self._validation_cache[cache_key] = CachedValidation(schema=schema, validator=None, name_to_uri={})
-
-        cached = self._validation_cache[cache_key]
-
-        if cached.validator is None and cached.schema is not None:
-            if cached.bundled is not None:
-                cached.validator = self.cache.validator(
-                    cached.bundled, self.adapter.jsonschema_validator_cls, validate_formats
-                )
-            else:
-                cached.validator = self._build_validator(cached.schema, validate_formats)
+        if cached.validator is None and cached.bundled is not None:
+            cached.validator = self.cache.validator(
+                cached.bundled, self.adapter.jsonschema_validator_cls, validate_formats
+            )
 
         return cached.validator
 
