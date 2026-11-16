@@ -1,4 +1,8 @@
+import re
+from xml.etree import ElementTree
+
 import pytest
+from flask import jsonify, request
 
 from test.utils import allure_results
 
@@ -10,6 +14,131 @@ def _allure_results(allure_dir):
     }
 
 
+def _two_thresholds_schema_url(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"price": {"type": "integer"}},
+                                    "required": ["price"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"id": "$response.body#/id"}}
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        price = request.json["price"]
+        if price > 100:
+            return jsonify({}), 500
+        if price < -100:
+            return jsonify({}), 418
+        return jsonify({"id": 1}), 201
+
+    @app.route("/items/<int:item_id>")
+    def get_item(item_id):
+        return jsonify({})
+
+    return app_runner.openapi_url(app)
+
+
+def _reported_prices(text):
+    return sorted(re.findall(r"-d '\{\"price\": (-?\d+)\}'", text))
+
+
+@pytest.mark.parametrize("shape", ["parametrized", "from_fixture", "stateful"])
+def test_distinct_check_failures_are_shrunk_and_failed(testdir, tmp_path, ctx, app_runner, shape):
+    schema_url = _two_thresholds_schema_url(ctx, app_runner)
+    allure_dir = tmp_path / "allure-results"
+    junit_path = tmp_path / "junit.xml"
+    settings = "settings(max_examples=10, derandomize=True, database=None, phases=[Phase.generate, Phase.shrink])"
+    if shape == "parametrized":
+        source = f"""
+schema = schemathesis.openapi.from_url("{schema_url}")
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+schema.config.reports.update(junit_path=r"{junit_path}")
+
+@schema.include(method="POST").parametrize()
+@{settings}
+def test_api(case):
+    case.call_and_validate()
+"""
+        name = "test_api[POST /items]"
+    elif shape == "from_fixture":
+        source = f"""
+@pytest.fixture
+def api_schema():
+    schema = schemathesis.openapi.from_url("{schema_url}").include(method="POST")
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+    schema.config.reports.update(junit_path=r"{junit_path}")
+    return schema
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@{settings}
+def test_api(case):
+    case.call_and_validate()
+"""
+        name = "test_api"
+    else:
+        source = f"""
+schema = schemathesis.openapi.from_url("{schema_url}")
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+schema.config.reports.update(junit_path=r"{junit_path}")
+TestCase = schema.as_state_machine().TestCase
+TestCase.settings = {settings[:-1]}, deadline=None, stateful_step_count=3)
+"""
+        name = "runTest"
+    testdir.make_test(source)
+
+    result = testdir.runpytest("--alluredir", str(allure_dir))
+
+    junit_failures = "".join(failure.text for failure in ElementTree.parse(junit_path).iter("failure"))
+    assert (_reported_prices(result.stdout.str()), _reported_prices(junit_failures)) == (
+        ["-101", "101"],
+        ["-101", "101"],
+    )
+    assert _allure_results(allure_dir) == {
+        name: ("failed", "ExceptionGroup: Hypothesis found 2 distinct failures. (2 sub-exceptions)")
+    }
+
+
 @pytest.mark.parametrize("shape", ["parametrized", "from_fixture", "stateful"])
 def test_check_failures_are_failed(testdir, tmp_path, ctx, shape):
     allure_dir = tmp_path / "allure-results"
@@ -18,12 +147,14 @@ def test_check_failures_are_failed(testdir, tmp_path, ctx, shape):
         testdir.makepyfile(
             f"""
 import schemathesis
-from hypothesis import settings
+from hypothesis import Phase, settings
 
 schema = schemathesis.openapi.from_url("{api.schema_url}")
 schema.config.update(base_url="{api.base_url}")
 TestCase = schema.as_state_machine().TestCase
-TestCase.settings = settings(max_examples=10, stateful_step_count=3, deadline=None, derandomize=True)
+TestCase.settings = settings(
+    max_examples=10, stateful_step_count=3, deadline=None, derandomize=True, phases=[Phase.generate]
+)
 
 def test_passing():
     pass

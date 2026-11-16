@@ -487,6 +487,54 @@ def test_validate_response_custom_check_raising_while_handling_error(ctx, respon
     ]
 
 
+def validate_with_case(case, response):
+    case.validate_response(response, checks=[response_schema_conformance])
+
+
+def validate_with_operation(case, response):
+    case.operation.validate_response(response)
+
+
+@pytest.mark.parametrize("validate", [validate_with_case, validate_with_operation], ids=["case", "operation"])
+def test_failure_in_hypothesis_test_is_shrunk(ctx, response_factory, validate):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [{"name": "price", "in": "query", "required": True, "schema": {"type": "integer"}}],
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"low": {"maximum": 100}, "high": {"maximum": 100}},
+                            }
+                        }
+                    },
+                }
+            },
+        },
+    )
+
+    with pytest.raises(FailureGroup) as exc:
+
+        @run_given(
+            case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE),
+            max_examples=10,
+            derandomize=True,
+            phases=[Phase.generate, Phase.shrink],
+        )
+        def test(case):
+            price = case.query["price"]
+            validate(case, response_factory.requests(content=json.dumps({"low": price, "high": price}).encode()))
+
+    assert sorted((failure.instance_path, failure.instance) for failure in exc.value.exceptions) == [
+        (["high"], 101),
+        (["low"], 101),
+    ]
+
+
 @pytest.mark.parametrize("factory_type", ["httpx", "httpx2", "requests", "wsgi"])
 @pytest.mark.parametrize(
     ("response_schema", "payload", "schema_path", "instance", "instance_path"),

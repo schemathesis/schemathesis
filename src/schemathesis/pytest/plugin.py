@@ -23,7 +23,13 @@ from schemathesis.core.errors import (
     SchemathesisError,
     format_exception,
 )
-from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, as_reported_failure, format_failures, get_origin
+from schemathesis.core.failures import (
+    RUN_CHECKS_LABEL,
+    FailureGroup,
+    format_failures,
+    get_origin,
+    reported_failures,
+)
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status
@@ -436,10 +442,8 @@ def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> Generator[None, object, N
     __tracebackhide__ = True
     if isinstance(pyfuncitem, SchemathesisFunction):
         try:
-            with ignore_hypothesis_output():
+            with reported_failures(), ignore_hypothesis_output():
                 yield
-        except FailureGroup as exc:
-            raise as_reported_failure(exc) from None
         except InvalidArgument as exc:
             raise _translate_invalid_argument(exc) from None
         except (SkipTest, unittest.SkipTest) as exc:
@@ -572,10 +576,11 @@ def _register_allure_forwarder(
     return forwarder
 
 
-def _unregister_allure_forwarder(forwarder: AllureHookForwarder) -> None:
+def _unregister_allure_forwarder(forwarder: AllureHookForwarder, outcome: PytestReportOutcome) -> None:
     import allure_commons
 
     allure_commons.plugin_manager.unregister(forwarder)
+    forwarder.flush(failed=outcome.status in (Status.FAILURE, Status.ERROR))
 
 
 def _send_to_xdist_controller(
@@ -710,7 +715,7 @@ def report_subtest(
         outcome = item.stash[_SUBTEST_OUTCOME_KEY]
         del item.stash[_SUBTEST_OUTCOME_KEY]
         if forwarder is not None:
-            _unregister_allure_forwarder(forwarder)
+            _unregister_allure_forwarder(forwarder, outcome)
         _write_pytest_result(
             item,
             schema,
@@ -816,10 +821,11 @@ def _teardown_stateful_test(item: pytest.Item, item_cls: type) -> None:
 
 
 def _teardown_operation_reporting(item: SchemathesisFunction, label: str) -> None:
+    outcome = item.stash.get(_REPORT_OUTCOME_KEY, PytestReportOutcome(Status.SUCCESS))
     forwarder = item.stash.get(_ALLURE_FORWARDER_KEY, None)
     if forwarder is not None:
         del item.stash[_ALLURE_FORWARDER_KEY]
-        _unregister_allure_forwarder(forwarder)
+        _unregister_allure_forwarder(forwarder, outcome)
     allure_buffer = item.stash.get(_ALLURE_BUFFER_KEY, None)
     if allure_buffer is not None:
         del item.stash[_ALLURE_BUFFER_KEY]
@@ -840,7 +846,7 @@ def _teardown_operation_reporting(item: SchemathesisFunction, label: str) -> Non
         item.operation_tags,
         dispatcher,
         writers,
-        item.stash.get(_REPORT_OUTCOME_KEY, PytestReportOutcome(Status.SUCCESS)),
+        outcome,
         allure_buffer,
     )
 

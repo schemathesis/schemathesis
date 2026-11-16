@@ -91,6 +91,7 @@ ___________________________ test_api[POST /bookings] ___________________________
   |     curl -X POST -H 'Authorization: Bearer secret-token' -H 'Content-Type: application/json' -d '{"guest_name": "00", "room_type": "", "nights": 1}' http://127.0.0.1:8080/bookings
   |
   |  (2 sub-exceptions)
+  | (note: 8 other explicit examples also failed with this error; use Verbosity.verbose to view)
 ...
 =========================== short test summary info ============================
 FAILED test_api.py::test_api[POST /bookings] - + Exception Group Traceback (m...

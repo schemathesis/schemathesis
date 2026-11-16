@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from collections.abc import Iterable, Sequence
 from hashlib import md5
+from operator import methodcaller
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from uuid import uuid4
@@ -10,6 +11,7 @@ from uuid import uuid4
 from allure_commons import hookimpl
 from allure_commons.logger import AllureFileLogger
 from allure_commons.model2 import Attachment, Label, Link, StatusDetails, TestResult, TestStepResult
+from hypothesis.control import current_build_context, currently_in_test_context
 
 from schemathesis.engine import Status
 from schemathesis.reporting.recorders import grouped_failures_from_recorder
@@ -277,28 +279,44 @@ class AllureHookForwarder:
     Created per pytest item, registered before the test body runs and unregistered in teardown.
     """
 
-    __slots__ = ("_label", "_writers")
+    __slots__ = ("_calls", "_label", "_writers")
 
     def __init__(self, label: str, writers: Sequence[AllureWriter | AllureCallBuffer]) -> None:
         self._label = label
         self._writers = writers
+        self._calls: list[tuple[bool, methodcaller]] = []
+
+    def _record(self, method: str, *args: object) -> None:
+        # Hypothesis runs explicit examples and the replay of a reported failure as final; fixtures run once.
+        final = not currently_in_test_context() or current_build_context().is_final
+        self._calls.append((final, methodcaller(method, self._label, *args)))
+
+    def flush(self, *, failed: bool) -> None:
+        """Send the recorded calls to the writers.
+
+        A failed test keeps only calls from final runs: generating and shrinking the failing example run the same
+        test body again and would repeat them.
+        """
+        calls = self._calls
+        if failed and any(final for final, _ in calls):
+            calls = [call for call in calls if call[0]]
+        for _, call in calls:
+            for w in self._writers:
+                call(w)
+        self._calls = []
 
     @hookimpl
     def attach_data(self, name: str, body: bytes, attachment_type: _HasMimeType | None, extension: str | None) -> None:
-        for w in self._writers:
-            w.accumulate_attachment(self._label, name, body, attachment_type)
+        self._record("accumulate_attachment", name, body, attachment_type)
 
     @hookimpl
     def add_link(self, url: str, link_type: str, name: str) -> None:
-        for w in self._writers:
-            w.accumulate_link(self._label, url, link_type, name)
+        self._record("accumulate_link", url, link_type, name)
 
     @hookimpl
     def add_title(self, test_title: str) -> None:
-        for w in self._writers:
-            w.accumulate_title(self._label, test_title)
+        self._record("accumulate_title", test_title)
 
     @hookimpl
     def add_description(self, test_description: str) -> None:
-        for w in self._writers:
-            w.accumulate_description(self._label, test_description)
+        self._record("accumulate_description", test_description)

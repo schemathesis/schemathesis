@@ -156,6 +156,7 @@ __________________________ test_api[POST /bookings] ___________________________
   |       http://127.0.0.1:8080/bookings
   |
   |  (2 sub-exceptions)
+  | (note: 8 other explicit examples also failed with this error; use Verbosity.verbose to view)
   +-+---------------- 1 ----------------
 ```
 
