@@ -69,6 +69,7 @@
 #### Coverage phase
 
 - Skipping the valid request when an earlier case fails.
+- `TypeError` in the coverage phase for schemas with non-array `examples`.
 - Missing positive values when `minLength` exceeds what an unanchored `pattern` matches. [#6085](https://github.com/schemathesis/schemathesis/issues/6085)
 - False positive `positive_data_acceptance` for optional parameters whose schema admits no value. [#6085](https://github.com/schemathesis/schemathesis/issues/6085)
 - Valid `oneOf` parameter values sent as negative test cases, e.g. `0` for an integer-or-string id.
