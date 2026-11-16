@@ -286,6 +286,22 @@ def nested_resource_names(parameter: str, path: str, collections: frozenset[str]
     )
 
 
+def collection_words(path: str, collections: frozenset[str]) -> tuple[str, ...]:
+    """Fixed segments naming the collection `path` lists or keys an item of, nearest first.
+
+    `download`, `share` for `/shares/downloads/{id}`.
+    """
+    segments = _blank_parameters(path)
+    if segments and segments[-1] == "{}":
+        segments.pop()
+    elif "/".join(segments) not in collections:
+        return ()
+    words = []
+    while segments and segments[-1] != "{}":
+        words.append(normalize_for_matching(to_singular(segments.pop())))
+    return tuple(words)
+
+
 def _blank_parameters(path: str) -> list[str]:
     return ["{}" if "{" in segment else segment for segment in _resource_segments(path)]
 

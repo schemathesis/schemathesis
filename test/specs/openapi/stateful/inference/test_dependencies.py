@@ -65,6 +65,9 @@ def response(status: str, schema=None, content_type: str = "application/json"):
     return container
 
 
+INTEGER = {"type": "integer"}
+
+
 def path_param(name: str, param_type: str = "string", required: bool = True):
     return {"name": name, "in": "path", "required": required, "schema": {"type": param_type}}
 
@@ -5015,6 +5018,324 @@ def test_parameter_binds_to_named_resource_over_prefix_named_one_with_inherited_
                 "parameters": {"query.barrier_id": "$response.body#/id"},
                 "x-schemathesis": {"is_inferred": True},
             },
+        ],
+    ]
+
+
+KEYED_BY_ID = {"type": "object", "properties": {"id": INTEGER}}
+
+
+def served(name: str, collection: str, key: str):
+    # `name` is what `GET /{collection}/{key}` returns
+    return operation("get", f"/{collection}/{{{key}}}", "200", component_ref(name), [path_param(key, "integer")])
+
+
+def links_filling(graph, parameter: str):
+    return [
+        [source, status, link["parameters"][parameter]]
+        for source, status, link in inferred_links(graph)
+        if parameter in link["parameters"]
+    ]
+
+
+def labels_by(parameter: str):
+    return operation(
+        "get",
+        "/labels",
+        "200",
+        {"type": "object"},
+        [{"name": parameter, "in": "query", "required": True, "schema": INTEGER}],
+    )
+
+
+@pytest.mark.parametrize("group_first", [True, False], ids=["group-first", "group-last"])
+def test_parameter_takes_schema_named_like_it_over_one_served_as_another_resource(ctx, group_first):
+    group, widget = served("widget-group", "widget-groups", "group_id"), served("widget", "widgets", "widget_id")
+    paths = {**(group | widget if group_first else widget | group), **labels_by("widget_id")}
+    schemas = {"widget-group": KEYED_BY_ID, "widget": KEYED_BY_ID}
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": schemas})
+    assert links_filling(graph, "query.widget_id") == [
+        ["#/paths/~1widgets~1{widget_id}/get", "200", "$response.body#/id"]
+    ]
+
+
+@pytest.mark.parametrize(
+    ("schema", "fields", "collection", "expected"),
+    [
+        ("WidgetRole", {"id": INTEGER}, "roles", []),
+        (
+            "WidgetRole",
+            {"id": INTEGER, "widget_id": INTEGER},
+            "roles",
+            [["#/paths/~1roles~1{key}/get", "200", "$response.body#/widget_id"]],
+        ),
+        ("WidgetSummary", {"id": INTEGER}, "widgets", [["#/paths/~1widgets~1{key}/get", "200", "$response.body#/id"]]),
+        (
+            "WidgetSummary",
+            {"id": INTEGER},
+            "get-widgets",
+            [["#/paths/~1get-widgets~1{key}/get", "200", "$response.body#/id"]],
+        ),
+        (
+            "BlueWidget",
+            {"id": INTEGER},
+            "blue-widgets",
+            [["#/paths/~1blue-widgets~1{key}/get", "200", "$response.body#/id"]],
+        ),
+        (
+            "WidgetDownload",
+            {"id": INTEGER},
+            "widgets/downloads",
+            [["#/paths/~1widgets~1downloads~1{key}/get", "200", "$response.body#/id"]],
+        ),
+    ],
+    ids=[
+        "served-as-another",
+        "field-named-like-parameter",
+        "served-as-the-resource",
+        "collection-ends-with-it",
+        "qualified-name",
+        "collection-under-the-resource",
+    ],
+)
+def test_prefix_named_schema_keys_parameter_unless_served_as_another_resource(
+    ctx, schema, fields, collection, expected
+):
+    paths = {
+        **served(schema, collection, "key"),
+        **operation("delete", "/widgets/{widget_id}", "204", parameters=[path_param("widget_id", "integer")]),
+        **labels_by("widget_id"),
+    }
+    schemas = {schema: {"type": "object", "properties": fields}}
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": schemas})
+    assert [
+        link for link in links_filling(graph, "query.widget_id") if link[0] != "#/paths/~1widgets~1{widget_id}/delete"
+    ] == expected
+
+
+@pytest.mark.parametrize(
+    ("abbreviation_collection", "expected"),
+    [
+        ("runners", [["#/paths/~1runs~1{run_id}/get", "200", "$response.body#/id"]]),
+        (None, [["#/paths/~1runners~1{runner_id}/get", "200", "$response.body#/id"]]),
+    ],
+    ids=["resource-has-own-collection", "word-only-abbreviated"],
+)
+def test_parameter_skips_longer_word_served_as_another_resource(ctx, abbreviation_collection, expected):
+    # `runner` is not a run when the API keys runs; `Application` may be an app when nothing else is one
+    paths = {
+        **served("runner", "runners", "runner_id"),
+        **(
+            {"/runs/{run_id}": served("workflow-run", "runs", "run_id")["/runs/{run_id}"]}
+            if abbreviation_collection
+            else {}
+        ),
+        **labels_by("run_id"),
+    }
+    schemas = {"runner": KEYED_BY_ID, "workflow-run": KEYED_BY_ID}
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": schemas})
+    assert links_filling(graph, "query.run_id") == expected
+
+
+def test_item_key_takes_schema_its_own_path_returns_among_those_served_as_its_resource(ctx):
+    paths = {
+        **served("hook-delivery", "deliveries", "delivery_id"),
+        **operation(
+            "get",
+            "/orgs/{org}/hooks/{hook_id}",
+            "200",
+            component_ref("org-hook"),
+            [path_param("org"), path_param("hook_id")],
+        ),
+        **operation(
+            "get",
+            "/repos/{repo}/hooks/{hook_id}",
+            "200",
+            component_ref("hook"),
+            [path_param("repo"), path_param("hook_id")],
+        ),
+        **operation(
+            "get",
+            "/repos/{repo}/hooks/{hook_id}/config",
+            "200",
+            {"type": "object"},
+            [path_param("repo"), path_param("hook_id")],
+        ),
+    }
+    schemas = {"hook-delivery": KEYED_BY_ID, "org-hook": KEYED_BY_ID, "hook": KEYED_BY_ID}
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": schemas})
+    assert [
+        [source, status, link["parameters"]["path.hook_id"]]
+        for source, status, link in inferred_links(graph)
+        if link["operationRef"] == "#/paths/~1repos~1{repo}~1hooks~1{hook_id}~1config/get"
+    ] == [["#/paths/~1repos~1{repo}~1hooks~1{hook_id}/get", "200", "$response.body#/id"]]
+
+
+def test_item_key_takes_schema_listed_by_the_collection_keying_it(ctx):
+    # `/enterprises/{enterprise}/organizations` lists `OrganizationSimple`, so it is what `{org_id}` there keys
+    paths = {
+        **operation(
+            "get",
+            "/enterprises/{enterprise}/organizations",
+            "200",
+            {"type": "array", "items": component_ref("OrganizationSimple")},
+            [path_param("enterprise")],
+        ),
+        **operation(
+            "delete",
+            "/enterprises/{enterprise}/organizations/{org_id}",
+            "204",
+            parameters=[path_param("enterprise"), path_param("org_id", "integer")],
+        ),
+        **served("org", "orgs", "key"),
+    }
+    schemas = {"OrganizationSimple": KEYED_BY_ID, "org": KEYED_BY_ID}
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": schemas})
+    assert links_filling(graph, "path.org_id") == [
+        ["#/paths/~1enterprises~1{enterprise}~1organizations/get", "200", "$response.body#/*/id"]
+    ]
+
+
+GROUP_LINK = ["#/paths/~1widget-groups~1{group_id}/get", "200", "$response.body#/id"]
+
+
+@pytest.mark.parametrize(
+    ("item_operations", "expected"),
+    [
+        (
+            {"get": {**response("200", component_ref("Gadget")), "parameters": [path_param("widget_id")]}},
+            [GROUP_LINK],
+        ),
+        (
+            {
+                "get": {**response("200", component_ref("Gadget")), "parameters": [path_param("widget_id")]},
+                "put": {**response("200", component_ref("GadgetUpdate")), "parameters": [path_param("widget_id")]},
+            },
+            [GROUP_LINK],
+        ),
+        (
+            {
+                "get": {
+                    **response("200", {"type": "array", "items": component_ref("Gadget")}),
+                    "parameters": [path_param("widget_id")],
+                }
+            },
+            [["#/paths/~1widgets~1{key}/get", "200", "$response.body#/id"]],
+        ),
+    ],
+    ids=["returns-another-object", "returns-several-objects", "returns-a-list"],
+)
+def test_item_key_rebinds_only_to_what_its_path_returns(ctx, item_operations, expected):
+    # `Gadget` is what `/widgets/{widget_id}` returns, which no name match finds; a list there holds other items
+    paths = {
+        **served("widget-group", "widget-groups", "group_id"),
+        "/widgets/{widget_id}": item_operations,
+        **operation("get", "/widgets/{widget_id}/labels", "200", {"type": "object"}, [path_param("widget_id")]),
+        **served("widget", "widgets", "key"),
+    }
+    schemas = {"widget-group": KEYED_BY_ID, "widget": KEYED_BY_ID, "Gadget": KEYED_BY_ID, "GadgetUpdate": KEYED_BY_ID}
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": schemas})
+    assert [
+        [source, status, link["parameters"]["path.widget_id"]]
+        for source, status, link in inferred_links(graph)
+        if link["operationRef"] == "#/paths/~1widgets~1{widget_id}~1labels/get"
+        and link["parameters"]["path.widget_id"].startswith("$response")
+    ] == expected
+
+
+def test_item_key_collection_shares_no_namespace_with_other_resources(ctx):
+    # `actions` names no item, so `runner-group` under `/actions/runner-groups` is not a runner
+    paths = {
+        **served("runner-group", "actions/runner-groups", "group_id"),
+        **served("runner", "actions/runners", "runner_id"),
+        **operation(
+            "get",
+            "/actions/runners/{runner_id}/labels",
+            "200",
+            {"type": "object"},
+            [path_param("runner_id", "integer")],
+        ),
+    }
+    _, graph = analyze_dependencies(
+        ctx, paths, components={"schemas": {"runner-group": KEYED_BY_ID, "runner": KEYED_BY_ID}}
+    )
+    assert [
+        [source, status, link["parameters"]["path.runner_id"]]
+        for source, status, link in inferred_links(graph)
+        if link["operationRef"] == "#/paths/~1actions~1runners~1{runner_id}~1labels/get"
+    ] == [["#/paths/~1actions~1runners~1{runner_id}/get", "200", "$response.body#/id"]]
+
+
+def test_item_key_under_a_parent_other_scopes_also_key_keeps_its_binding(ctx):
+    # `{group_id}` keys groups of orgs and of enterprises; a runner listed in one would carry its group into the other
+    group = [path_param("group_id", "integer")]
+    runner = [path_param("enterprise"), *group, path_param("runner_id", "integer")]
+    org_runners = {"type": "object", "properties": {"runners": {"type": "array", "items": component_ref("runner")}}}
+    paths = {
+        **operation(
+            "get",
+            "/enterprises/{enterprise}/groups/{group_id}",
+            "200",
+            component_ref("runner-group"),
+            [path_param("enterprise"), *group],
+        ),
+        **operation("get", "/orgs/{org}/groups/{group_id}/runners", "200", org_runners, [path_param("org"), *group]),
+        "/enterprises/{enterprise}/groups/{group_id}/runners/{runner_id}": {
+            "put": {**response("204"), "parameters": runner},
+            "delete": {**response("204"), "parameters": runner},
+        },
+        **served("runner", "runners", "runner_id"),
+    }
+    _, graph = analyze_dependencies(
+        ctx, paths, components={"schemas": {"runner-group": KEYED_BY_ID, "runner": KEYED_BY_ID}}
+    )
+    links = inferred_links(graph)
+    nested = "#/paths/~1enterprises~1{enterprise}~1groups~1{group_id}~1runners~1{runner_id}"
+    assert [
+        link["parameters"]
+        for source, _, link in links
+        if source == "#/paths/~1orgs~1{org}~1groups~1{group_id}~1runners/get"
+        and link["operationRef"] == f"{nested}/delete"
+    ] == []
+    # A bodyless `PUT` there still confirms the runner it adds
+    assert [
+        link["parameters"]
+        for source, _, link in links
+        if source == f"{nested}/put" and "runners~1{runner_id}/get" in link["operationRef"]
+    ] == [{"path.runner_id": "$request.path.runner_id"}]
+
+
+def test_bodyless_put_confirms_resource_its_key_rebinds_to(ctx):
+    paths = {
+        **operation("post", "/widget-groups", "201", component_ref("widget-group")),
+        "/widget-groups/{group_id}/widgets/{widget_id}": {
+            "put": {**response("204"), "parameters": [path_param("group_id"), path_param("widget_id")]}
+        },
+        **operation("get", "/widgets/{widget_id}", "200", component_ref("widget"), [path_param("widget_id")]),
+    }
+    _, graph = analyze_dependencies(
+        ctx, paths, components={"schemas": {"widget-group": KEYED_BY_ID, "widget": KEYED_BY_ID}}
+    )
+    assert [
+        [source, status, link["operationRef"], link["parameters"]] for source, status, link in inferred_links(graph)
+    ] == [
+        [
+            "#/paths/~1widget-groups/post",
+            "201",
+            "#/paths/~1widget-groups~1{group_id}~1widgets~1{widget_id}/put",
+            {"path.group_id": "$response.body#/id"},
+        ],
+        [
+            "#/paths/~1widget-groups~1{group_id}~1widgets~1{widget_id}/put",
+            "204",
+            "#/paths/~1widgets~1{widget_id}/get",
+            {"path.widget_id": "$request.path.widget_id"},
+        ],
+        [
+            "#/paths/~1widgets~1{widget_id}/get",
+            "200",
+            "#/paths/~1widget-groups~1{group_id}~1widgets~1{widget_id}/put",
+            {"path.widget_id": "$response.body#/id"},
         ],
     ]
 
@@ -12349,9 +12670,6 @@ def test_scalar_body_field_named_after_object_collection(ctx, item, language, ex
 
 def keyed(**fields):
     return {"type": "object", "properties": {"pk": {"type": "integer", "readOnly": True}, **fields}}
-
-
-INTEGER = {"type": "integer"}
 
 
 NAMED = keyed(name={"type": "string"})
