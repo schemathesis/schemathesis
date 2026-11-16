@@ -73,6 +73,7 @@ if TYPE_CHECKING:
     from random import Random
 
     from hypothesis.strategies import SearchStrategy
+    from hypothesis_graphql import Mode
 
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.checks import CheckContext
@@ -123,6 +124,8 @@ class GraphQLSchema(BaseSchema):
         self.analysis = GraphQLAnalysis(self)
         # Coverage cases shared by operations, for callers that pass no run-scoped session.
         self.coverage_shared_targets_seen: set[Hashable] = set()
+        # Query strategies with the custom scalars they were built from, rebuilt when the scalar registry changes.
+        self._query_strategies: dict[Hashable, tuple[dict[str, SearchStrategy], SearchStrategy]] = {}
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
@@ -565,30 +568,16 @@ def graphql_cases(
     mutate_ast: Callable[[graphql.OperationDefinitionNode, Random], graphql.OperationDefinitionNode] | None = None,
 ) -> Any:
     from hypothesis_graphql import Mode as GqlMode
-    from hypothesis_graphql import strategies as gql_st
 
     started_at = Instant()
-    definition = cast(GraphQLOperationDefinition, operation.definition)
-    strategy_factory = {
-        RootType.QUERY: gql_st.queries,
-        RootType.MUTATION: gql_st.mutations,
-    }[definition.root_type]
     hook_context = HookContext(operation=operation)
-    custom_scalars = scalar_strategies()
     generation = operation.schema.config.generation_for(operation=operation, phase=phase.value)
     gql_mode = GqlMode.NEGATIVE if generation_mode == GenerationMode.NEGATIVE else GqlMode.POSITIVE
     effective_mode = generation_mode
-    strategy = strategy_factory(
-        operation.schema.client_schema,
-        fields=[definition.field_name],
-        custom_scalars=custom_scalars,
-        print_ast=_noop,
-        allow_x00=generation.allow_x00,
-        allow_null=generation.graphql_allow_null,
-        codec=generation.codec,
-        mode=gql_mode,
+    # Hooks are resolved on every call, so their wrappers are not reused
+    strategy = apply_to_all_dispatchers(
+        operation, hook_context, hooks, _query_strategy(operation, generation, gql_mode), "body"
     )
-    strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body")
     try:
         ast_node = _draw_ast(draw, strategy)
     except InvalidArgument:
@@ -596,17 +585,9 @@ def graphql_cases(
         if generation.modes == [GenerationMode.NEGATIVE]:
             raise SkipTest("Impossible to generate negative test cases for this GraphQL operation") from None
         effective_mode = GenerationMode.POSITIVE
-        fallback_strategy = strategy_factory(
-            operation.schema.client_schema,
-            fields=[definition.field_name],
-            custom_scalars=custom_scalars,
-            print_ast=_noop,
-            allow_x00=generation.allow_x00,
-            allow_null=generation.graphql_allow_null,
-            codec=generation.codec,
-            mode=GqlMode.POSITIVE,
+        fallback_strategy = apply_to_all_dispatchers(
+            operation, hook_context, hooks, _query_strategy(operation, generation, GqlMode.POSITIVE), "body"
         )
-        fallback_strategy = apply_to_all_dispatchers(operation, hook_context, hooks, fallback_strategy, "body")
         ast_node = _draw_ast(draw, fallback_strategy)
 
     operation_node = next(
@@ -742,6 +723,40 @@ def _generate_parameter(
     else:
         strategy = apply_to_all_dispatchers(operation, context, hooks, st.just(explicit), container)
     return draw(strategy)
+
+
+def _query_strategy(
+    operation: APIOperation, generation: GenerationConfig, mode: Mode
+) -> SearchStrategy[graphql.DocumentNode]:
+    from hypothesis_graphql import strategies
+
+    definition = cast(GraphQLOperationDefinition, operation.definition)
+    schema = cast(GraphQLSchema, operation.schema)
+    custom_scalars = scalar_strategies()
+    key = (
+        definition.root_type,
+        definition.field_name,
+        generation.allow_x00,
+        generation.graphql_allow_null,
+        generation.codec,
+        mode,
+    )
+    cached = schema._query_strategies.get(key)
+    if cached is not None and cached[0] == custom_scalars:
+        return cached[1]
+    factory = strategies.queries if definition.root_type == RootType.QUERY else strategies.mutations
+    strategy = factory(
+        schema.client_schema,
+        fields=[definition.field_name],
+        custom_scalars=custom_scalars,
+        print_ast=_noop,
+        allow_x00=generation.allow_x00,
+        allow_null=generation.graphql_allow_null,
+        codec=generation.codec,
+        mode=mode,
+    )
+    schema._query_strategies[key] = (custom_scalars, strategy)
+    return strategy
 
 
 def _draw_ast(draw: Callable, strategy: SearchStrategy[graphql.DocumentNode]) -> graphql.DocumentNode:

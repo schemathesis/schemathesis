@@ -22,8 +22,7 @@ type Query {
 
 
 def test_custom_scalar_graphql(ctx):
-    expected = "2022-04-27"
-    schemathesis.graphql.scalar("Date", st.just(expected).map(nodes.String))
+    expected = "not-a-date"
     raw_schema = """
 scalar Date
 
@@ -32,8 +31,16 @@ type Query {
 }
 """
     schema = ctx.graphql.load_sdl(raw_schema)
+    strategy = schema["Query"]["getByDate"].as_strategy()
 
-    @run_given(schema["Query"]["getByDate"].as_strategy(), max_examples=100)
+    @run_given(strategy, max_examples=10)
+    def test_default(case):
+        assert expected not in case.body
+
+    # A scalar registered after cases were already generated applies to the next ones
+    schemathesis.graphql.scalar("Date", st.just(expected).map(nodes.String))
+
+    @run_given(strategy, max_examples=10)
     def test(case):
         assert f'getByDate(value: "{expected}")' in case.body
 

@@ -24,6 +24,7 @@
 
 - Up to 2x faster coverage phase for patterns with wide character classes like `\p{L}`.
 - Up to 13% faster negative coverage phase against fast local APIs.
+- Up to 2x faster GraphQL test case generation in negative mode.
 
 ### :wrench: Changed
 
