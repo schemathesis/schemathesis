@@ -470,6 +470,24 @@ def test_validate_response_no_errors(ctx, response_factory):
     assert case.validate_response(response_factory.requests(status_code=200)) is None
 
 
+@pytest.mark.parametrize(
+    "validate",
+    [
+        lambda case, response: case.validate_response(response),
+        lambda case, response: case.operation.validate_response(response),
+    ],
+    ids=["case", "operation"],
+)
+def test_validate_response_unsupported_response_type(ctx, validate):
+    operation = ctx.openapi.load_operation("GET /users", {"responses": {"200": {"description": "OK"}}})
+    with pytest.raises(IncorrectUsage) as exc_info:
+        validate(operation.Case(), {"status": 200})
+    assert str(exc_info.value) == (
+        "Unsupported response type: `dict`. Expected one of: `requests.Response`, `httpx.Response`, "
+        "`httpx2.Response`, `werkzeug.test.TestResponse` or `schemathesis.Response`."
+    )
+
+
 def test_validate_response_custom_check_raising_while_handling_error(ctx, response_factory):
     operation = ctx.openapi.load_operation("GET /x", {"responses": {"200": {"description": "OK"}}})
     case = operation.Case()

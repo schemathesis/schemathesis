@@ -547,8 +547,9 @@ class Case(Generic[OperationT]):
         # Checks may not be loaded yet, e.g. in non-Schemathesis tests that construct `Case` by hand
         load_all_checks()
 
-        sent_base_url = _sent_base_url(self, response, transport_kwargs)
-        response = Response.from_any(response)
+        # A followed redirect is visible only on the response as the client returned it.
+        original, response = response, Response.from_any(response)
+        sent_base_url = _sent_base_url(self, original, transport_kwargs)
 
         phase = PhaseName.from_str(self.meta.phase.name.value) if self.meta is not None else None
         config = self.operation.schema.config.checks_config_for(
