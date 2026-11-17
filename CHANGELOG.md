@@ -105,6 +105,7 @@
 - `st explain ST112` suggesting `--exclude-checks max_response_time`, which `st run` rejects.
 - Shrink `st run` failures to a minimal example, so `--no-shrink` takes effect.
 - Stop `schemathesis.toml` discovery at the root of a git worktree or submodule.
+- `UnicodeEncodeError` in CLI output on non-UTF-8 streams, such as piped output on Windows.
 
 #### pytest and Python API
 

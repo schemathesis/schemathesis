@@ -49,20 +49,11 @@ if TYPE_CHECKING:
     from schemathesis.engine import events
     from schemathesis.engine.statistic import GroupedFailures, Statistic
 
-IO_ENCODING = os.getenv("PYTHONIOENCODING", "utf-8")
+HEADER_SEPARATOR = "━"
 
-if IO_ENCODING != "utf-8":
-    HEADER_SEPARATOR = "-"
 
-    def style(text: str, **kwargs: Any) -> str:
-        text = text.encode(IO_ENCODING, errors="replace").decode("utf-8")
-        return click.style(text, **kwargs)
-
-else:
-    HEADER_SEPARATOR = "━"
-
-    def style(text: str, **kwargs: Any) -> str:
-        return click.style(text, **kwargs)
+def style(text: str, **kwargs: Any) -> str:
+    return click.style(text, **kwargs)
 
 
 @dataclass
@@ -180,7 +171,12 @@ def display_header(version: str) -> None:
     prefix = "v" if version != "dev" else ""
     header = f"Schemathesis {prefix}{version}"
     click.echo(style(header, bold=True))
-    click.echo(style(HEADER_SEPARATOR * len(header), bold=True))
+    try:
+        HEADER_SEPARATOR.encode(sys.stdout.encoding or "utf-8")
+        separator = HEADER_SEPARATOR
+    except UnicodeEncodeError:
+        separator = "-"
+    click.echo(style(separator * len(header), bold=True))
     click.echo()
 
 
@@ -223,9 +219,10 @@ def make_progress_bar(console: Console, *, indent: str = "", transient: bool = T
     )
 
 
-def _degrade_unencodable_glyphs(stream: object) -> None:
+def degrade_unencodable_glyphs(stream: object) -> None:
     # Status glyphs may not encode (CP1252 on Windows, or redirected output); replace them instead of aborting mid-run.
-    if isinstance(stream, io.TextIOWrapper) and stream.errors == "strict":
+    # `surrogateescape`, the default on Windows and in the C locale, rejects them like `strict` does.
+    if isinstance(stream, io.TextIOWrapper) and stream.errors in ("strict", "surrogateescape"):
         stream.reconfigure(errors="replace")
 
 
@@ -238,7 +235,6 @@ def make_console(**kwargs: Any) -> Console:
         # Snapshots assume non-terminal rendering; force it even when CI sets FORCE_COLOR=1.
         kwargs.setdefault("force_terminal", False)
         kwargs.setdefault("color_system", None)
-    _degrade_unencodable_glyphs(kwargs.get("file") or sys.stdout)
     return Console(**kwargs)
 
 
