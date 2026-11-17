@@ -107,12 +107,14 @@ class Failure(AssertionError):
             "severity": self.severity.value,
         }
 
+    # The title breaks ties, e.g. two custom checks failing with the same message
     def __lt__(self, other: Failure) -> bool:
         return (
             self.severity,
             self.__class__.__name__,
             self.message,
-        ) < (other.severity, other.__class__.__name__, other.message)
+            self.title,
+        ) < (other.severity, other.__class__.__name__, other.message, other.title)
 
     # Hash by class alone, so shrinking keeps the minimized failure
     def __hash__(self) -> int:
