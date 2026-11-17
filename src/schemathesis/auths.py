@@ -717,7 +717,9 @@ def _caching_providers_in(storage: AuthStorage) -> Iterator[CachingAuthProvider]
 
 
 def _iter_caching_providers(case: Case) -> Iterator[CachingAuthProvider]:
-    """Caching auth providers reachable for this case: config dynamic-token, schema-level and global ``@auth``."""
+    """Caching auth providers for this case: its own, config dynamic-token, schema-level and global ``@auth``."""
+    if case._auth_storage is not None:
+        yield from _caching_providers_in(case._auth_storage)
     for provider in case.operation.schema.security_auth_providers():
         if isinstance(provider, CachingAuthProvider):
             yield provider
@@ -726,8 +728,11 @@ def _iter_caching_providers(case: Case) -> Iterator[CachingAuthProvider]:
 
 
 def apply_configured_auth(case: Case) -> None:
-    """Set the credentials a run would send for `case`: auth providers, configured auth or the schema's security."""
-    set_on_case(case, AuthContext(operation=case.operation, app=case.operation.app), None)
+    """Set the credentials a run would send for `case`: auth providers, configured auth or the schema's security.
+
+    A case generated with its own auth storage gets credentials from that storage only.
+    """
+    set_on_case(case, AuthContext(operation=case.operation, app=case.operation.app), case._auth_storage)
 
 
 def refresh_auth(case: Case) -> None:

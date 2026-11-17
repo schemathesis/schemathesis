@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import jsonschema_rs
 from jsonschema_rs import Validator
 
-from schemathesis.auths import AuthContext, reauth_and_replay, set_on_case
+from schemathesis.auths import apply_configured_auth, reauth_and_replay
 from schemathesis.checks import (
     CheckContext,
     CheckFunction,
@@ -415,7 +415,7 @@ class Case(Generic[OperationT]):
         than `refresh_interval`, then fetches a new one. Cases without configured auth stay unchanged.
         """
         if self._has_explicit_auth:
-            set_on_case(self, AuthContext(operation=self.operation, app=self.operation.app), self._auth_storage)
+            apply_configured_auth(self)
 
     @property
     def formatted_path(self) -> str:
