@@ -25,6 +25,12 @@ def test_failure_class_names_existing_checks(cls):
     assert tuning is None or tuning[0] in cls.checks
 
 
+def test_exclude_checks_advice_names_accepted_checks():
+    advised = re.findall(r"`--exclude-checks ([\w,]+)`", generate_docs_page())
+    assert advised
+    assert {name for value in advised for name in value.split(",")} - set(CHECKS.get_all_names()) == set()
+
+
 @pytest.mark.parametrize("argument", ["st108", "108", " St108 "])
 def test_explain_accepts_code_aliases(cli, argument):
     assert cli.main("explain", argument).stdout == cli.main("explain", "ST108").stdout

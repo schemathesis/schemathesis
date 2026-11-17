@@ -81,6 +81,9 @@ def config_snippet(code: str, *, width: int) -> list[str]:
 
 def turn_off_text(code: str) -> str:
     checks = _failure_class(code).checks
+    # `--exclude-checks` does not accept it: the check runs only when a limit is set.
+    if checks == ("max_response_time",):
+        return "Removing `--max-response-time` and `checks.max_response_time` turns it off."
     flag = f"`--exclude-checks {','.join(checks) or '<name>'}` turns it off"
     hidden = _hidden_with(code, checks)
     return f"{flag}, along with {', '.join(hidden)}." if hidden else f"{flag}."
