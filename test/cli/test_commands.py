@@ -1018,8 +1018,17 @@ def test_connection_error(ctx, cli, workers, snapshot_cli):
 
 
 # A listener with a full accept queue drops new connection attempts, so they time out instead of being refused.
-def test_server_that_times_out_connections_has_unknown_capabilities(ctx, cli):
-    api = ctx.openapi.apps.success()
+def test_server_that_times_out_connections(ctx, cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "api_key", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
     with socket.create_server(("127.0.0.1", 0), backlog=0) as server:
         port = server.getsockname()[1]
         pending = []
@@ -1033,19 +1042,33 @@ def test_server_that_times_out_connections_has_unknown_capabilities(ctx, cli):
             except OSError:
                 break
         try:
-            lines = cli.run(
-                api.schema_url,
-                f"--url=http://127.0.0.1:{port}/api",
+            lines = cli.run_openapi_app(
+                app,
+                f"--url=http://127.0.0.1:{port}",
                 "--phases=fuzzing",
                 "-n",
                 "1",
                 "--request-timeout=0.2",
+                config={"parameters": {"api_key": "s3cr3t"}},
             ).stdout.splitlines()
         finally:
             for connection in pending:
                 connection.close()
     assert [line.strip() for line in lines if "API capabilities" in line or "✘" in line] == [
         "⚠️  API capabilities: unknown, server unreachable"
+    ]
+    # The error masks the same query values as the command reproducing it
+    assert lines[lines.index("Network Error") : lines.index("Need more help?")] == [
+        "Network Error",
+        "",
+        "Connection failed",
+        "",
+        "    Max retries exceeded with url: /items?api_key=%5BFiltered%5D",
+        "",
+        "Reproduce with:",
+        "",
+        f"    curl -X GET 'http://127.0.0.1:{port}/items?api_key=%5BFiltered%5D'",
+        "",
     ]
 
 

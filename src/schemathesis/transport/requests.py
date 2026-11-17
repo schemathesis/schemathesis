@@ -14,7 +14,7 @@ from urllib.parse import urlencode, urljoin, urlparse
 import requests
 from requests.adapters import HTTPAdapter
 from typing_extensions import override
-from urllib3.exceptions import DecodeError, ProtocolError, ReadTimeoutError
+from urllib3.exceptions import DecodeError, MaxRetryError, ProtocolError, ReadTimeoutError
 from urllib3.filepost import encode_multipart_formdata
 
 from schemathesis.core import Body, NotSet, media_types
@@ -22,6 +22,7 @@ from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible, i
 from schemathesis.core.file_samples import MEDIA_TYPE_FILE_SAMPLES
 from schemathesis.core.jsonschema import get_type, resolve_with_root_bundle
 from schemathesis.core.jsonschema.types import JsonSchemaObject
+from schemathesis.core.output.sanitization import sanitize_url
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at, to_wire_text
@@ -54,6 +55,7 @@ from schemathesis.transport.serialization import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from schemathesis.config import SanitizationConfig
     from schemathesis.generation.case import Case
 
 
@@ -285,7 +287,14 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             max_stream_events = config.max_stream_events_for(operation=case.operation)
             with ratelimit(rate_limit, config.base_url):
                 response = retry_on_transport_errors(
-                    partial(_request_resending_on_dropped_connection, session, data, max_stream_events), retries
+                    partial(
+                        _request_resending_on_dropped_connection,
+                        session,
+                        data,
+                        max_stream_events,
+                        config.output.sanitization,
+                    ),
+                    retries,
                 )
             return Response.from_requests(
                 response,
@@ -293,6 +302,9 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 _override=Override.from_send_kwargs(kwargs),
                 _explicit_auth=kwargs.get("auth") is not None or session.auth is not None,
             )
+        except requests.exceptions.RequestException as exc:
+            _mask_quoted_url(exc, config.output.sanitization)
+            raise
         finally:
             session.headers = current_session_headers
             if current_session_auth is not None:
@@ -303,20 +315,28 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 session.cookies.clear()
 
 
+def _mask_quoted_url(exc: requests.exceptions.RequestException, sanitization: SanitizationConfig) -> None:
+    # urllib3 quotes the sent URL, e.g. `Max retries exceeded with url: /items?api_key=...`. Rebuilt in place, since
+    # the same error is chained to the raised one, so tracebacks and pickled copies show the masked URL too.
+    inner = exc.args[0] if exc.args else None
+    if sanitization.enabled and isinstance(inner, MaxRetryError) and inner.url is not None:
+        MaxRetryError.__init__(inner, inner.pool, sanitize_url(inner.url, config=sanitization), inner.reason)
+
+
 def _request_resending_on_dropped_connection(
-    session: requests.Session, data: dict[str, Any], max_stream_events: int
+    session: requests.Session, data: dict[str, Any], max_stream_events: int, sanitization: SanitizationConfig
 ) -> requests.Response:
     # A server may close a keep-alive connection after a response without `Connection: close`, leaving a request
     # already sent on it unread. Like browsers and curl, send such a request once more on a fresh connection.
     opened = _count_opened_connections(session)
     try:
-        return _request(session, data, max_stream_events)
+        return _request(session, data, max_stream_events, sanitization)
     except requests.exceptions.ConnectionError as exc:
         if not _is_dropped_before_response(exc) or _count_opened_connections(session) != opened:
             raise
         dropped = exc
     try:
-        return _request(session, data, max_stream_events)
+        return _request(session, data, max_stream_events, sanitization)
     except requests.exceptions.RequestException:
         # The fresh connection failing too means the server itself is broken; report what the original request saw.
         pass
@@ -326,7 +346,9 @@ def _request_resending_on_dropped_connection(
 EVENT_STREAM_CHUNK_SIZE = 64 * 1024
 
 
-def _request(session: requests.Session, data: dict[str, Any], max_stream_events: int) -> requests.Response:
+def _request(
+    session: requests.Session, data: dict[str, Any], max_stream_events: int, sanitization: SanitizationConfig
+) -> requests.Response:
     response = session.request(**{**data, "stream": True})
     if media_types.is_sse(response.headers.get("Content-Type")):
         # An event stream may never end; stop reading once the request timeout passes in total.
@@ -339,17 +361,18 @@ def _request(session: requests.Session, data: dict[str, Any], max_stream_events:
         response.close()
     else:
         # Read the body here, so network errors while reading it are retried like before.
-        _read_body(response, data["timeout"])
+        _read_body(response, data["timeout"], sanitization)
     return response
 
 
-def _read_body(response: requests.Response, timeout: float | int) -> None:
+def _read_body(response: requests.Response, timeout: float | int, sanitization: SanitizationConfig) -> None:
     try:
         response.content  # noqa: B018
     except requests.exceptions.ConnectionError as exc:
         # A body that stops arriving within the timeout is reported like a response that never started.
         if is_read_timeout(exc):
-            raise read_timeout_error(response.url, timeout, response.request) from exc
+            url = sanitize_url(response.url, config=sanitization) if sanitization.enabled else response.url
+            raise read_timeout_error(url, timeout, response.request) from exc
         raise
 
 
