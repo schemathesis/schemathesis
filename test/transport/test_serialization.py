@@ -1875,13 +1875,22 @@ def test_multipart_part_content_type(ctx, case_factory, load_kwargs, body, field
     ("part", "expected"),
     [
         ({"type": "object"}, "application/json"),
-        ({"type": ["array", "null"]}, "application/json"),
+        ({"type": "array"}, "application/octet-stream"),
+        ({"type": ["array", "null"]}, "application/octet-stream"),
         ({"type": ["string", "null"]}, None),
         ({"additionalProperties": {"type": "string"}}, "application/json"),
         ({"items": {}}, "application/octet-stream"),
         ({}, "application/octet-stream"),
     ],
-    ids=["object", "type-list-array", "type-list-scalar", "untyped-additional-properties", "untyped-items", "empty"],
+    ids=[
+        "object",
+        "array-without-items",
+        "type-list-array",
+        "type-list-scalar",
+        "untyped-additional-properties",
+        "untyped-items",
+        "empty",
+    ],
 )
 def test_multipart_structured_part_defaults_to_json(ctx, case_factory, part, expected):
     operation = ctx.openapi.load_operation(

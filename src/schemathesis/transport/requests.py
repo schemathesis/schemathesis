@@ -600,10 +600,12 @@ def _encode_positional_parts(
 
 
 def _part_schema(schema: dict[str, Any]) -> dict[str, Any]:
-    # An array part takes the default of its items; `{}` items default to bytes like any untyped part.
+    # An array part takes the default of its items; absent or `{}` items default to bytes like any untyped part.
     items = schema.get("items")
     if isinstance(items, dict):
         return items
+    if [ty for ty in get_type(schema) if ty != "null"] == ["array"]:
+        return {}
     return schema
 
 
