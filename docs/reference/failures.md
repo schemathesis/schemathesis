@@ -163,7 +163,7 @@ include-name = "GET /reports"
 checks.max_response_time = 30.0
 ```
 
-`--exclude-checks max_response_time` turns it off.
+Removing `--max-response-time` and `checks.max_response_time` turns it off.
 
 ### ST113 GraphQL server error {#st113}
 
