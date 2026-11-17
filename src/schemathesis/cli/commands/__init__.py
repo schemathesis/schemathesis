@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from tomllib import TOMLDecodeError
 from typing import Any
@@ -14,7 +15,7 @@ from schemathesis.cli.commands.run import run as run_command
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ExitCode
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.ext.groups import CommandWithGroupedOptions, GroupedOption, StyledGroup, should_use_color
-from schemathesis.cli.output import display_header
+from schemathesis.cli.output import degrade_unencodable_glyphs, display_header
 from schemathesis.config import ConfigError, SchemathesisConfig
 from schemathesis.core.errors import HookError, format_exception
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -69,6 +70,7 @@ def _show_help(ctx: click.Context, param: click.Parameter, value: bool) -> None:
 )
 def schemathesis(ctx: click.Context, config_file: str | None) -> None:
     """Property-based API testing for OpenAPI, GraphQL, and gRPC."""
+    degrade_unencodable_glyphs(sys.stdout)
     # grpc's native logs repeat errors the report shows. grpc reads this on import, which hooks loaded below may do.
     os.environ.setdefault("GRPC_VERBOSITY", "NONE")
     # A command creates its extensions itself, also when it runs inside a pytest session
