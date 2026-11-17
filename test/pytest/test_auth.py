@@ -770,3 +770,87 @@ def test_api(case):
     )
     result = testdir.runpytest("-s")
     result.assert_outcomes(passed=1)
+
+
+PER_TEST_AUTH = "@schema.auth(ScopedAuth)\n@schema.parametrize()"
+STRATEGY_AUTH = """
+scoped = AuthStorage()
+scoped.auth()(ScopedAuth)
+
+@given(case=schema["/items"]["GET"].as_strategy(auth_storage=scoped))
+"""
+
+
+@pytest.mark.parametrize(
+    ("retry_source", "test_auth"),
+    [
+        ("@schema.auth(retry_on=[401])", PER_TEST_AUTH),
+        ("@schemathesis.auth(retry_on=[401])", PER_TEST_AUTH),
+        ('@schema.auth(retry_on=[401]).apply_to(path="/other")', PER_TEST_AUTH),
+        ("@schema.auth(retry_on=[401])", STRATEGY_AUTH),
+    ],
+    ids=["schema-auth", "global-auth", "schema-auth-for-other-paths", "strategy-auth"],
+)
+def test_reactive_reauth_refreshes_auth_the_case_was_generated_with(testdir, ctx, retry_source, test_auth):
+    testdir.makefile(".toml", schemathesis='[generation]\nmode = "positive"\n')
+    testdir.make_test(
+        f"""
+from flask import Flask, request
+from schemathesis.auths import AuthStorage
+from schemathesis.specs.openapi.checks import ignored_auth
+
+app = Flask(__name__)
+
+@app.route("/items")
+def items():
+    token = request.headers.get("Authorization", "").removeprefix("Bearer ")
+    # Only scoped tokens are accepted, and the first one has expired.
+    if token.startswith("scoped-") and token != "scoped-1":
+        return []
+    return {{"error": "Unauthorized"}}, 401
+
+@app.route("/openapi.json")
+def openapi():
+    return raw_schema
+
+schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+{retry_source}
+class OtherAuth:
+    def get(self, case, ctx):
+        return "other"
+
+    def set(self, case, data, ctx):
+        case.headers["Authorization"] = f"Bearer {{data}}"
+
+counter = {{"n": 0}}
+
+class ScopedAuth:
+    def get(self, case, ctx):
+        counter["n"] += 1
+        return f"scoped-{{counter['n']}}"
+
+    def set(self, case, data, ctx):
+        case.headers["Authorization"] = f"Bearer {{data}}"
+
+{test_auth}
+@settings(max_examples=3)
+def test_api(case):
+    response = case.call_and_validate(excluded_checks=[ignored_auth])
+    latest = f"Bearer scoped-{{counter['n']}}"
+    assert (response.status_code, response.request.headers["Authorization"]) == (200, latest)
+""",
+        schema=ctx.openapi.build_schema(
+            {
+                "/items": {
+                    "get": {
+                        "security": [{"Bearer": []}],
+                        "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                    }
+                }
+            },
+            components={"securitySchemes": {"Bearer": {"type": "http", "scheme": "bearer"}}},
+        ),
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
