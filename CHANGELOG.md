@@ -87,6 +87,7 @@
 - False positive `negative_data_rejection` for empty `multipart/mixed` array bodies.
 - Internal error in `positive_data_acceptance` for rejected bodies with undeclared properties and a malformed schema. [#6118](https://github.com/schemathesis/schemathesis/issues/6118)
 - `--checks` enabling `max_response_time` with a 10-second limit, or disabling a configured one.
+- List failures in the same order on every run, in the CLI and `validate_response()` errors.
 
 #### Inferred links
 

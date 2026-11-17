@@ -511,6 +511,70 @@ def test_validate_response_custom_check_raising_while_handling_error(ctx, respon
     ]
 
 
+@pytest.mark.parametrize(
+    ("id_message", "name_message", "expected"),
+    [
+        (
+            "Missing `id`",
+            "Missing `name`",
+            "Schemathesis found 4 distinct failures\n\n"
+            "- ST101 Server error\n\n"
+            "- ST901 Custom check failed: `has_id`\n\n"
+            "    Missing `id`\n\n"
+            "- ST901 Custom check failed: `has_name`\n\n"
+            "    Missing `name`\n\n"
+            "- ST103 Undocumented status code\n\n"
+            "    Received: 500\n"
+            "    Documented: 200\n\n"
+            "[500] Internal Server Error:\n\n"
+            "    `{}`\n\n"
+            "Reproduce with:\n\n"
+            "    curl -X GET --insecure http://127.0.0.1/items\n\n",
+        ),
+        (
+            "",
+            "",
+            "Schemathesis found 4 distinct failures\n\n"
+            "- ST101 Server error\n\n"
+            "- ST901 Custom check failed: `has_id`\n\n"
+            "- ST901 Custom check failed: `has_name`\n\n"
+            "- ST103 Undocumented status code\n\n"
+            "    Received: 500\n"
+            "    Documented: 200\n\n"
+            "[500] Internal Server Error:\n\n"
+            "    `{}`\n\n"
+            "Reproduce with:\n\n"
+            "    curl -X GET --insecure http://127.0.0.1/items\n\n",
+        ),
+    ],
+    ids=["distinct-messages", "equal-messages"],
+)
+def test_validate_response_orders_failures_by_severity_and_kind(
+    ctx, response_factory, id_message, name_message, expected
+):
+    operation = ctx.openapi.load_operation("GET /items", {"responses": {"200": {"description": "OK"}}})
+
+    def has_name(ctx, response, case):
+        raise AssertionError(name_message)
+
+    def has_id(ctx, response, case):
+        raise AssertionError(id_message)
+
+    with pytest.raises(FailureGroup) as exc:
+        operation.Case().validate_response(
+            response_factory.core(status_code=500, url="http://127.0.0.1/items"), additional_checks=[has_name, has_id]
+        )
+    assert (exc.value.message, [failure.title for failure in exc.value.exceptions]) == (
+        expected,
+        [
+            "Server error",
+            "Custom check failed: `has_id`",
+            "Custom check failed: `has_name`",
+            "Undocumented status code",
+        ],
+    )
+
+
 def validate_with_case(case, response):
     case.validate_response(response, checks=[response_schema_conformance])
 

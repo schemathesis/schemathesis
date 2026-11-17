@@ -599,7 +599,8 @@ class Case(Generic[OperationT]):
             on_failure=on_failure,
         )
         if failures:
-            _failures = list(failures)
+            # Same order on every run and in the CLI report
+            _failures = sorted(failures)
             message = failure_report_title(_failures) + "\n"
             curl = self.as_reproduction_command(
                 headers=dict(response.request.headers), verify=response.verify, base_url=sent_base_url
