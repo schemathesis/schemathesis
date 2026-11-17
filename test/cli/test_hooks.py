@@ -107,6 +107,56 @@ hypothesis.settings.load_profile("large")
     assert f"{max_examples} generated" in result.stdout
 
 
+ACCOUNT_ID = 937418265
+
+
+# Hypothesis draws literals from local modules, such as hooks files; no other literal it favors fits this range.
+def test_hooks_module_literals_stay_out_of_generated_data(ctx, cli, app_runner):
+    fields = [f"field_{index}" for index in range(20)]
+    integer = {"type": "integer", "minimum": 900000000, "maximum": 999999990}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": dict.fromkeys(fields, integer),
+                                    "required": fields,
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    received = []
+
+    @app.route("/items", methods=["POST"])
+    def items():
+        received.extend(request.json.values())
+        return jsonify({})
+
+    module = ctx.write_pymodule(f"ACCOUNT_ID = {ACCOUNT_ID}", filename="account_hooks")
+    cli.main(
+        "run",
+        app_runner.openapi_url(app),
+        "--phases=fuzzing",
+        "--mode=positive",
+        "--max-examples=10",
+        "--seed=1",
+        hooks=module,
+    )
+    assert len(received) == 200
+    assert [value for value in received if value == ACCOUNT_ID] == []
+
+
 def test_stateful_run_with_default_profile_settings(ctx, cli):
     api = ctx.openapi.apps.stateful_users()
     module = ctx.write_pymodule(

@@ -73,4 +73,22 @@ def setup() -> None:
     root_core.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     engine.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
+    _skip_local_constants()
     setup._is_patched = True  # type: ignore[attr-defined]
+
+
+def _skip_local_constants() -> None:
+    # Hypothesis draws literals from local modules, such as hooks and auth files, so their secrets would reach requests
+    # and the data for a seed would depend on what is imported. No public opt-out: HypothesisWorks/hypothesis#4627
+    try:
+        from hypothesis.internal.conjecture.providers import CONSTANTS_CACHE, HypothesisProvider
+        from hypothesis.internal.constants_ast import Constants
+
+        cached_choices = CONSTANTS_CACHE.cache
+    except (ImportError, AttributeError):  # pragma: no cover
+        return
+    no_constants = Constants()
+    # A property, unlike the upstream cached one, also covers providers that already cached local constants.
+    HypothesisProvider._local_constants = property(lambda self: no_constants)  # type: ignore[assignment]
+    # Constant choices this thread cached earlier may include local constants.
+    cached_choices.clear()
