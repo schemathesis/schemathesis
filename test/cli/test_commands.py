@@ -6,6 +6,7 @@ import pathlib
 import platform
 import re
 import shutil
+import signal
 import socket
 import ssl
 import subprocess
@@ -1342,12 +1343,22 @@ def test_keyboard_interrupt_exit_code_during_hooks_loading(ctx, cli):
     assert cli.main("run", api.schema_url, hooks=module).exit_code == 130
 
 
-def test_keyboard_interrupt_in_custom_handler_during_stateful(ctx, cli, snapshot_cli):
+def _raise_keyboard_interrupt():
+    raise KeyboardInterrupt
+
+
+def _press_ctrl_c_twice():
+    signal.raise_signal(signal.SIGINT)
+    signal.raise_signal(signal.SIGINT)
+
+
+@pytest.mark.parametrize("interrupt", [_raise_keyboard_interrupt, _press_ctrl_c_twice], ids=["raise", "ctrl-c-twice"])
+def test_keyboard_interrupt_in_custom_handler_during_stateful(ctx, cli, snapshot_cli, interrupt):
     @schemathesis.cli.handler()
     class Interrupter(schemathesis.cli.EventHandler):
         def handle_event(self, context, event) -> None:
             if isinstance(event, events.ScenarioStarted) and event.phase == PhaseName.STATEFUL_TESTING:
-                raise KeyboardInterrupt
+                interrupt()
 
     api = ctx.openapi.apps.users_crud()
     assert cli.run(api.schema_url, "--phases=stateful", "--max-examples=1") == snapshot_cli
@@ -1367,6 +1378,28 @@ def test_keyboard_interrupt_while_stateful_phase_waits_for_a_response(ctx, cli):
         return jsonify({"id": 1}), 201
 
     result = cli.run_openapi_app(app, "--phases=stateful", "--max-examples=1")
+    assert result.exit_code == 130, result.stdout
+    assert re.fullmatch(r"=+ Interrupted after \d+\.\d{2}s =+", result.stdout.strip().splitlines()[-1])
+    assert [thread.name for thread in threading.enumerate() if thread.name == "schemathesis_stateful_tests"] == []
+
+
+# Ctrl-C lands while the CLI displays an event, between the steps of a phase.
+def test_keyboard_interrupt_while_handling_an_event(ctx, cli):
+    interrupted = []
+
+    @schemathesis.cli.handler()
+    class Interrupter(schemathesis.cli.EventHandler):
+        def handle_event(self, context, event) -> None:
+            if (
+                isinstance(event, events.ScenarioStarted)
+                and event.phase == PhaseName.STATEFUL_TESTING
+                and not interrupted
+            ):
+                interrupted.append(True)
+                signal.raise_signal(signal.SIGINT)
+
+    api = ctx.openapi.apps.users_crud()
+    result = cli.run(api.schema_url, "--phases=stateful", "--max-examples=1")
     assert result.exit_code == 130, result.stdout
     assert re.fullmatch(r"=+ Interrupted after \d+\.\d{2}s =+", result.stdout.strip().splitlines()[-1])
     assert [thread.name for thread in threading.enumerate() if thread.name == "schemathesis_stateful_tests"] == []
