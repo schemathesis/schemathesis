@@ -432,7 +432,7 @@ def _lifecycle_app(ctx, calls, *, interrupt=False):
 
     @app.route("/items")
     def items():
-        if interrupt:
+        if interrupt and "test" not in calls:
             _thread.interrupt_main()
         calls.append("test")
         return jsonify([])

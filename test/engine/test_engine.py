@@ -1260,6 +1260,19 @@ def test_interrupted_outside_test(ctx):
         pytest.fail("KeyboardInterrupt should be handled")
 
 
+# Only the main thread may set signal handlers, so a run elsewhere leaves Ctrl-C handling alone.
+def test_run_from_a_background_thread(ctx):
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    finished = []
+    thread = threading.Thread(
+        target=lambda: finished.append(execute(schema, max_examples=1).find(events.EngineFinished))
+    )
+    thread.start()
+    thread.join(timeout=30)
+    assert [event.stop_reason for event in finished] == [StopReason.COMPLETED]
+
+
 @pytest.fixture(params=[1, 2], ids=["single-worker", "multi-worker"])
 def workers_num(request):
     return request.param

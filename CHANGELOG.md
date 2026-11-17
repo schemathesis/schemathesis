@@ -100,6 +100,7 @@
 #### CLI and configuration
 
 - Command-line options losing to `[[operations]]` and `[phases]` settings in the configuration file.
+- Internal error or ignored Ctrl-C when interrupting `st run` and `st fuzz`.
 - `st explain ST112` suggesting `--exclude-checks max_response_time`, which `st run` rejects.
 - Shrink `st run` failures to a minimal example, so `--no-shrink` takes effect.
 
