@@ -5,7 +5,7 @@ import sys
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
 
-from schemathesis.core.output.sanitization import is_sensitive_key, sanitize_url
+from schemathesis.core.output.sanitization import sanitize_header, sanitize_url
 
 if TYPE_CHECKING:
     from schemathesis.config import SanitizationConfig
@@ -13,12 +13,11 @@ if TYPE_CHECKING:
 
 def _sanitize_header(value: str, config: SanitizationConfig) -> str:
     name, separator, rest = value.partition(":")
-    if not separator or not is_sensitive_key(
-        name.strip(), keys_to_sanitize=config.keys_to_sanitize, sensitive_markers=config.sensitive_markers
-    ):
+    if not separator:
         return value
-    padding = rest[: len(rest) - len(rest.lstrip())]
-    return f"{name}{separator}{padding}{config.replacement}"
+    header_value = rest.lstrip()
+    padding = rest[: len(rest) - len(header_value)]
+    return f"{name}{separator}{padding}{sanitize_header(name.strip(), header_value, config=config)}"
 
 
 def _sanitize_secret(value: str, config: SanitizationConfig) -> str:

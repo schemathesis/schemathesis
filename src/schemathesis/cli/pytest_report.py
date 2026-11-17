@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.core.failures import Failure, MalformedJson, ResponseTimeExceeded
-from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
+from schemathesis.core.output.sanitization import sanitize_headers, sanitize_url
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine.events import FuzzScenarioFinished, ScenarioFinished
 from schemathesis.openapi.checks import (
@@ -38,7 +38,7 @@ def _render_request(interaction: Interaction, operation: APIOperation, config: O
     uri = request.uri
     if config.sanitization.enabled:
         uri = sanitize_url(uri, config=config.sanitization)
-        sanitize_value(headers, config=config.sanitization)
+        sanitize_headers(headers, config=config.sanitization)
     lines = ["    response = requests.request(", f"        {request.method!r},", f"        {uri!r},"]
     lines.append(f"        headers={headers!r},")
     if request.body is not None:

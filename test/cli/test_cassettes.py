@@ -20,7 +20,7 @@ from schemathesis.reporting.har import _cookie_to_har
 from schemathesis.reporting.vcr import write_double_quoted
 from test.apps.catalog.openapi import basic
 from test.apps.catalog.openapi.modifiers.stateful import SlowOperations
-from test.utils import load_json_or_fail, load_ndjson, load_yaml_or_fail
+from test.utils import crash_cache_dir, load_json_or_fail, load_ndjson, load_yaml_or_fail
 
 
 def load_cassette(path):
@@ -302,6 +302,82 @@ def test_har_cookies(ctx, cli, cassette_path):
         (entry["request"]["cookies"], entry["response"]["cookies"])
         for entry in load_json_or_fail(har_path)["log"]["entries"]
     ] == [([{"name": "theme", "value": "dark"}], [{"name": "session", "value": "abc", "path": "/"}])]
+
+
+# HAR headers and crash files keep only the first value of a repeated header.
+@pytest.mark.snapshot(replace_reproduce_with=False)
+def test_reports_sanitize_cookies_by_name(ctx, cli, tmp_path, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"name": "sessionid", "in": "cookie", "required": True, "schema": {"type": "string"}},
+                        {"name": "lang", "in": "cookie", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        response = flask.jsonify({})
+        response.status_code = 500
+        response.headers.add("Set-Cookie", "sessionid=xyz; Path=/; HttpOnly")
+        response.headers.add("Set-Cookie", "lang=en; Path=/")
+        return response
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=fuzzing",
+            "--max-examples=1",
+            "--checks=not_a_server_error",
+            f"--report-har-path={tmp_path / 'report.har'}",
+            f"--report-vcr-path={tmp_path / 'report.yaml'}",
+            f"--report-ndjson-path={tmp_path / 'report.ndjson'}",
+            config={"parameters": {"sessionid": "abc", "lang": "en"}},
+        )
+        == snapshot_cli
+    )
+    har = load_json_or_fail(tmp_path / "report.har")["log"]["entries"][0]
+    vcr = load_cassette(tmp_path / "report.yaml")["http_interactions"][0]
+    ndjson = next(
+        interaction
+        for event in load_ndjson(tmp_path / "report.ndjson")
+        if "ScenarioFinished" in event
+        for interaction in event["ScenarioFinished"]["recorder"]["interactions"].values()
+    )
+    [crash_file] = [path for path in crash_cache_dir(tmp_path).rglob("*.json") if path.name != "manifest.json"]
+    [crash] = load_json_or_fail(crash_file)["sequence"]
+    cookie = "sessionid=[Filtered]; lang=en"
+    set_cookie = ["sessionid=[Filtered]; Path=/; HttpOnly", "lang=en; Path=/"]
+    assert {
+        "har": (
+            [header["value"] for header in har["request"]["headers"] if header["name"] == "Cookie"],
+            har["request"]["cookies"],
+            [header["value"] for header in har["response"]["headers"] if header["name"] == "set-cookie"],
+            har["response"]["cookies"],
+        ),
+        "vcr": (vcr["request"]["headers"]["Cookie"], vcr["response"]["headers"]["set-cookie"]),
+        "ndjson": (ndjson["request"]["headers"]["Cookie"], ndjson["response"]["headers"]["set-cookie"]),
+        "crash": (crash["headers"]["Cookie"], crash["response"]["headers"]["set-cookie"]),
+    } == {
+        "har": (
+            [cookie],
+            [{"name": "sessionid", "value": "[Filtered]"}, {"name": "lang", "value": "en"}],
+            set_cookie[:1],
+            [
+                {"name": "sessionid", "value": "[Filtered]", "path": "/", "httpOnly": True},
+                {"name": "lang", "value": "en", "path": "/"},
+            ],
+        ),
+        "vcr": ([cookie], set_cookie),
+        "ndjson": ([cookie], set_cookie),
+        "crash": (cookie, set_cookie[0]),
+    }
 
 
 def test_har_response_mime_type_and_redirect_url(ctx, cli, cassette_path):

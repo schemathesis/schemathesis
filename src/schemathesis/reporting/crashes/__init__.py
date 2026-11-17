@@ -14,7 +14,7 @@ import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.core.failures import Failure, is_reproducible_failure
 from schemathesis.core.fs import file_exists
-from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
+from schemathesis.core.output.sanitization import sanitize_headers, sanitize_url, sanitize_value
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION
 from schemathesis.core.storage import atomic_write_text, retry_while_locked
 from schemathesis.core.timing import format_timestamp
@@ -377,6 +377,10 @@ def build_crashes_from_recorder(
         if enabled:
             sanitize_value(value, config=sanitization)
 
+    def sanitize_header_mapping(value: dict[str, Any]) -> None:
+        if enabled:
+            sanitize_headers(value, config=sanitization)
+
     def sanitize_uri(url: str) -> str:
         return sanitize_url(url, config=sanitization) if enabled else url
 
@@ -392,14 +396,14 @@ def build_crashes_from_recorder(
 
         request = interaction.request
         raw_headers = dict(request.headers)
-        sanitize_mapping(raw_headers)
+        sanitize_header_mapping(raw_headers)
         request_headers = {k: v[0] if isinstance(v, list) else v for k, v in raw_headers.items()}
         request_url = sanitize_uri(request.uri)
 
         response = interaction.response
         response_status = response.status_code
         raw_response_headers = dict(response.headers)
-        sanitize_mapping(raw_response_headers)
+        sanitize_header_mapping(raw_response_headers)
         response_headers: dict[str, str] = {k: v[0] if v else "" for k, v in raw_response_headers.items()}
         response_body = response.text_lossy()
 
@@ -424,7 +428,7 @@ def build_crashes_from_recorder(
         case_query = dict(case.query)
         sanitize_mapping(case_query)
         case_headers = dict(case.headers)
-        sanitize_mapping(case_headers)
+        sanitize_header_mapping(case_headers)
         case_cookies = dict(case.cookies)
         sanitize_mapping(case_cookies)
         case_body = case.body

@@ -11,7 +11,7 @@ from urllib.parse import parse_qsl
 import harfile
 
 from schemathesis.config import OutputConfig
-from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
+from schemathesis.core.output.sanitization import sanitize_headers, sanitize_url
 from schemathesis.core.timing import format_timestamp
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Headers, Response, response_content_type
@@ -84,7 +84,7 @@ class HarWriter:
                 http_version = f"HTTP/{interaction.response.http_version}"
                 if config.sanitization.enabled:
                     resp_headers = deepclone(interaction.response.headers)
-                    sanitize_value(resp_headers, config=config.sanitization)
+                    sanitize_headers(resp_headers, config=config.sanitization)
                 else:
                     resp_headers = interaction.response.headers
                 response = harfile.Response(
@@ -106,7 +106,7 @@ class HarWriter:
 
             if config.sanitization.enabled:
                 req_headers = deepclone(interaction.request.headers)
-                sanitize_value(req_headers, config=config.sanitization)
+                sanitize_headers(req_headers, config=config.sanitization)
             else:
                 req_headers = interaction.request.headers
             started_datetime = format_timestamp(interaction.timestamp)

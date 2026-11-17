@@ -31,6 +31,7 @@
 - `st fuzz` probes API capabilities and runs sign-up before fuzzing, like `st run`.
 - One `setup` phase replaces `probing`, `schema_analysis` and `auth_bootstrap` in NDJSON reports.
 - Check failures from `call_and_validate()` and `validate_response()` are `AssertionError`s, so `except Exception` catches them.
+- Output sanitization masks `Cookie` and `Set-Cookie` headers per cookie name, keeping non-sensitive cookies visible.
 
 ### :bug: Fixed
 

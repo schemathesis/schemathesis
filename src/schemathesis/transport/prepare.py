@@ -11,7 +11,7 @@ from schemathesis.config import SanitizationConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, media_types
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.mutations import OperatorKind
-from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
+from schemathesis.core.output.sanitization import sanitize_headers, sanitize_url, sanitize_value
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import TEMPLATE_PLACEHOLDER, deepclone, to_wire_text
 from schemathesis.core.transport import USER_AGENT
@@ -204,7 +204,7 @@ def prepare_request(
     if config.enabled:
         kwargs["url"] = sanitize_url(kwargs["url"], config=config)
         kwargs["headers"] = dict(kwargs["headers"])
-        sanitize_value(kwargs["headers"], config=config)
+        sanitize_headers(kwargs["headers"], config=config)
         if kwargs["cookies"]:
             kwargs["cookies"] = dict(kwargs["cookies"])
             sanitize_value(kwargs["cookies"], config=config)

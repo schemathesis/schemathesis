@@ -7,7 +7,7 @@ from types import TracebackType
 from typing import IO, TYPE_CHECKING
 
 from schemathesis.config import OutputConfig
-from schemathesis.core.output.sanitization import sanitize_url
+from schemathesis.core.output.sanitization import sanitize_headers, sanitize_url
 from schemathesis.core.timing import format_timestamp
 from schemathesis.core.transport import Headers, Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -55,18 +55,14 @@ class VcrWriter:
             stream.writelines(f"      - {json.dumps(v)}\n" for v in values)
 
         if config.sanitization.enabled:
-            sanitization_keys = config.sanitization.keys_to_sanitize
-            sensitive_markers = config.sanitization.sensitive_markers
-            replacement = config.sanitization.replacement
+            sanitization = config.sanitization
 
             def write_headers(headers: Headers) -> None:
-                for name, values in headers.items():
-                    lower_name = name.lower()
+                sanitized = dict(headers)
+                sanitize_headers(sanitized, config=sanitization)
+                for name, values in sanitized.items():
                     stream.write(f'      "{name}":\n')
-                    if lower_name in sanitization_keys or any(marker in lower_name for marker in sensitive_markers):
-                        stream.write(f"      - {json.dumps(replacement)}\n")
-                    else:
-                        write_header_values(values)
+                    write_header_values(values)
         else:
 
             def write_headers(headers: Headers) -> None:

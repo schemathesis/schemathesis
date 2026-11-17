@@ -5,7 +5,7 @@ import pytest
 from schemathesis.config import SanitizationConfig
 from schemathesis.config._output import DEFAULT_KEYS_TO_SANITIZE, DEFAULT_REPLACEMENT
 from schemathesis.core import NOT_SET
-from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
+from schemathesis.core.output.sanitization import sanitize_headers, sanitize_url, sanitize_value
 
 
 @pytest.fixture
@@ -146,3 +146,46 @@ def test_sanitize_url(input_url, expected_url):
 )
 def test_sanitize_url_preserves_query(input_url, expected_url):
     assert sanitize_url(input_url, config=SanitizationConfig()) == expected_url
+
+
+@pytest.mark.parametrize(
+    ("headers", "expected"),
+    [
+        ({"Cookie": "token=a=b; lang=en"}, {"Cookie": "token=[Filtered]; lang=en"}),
+        ({"cookie": ["sessionid=abc", "lang=en"]}, {"cookie": ["sessionid=[Filtered]", "lang=en"]}),
+        ({"Cookie": " sessionid = abc ;lang=en;"}, {"Cookie": " sessionid =[Filtered];lang=en;"}),
+        ({"Cookie": ""}, {"Cookie": ""}),
+        ({"Cookie": 42}, {"Cookie": "[Filtered]"}),
+        (
+            {"Set-Cookie": ["sessionid=xyz; Path=/; HttpOnly", "lang=en; Path=/"]},
+            {"Set-Cookie": ["sessionid=[Filtered]; Path=/; HttpOnly", "lang=en; Path=/"]},
+        ),
+        (
+            {"set-cookie": "sessionid=xyz; Expires=Wed, 21 Oct 2026 07:28:00 GMT; Path=/"},
+            {"set-cookie": "sessionid=[Filtered]; Expires=Wed, 21 Oct 2026 07:28:00 GMT; Path=/"},
+        ),
+        ({"Set-Cookie": "lang=en"}, {"Set-Cookie": "lang=en"}),
+        ({"Set-Cookie": "lang=en; Path=/, sessionid=xyz; Path=/"}, {"Set-Cookie": "[Filtered]"}),
+        ({"Set-Cookie": "sessionid; Path=/"}, {"Set-Cookie": "[Filtered]"}),
+        (
+            {"Authorization": ["Bearer a", "Bearer b"], "X-Trace": "1"},
+            {"Authorization": ["[Filtered]"], "X-Trace": "1"},
+        ),
+    ],
+    ids=[
+        "equals-in-value",
+        "repeated-cookie-headers",
+        "whitespace-and-trailing-separator",
+        "empty",
+        "non-string",
+        "set-cookie-attributes",
+        "set-cookie-expires",
+        "set-cookie-without-attributes",
+        "set-cookie-joined",
+        "set-cookie-without-value",
+        "other-headers",
+    ],
+)
+def test_sanitize_headers(headers, expected):
+    sanitize_headers(headers, config=SanitizationConfig())
+    assert headers == expected
