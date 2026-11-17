@@ -102,6 +102,7 @@
 - Command-line options losing to `[[operations]]` and `[phases]` settings in the configuration file.
 - `st explain ST112` suggesting `--exclude-checks max_response_time`, which `st run` rejects.
 - Shrink `st run` failures to a minimal example, so `--no-shrink` takes effect.
+- Stop `schemathesis.toml` discovery at the root of a git worktree or submodule.
 
 #### pytest and Python API
 

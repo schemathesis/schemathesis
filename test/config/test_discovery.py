@@ -1,3 +1,5 @@
+import pytest
+
 from schemathesis.config import SchemathesisConfig
 
 TOML_CONTENT = """
@@ -43,19 +45,21 @@ def test_discover_not_found(tmp_path, monkeypatch):
     assert config.max_failures is None
 
 
-def test_discover_stops_at_git_root(tmp_path, monkeypatch):
-    parent = tmp_path / "parent"
-    parent.mkdir()
-    (parent / ".git").mkdir()
-    child = parent / "child"
+@pytest.mark.parametrize("git", ["directory", "file"], ids=["repository", "worktree-or-submodule"])
+def test_discover_stops_at_git_root(tmp_path, monkeypatch, git):
+    # A config above the repository root belongs to another project
+    (tmp_path / "schemathesis.toml").write_text(TOML_CONTENT)
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    if git == "directory":
+        (repository / ".git").mkdir()
+    else:
+        # Worktrees and submodules have a `.git` file pointing at the main repository
+        (repository / ".git").write_text("gitdir: /elsewhere/.git/worktrees/repository\n")
+    child = repository / "child"
     child.mkdir()
-
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    config_file = outside / "schemathesis.toml"
-    config_file.write_text(TOML_CONTENT)
 
     monkeypatch.chdir(child)
 
     config = SchemathesisConfig.discover()
-    assert config.color is None
+    assert (config.config_path, config.color) == (None, None)
