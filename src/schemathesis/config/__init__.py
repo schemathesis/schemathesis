@@ -163,7 +163,7 @@ class SchemathesisConfig(DiffBase):
 
     @classmethod
     def discover(cls) -> SchemathesisConfig:
-        """Load the nearest `schemathesis.toml` up to a `.git` directory or the root, or return the default config."""
+        """Load the nearest `schemathesis.toml` up to the repository root or the root, or return the default config."""
         current_dir = os.getcwd()
         config_file = None
 
@@ -173,8 +173,8 @@ class SchemathesisConfig(DiffBase):
                 config_file = candidate
                 break
 
-            git_dir = os.path.join(current_dir, ".git")
-            if os.path.isdir(git_dir):
+            # Worktrees and submodules have a `.git` file instead of a directory
+            if os.path.exists(os.path.join(current_dir, ".git")):
                 break
 
             parent = os.path.dirname(current_dir)
