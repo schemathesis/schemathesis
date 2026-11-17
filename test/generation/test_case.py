@@ -1,8 +1,13 @@
 import copy
 import json
 import re
+import socket
+import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from unittest.mock import ANY
+from urllib.parse import urlsplit
 
 import fastapi
 import flask
@@ -26,7 +31,8 @@ from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transport.prepare import get_default_headers
 from test.apps.catalog.graphql.bookstore import books
-from test.utils import run_given
+from test.fixtures.app_runner import accept_connections
+from test.utils import refusing_url, run_given
 
 
 @pytest.fixture
@@ -983,6 +989,58 @@ def test_call_timeout_override(app_runner, echo_app, with_config):
         schema.config.request_timeout = 0.05
     case = schema["/users"]["GET"].Case(query={"delay": "0.2"})
     assert case.call(timeout=42).status_code == 200
+
+
+@contextmanager
+def stalled_body_url() -> Iterator[str]:
+    release = threading.Event()
+
+    def stall(connection):
+        with connection:
+            connection.recv(65536)
+            connection.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 20\r\n\r\n{")
+            release.wait()
+
+    with socket.create_server(("127.0.0.1", 0)) as listener:
+        accept_connections(listener, stall)
+        try:
+            yield f"http://127.0.0.1:{listener.getsockname()[1]}"
+        finally:
+            release.set()
+
+
+@pytest.mark.parametrize(
+    ("server", "error", "expected"),
+    [
+        (
+            refusing_url,
+            requests.ConnectionError,
+            "HTTPConnectionPool(host='127.0.0.1', port={port}): Max retries exceeded with url: /items?api_key=%5BFiltered%5D",
+        ),
+        (
+            stalled_body_url,
+            requests.ReadTimeout,
+            "http://127.0.0.1:{port}/items?api_key=%5BFiltered%5D: Read timed out. (read timeout=0.5)",
+        ),
+    ],
+    ids=["refused", "body-timeout"],
+)
+def test_call_network_error_masks_sensitive_query(ctx, server, error, expected):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [{"name": "api_key", "in": "query", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    with server() as base_url, pytest.raises(error) as exc_info:
+        operation.Case(query={"api_key": "s3cr3t"}).call(base_url=base_url, timeout=0.5)
+    # The cause urllib3 appends to a connection error is worded differently on each platform
+    message = str(exc_info.value).partition(" (Caused by")[0]
+    assert [message, *exc_info.value.__notes__] == [
+        expected.format(port=urlsplit(base_url).port),
+        f"\nReproduce with:\n\n    curl -X GET '{base_url}/items?api_key=%5BFiltered%5D'",
+    ]
 
 
 def test_merge_at():
