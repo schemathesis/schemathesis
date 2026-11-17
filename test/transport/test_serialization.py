@@ -2049,8 +2049,8 @@ META = {"type": "object", "properties": {"a": {"type": "integer"}}}
         ),
         (
             {"anyOf": [{"type": "array", "items": META}, {"type": "null"}]},
-            [{"a": 1}],
-            [("meta", (None, b'[{"a": 1}]', "application/json"))],
+            [{"a": 1}, {"a": 2}],
+            [("meta", (None, b'{"a": 1}', "application/json")), ("meta", (None, b'{"a": 2}', "application/json"))],
         ),
         (
             {"anyOf": [{"type": "array", "items": {"type": "string"}}, {"type": "null"}]},

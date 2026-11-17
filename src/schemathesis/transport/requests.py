@@ -726,10 +726,14 @@ def _serialize_form_field(
     ctx: SerializationContext, value: object, schema: JsonSchemaObject, name: str, content_type: str
 ) -> tuple[object, str]:
     """Serialize a named form field, whose array items are separate parts under the field's media type."""
-    items = schema.get("items", {})
-    if isinstance(value, list) and "type" in schema and "array" in get_type(schema) and isinstance(items, dict):
-        # The field's media type describes each item, e.g. one JSON document per item.
-        return [_serialize_part_value(ctx, item, items, name, content_type)[0] for item in value], content_type
+    if isinstance(value, list):
+        # Optional arrays declare the array alone in an `anyOf` branch next to `null`.
+        for group in _alternative_groups(schema):
+            branch = group[0]
+            items = branch.get("items", {})
+            if len(group) == 1 and "type" in branch and "array" in get_type(branch) and isinstance(items, dict):
+                # The field's media type describes each item, e.g. one JSON document per item.
+                return [_serialize_part_value(ctx, item, items, name, content_type)[0] for item in value], content_type
     return _serialize_part_value(ctx, value, schema, name, content_type)
 
 
