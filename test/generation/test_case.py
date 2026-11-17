@@ -124,6 +124,10 @@ def test_make_case_missing_media_type(ctx):
             "Case(cookies={'session': '[Filtered]', 'theme': 'dark'})",
         ),
         (
+            {"headers": {"Cookie": "session=abc; theme=dark"}},
+            "Case(headers={'Cookie': 'session=[Filtered]; theme=dark'})",
+        ),
+        (
             {"query": {"api_key": "abc", "ids": [1, 2]}},
             "Case(query={'api_key': '[Filtered]', 'ids': [1, 2]})",
         ),
@@ -141,6 +145,7 @@ def test_make_case_missing_media_type(ctx):
         "sensitive-path",
         "sensitive-header",
         "sensitive-cookie",
+        "cookie-header",
         "sensitive-query",
         "nested-object-body",
         "array-body",

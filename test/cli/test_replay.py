@@ -2267,7 +2267,7 @@ def test_replay_names_every_masked_value_not_supplied(cli, app_runner, ctx, cras
         path_template="/users",
         status=500,
         body='{"error": "was broken"}',
-        request_headers={"Authorization": "[Filtered]"},
+        request_headers={"Authorization": "[Filtered]", "Cookie": "sid=[Filtered]; theme=dark"},
         query={"api_key": "[Filtered]"},
         cookies={"session": "[Filtered]"},
     )
@@ -2276,7 +2276,23 @@ def test_replay_names_every_masked_value_not_supplied(cli, app_runner, ctx, cras
     assert crash_file.exists()
 
 
-def test_replay_removes_fixed_crash_once_masked_credentials_are_supplied(cli, app_runner, ctx, crash_factory, tmp_path):
+@pytest.mark.parametrize(
+    ("masked", "header"),
+    [
+        ({"request_headers": {"Authorization": "[Filtered]"}}, f"Authorization: Bearer {VALID_TOKEN}"),
+        (
+            {
+                "request_headers": {"Cookie": "session=[Filtered]; lang=en"},
+                "cookies": {"session": "[Filtered]", "lang": "en"},
+            },
+            f"Cookie: session={VALID_TOKEN}",
+        ),
+    ],
+    ids=["header", "cookie"],
+)
+def test_replay_removes_fixed_crash_once_masked_credentials_are_supplied(
+    cli, app_runner, ctx, crash_factory, tmp_path, masked, header
+):
     schema_url, base = _users_app(ctx, app_runner)
     crash_file = _write_crash(
         tmp_path,
@@ -2286,10 +2302,10 @@ def test_replay_removes_fixed_crash_once_masked_credentials_are_supplied(cli, ap
         path_template="/users",
         status=500,
         body='{"error": "was broken"}',
-        request_headers={"Authorization": "[Filtered]"},
+        **masked,
     )
 
-    result = cli.main("replay", str(crash_file), "-H", f"Authorization: Bearer {VALID_TOKEN}")
+    result = cli.main("replay", str(crash_file), "-H", header)
 
     assert result.exit_code == 0, result.output
     assert not crash_file.exists()

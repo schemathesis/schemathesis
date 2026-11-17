@@ -199,6 +199,39 @@ def test_as_curl_command_keeps_non_sensitive_raw_query_pairs(ctx):
     assert case.as_curl_command() == "curl -X GET 'http://localhost/q?token=%5BFiltered%5D&page=2'"
 
 
+@pytest.mark.parametrize(
+    ("case_kwargs", "headers", "sanitization", "expected"),
+    [
+        ({"cookies": {"sessionid": "abc", "lang": "en"}}, None, {}, "sessionid=[Filtered]; lang=en"),
+        ({}, {"Cookie": "sessionid=abc; lang=en"}, {}, "sessionid=[Filtered]; lang=en"),
+        ({"headers": {"Cookie": "lang=en;sessionid=abc"}}, None, {}, "lang=en;sessionid=[Filtered]"),
+        ({}, {"Cookie": "lang=en; flag"}, {}, "[Filtered]"),
+        (
+            {},
+            {"Cookie": "sessionid=abc; lang=en; theme=dark"},
+            {"keys-to-sanitize": ["lang"]},
+            "sessionid=[Filtered]; lang=[Filtered]; theme=dark",
+        ),
+        ({}, {"Cookie": "sessionid=abc; lang=en"}, {"enabled": False}, "sessionid=abc; lang=en"),
+    ],
+    ids=["cookie-parameters", "sent-header", "case-header", "unparsable", "custom-keys", "disabled"],
+)
+def test_as_curl_command_sanitizes_cookies_by_name(ctx, case_kwargs, headers, sanitization, expected):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [
+                {"name": "sessionid", "in": "cookie", "schema": {"type": "string"}},
+                {"name": "lang", "in": "cookie", "schema": {"type": "string"}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+        config=schemathesis.Config.from_dict({"output": {"sanitization": sanitization}}),
+    )
+    case = operation.Case(**case_kwargs)
+    assert case.as_curl_command(headers=headers) == f"curl -X GET -H 'Cookie: {expected}' http://localhost/items"
+
+
 def test_cli_output(ctx, cli, curl):
     api = ctx.openapi.apps.failure()
     result = cli.run_and_assert(api.schema_url, exit_code=ExitCode.TESTS_FAILED)

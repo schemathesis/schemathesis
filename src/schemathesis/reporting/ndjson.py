@@ -13,7 +13,7 @@ from typing import IO, TYPE_CHECKING, Any
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.failures import Failure
-from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
+from schemathesis.core.output.sanitization import sanitize_headers, sanitize_url, sanitize_value
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transforms import Unresolvable
 from schemathesis.core.transport import Response
@@ -106,7 +106,7 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
     if isinstance(obj, Response):
         headers = serialize(obj.headers, sanitization=sanitization)
         if sanitization is not None:
-            sanitize_value(headers, config=sanitization)
+            sanitize_headers(headers, config=sanitization)
         headers = {k: v for k, v in headers.items() if k.lower() not in {h.lower() for h in SKIP_RESPONSE_HEADERS}}
         data: dict[str, Any] = {
             "status_code": obj.status_code,
@@ -126,7 +126,7 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
             url = sanitize_url(url, config=sanitization)
         headers = dict(obj.headers) if obj.headers else {}
         if sanitization is not None:
-            sanitize_value(headers, config=sanitization)
+            sanitize_headers(headers, config=sanitization)
         return {
             "method": obj.method,
             "url": url,
@@ -140,7 +140,7 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
     if isinstance(obj, Request):
         headers = {k: v for k, v in obj.headers.items() if k not in SKIP_REQUEST_HEADERS}
         if sanitization is not None:
-            sanitize_value(headers, config=sanitization)
+            sanitize_headers(headers, config=sanitization)
         result: dict[str, Any] = {
             "method": obj.method,
             "uri": obj.uri,
@@ -167,7 +167,10 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
                 dc_data[public_name] = value
         # A recorded case carries the same credentials as the request sent from it.
         if sanitization is not None and cls_name == "Case":
-            for name in ("headers", "cookies", "query"):
+            headers = dc_data.get("headers")
+            if isinstance(headers, dict):
+                sanitize_headers(headers, config=sanitization)
+            for name in ("cookies", "query"):
                 sanitize_value(dc_data.get(name), config=sanitization)
         return dc_data
     return str(obj)

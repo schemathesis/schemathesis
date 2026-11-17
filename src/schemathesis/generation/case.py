@@ -26,7 +26,7 @@ from schemathesis.core.failures import (
     format_failures,
 )
 from schemathesis.core.jsonschema import make_validator
-from schemathesis.core.output.sanitization import sanitize_value
+from schemathesis.core.output.sanitization import sanitize_headers, sanitize_value
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation, plain_str_values
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import HttpMethod, Response, prepare_urlencoded
@@ -216,7 +216,10 @@ class Case(Generic[OperationT]):
             if value is not None and not isinstance(value, NotSet):
                 if sanitization.enabled and isinstance(value, (Mapping, list)):
                     value = deepclone(dict(value) if isinstance(value, Mapping) else value)
-                    sanitize_value(value, config=sanitization)
+                    if isinstance(value, dict) and name == "headers":
+                        sanitize_headers(value, config=sanitization)
+                    else:
+                        sanitize_value(value, config=sanitization)
                 if first:
                     first = False
                 else:

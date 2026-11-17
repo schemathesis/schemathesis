@@ -376,6 +376,9 @@ Rules:
     `sensitive-markers`. That covers request and response headers, query parameters, URL credentials,
     request body fields, and the reproduction command.
 
+    In `Cookie` and `Set-Cookie` headers, each cookie name is a key: `Cookie: sessionid=abc; lang=en` becomes
+    `Cookie: sessionid=[Filtered]; lang=en`. A cookie header that is not `name=value` pairs is replaced whole.
+
     **Response bodies are written verbatim** — to the terminal and to every report format. A secret the
     API returns in a body is not redacted, whatever its key is named. Treat failure output and report
     artifacts as sensitive.
