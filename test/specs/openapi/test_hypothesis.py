@@ -1,4 +1,5 @@
 import datetime
+import importlib
 import re
 import string
 import subprocess
@@ -466,6 +467,78 @@ def test_format_values_follow_codec_changed_after_generation():
     config.update(codec="ascii")
     strategy = make_positive_strategy(schema, "GET /y", ParameterLocation.QUERY, None, config, Draft4Validator)
     assert [value["q"] for value in generate_many(strategy, 50) if not value["q"].isascii()] == []
+
+
+# Hypothesis draws literals from local modules, so the data for a seed would depend on what is imported.
+def test_seed_generates_same_cases_whatever_local_modules_are_imported(ctx):
+    properties = {
+        **{f"text_{index}": {"type": "string"} for index in range(10)},
+        **{f"number_{index}": {"type": "integer"} for index in range(10)},
+    }
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": properties,
+                            "required": list(properties),
+                            "additionalProperties": False,
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    before = [case.body for case in generate_many(operation.as_strategy(), 10)]
+    importlib.import_module(
+        ctx.write_pymodule('REGION = "eu-north-7"\nTENANT = "acme-corp"\nLIMIT = 4096', filename="local_settings")
+    )
+    assert [case.body for case in generate_many(operation.as_strategy(), 10)] == before
+
+
+_CACHED_LITERALS_PROBE = """
+from hypothesis import given, seed, settings, strategies as st
+
+import account_settings
+import schemathesis
+
+
+def draw(max_examples):
+    drawn = []
+
+    @seed(0)
+    @settings(max_examples=max_examples, database=None)
+    @given(st.integers(900000000, 999999990))
+    def test(value):
+        drawn.append(value)
+
+    test()
+    return drawn
+
+
+draw(50)
+schemathesis.openapi.from_dict(
+    {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "version": "1"},
+        "paths": {"/items": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    }
+)["/items"]["GET"].as_strategy()
+print([value for value in draw(300) if value == account_settings.ACCOUNT_ID])
+"""
+
+
+# Hypothesis caches the literals it may draw, also before Schemathesis generation starts in the process.
+def test_literals_cached_before_generation_are_not_drawn(tmp_path):
+    (tmp_path / "account_settings.py").write_text("ACCOUNT_ID = 937418265\n")
+    script = tmp_path / "probe.py"
+    script.write_text(_CACHED_LITERALS_PROBE)
+    assert subprocess.run([sys.executable, str(script)], capture_output=True, text=True, check=True).stdout == "[]\n"
 
 
 def test_as_strategy_keeps_passed_containers_unchanged(ctx):
