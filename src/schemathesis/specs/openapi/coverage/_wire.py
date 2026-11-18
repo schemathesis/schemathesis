@@ -137,9 +137,11 @@ class WireSemantics:
         return self.location == ParameterLocation.BODY and self.media_type == ("application", "x-www-form-urlencoded")
 
     def rendered(self, value: Any) -> Any:
-        """The value as this location transmits it."""
+        """The value as this location transmits it, before percent-encoding."""
         if self.location == ParameterLocation.PATH:
-            return quote_path_parameter(jsonify_python_specific_types(value))
+            value = jsonify_python_specific_types(value)
+            # Request serialization percent-encodes path text; encoding it here too would send `%` literally.
+            return value if isinstance(value, str) else quote_path_parameter(value)
         if self.location == ParameterLocation.QUERY:
             return jsonify_python_specific_types(value)
         return value

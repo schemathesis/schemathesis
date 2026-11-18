@@ -152,12 +152,13 @@ def test_integer_eligibility_filters_string_values(ctx):
 
 
 @pytest.mark.hypothesis_nested
-def test_positive_path_parameter_binding_does_not_break_serialization(ctx):
-    # Path quoting and JSON conversion cannot iterate the `GeneratedValue` the dictionary overlay wraps values in.
+@pytest.mark.parametrize("entry", ["abc123", "a%40b"], ids=["plain", "percent-encoded"])
+def test_positive_path_parameter_binding_does_not_break_serialization(ctx, entry):
+    # Path quoting handles the values the dictionary overlay wraps, and entries go out as written, like path examples.
     schema = _load_schema_with_dictionaries(
         ctx,
         {
-            "dictionaries": {"ids": {"values": ["abc123"]}},
+            "dictionaries": {"ids": {"values": [entry]}},
             "parameters": {"path.id": {"dictionary": "ids"}},
         },
         {
@@ -173,7 +174,7 @@ def test_positive_path_parameter_binding_does_not_break_serialization(ctx):
 
     @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
     def collect(case):
-        assert case.path_parameters["id"] == "abc123"
+        assert case.path_parameters["id"] == entry
 
 
 @pytest.mark.hypothesis_nested

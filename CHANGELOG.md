@@ -31,6 +31,7 @@
 
 - `st fuzz` probes API capabilities and runs sign-up before fuzzing, like `st run`.
 - One `setup` phase replaces `probing`, `schema_analysis` and `auth_bootstrap` in NDJSON reports.
+- Custom `format` values in path parameters are sent as is, with `%` encoded as `%25`.
 - Check failures from `call_and_validate()` and `validate_response()` are `AssertionError`s, so `except Exception` catches them.
 - Output sanitization masks `Cookie` and `Set-Cookie` headers per cookie name, keeping non-sensitive cookies visible.
 
@@ -69,6 +70,7 @@
 - `multipart/form-data` array properties with non-string items sent as a single part.
 - Unwrapped XML arrays naming their items after the array's own `xml.name`.
 - Missing `application/octet-stream` part `Content-Type` for binary, `contentEncoding` and untyped multipart fields.
+- Generated path values with `%XX` sent decoded, e.g. `a%41` as `aA` or `%e0` as `U+FFFD`.
 
 #### Data generation
 

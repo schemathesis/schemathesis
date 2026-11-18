@@ -65,7 +65,7 @@ from schemathesis.specs.openapi.adapter.validators import ensure_object
 from schemathesis.specs.openapi.converter import permit_forbidden_properties, to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
 from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS
-from schemathesis.transport.serialization import Binary, quote_all
+from schemathesis.transport.serialization import Binary, quote_all, quote_generated
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -734,11 +734,10 @@ def _with_dictionary_values(
     )
 
 
-def _quote_all_safe(value: dict[str, Any]) -> dict[str, Any]:
+def _quote_path_safe(value: dict[str, Any], quote_values: Callable[[dict[str, Any]], dict[str, Any]]) -> dict[str, Any]:
     """Quote path parameter values, preserving invalid inputs for later filtering."""
-    quoted = dict(value)
     try:
-        return quote_all(quoted)
+        return quote_values(dict(value))
     except UnicodeEncodeError:
         return value
 
@@ -771,17 +770,21 @@ def _serialize_for_location(
     # Path and query values become strings; JSON spellings of `True`/`False`/`None` pass validation more often.
     match location:
         case ParameterLocation.PATH:
+            quote_values = partial(quote_generated, listed=listed_path_values(items))
             if is_negative:
                 # Negative data keeps strict misrouting checks; `%2F` allowances apply to positive data only
                 strategy = strategy.map(
                     wrap_map_hook_for_generated_value(
-                        lambda value: _quote_all_safe(jsonify_python_specific_types(value)), prune_constants=False
+                        lambda value: _quote_path_safe(jsonify_python_specific_types(value), quote_values),
+                        prune_constants=False,
                     )
                 )
                 return strategy.filter(wrap_filter_hook_for_generated_value(is_valid_path))
-            strategy = strategy.map(wrap_map_hook_for_generated_value(_quote_all_safe, prune_constants=False)).map(
-                wrap_map_hook_for_generated_value(jsonify_python_specific_types, prune_constants=False)
-            )
+            strategy = strategy.map(
+                wrap_map_hook_for_generated_value(
+                    lambda value: _quote_path_safe(value, quote_values), prune_constants=False
+                )
+            ).map(wrap_map_hook_for_generated_value(jsonify_python_specific_types, prune_constants=False))
             return strategy.filter(
                 wrap_filter_hook_for_generated_value(
                     partial(is_valid_path, allow_encoded_slash_for=_get_explicit_intent_path_names(parameters=items))
@@ -970,21 +973,37 @@ def _integer_property_validators(schema: JsonSchemaObject, validator_cls: type) 
     return validators
 
 
-def _has_explicit_slash_example(examples: Sequence[object]) -> bool:
-    return any(isinstance(example, str) and "/" in unquote(example) for example in examples)
+def _listed_strings(parameter: OpenApiParameter) -> frozenset[str]:
+    """Strings the parameter lists verbatim: its examples and every literal value keyword in its schema."""
+    values = list(parameter.examples)
+    # Walk the whole schema: listed values also sit under `anyOf`, `allOf` and bundled references
+    nodes: list[object] = [parameter.optimized_schema]
+    while nodes:
+        node = nodes.pop()
+        if isinstance(node, dict):
+            for keyword in ("enum", "examples"):
+                if isinstance(node.get(keyword), list):
+                    values.extend(node[keyword])
+            values.extend(node[keyword] for keyword in ("const", "default", "example") if keyword in node)
+            nodes.extend(node.values())
+        elif isinstance(node, list):
+            nodes.extend(node)
+    return frozenset(value for value in values if isinstance(value, str))
+
+
+def listed_path_values(parameters: Iterable[OpenApiParameter]) -> dict[str, frozenset[str]]:
+    """Strings each path parameter lists verbatim, which may be written percent-encoded."""
+    return {parameter.name: _listed_strings(parameter) for parameter in parameters}
 
 
 def _get_explicit_intent_path_names(*, parameters: Sequence[OpenApiParameter]) -> frozenset[str]:
     """Path parameter names whose examples, listed values or `format` allow an encoded slash."""
     explicit: set[str] = set()
     for parameter in parameters:
-        if _has_explicit_slash_example(parameter.examples):
+        if any("/" in unquote(value) for value in _listed_strings(parameter)):
             explicit.add(parameter.name)
         schema = parameter.optimized_schema
         if isinstance(schema, dict) and schema.get("format") in STRING_FORMATS:
-            explicit.add(parameter.name)
-        # Values the schema lists verbatim carry the same intent as examples.
-        if isinstance(schema, dict) and _has_explicit_slash_example([*(schema.get("enum") or ()), schema.get("const")]):
             explicit.add(parameter.name)
     return frozenset(explicit)
 
@@ -2548,7 +2567,9 @@ class OpenApiParameterSet(ParameterSet):
         fitting = [
             variant
             for variant in variants
-            if is_valid_path(_quote_all_safe(cast("dict[str, Any]", variant.overlay)), allow_encoded_slash_for=allowed)
+            if is_valid_path(
+                _quote_path_safe(cast("dict[str, Any]", variant.overlay), quote_all), allow_encoded_slash_for=allowed
+            )
         ]
         return (fitting, usage_tracker) if fitting else None
 

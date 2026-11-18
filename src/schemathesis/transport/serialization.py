@@ -16,6 +16,29 @@ from schemathesis.core.parameters import DelimitedValue, EncodedPath
 from schemathesis.core.transforms import to_wire_string, to_wire_text, transform
 
 
+def _quote_path_segment(value: str) -> str:
+    if value == ".":
+        return "%2E"
+    if value == "..":
+        return "%2E%2E"
+    # Percent-encode for path segments (space -> "%20"); "+" is literal in a path, not a space.
+    return quote(value, safe="")
+
+
+def quote_generated(parameters: dict[str, Any], listed: Mapping[str, Collection[str]]) -> dict[str, Any]:
+    """Percent-encode generated path values with `%` kept literal: `a%41` reaches the server as `a%41`, not `aA`.
+
+    Values the schema lists, like examples or `enum` members, may be written percent-encoded, so they are unquoted
+    first, as in `quote_all`. A later `quote_all` pass leaves the result unchanged.
+    """
+    for key, value in parameters.items():
+        if isinstance(value, DelimitedValue):
+            parameters[key] = EncodedPath(value.encoded)
+        elif isinstance(value, str):
+            parameters[key] = _quote_path_segment(unquote(value) if value in listed.get(key, ()) else value)
+    return parameters
+
+
 def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
     """Apply URL quotation for all values in a dictionary."""
     # Even though, "." is an unreserved character, it has a special meaning in "." and ".." strings.
@@ -34,19 +57,12 @@ def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
         elif isinstance(value, str):
             # Unquote first to keep quoting idempotent for already-escaped inputs.
             # E.g. "%2E" should stay escaped and not become a raw "."
-            decoded = unquote(value)
-            if decoded == ".":
-                parameters[key] = "%2E"
-            elif decoded == "..":
-                parameters[key] = "%2E%2E"
-            else:
-                # Percent-encode for path segments (space -> "%20"); "+" is literal in a path, not a space.
-                parameters[key] = quote(decoded, safe="")
+            parameters[key] = _quote_path_segment(unquote(value))
     return parameters
 
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Collection, Iterable, Iterator, Mapping
 
     from schemathesis.generation.case import Case
 

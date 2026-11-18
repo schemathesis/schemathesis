@@ -1219,6 +1219,73 @@ def test_custom_format_path_value_with_slash_is_accepted_when_explicit(ctx):
 
 
 @pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("a%e0b", "a%25e0b"),
+        ("a%41b", "a%2541b"),
+        ("x%40y@example.com", "x%2540y%40example.com"),
+    ],
+    ids=["invalid-utf8-escape", "ascii-escape", "escaped-at"],
+)
+def test_generated_path_value_with_percent_escape_keeps_literal_percent(ctx, value, expected):
+    # A generated value is the logical value: its `%` is a literal character, so the server must decode it back as is
+    format_name = f"percent-escape-{expected}"
+    schemathesis.openapi.format(format_name, st.just(value))
+    operation = ctx.openapi.load_operation(
+        "GET /accounts/{email}",
+        {
+            "parameters": [
+                {
+                    "name": "email",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string", "format": format_name},
+                }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+
+    @run_given(case=operation.as_strategy(), max_examples=1)
+    def inner(case):
+        assert case.path_parameters["email"] == expected
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("schema", "extra"),
+    [
+        ({"type": "string"}, {"example": "user%40example"}),
+        ({"type": "string", "enum": ["user%40example"]}, {}),
+        ({"type": "string", "const": "user%40example"}, {}),
+        ({"anyOf": [{"type": "string", "enum": ["user%40example"]}, {"type": "integer"}]}, {}),
+        ({"allOf": [{"$ref": "#/components/schemas/Email"}]}, {}),
+    ],
+    ids=["example", "enum", "const", "nested-enum", "referenced-enum"],
+)
+def test_listed_path_value_sent_as_written(ctx, schema, extra):
+    # Listed values may be written percent-encoded and must not be encoded twice; examples come in one draw in five
+    operation = ctx.openapi.load_operation(
+        "GET /accounts/{email}",
+        {
+            "parameters": [{"name": "email", "in": "path", "required": True, "schema": schema, **extra}],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.1.0",
+        components={"schemas": {"Email": {"type": "string", "enum": ["user%40example"]}}},
+    )
+    seen = set()
+
+    @run_given(case=operation.as_strategy(), max_examples=100)
+    def inner(case):
+        seen.add(case.path_parameters["email"])
+
+    assert "user%40example" in seen
+    assert "user%2540example" not in seen
+
+
+@pytest.mark.hypothesis_nested
 def test_custom_format_path_value_that_cannot_be_url_encoded_is_rejected(ctx):
     format_name = "lone-surrogate-path"
     schemathesis.openapi.format(format_name, st.just("a\ud800"))
