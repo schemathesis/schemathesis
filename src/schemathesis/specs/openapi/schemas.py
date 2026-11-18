@@ -104,6 +104,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.filters import FilterSet
     from schemathesis.generation.coverage import GenerationSession
+    from schemathesis.generation.dictionaries import PairedDictionaries
     from schemathesis.generation.hypothesis.reporting import SlowParameter, UnsatisfiableParameter
     from schemathesis.generation.stateful import APIStateMachine
     from schemathesis.generation.stateful.state_machine import StepInput, StepOutput
@@ -166,6 +167,8 @@ class OpenApiSchema(BaseSchema):
         self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
         # Security requirements found by runtime auth inference, per operation; the parsed spec stays unchanged.
         self._inferred_security: dict[str, SecurityRequirements] = {}
+        # Dictionaries whose values belong together, per operation label; built from dictionaries already loaded.
+        self.dictionary_pairs: dict[str, list[PairedDictionaries]] = {}
         # Credentials from automatic sign-up, keyed by security scheme.
         self.bootstrapped_auth: dict[str, HttpBearerAuthConfig | ApiKeyAuthConfig] = {}
         # Credentials of the signed-up account, keyed by the login operation label.

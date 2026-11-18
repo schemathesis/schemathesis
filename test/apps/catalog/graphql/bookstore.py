@@ -8,7 +8,7 @@ from typing import Literal, NewType
 import graphql
 import strawberry
 from fastapi import FastAPI
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 from strawberry.fastapi import GraphQLRouter
 from strawberry.flask.views import GraphQLView
 from strawberry.schema.config import StrawberryConfig
@@ -679,11 +679,16 @@ def relay_connection() -> GraphQLApp:
 
 
 _CHILDREN_BY_PARENT = {"1": ["c11", "c12"], "2": ["c21", "c22"], "3": []}
+_LOCKERS_BY_PARENT = {"1": ["10", "x1"], "2": ["20"], "3": []}
 
 
 def _make_parents_with_children() -> strawberry.Schema:
     @strawberry.type
     class Child:
+        id: strawberry.ID
+
+    @strawberry.type
+    class Locker:
         id: strawberry.ID
 
     @strawberry.type
@@ -708,8 +713,36 @@ def _make_parents_with_children() -> strawberry.Schema:
                 return Child(id=childId)
             return None
 
+        @strawberry.field
+        def lockers(self, parentId: strawberry.ID) -> list[Locker]:
+            return [Locker(id=strawberry.ID(locker)) for locker in _LOCKERS_BY_PARENT.get(parentId, [])]
+
+        # Locker `x1` is not a number, so it fits no `number`.
+        @strawberry.field
+        def locker(self, parentId: strawberry.ID, number: int) -> Locker | None:
+            if str(number) in _LOCKERS_BY_PARENT.get(parentId, []):
+                return Locker(id=strawberry.ID(str(number)))
+            return None
+
     return strawberry.Schema(Query)
 
 
+class _RequestErrorStatusView(_View):
+    # Like Apollo Server, a request that fails before execution gets status 400; its errors carry no `path`.
+    def dispatch_request(self) -> Response | str:
+        response = super().dispatch_request()
+        # The GraphiQL page comes as a string.
+        if isinstance(response, str):
+            return response
+        payload = response.get_json(silent=True)
+        errors = payload.get("errors") if isinstance(payload, dict) else None
+        if errors and all("path" not in error for error in errors):
+            response.status_code = 400
+        return response
+
+
 def parents_with_children() -> GraphQLApp:
-    return _wrap(_make_parents_with_children(), "/graphql", "flask")
+    app = Flask("test_app")
+    view = _RequestErrorStatusView.as_view("graphql", schema=_make_parents_with_children())
+    app.add_url_rule("/graphql", view_func=view)
+    return GraphQLApp(server=app, kind="flask", endpoint="/graphql")

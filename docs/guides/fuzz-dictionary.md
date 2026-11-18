@@ -72,7 +72,7 @@ parameters = { "query.limit" = 100 }
 
 Before testing starts, `st run` and `st fuzz` send one `GET /users?limit=100` request and collect every value at `pointer`, a JSON Pointer into the response body where `*` matches each item of an array. The request carries your headers and configured auth, and Schemathesis calls the operation even when filters exclude it from testing. Keys in `parameters` start with `path.`, `query.`, `header.` or `cookie.`; every path parameter of the source operation needs a value.
 
-Fetched values take the type of the parameter they fill, so an integer ID `42` reaches a `type: string` path parameter as `"42"`. Strings and numbers count as values; objects, arrays, booleans and `null` do not.
+Fetched values take the type of the parameter or body field they fill, so an integer ID `42` reaches a `type: string` path parameter as `"42"`. Strings and numbers count as values; objects, arrays, booleans and `null` do not.
 
 If the request fails, returns a non-2xx status, or yields no values, the dictionary stays empty and its parameters fall back to generated values. Schemathesis reports the error and exits with code 1, but the run continues. The pytest plugin does not load these dictionaries.
 
@@ -103,7 +103,7 @@ Every order remembers the user it was listed under. A source that binds both dic
 
 With both bindings from the example above, a positive-mode request to `GET /users/{user_id}/orders/{order_id}` draws an order and takes `user_id` from the user it was listed under, so the pair always exists. Operations that bind only `path.user_id`, such as `GET /users/{user_id}/orders`, keep drawing from every user.
 
-Pairing applies to parameter bindings in the same location, e.g. both in the path, and to scalar arguments of one GraphQL field. Negative-mode requests, type-wide bindings, body bindings and pairs split across locations draw each value on its own. When the order binding sets `probability`, it also decides how often the pair is drawn.
+Pairing works wherever the two bindings live in one operation: `user_id` in the path with `"body.order_id"` in the request body pairs the same way, and so do query, header and cookie bindings and scalar arguments of one GraphQL field. A pair holds only values that fit both schemas, so an order whose ID does not fit the `order_id` schema is never drawn with its user. Negative-mode requests pair the locations they keep valid. Type-wide bindings and body bindings with `[*]` draw each value on their own. When the order binding sets `probability`, it also decides how often the pair is drawn.
 
 ## Fill a Dictionary From a GraphQL API
 

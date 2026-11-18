@@ -72,6 +72,7 @@ if TYPE_CHECKING:
 
     from schemathesis.config._dictionaries import DictionaryBinding
     from schemathesis.core.error_feedback import ErrorFeedbackStore
+    from schemathesis.generation.dictionaries import PairedEntries
     from schemathesis.specs.openapi.extra_data_source import (
         CapturedVariant,
         OpenApiExtraDataSource,
@@ -711,6 +712,7 @@ def _with_dictionary_values(
     schema: JsonSchemaObject,
     generation_config: GenerationConfig,
     generation_mode: GenerationMode,
+    paired: PairedEntries | None,
 ) -> st.SearchStrategy:
     from schemathesis.generation.dictionaries import build_dictionary_overlay_strategy, resolve_parameter_bindings
 
@@ -728,6 +730,7 @@ def _with_dictionary_values(
         schema_properties=properties,
         validator_cls=operation.schema.adapter.jsonschema_validator_cls,
         generation_mode=generation_mode,
+        paired=paired,
     )
 
 
@@ -1688,11 +1691,12 @@ class OpenApiBody(OpenApiComponent):
         generation_mode: GenerationMode,
         feedback: FeedbackSources = NO_FEEDBACK,
         mix_examples: bool = True,
+        paired: PairedEntries | None = None,
     ) -> st.SearchStrategy:
         strategy_key = _strategy_cache_key(operation, generation_config, feedback, mix_examples)
-        # Caching the captured-variant overlay would freeze stale values; only the strategy beneath it is cached
-        consumes_captured = _captured_variants_active(feedback.extra_data_source, operation)
-        overlay_key = None if consumes_captured else strategy_key
+        # Captured variants and paired entries change from case to case, so only the strategy beneath them is cached
+        builds_per_case = paired is not None or _captured_variants_active(feedback.extra_data_source, operation)
+        overlay_key = None if builds_per_case else strategy_key
         # Only the latest strategy per mode is kept; a new feedback generation replaces it.
         cached = self._strategy_cache.get(generation_mode) if overlay_key is not None else None
         if cached is not None and cached[0] == overlay_key:
@@ -1718,13 +1722,13 @@ class OpenApiBody(OpenApiComponent):
                 generation_mode,
                 captured,
                 feedback=feedback,
-                base_key=strategy_key if consumes_captured else None,
+                base_key=strategy_key if builds_per_case else None,
                 mix_examples=mix_examples,
             )
         if strategy is EMPTY_STRATEGY:
             # Returned as is, so callers still recognize the schema as unsatisfiable
             return strategy
-        strategy = self._with_configured_values(strategy, operation, schema, generation_config, generation_mode)
+        strategy = self._with_configured_values(strategy, operation, schema, generation_config, generation_mode, paired)
 
         if overlay_key is not None:
             self._strategy_cache[generation_mode] = (overlay_key, strategy)
@@ -1841,6 +1845,7 @@ class OpenApiBody(OpenApiComponent):
         schema: JsonSchema,
         generation_config: GenerationConfig,
         generation_mode: GenerationMode,
+        paired: PairedEntries | None,
     ) -> st.SearchStrategy:
         """Apply user-configured dictionaries, then body overrides, on top of every other source."""
         from schemathesis.generation.body_overrides import (
@@ -1863,6 +1868,7 @@ class OpenApiBody(OpenApiComponent):
                 container_schema=schema,
                 validator_cls=operation.schema.adapter.jsonschema_validator_cls,
                 generation_mode=generation_mode,
+                paired=paired,
             )
         body_overrides = resolve_body_overrides(operation=operation, body_schema=schema)
         if body_overrides:
@@ -2487,13 +2493,15 @@ class OpenApiParameterSet(ParameterSet):
         exclude: Iterable[str] = (),
         feedback: FeedbackSources = NO_FEEDBACK,
         mix_examples: bool = True,
+        paired: PairedEntries | None = None,
     ) -> st.SearchStrategy:
         exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
         strategy_key = _strategy_cache_key(operation, generation_config, feedback, mix_examples)
         cache_key = (exclude_key, generation_mode, strategy_key) if strategy_key is not None else None
-        # Captured variants are bound at build time, so their consumers cache only the strategy beneath them.
-        consumes_captured = _captured_variants_active(feedback.extra_data_source, operation)
-        if cache_key is not None and not consumes_captured and cache_key in self._strategy_cache:
+        # Captured variants and paired entries are bound at build time, so their consumers cache only the strategy
+        # beneath them.
+        builds_per_case = paired is not None or _captured_variants_active(feedback.extra_data_source, operation)
+        if cache_key is not None and not builds_per_case and cache_key in self._strategy_cache:
             return self._strategy_cache[cache_key]
 
         schema = _adjusted_schema(
@@ -2521,11 +2529,12 @@ class OpenApiParameterSet(ParameterSet):
                 exclude_key,
                 captured,
                 feedback=feedback,
-                base_key=cache_key if consumes_captured else None,
+                base_key=cache_key if builds_per_case else None,
                 mix_examples=mix_examples,
+                paired=paired,
             )
 
-        if cache_key is not None and not consumes_captured:
+        if cache_key is not None and not builds_per_case:
             self._strategy_cache[cache_key] = strategy
         return strategy
 
@@ -2555,6 +2564,7 @@ class OpenApiParameterSet(ParameterSet):
         feedback: FeedbackSources,
         base_key: tuple[frozenset[str], GenerationMode, StrategyCacheKey] | None,
         mix_examples: bool,
+        paired: PairedEntries | None,
     ) -> st.SearchStrategy:
         from hypothesis import strategies as st
 
@@ -2577,6 +2587,9 @@ class OpenApiParameterSet(ParameterSet):
         if strategy is EMPTY_STRATEGY:
             # Returned as is, so callers still recognize the schema as unsatisfiable
             return strategy
+        strategy = _with_dictionary_values(
+            strategy, operation, self.location, schema, generation_config, generation_mode, paired
+        )
         if captured is not None:
             strategy = build_hybrid_strategy(strategy, *captured)
         return _serialize_for_location(
@@ -2599,7 +2612,7 @@ class OpenApiParameterSet(ParameterSet):
         feedback: FeedbackSources,
         mix_examples: bool,
     ) -> st.SearchStrategy:
-        """Generate parameter values with every overlay except captured values, before location serialization."""
+        """Generate parameter values with every overlay except dictionaries and captured values."""
         from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
 
         # Negative filter needs `prefixItems` intact so `Draft202012Validator` can be constructed.
@@ -2643,7 +2656,7 @@ class OpenApiParameterSet(ParameterSet):
         feedback: FeedbackSources,
         mix_examples: bool,
     ) -> st.SearchStrategy:
-        """Substitute values from every non-captured source into generated ones.
+        """Substitute values from every source except dictionaries and captured ones into generated values.
 
         Examples go first to share later transformations; path integers precede constants so a literal stays final;
         constants precede semantic values so response-derived ones win.
@@ -2675,7 +2688,7 @@ class OpenApiParameterSet(ParameterSet):
                 validator_cls,
                 name_only=self.location == ParameterLocation.PATH,
             )
-        return _with_dictionary_values(strategy, operation, self.location, schema, generation_config, generation_mode)
+        return strategy
 
     def _build_negative_aware_strategy(
         self,

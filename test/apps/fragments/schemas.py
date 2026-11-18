@@ -939,7 +939,78 @@ def parents_with_children() -> dict[str, Any]:
         "/api/parents/{parentId}/children/{childId}/toys": {
             "get": {"parameters": [parent_id, child_id], "responses": responses}
         },
+        "/api/children/{childId}": {
+            "get": {
+                "parameters": [
+                    child_id,
+                    {"in": "query", "name": "parentId", "required": True, "schema": {"type": "string"}},
+                ],
+                "responses": responses,
+            }
+        },
+        "/api/parents/{parentId}/adoptions": {
+            "post": {
+                "parameters": [parent_id],
+                "requestBody": _required_json_body({"childId": {"type": "string"}}),
+                "responses": responses,
+            }
+        },
+        "/api/parents/{parentId}/children/{childId}/notes": {
+            "post": {
+                # Only parent `1` and the first child of each parent, such as `c11`, fit.
+                "parameters": [
+                    {**parent_id, "schema": {"type": "string", "pattern": "^1$"}},
+                    {**child_id, "schema": {"type": "string", "pattern": "1$"}},
+                ],
+                "requestBody": _required_json_body({"text": {"type": "string"}}),
+                "responses": responses,
+            }
+        },
+        "/api/parents/{parentId}/guardians": {
+            "post": {
+                "parameters": [parent_id],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    _closed_object({"childId": {"type": "string"}}),
+                                    _closed_object({"wardId": {"type": "string"}}),
+                                ]
+                            }
+                        }
+                    },
+                },
+                "responses": responses,
+            }
+        },
+        "/api/parents/{parentId}/adoptions/batch": {
+            "post": {
+                "parameters": [parent_id],
+                "requestBody": _required_json_body(
+                    {"childIds": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 2}}
+                ),
+                "responses": responses,
+            }
+        },
+        "/api/transfers": {
+            "post": {
+                "requestBody": _required_json_body(
+                    {"parentId": {"type": "string"}, "childId": {"type": "string"}, "wardId": {"type": "integer"}}
+                ),
+                "responses": responses,
+            }
+        },
     }
+
+
+def _closed_object(properties: dict[str, Any]) -> dict[str, Any]:
+    return {"type": "object", "properties": properties, "required": list(properties), "additionalProperties": False}
+
+
+def _required_json_body(properties: dict[str, Any]) -> dict[str, Any]:
+    return {"required": True, "content": {"application/json": {"schema": _closed_object(properties)}}}
 
 
 def languages_with_codes() -> dict[str, Any]:
