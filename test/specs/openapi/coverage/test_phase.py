@@ -5650,6 +5650,31 @@ def test_path_parameter_with_slash_in_custom_format(ctx):
     assert all(v == "0.0.0.0%2F0" for v in path_values), f"Unexpected values: {path_values}"
 
 
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        ({"type": "string", "format": "percent-escape"}, "a%2540b"),
+        ({"type": "string", "enum": ["a%40b"]}, "a%40b"),
+        ({"type": "string", "default": "a%40b"}, "a%40b"),
+        ({"allOf": [{"type": "string", "example": "a%40b"}]}, "a%40b"),
+    ],
+    ids=["generated", "enum", "default", "nested-example"],
+)
+def test_path_parameter_percent_escape(ctx, schema, expected):
+    # A generated `%` is a literal character, while values the schema lists may be written percent-encoded
+    schemathesis.openapi.format("percent-escape", st.just("a%40b"))
+    operation = load_schema(
+        ctx,
+        path="/accounts/{email}",
+        method="get",
+        parameters=[{"name": "email", "in": "path", "required": True, "schema": schema}],
+    )["/accounts/{email}"]["get"]
+
+    path_values = {case.path_parameters.get("email") for case in collect_cases(operation, GenerationMode.POSITIVE)}
+
+    assert path_values == {expected}
+
+
 def test_path_parameter_enum_value_with_slash_is_covered(ctx):
     # An enum member containing "/" must still be tried, percent-encoded, not dropped.
     operation = load_schema(

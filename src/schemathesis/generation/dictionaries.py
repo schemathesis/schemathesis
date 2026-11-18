@@ -6,6 +6,7 @@ from collections.abc import Callable, Container, Iterable, Iterator, Mapping, Se
 from dataclasses import dataclass, field
 from operator import itemgetter
 from typing import TYPE_CHECKING
+from urllib.parse import unquote
 
 import jsonschema_rs
 from hypothesis import strategies as st
@@ -321,6 +322,13 @@ class PairedEntries:
         return eligible[position]
 
 
+def _as_sent(value: EntryValue, location: ParameterLocation) -> EntryValue:
+    # Path entries may be written percent-encoded, like path examples; decoded, they are sent as written
+    if location == ParameterLocation.PATH and isinstance(value, str):
+        return unquote(value)
+    return value
+
+
 def build_dictionary_overlay_strategy(
     inner: st.SearchStrategy,
     *,
@@ -400,7 +408,7 @@ def build_dictionary_overlay_strategy(
                     continue
                 entry = draw(st.sampled_from(eligible))
             entry_index, entry_value, matches_schema = entry
-            new_value[parameter_name] = entry_value
+            new_value[parameter_name] = _as_sent(entry_value, parameter_location)
             new_draws.append(record(parameter_name, entry_index, entry_value, matches_schema))
 
         if not new_draws and not isinstance(produced, GeneratedValue):
