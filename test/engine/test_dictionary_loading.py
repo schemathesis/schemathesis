@@ -5,6 +5,7 @@ import pytest
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.dictionary_loading import DictionaryLoad
@@ -116,8 +117,22 @@ def test_source_operation_outside_filters_still_loads(ctx):
             "`query` applies only to GraphQL operations",
             0,
         ),
+        # Only GraphQL reports failures as `errors`; this response has a warning there.
+        (
+            {**PARENTS, "parameters": {"query.limit": 0}},
+            "no values at `/data/*/id` in the `GET /api/parents` response",
+            1,
+        ),
     ],
-    ids=["unknown-operation", "no-values", "objects-only", "error-status", "missing-path-parameter", "graphql-query"],
+    ids=[
+        "unknown-operation",
+        "no-values",
+        "objects-only",
+        "error-status",
+        "missing-path-parameter",
+        "graphql-query",
+        "rest-errors-member",
+    ],
 )
 def test_failed_load_is_reported(ctx, source, error, sent):
     api = ctx.openapi.serve(nested.parents_with_children())
@@ -144,18 +159,23 @@ def test_dropped_connection_is_reported(app_runner):
 
 
 # A proxy or login page can answer with HTML instead of the API's JSON.
-def test_non_json_response_is_reported(app_runner):
+@pytest.mark.parametrize(
+    ("status", "error"),
+    [(200, "`GET /api/parents` returned a response that is not JSON"), (502, "`GET /api/parents` returned 502")],
+    ids=["success", "error-status"],
+)
+def test_non_json_response_is_reported(app_runner, status, error):
     api = nested.parents_with_children()
 
     @api.server.before_request
     def serve_html():
-        return "<html></html>", 200
+        return "<html></html>", status
 
     schema = schemathesis.openapi.from_dict(api.spec, config=_config(PARENTS))
     schema.config.update(base_url=f"http://127.0.0.1:{app_runner.run_flask_app(api.server)}")
     stream = EventStream(schema, phases=[PhaseName.FUZZING], max_examples=1).execute()
     [load] = _setup(stream).payload.dictionaries
-    assert (load.error, load.requests) == ("`GET /api/parents` returned a response that is not JSON", 1)
+    assert (load.error, load.requests) == (error, 1)
 
 
 # Parent `3` has no children; the listing still loads from the other parents.
@@ -264,6 +284,157 @@ def test_parent_only_binding_draws_from_every_parent(ctx):
     assert parents == {"1", "2", "3"}
 
 
+PAIRS = {("1", "c11"), ("1", "c12"), ("2", "c21"), ("2", "c22")}
+
+
+def _generate(ctx, config, path, method, generation_mode=GenerationMode.POSITIVE):
+    api = ctx.openapi.serve(nested.parents_with_children())
+    schema = schemathesis.openapi.from_url(api.schema_url, config=SchemathesisConfig.from_dict(config))
+    _run_setup(schema)
+    return schema, generate_many(schema[path][method].as_strategy(generation_mode=generation_mode), 30)
+
+
+def _read_cases(ctx, path, method, read, child_binding, generation_mode=GenerationMode.POSITIVE, parameters=None):
+    parents = {"dictionary": "parents"}
+    config = {
+        "dictionaries": {"parents": PARENTS, "children": CHILDREN_SOURCE},
+        "parameters": {
+            "path.parentId": parents,
+            "query.parentId": parents,
+            "body.parentId": parents,
+            "path.childId": child_binding,
+            "body.childId": child_binding,
+            "body.wardId": child_binding,
+            "body.childIds[*]": child_binding,
+            **(parameters or {}),
+        },
+    }
+    _, cases = _generate(ctx, config, path, method, generation_mode)
+    return [read(case) for case in cases]
+
+
+def _query_parent_and_path_child(case):
+    return case.query["parentId"], case.path_parameters["childId"]
+
+
+def _path_parent_and_child(case):
+    return case.path_parameters["parentId"], case.path_parameters["childId"]
+
+
+NOTES = "/api/parents/{parentId}/children/{childId}/notes"
+
+
+@pytest.mark.parametrize(
+    ("path", "method", "read_pair"),
+    [
+        ("/api/children/{childId}", "GET", _query_parent_and_path_child),
+        (
+            "/api/parents/{parentId}/adoptions",
+            "POST",
+            lambda case: (case.path_parameters["parentId"], case.body["childId"]),
+        ),
+        # The API lists integer parent IDs, while this body field declares `type: string`. `wardId` is bound to
+        # children too, but no child fits its `type: integer`.
+        ("/api/transfers", "POST", lambda case: (case.body["parentId"], case.body["childId"])),
+        # The body holds either `childId` or `wardId`, both bound to children, and the one generated takes the pair.
+        (
+            "/api/parents/{parentId}/guardians",
+            "POST",
+            lambda case: (case.path_parameters["parentId"], case.body.get("wardId", case.body.get("childId"))),
+        ),
+    ],
+    ids=["query-and-path", "path-and-body", "body", "either-body-field"],
+)
+def test_parent_and_child_in_any_location_come_from_the_same_listing(ctx, path, method, read_pair):
+    pairs = set(_read_cases(ctx, path, method, read_pair, {"dictionary": "children"}))
+    assert pairs <= PAIRS
+    assert len({parent for parent, _ in pairs}) == 2
+
+
+# Only parent `1` fits `parentId`, and only the first child of each parent fits `childId`.
+def test_pair_is_drawn_among_values_that_fit_every_parameter(ctx):
+    pairs = set(_read_cases(ctx, NOTES, "POST", _path_parent_and_child, {"dictionary": "children"}))
+    assert pairs == {("1", "c11")}
+
+
+def test_negative_case_pairs_values_in_locations_it_keeps_valid(ctx):
+    cases = _read_cases(
+        ctx,
+        NOTES,
+        "POST",
+        lambda case: (case.meta.components[ParameterLocation.PATH].mode, _path_parent_and_child(case)),
+        {"dictionary": "children"},
+        generation_mode=GenerationMode.NEGATIVE,
+    )
+    assert {pair for mode, pair in cases if mode.is_positive} == {("1", "c11")}
+
+
+# The path takes the paired child first, so `text`, also bound to children, draws its own one.
+def test_second_place_bound_to_a_paired_dictionary_draws_on_its_own(ctx):
+    cases = _read_cases(
+        ctx,
+        NOTES,
+        "POST",
+        lambda case: (_path_parent_and_child(case), case.body["text"]),
+        {"dictionary": "children"},
+        parameters={"body.text": {"dictionary": "children"}},
+    )
+    assert {pair for pair, _ in cases} == {("1", "c11")}
+    assert any(text != "c11" for _, text in cases)
+
+
+def test_type_wide_binding_draws_on_its_own(ctx):
+    config = {
+        "dictionaries": {"parents": PARENTS, "children": CHILDREN_SOURCE},
+        "parameters": {"query.parentId": {"dictionary": "parents"}},
+        "generation": {"dictionaries": {"string": {"dictionary": "children", "probability": 1.0}}},
+    }
+    _, cases = _generate(ctx, config, "/api/children/{childId}", "GET")
+    assert any(_query_parent_and_path_child(case) not in PAIRS for case in cases)
+
+
+# Every parent lists all parents, so each value is held by several entries, each remembering another parent.
+def test_paired_draw_records_the_entry_it_was_drawn_from(ctx):
+    listed = {
+        "from-operation": "GET /api/parents",
+        "pointer": "/data/*/id",
+        "parameters": {"query.limit": {"dictionary": "parents"}},
+    }
+    config = {
+        "dictionaries": {"parents": PARENTS, "listed": listed},
+        "parameters": {"query.parentId": {"dictionary": "parents"}, "path.childId": {"dictionary": "listed"}},
+    }
+    schema, cases = _generate(ctx, config, "/api/children/{childId}", "GET")
+    entries = schema.config.dictionaries["listed"].entries
+    for case in cases:
+        [draw] = [draw for draw in case.meta.dictionary_draws if draw.dictionary == "listed"]
+        assert str(entries[draw.entry_index].origin["parents"]) == case.query["parentId"]
+
+
+# A pair fills one field, so the items of a wildcard binding keep drawing children on their own.
+def test_wildcard_body_binding_draws_each_item_on_its_own(ctx):
+    children = _read_cases(
+        ctx,
+        "/api/parents/{parentId}/adoptions/batch",
+        "POST",
+        lambda case: case.body["childIds"],
+        {"dictionary": "children"},
+    )
+    assert any(len(set(items)) == 2 for items in children)
+
+
+def test_child_binding_probability_decides_how_often_a_split_pair_is_drawn(ctx):
+    pairs = _read_cases(
+        ctx,
+        "/api/children/{childId}",
+        "GET",
+        _query_parent_and_path_child,
+        {"dictionary": "children", "probability": 0.5},
+    )
+    assert any(pair in PAIRS for pair in pairs)
+    assert any(pair not in PAIRS for pair in pairs)
+
+
 def test_from_operation_dictionary_needs_openapi_or_graphql(ctx):
     schema = load_grpc(
         ctx.grpc.apps.users(), dictionaries={"users": {"from-operation": "pkg.Users/GetUser", "pointer": "/id"}}
@@ -277,6 +448,12 @@ GRAPHQL_CHILDREN = {
     "from-operation": "Query.children",
     "query": "query($parentId: ID!) { children(parentId: $parentId) { id } }",
     "pointer": "/data/children/*/id",
+    "parameters": {"parentId": {"dictionary": "parents"}},
+}
+GRAPHQL_LOCKERS = {
+    "from-operation": "Query.lockers",
+    "query": "query($parentId: ID!) { lockers(parentId: $parentId) { id } }",
+    "pointer": "/data/lockers/*/id",
     "parameters": {"parentId": {"dictionary": "parents"}},
 }
 
@@ -313,8 +490,14 @@ def test_graphql_child_entries_remember_parent(ctx):
             "`Query.children` returned errors: Unknown parent `9`",
             1,
         ),
+        # The server answers a query that fails validation with status 400.
+        (
+            {"from-operation": "Query.parents", "query": "{ parents { name } }", "pointer": "/data"},
+            "`Query.parents` returned 400: Cannot query field 'name' on type 'Parent'.",
+            1,
+        ),
     ],
-    ids=["no-query", "errors"],
+    ids=["no-query", "errors", "error-status"],
 )
 def test_failed_graphql_load_is_reported(ctx, source, error, sent):
     [load] = _run_setup(_load_graphql(ctx, parents=source)).payload.dictionaries
@@ -324,20 +507,24 @@ def test_failed_graphql_load_is_reported(ctx, source, error, sent):
 GRAPHQL_PAIRS = {("1", "c11"), ("1", "c12"), ("2", "c21"), ("2", "c22")}
 
 
-def _graphql_child_arguments(ctx, child_binding):
+def _graphql_child_arguments(ctx, child_binding, field_name="child", child_argument="childId"):
     schema = _load_graphql(
         ctx,
         parents=GRAPHQL_PARENTS,
         children=GRAPHQL_CHILDREN,
-        parameters={"Query.child.parentId": {"dictionary": "parents"}, "Query.child.childId": child_binding},
+        lockers=GRAPHQL_LOCKERS,
+        parameters={
+            f"Query.{field_name}.parentId": {"dictionary": "parents"},
+            f"Query.{field_name}.{child_argument}": child_binding,
+        },
     )
     _run_setup(schema)
     pairs = []
-    for case in generate_many(schema["Query"]["child"].as_strategy(), 30):
+    for case in generate_many(schema["Query"][field_name].as_strategy(), 30):
         [operation] = graphql.parse(case.body).definitions
         [field] = operation.selection_set.selections
         arguments = {argument.name.value: argument.value.value for argument in field.arguments}
-        pairs.append((arguments["parentId"], arguments["childId"]))
+        pairs.append((arguments["parentId"], arguments[child_argument]))
     return pairs
 
 
@@ -351,6 +538,18 @@ def test_graphql_child_binding_probability_decides_how_often_the_pair_is_drawn(c
     pairs = _graphql_child_arguments(ctx, {"dictionary": "children", "probability": 0.5})
     assert any(pair in GRAPHQL_PAIRS for pair in pairs)
     assert any(child not in {"c11", "c12", "c21", "c22"} for _, child in pairs)
+
+
+# Parent 1 has lockers `10` and `x1`, and only `10` fits `number: Int`.
+def test_graphql_pair_is_drawn_among_values_that_fit_every_argument(ctx):
+    pairs = set(_graphql_child_arguments(ctx, {"dictionary": "lockers"}, field_name="locker", child_argument="number"))
+    assert pairs == {("1", "10"), ("2", "20")}
+
+
+# No child ID fits `number: Int`, so `parentId` draws on its own, including parent `3` without children.
+def test_graphql_argument_that_no_value_fits_leaves_the_pair_undrawn(ctx):
+    pairs = _graphql_child_arguments(ctx, {"dictionary": "children"}, field_name="locker", child_argument="number")
+    assert {parent for parent, _ in pairs} == {"1", "2", "3"}
 
 
 def _child_path_parameters(ctx, *, child_binding, parent_ids=None):

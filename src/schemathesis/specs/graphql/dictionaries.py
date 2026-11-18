@@ -18,7 +18,7 @@ from schemathesis.config._dictionaries import (
     parse_graphql_path,
 )
 from schemathesis.core.transforms import format_body_path
-from schemathesis.generation.dictionaries import DictionaryDraw, pair_parameters
+from schemathesis.generation.dictionaries import DictionaryDraw, draw_paired_entries, pair_dictionaries
 from schemathesis.specs.graphql._helpers import (
     _root_type_for,
     _unwrap,
@@ -264,19 +264,28 @@ def _draw_pairs(
     # Only a dictionary whose entries remember values of another one leads a pair.
     if not any(binding.dictionary.origin for binding, _ in bound.values()):
         return {}
-    eligible = {
-        name: _eligible_entries(binding.dictionary, scalar_name, _SCALAR_TYPE_KEYS[scalar_name])
-        for name, (binding, scalar_name) in bound.items()
-    }
+    # The first argument bound to a dictionary takes part in pairing; another one bound to it draws on its own.
+    argument_for: dict[str, str] = {}
+    for name, (binding, _) in bound.items():
+        argument_for.setdefault(binding.dictionary.name, name)
+    # Values converted to each argument's type, by entry index.
+    eligible: dict[str, dict[int, EntryValue]] = {}
+    for name in argument_for.values():
+        binding, scalar_name = bound[name]
+        eligible[name] = dict(_eligible_entries(binding.dictionary, scalar_name, _SCALAR_TYPE_KEYS[scalar_name]))
+    pairs = pair_dictionaries(
+        {
+            dictionary_name: (bound[name][0].dictionary, bound[name][0].probability, eligible[name])
+            for dictionary_name, name in argument_for.items()
+        }
+    )
     values: dict[str, graphql.ValueNode] = {}
-    for pair in pair_parameters({name: binding.dictionary for name, (binding, _) in bound.items()}, eligible):
-        leader, _ = bound[pair.parameters[0]]
-        if context.random.random() >= leader.probability:
-            continue
-        for name, (entry_index, entry_value) in zip(pair.parameters, context.random.choice(pair.choices), strict=True):
-            binding, scalar_name = bound[name]
-            _record(context, binding.dictionary, entry_index, entry_value, (name,), (*field_path, name))
-            values[name] = scalar_value_node(scalar_name, entry_value)
+    for dictionary_name, entry_index in draw_paired_entries(context.random, pairs).items():
+        name = argument_for[dictionary_name]
+        binding, scalar_name = bound[name]
+        entry_value = eligible[name][entry_index]
+        _record(context, binding.dictionary, entry_index, entry_value, (name,), (*field_path, name))
+        values[name] = scalar_value_node(scalar_name, entry_value)
     return values
 
 

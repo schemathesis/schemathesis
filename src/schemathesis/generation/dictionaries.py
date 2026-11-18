@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from bisect import bisect_left
+from collections.abc import Callable, Container, Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass, field
+from operator import itemgetter
 from typing import TYPE_CHECKING
 
 import jsonschema_rs
@@ -11,8 +13,10 @@ from hypothesis import strategies as st
 from schemathesis.config._dictionaries import (
     BODY_PREFIX,
     SUPPORTED_TYPE_KEYS,
+    WILDCARD,
     DictionaryBinding,
     DictionaryDefinition,
+    DictionaryEntry,
     EntryValue,
     ParameterDictionaryBinding,
     coerce_entries_for_type,
@@ -41,6 +45,9 @@ if TYPE_CHECKING:
     from schemathesis.core.mutations import MutationMetadata
     from schemathesis.python._constants.pool import ConstantDraw
     from schemathesis.schemas import APIOperation
+
+# An entry index, the entry's value converted to the target's type, and whether it matches the target's schema.
+EligibleEntry = tuple[int, EntryValue, bool]
 
 
 def _eligible_for_mode(matches_schema: bool, mode: GenerationMode) -> bool:
@@ -176,48 +183,142 @@ def _infer_ty(parameter_schema: JsonSchema) -> str | None:
 
 
 @dataclass(slots=True, frozen=True)
-class PairedParameters:
-    # The leader parameter first, then the parameters bound to dictionaries whose values its entries remember.
-    parameters: tuple[str, ...]
-    # One `(entry index, value)` per parameter, for each leader entry whose remembered values are eligible too.
-    choices: tuple[tuple[tuple[int, EntryValue], ...], ...]
+class PairedDictionaries:
+    # The leader first, then the dictionaries whose values its entries remember.
+    names: tuple[str, ...]
+    probability: float
+    # An entry index per dictionary in `names`, for each leader entry whose remembered values all fit.
+    choices: tuple[tuple[int, ...], ...]
 
 
-def pair_parameters(
-    dictionaries: dict[str, DictionaryDefinition],
-    eligible: Mapping[str, Sequence[tuple[int, EntryValue]]],
-) -> list[PairedParameters]:
-    """Parameters whose dictionary values belong together, keyed by parameter name in both arguments."""
-    # The first parameter bound to a dictionary takes part in pairing; another one bound to it draws on its own.
-    parameter_for: dict[str, str] = {}
-    for parameter_name, dictionary in dictionaries.items():
-        parameter_for.setdefault(dictionary.name, parameter_name)
+def pair_dictionaries(
+    bound: Mapping[str, tuple[DictionaryDefinition, float, Container[int]]],
+) -> list[PairedDictionaries]:
+    """Bound dictionaries whose entries remember each other's values, keyed by dictionary name.
+
+    Each dictionary comes with its binding's probability and the indices of its entries that fit where it is bound.
+    """
     paired = []
-    for leader, followers in pair_groups(dictionaries[name] for name in parameter_for.values()):
+    for leader, followers in pair_groups(definition for definition, _, _ in bound.values()):
         if not followers:
             continue
-        # The first eligible entry with each value, per follower.
-        lookups: list[tuple[str, dict[EntryValue, tuple[int, EntryValue]]]] = []
-        for follower in followers:
-            lookup: dict[EntryValue, tuple[int, EntryValue]] = {}
-            for entry_index, entry_value in eligible[parameter_for[follower.name]]:
-                lookup.setdefault(follower.entries[entry_index].value, (entry_index, entry_value))
-            lookups.append((follower.name, lookup))
+        _, probability, fits = bound[leader.name]
+        lookups = [(follower.name, _entries_by_value(follower), bound[follower.name][2]) for follower in followers]
         choices = []
-        for entry_index, entry_value in eligible[parameter_for[leader.name]]:
-            origin = leader.entries[entry_index].origin
-            choice = [(entry_index, entry_value)]
-            for name, lookup in lookups:
-                match = lookup.get(origin[name])
+        for entry in leader.entries:
+            if entry.index not in fits:
+                continue
+            choice = [entry.index]
+            for name, by_value, follower_fits in lookups:
+                # A value may repeat under other ancestors, so take the entry listed under this entry's ones.
+                match = next(
+                    (
+                        candidate.index
+                        for candidate in by_value.get(entry.origin[name], ())
+                        if candidate.index in follower_fits and candidate.origin.items() <= entry.origin.items()
+                    ),
+                    None,
+                )
                 if match is None:
                     break
                 choice.append(match)
             else:
                 choices.append(tuple(choice))
         if choices:
-            parameters = (parameter_for[leader.name], *(parameter_for[follower.name] for follower in followers))
-            paired.append(PairedParameters(parameters=parameters, choices=tuple(choices)))
+            names = (leader.name, *(follower.name for follower in followers))
+            paired.append(PairedDictionaries(names=names, probability=probability, choices=tuple(choices)))
     return paired
+
+
+def _entries_by_value(dictionary: DictionaryDefinition) -> dict[EntryValue, list[DictionaryEntry]]:
+    by_value: dict[EntryValue, list[DictionaryEntry]] = {}
+    for entry in dictionary.entries:
+        by_value.setdefault(entry.value, []).append(entry)
+    return by_value
+
+
+def draw_paired_entries(random: random.Random, pairs: Sequence[PairedDictionaries]) -> dict[str, int]:
+    """An entry index per dictionary name, for each pair whose probability comes up."""
+    drawn: dict[str, int] = {}
+    for pair in pairs:
+        if random.random() < pair.probability:
+            drawn.update(zip(pair.names, random.choice(pair.choices), strict=True))
+    return drawn
+
+
+def pair_operation_dictionaries(
+    operation: APIOperation,
+    *,
+    parameter_properties: Mapping[ParameterLocation, dict[str, JsonSchema]],
+    body_schemas: Iterable[JsonSchema],
+    generation_config: GenerationConfig,
+    validator_cls: type,
+) -> list[PairedDictionaries]:
+    """Dictionaries whose values belong together in one operation, given its parameters and a body per media type.
+
+    A case may fill any place bound to a dictionary, so a pair holds only entries that fit every such place.
+    """
+    config: ProjectConfig = operation.schema.config
+    if not any(definition.origin for definition in config.dictionaries.values()):
+        return []
+    places: list[tuple[DictionaryDefinition, float, tuple[EligibleEntry, ...]]] = []
+    for location, properties in parameter_properties.items():
+        bindings = resolve_parameter_bindings(
+            operation=operation, location=location, properties=properties, generation_config=generation_config
+        )
+        for name, binding in bindings.items():
+            if binding.is_parameter_specific:
+                eligible = _classify_entries(
+                    binding.entries, properties.get(name), validator_cls, GenerationMode.POSITIVE
+                )
+                places.append((binding.dictionary, binding.probability, eligible))
+    if any(_body_bindings(operation, config)):
+        for schema in body_schemas:
+            for body_binding in resolve_body_bindings(
+                operation=operation, body_schema=schema, generation_config=generation_config
+            ):
+                # A wildcard reaches many fields, while a pair fills one.
+                if WILDCARD not in split_body_path(body_binding.pointer):
+                    eligible = _classify_entries(
+                        body_binding.entries, body_binding.leaf_schema, validator_cls, GenerationMode.POSITIVE
+                    )
+                    places.append((body_binding.dictionary, body_binding.probability, eligible))
+    bound: dict[str, tuple[DictionaryDefinition, float, set[int]]] = {}
+    for dictionary, probability, eligible in places:
+        # A place without fitting entries never takes a paired entry, so it narrows nothing.
+        if not eligible:
+            continue
+        fits = {entry_index for entry_index, _, _ in eligible}
+        if dictionary.name in bound:
+            bound[dictionary.name][2].intersection_update(fits)
+        else:
+            bound[dictionary.name] = (dictionary, probability, fits)
+    return pair_dictionaries(bound)
+
+
+# A parameter location with a parameter name, or `body` with a JSON Pointer into the body.
+Place = tuple[str, str]
+
+
+@dataclass(slots=True)
+class PairedEntries:
+    """Entries drawn together for one case, by dictionary name."""
+
+    entries: dict[str, int]
+    # The place that took each dictionary's entry; other places bound to that dictionary draw on their own.
+    takers: dict[str, Place] = field(default_factory=dict)
+
+    def take(self, dictionary: str, place: Place, eligible: Sequence[EligibleEntry]) -> EligibleEntry | None:
+        """The entry drawn for `dictionary`, if it is among `place`'s eligible ones, which are sorted by index."""
+        entry_index = self.entries.get(dictionary)
+        if entry_index is None:
+            return None
+        position = bisect_left(eligible, entry_index, key=itemgetter(0))
+        if position == len(eligible) or eligible[position][0] != entry_index:
+            return None
+        if self.takers.setdefault(dictionary, place) != place:
+            return None
+        return eligible[position]
 
 
 def build_dictionary_overlay_strategy(
@@ -229,6 +330,7 @@ def build_dictionary_overlay_strategy(
     schema_properties: dict[str, JsonSchema],
     validator_cls: type,
     generation_mode: GenerationMode,
+    paired: PairedEntries | None = None,
 ) -> st.SearchStrategy:
     # Build-time mode filter so a substitution can't silently flip the case mode chosen by `inner`.
     location_value = parameter_location.value
@@ -246,20 +348,6 @@ def build_dictionary_overlay_strategy(
 
     if not eligible_per_parameter:
         return inner
-
-    # Negative cases want values that break the schema, not pairs that belong together.
-    paired = (
-        pair_parameters(
-            {
-                name: bindings[name].dictionary
-                for name in eligible_per_parameter
-                if bindings[name].is_parameter_specific
-            },
-            {name: [(index, value) for index, value, _ in entries] for name, entries in eligible_per_parameter.items()},
-        )
-        if generation_mode.is_positive
-        else []
-    )
 
     def record(parameter_name: str, entry_index: int, entry_value: EntryValue, matches_schema: bool) -> DictionaryDraw:
         dictionary = bindings[parameter_name].dictionary
@@ -297,26 +385,21 @@ def build_dictionary_overlay_strategy(
 
         new_value = dict(value)
         new_draws: list[DictionaryDraw] = []
-        for pair in paired:
-            if random.random() >= bindings[pair.parameters[0]].probability:
-                continue
-            for parameter_name, (entry_index, entry_value) in zip(
-                pair.parameters, draw(st.sampled_from(pair.choices)), strict=True
-            ):
-                new_value[parameter_name] = entry_value
-                # Positive-mode eligible entries all match their schema.
-                new_draws.append(record(parameter_name, entry_index, entry_value, True))
-        drawn = {draw_.parameter_name for draw_ in new_draws}
         for parameter_name, eligible in eligible_per_parameter.items():
             binding = bindings[parameter_name]
-            present = parameter_name in new_value
-            # Type-wide fills only if the strategy already included the param; parameter-specific forces it.
-            if parameter_name in drawn or (not present and not binding.is_parameter_specific):
-                continue
-            # A binding is explicit intent, so it overrides a value the resource pool put in the same slot.
-            if random.random() >= binding.probability:
-                continue
-            entry_index, entry_value, matches_schema = draw(st.sampled_from(eligible))
+            entry = None
+            if paired is not None and binding.is_parameter_specific:
+                entry = paired.take(binding.dictionary.name, (location_value, parameter_name), eligible)
+            if entry is None:
+                present = parameter_name in new_value
+                # Type-wide fills only if the strategy already included the param; parameter-specific forces it.
+                if not present and not binding.is_parameter_specific:
+                    continue
+                # A binding is explicit intent, so it overrides a value the resource pool put in the same slot.
+                if random.random() >= binding.probability:
+                    continue
+                entry = draw(st.sampled_from(eligible))
+            entry_index, entry_value, matches_schema = entry
             new_value[parameter_name] = entry_value
             new_draws.append(record(parameter_name, entry_index, entry_value, matches_schema))
 
@@ -373,14 +456,43 @@ def resolve_body_bindings(
     dictionaries = config.dictionaries
     if not dictionaries and not suggestions.dictionaries:
         return []
+    resolved: list[_ResolvedBodyBinding] = []
+    for key, binding in _body_bindings(operation, config):
+        pointer = parse_body_path(key)
+        found = _resolve_body_path(body_schema, pointer)
+        if found is None:
+            continue
+        leaf_schema, unique_items = found
+        dictionary = dictionaries.get(binding.dictionary) or suggestions.dictionaries[binding.dictionary]
+        # Values fetched from the API take the field's type, so an integer ID fills a string field.
+        ty = _infer_ty(leaf_schema) if dictionary.source is not None else None
+        if ty is not None:
+            entries = coerce_entries_for_type(dictionary.entries, ty)
+        else:
+            entries = tuple((entry.index, entry.value) for entry in dictionary.entries)
+        resolved.append(
+            _ResolvedBodyBinding(
+                pointer=pointer,
+                dictionary=dictionary,
+                probability=binding.probability,
+                entries=entries,
+                leaf_schema=leaf_schema,
+                unique_items=unique_items,
+            )
+        )
+    return resolved
+
+
+def _body_bindings(operation: APIOperation, config: ProjectConfig) -> Iterator[tuple[str, ParameterDictionaryBinding]]:
+    # An operation's entry vetoes the global one under the same key, whatever its form; the user's bindings win over
+    # suggested ones.
     operation_config = config.operations.get_for_operation(operation)
     operation_scoped_body_keys = {key for key in operation_config.parameters if key.startswith(BODY_PREFIX)}
     seen: set[str] = set()
-    resolved: list[_ResolvedBodyBinding] = []
     sources = (
         (True, operation_config.parameters),
         (False, config.parameters),
-        *((False, suggested) for suggested in suggestions.parameters(operation.label)),
+        *((False, suggested) for suggested in operation.schema.suggestions.parameters(operation.label)),
     )
     for is_operation_source, source in sources:
         for key, binding in source.items():
@@ -393,24 +505,7 @@ def resolve_body_bindings(
             if key in seen:
                 continue
             seen.add(key)
-            pointer = parse_body_path(key)
-            found = _resolve_body_path(body_schema, pointer)
-            if found is None:
-                continue
-            leaf_schema, unique_items = found
-            dictionary = dictionaries.get(binding.dictionary) or suggestions.dictionaries[binding.dictionary]
-            entries = tuple((entry.index, entry.value) for entry in dictionary.entries)
-            resolved.append(
-                _ResolvedBodyBinding(
-                    pointer=pointer,
-                    dictionary=dictionary,
-                    probability=binding.probability,
-                    entries=entries,
-                    leaf_schema=leaf_schema,
-                    unique_items=unique_items,
-                )
-            )
-    return resolved
+            yield key, binding
 
 
 def resolve_body_leaf_schema(schema: JsonSchema, pointer: str) -> JsonSchema | None:
@@ -502,10 +597,11 @@ def build_body_dictionary_overlay_strategy(
     container_schema: JsonSchema,
     validator_cls: type,
     generation_mode: GenerationMode,
+    paired: PairedEntries | None = None,
 ) -> st.SearchStrategy:
     # Build-time mode filter so a substitution can't silently flip the case mode chosen by `inner`.
     eligible_per_binding: list[
-        tuple[_ResolvedBodyBinding, tuple[tuple[int, EntryValue, bool], ...], dict[object, list[int]]]
+        tuple[_ResolvedBodyBinding, tuple[EligibleEntry, ...], dict[object, list[int]], bool]
     ] = []
     for binding in bindings:
         classified = _classify_entries(binding.entries, binding.leaf_schema, validator_cls, generation_mode)
@@ -513,7 +609,9 @@ def build_body_dictionary_overlay_strategy(
             positions: dict[object, list[int]] = {}
             for position, (_, entry_value, _) in enumerate(classified):
                 positions.setdefault(json_identity(entry_value), []).append(position)
-            eligible_per_binding.append((binding, classified, positions))
+            # A pair fills one field, which a wildcard pointer is not.
+            takes_pairs = paired is not None and WILDCARD not in split_body_path(binding.pointer)
+            eligible_per_binding.append((binding, classified, positions, takes_pairs))
 
     if not eligible_per_binding:
         return inner
@@ -546,7 +644,7 @@ def build_body_dictionary_overlay_strategy(
 
         random = draw(st.randoms())
         new_draws: list[DictionaryDraw] = []
-        for binding, eligible, positions in eligible_per_binding:
+        for binding, eligible, positions, takes_pairs in eligible_per_binding:
             mark = len(new_draws)
             substituted = _substitute_entries(
                 value,
@@ -558,6 +656,7 @@ def build_body_dictionary_overlay_strategy(
                     binding=binding,
                     eligible=eligible,
                     positions=positions,
+                    paired=paired if takes_pairs else None,
                     operation_label=operation_label,
                     new_draws=new_draws,
                 ),
@@ -617,27 +716,35 @@ def _make_replacement(
     draw: st.DrawFn,
     random: random.Random,
     binding: _ResolvedBodyBinding,
-    eligible: tuple[tuple[int, EntryValue, bool], ...],
+    eligible: tuple[EligibleEntry, ...],
     positions: dict[object, list[int]],
+    # Entries drawn together for the whole case; `None` when this binding draws on its own.
+    paired: PairedEntries | None,
     operation_label: str,
     new_draws: list[DictionaryDraw],
 ) -> Callable[[JsonValue, set[object]], JsonValue]:
     def replace(current: JsonValue, exclude: set[object]) -> JsonValue:
-        if random.random() >= binding.probability:
-            return current
-        skipped = sorted(position for identity in exclude for position in positions.get(identity, ()))
-        if not skipped:
-            entry = draw(st.sampled_from(eligible))
-        elif len(skipped) < len(eligible):
-            # Draw among the entries left and step over the skipped ones, so large dictionaries are not scanned.
-            index = draw(st.integers(0, len(eligible) - len(skipped) - 1))
-            for position in skipped:
-                if position > index:
-                    break
-                index += 1
-            entry = eligible[index]
-        else:
-            return current
+        # Only a field the body holds takes a paired entry, and pairs skip wildcard pointers, so it has no other
+        # items to avoid.
+        entry = (
+            paired.take(binding.dictionary.name, ("body", binding.pointer), eligible) if paired is not None else None
+        )
+        if entry is None:
+            if random.random() >= binding.probability:
+                return current
+            skipped = sorted(position for identity in exclude for position in positions.get(identity, ()))
+            if not skipped:
+                entry = draw(st.sampled_from(eligible))
+            elif len(skipped) < len(eligible):
+                # Draw among the entries left and step over the skipped ones, so large dictionaries are not scanned.
+                index = draw(st.integers(0, len(eligible) - len(skipped) - 1))
+                for position in skipped:
+                    if position > index:
+                        break
+                    index += 1
+                entry = eligible[index]
+            else:
+                return current
         entry_index, entry_value, matches_schema = entry
         new_draws.append(
             DictionaryDraw(

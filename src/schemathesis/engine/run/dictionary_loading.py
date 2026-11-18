@@ -163,12 +163,16 @@ def _fetch(
         response = case.call(**ctx.get_transport_kwargs(operation=operation))
     except (requests.RequestException, AuthenticationError) as exc:
         return f"`{source.operation}` request failed: {exc}"
-    if not 200 <= response.status_code < 300:
-        return f"`{source.operation}` returned {response.status_code}"
+    is_success = 200 <= response.status_code < 300
     try:
         document = response.json()
     except ValueError:
-        return f"`{source.operation}` returned a response that is not JSON"
+        if is_success:
+            return f"`{source.operation}` returned a response that is not JSON"
+        return f"`{source.operation}` returned {response.status_code}"
+    errors = _graphql_errors(document) if source.query is not None else None
+    if not is_success:
+        return f"`{source.operation}` returned {response.status_code}" + (f": {errors}" if errors is not None else "")
     found = resolve_pointer_all(document, source.pointer)
     # Booleans, objects, arrays and nulls cannot fill a parameter.
     fetched: list[EntryValue] = (
@@ -176,9 +180,14 @@ def _fetch(
         if isinstance(found, Unresolvable)
         else [value for value in found if isinstance(value, (str, int, float)) and not isinstance(value, bool)]
     )
-    # GraphQL reports failures as `errors` in a 200 response.
-    errors = document.get("errors") if isinstance(document, dict) else None
-    if not fetched and isinstance(errors, list) and errors:
-        messages = "; ".join(str(error.get("message", error) if isinstance(error, dict) else error) for error in errors)
-        return f"`{source.operation}` returned errors: {messages}"
+    if not fetched and errors is not None:
+        return f"`{source.operation}` returned errors: {errors}"
     return fetched
+
+
+def _graphql_errors(document: object) -> str | None:
+    # GraphQL reports failures as `errors`, in a 200 response or along with an error status.
+    errors = document.get("errors") if isinstance(document, dict) else None
+    if not isinstance(errors, list) or not errors:
+        return None
+    return "; ".join(str(error.get("message", error) if isinstance(error, dict) else error) for error in errors)

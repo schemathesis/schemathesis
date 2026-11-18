@@ -37,11 +37,17 @@ from schemathesis.core.media_types import (
     iter_matching_media_type_strategies,
 )
 from schemathesis.core.mutations import MutationMetadata
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import CONCRETE_LOCATIONS, ParameterLocation
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone, jsonify_python_specific_types
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.dictionaries import (
+    PairedDictionaries,
+    PairedEntries,
+    draw_paired_entries,
+    pair_operation_dictionaries,
+)
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis import custom_formats_cache
 from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY, build
@@ -167,6 +173,10 @@ def openapi_cases(
         body_is_generated=body is NOT_SET,
     )
 
+    pairs = _dictionary_pairs(operation, generation_config)
+    entries = draw_paired_entries(draw(st.randoms()), pairs) if pairs else {}
+    # Negative cases draw pairs too, for the locations they keep valid.
+    paired = PairedEntries(entries) if entries else None
     # Drawn in this order: path, headers, cookies, query.
     path_parameters_, headers_, cookies_, query_ = (
         generate_parameter(
@@ -180,6 +190,7 @@ def openapi_cases(
             generation_config,
             feedback=feedback,
             mix_examples=mix_examples,
+            paired=paired,
             # Configured auth overwrites these on the wire, so drawing them only repeats the same request.
             exclude=feedback.auth_headers
             if location == ParameterLocation.HEADER and generation_mode.is_positive
@@ -206,6 +217,7 @@ def openapi_cases(
             generation_config,
             feedback=feedback,
             mix_examples=mix_examples,
+            paired=paired,
         )
     else:
         body_ = ValueContainer(value=body, location="body", generator=None, meta=None)
@@ -296,6 +308,7 @@ def _generate_body(
     *,
     feedback: FeedbackSources,
     mix_examples: bool,
+    paired: PairedEntries | None = None,
 ) -> tuple[ValueContainer, str]:
     """Draw a body and the media type it is sent with."""
     candidates, generation_mode = _body_candidates(operation.body.items, generation_mode)
@@ -310,6 +323,7 @@ def _generate_body(
         generation_mode,
         feedback=feedback,
         mix_examples=mix_examples,
+        paired=paired if generation_mode.is_positive else None,
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
     if media_types.is_form_urlencoded(media_type):
@@ -688,6 +702,7 @@ def _get_body_strategy(
     generation_mode: GenerationMode,
     feedback: FeedbackSources = NO_FEEDBACK,
     mix_examples: bool = True,
+    paired: PairedEntries | None = None,
 ) -> st.SearchStrategy:
     if parameter.media_type in FORM_MEDIA_TYPES:
         custom_strategy = _build_form_strategy_with_encoding(
@@ -706,7 +721,7 @@ def _get_body_strategy(
         return custom_strategy
 
     strategy = _get_body_value_strategy(
-        parameter, media_type, operation, generation_config, generation_mode, feedback, mix_examples
+        parameter, media_type, operation, generation_config, generation_mode, feedback, mix_examples, paired
     )
     return _maybe_set_optional_body(strategy, parameter, operation, draw, feedback.error_feedback)
 
@@ -719,6 +734,7 @@ def _get_body_value_strategy(
     generation_mode: GenerationMode,
     feedback: FeedbackSources,
     mix_examples: bool,
+    paired: PairedEntries | None,
 ) -> st.SearchStrategy:
     # A media type naming a file format gets a real file of that format in positive mode.
     file_sample = next(parameter.iter_file_samples(media_type), None)
@@ -730,6 +746,7 @@ def _get_body_value_strategy(
         generation_mode,
         feedback=feedback,
         mix_examples=mix_examples,
+        paired=paired,
     )
 
 
@@ -745,6 +762,7 @@ def get_parameters_value(
     feedback: FeedbackSources = NO_FEEDBACK,
     mix_examples: bool = True,
     exclude: frozenset[str] = frozenset(),
+    paired: PairedEntries | None = None,
 ) -> GeneratedValue:
     """Generate the value for `location`, or only the parts an explicit `value` misses."""
     if value is None:
@@ -756,6 +774,7 @@ def get_parameters_value(
             exclude=exclude,
             feedback=feedback,
             mix_examples=mix_examples,
+            paired=paired,
         )
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         result = _draw(draw, strategy, operation)
@@ -771,6 +790,7 @@ def get_parameters_value(
         exclude=value.keys() | exclude,
         feedback=feedback,
         mix_examples=mix_examples,
+        paired=paired,
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = _draw(draw, strategy, operation)
@@ -884,6 +904,7 @@ def generate_parameter(
     feedback: FeedbackSources = NO_FEEDBACK,
     mix_examples: bool = True,
     exclude: frozenset[str] = frozenset(),
+    paired: PairedEntries | None = None,
 ) -> ValueContainer:
     """Generate a parameter value, in positive mode when the location cannot be negated."""
     if generator.is_negative and (
@@ -904,6 +925,8 @@ def generate_parameter(
         feedback=feedback,
         mix_examples=mix_examples,
         exclude=exclude,
+        # Negative cases want values that break the schema, not pairs that belong together.
+        paired=paired if generator.is_positive else None,
     )
     value = generated.value
     if value is not None and location == ParameterLocation.PATH:
@@ -925,6 +948,24 @@ def generate_parameter(
         dictionary_draws=generated.dictionary_draws,
         constants_draws=generated.constants_draws,
     )
+
+
+def _dictionary_pairs(operation: APIOperation, generation_config: GenerationConfig) -> list[PairedDictionaries]:
+    schema = cast("OpenApiOperation", operation).schema
+    pairs = schema.dictionary_pairs.get(operation.label)
+    if pairs is None:
+        pairs = pair_operation_dictionaries(
+            operation,
+            parameter_properties={
+                location: cast(OpenApiParameterSet, operation.get_parameter_set(location)).schema["properties"]
+                for location in CONCRETE_LOCATIONS
+            },
+            body_schemas=(cast(OpenApiBody, item).optimized_schema for item in operation.body.items),
+            generation_config=generation_config,
+            validator_cls=schema.adapter.jsonschema_validator_cls,
+        )
+        schema.dictionary_pairs[operation.label] = pairs
+    return pairs
 
 
 def _draw_negated_locations(
@@ -1022,6 +1063,7 @@ def get_parameters_strategy(
     exclude: Iterable[str] = (),
     feedback: FeedbackSources = NO_FEEDBACK,
     mix_examples: bool = True,
+    paired: PairedEntries | None = None,
 ) -> st.SearchStrategy:
     container = cast(OpenApiParameterSet, operation.get_parameter_set(location))
     # Direct list bool check skips ParameterSet.__len__ method dispatch.
@@ -1033,6 +1075,7 @@ def get_parameters_strategy(
             exclude,
             feedback=feedback,
             mix_examples=mix_examples,
+            paired=paired,
         )
     # No parameters defined for this location
     return _NONE_STRATEGY

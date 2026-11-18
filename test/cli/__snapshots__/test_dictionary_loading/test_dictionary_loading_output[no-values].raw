@@ -8,7 +8,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       4 selected / 4 total
+     Operations:       10 selected / 10 total
      Configuration:    /tmp/config.toml
      Dictionaries:     1 dictionary / 0 entries
 
@@ -19,7 +19,7 @@ Schemathesis dev
 
  ⏭   Examples (in 0.00s)
 
-     ⏭  4 skipped
+     ⏭  10 skipped
 
 ==================================== ERRORS ====================================
 _____________________________ Dictionary `parents` _____________________________
@@ -33,9 +33,9 @@ Need more help?
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 4/4
+  Selected: 10/10
   Tested: 0
-  Skipped: 4
+  Skipped: 10
     - No examples in schema
 
 Test Phases:
