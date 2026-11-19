@@ -1523,6 +1523,10 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
             break
     if not overrides_all_parameters:
         return None
+    # A generated body field can name what is missing, e.g. ids of children to delete
+    body = case.body
+    if body is not NOT_SET and not (isinstance(body, Mapping) and body.keys() <= overrides.body.keys()):
+        return None
 
     # Any successful DELETE of this resource counts, not only those under the current root
     if ctx.internals.recorder is not None and resource_was_deleted(ctx.internals.recorder, case, created_by=parent.id):

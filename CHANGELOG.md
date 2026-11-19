@@ -87,6 +87,7 @@
 - False positive `ignored_auth` for credentials passed via `auth` or `session.auth`.
 - Report `after_run` checks skipped when `--max-failures` or an interrupt stops `st run`.
 - False positive `negative_data_rejection` for empty `multipart/mixed` array bodies.
+- False positive `ensure_resource_availability` for request bodies not set by a link. [#6178](https://github.com/schemathesis/schemathesis/issues/6178)
 - Internal error in `positive_data_acceptance` for rejected bodies with undeclared properties and a malformed schema. [#6118](https://github.com/schemathesis/schemathesis/issues/6118)
 - `--checks` enabling `max_response_time` with a 10-second limit, or disabling a configured one.
 - List failures in the same order on every run, in the CLI and `validate_response()` errors.

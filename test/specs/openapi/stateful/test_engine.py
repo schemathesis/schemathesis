@@ -1477,6 +1477,96 @@ def test_removal_by_non_delete_verb_suppresses_resource_availability(ctx, app_ru
     assert result.failures == [], [failure.failure_info.failure.title for failure in result.failures]
 
 
+CHILD_IDS = {"type": "array", "items": {"type": "string"}, "minItems": 1}
+CHILD_IDS_BODY = {
+    "type": "object",
+    "properties": {"ids": CHILD_IDS},
+    "required": ["ids"],
+    "additionalProperties": False,
+}
+CHILD_IDS_WITH_REASON_BODY = {
+    "type": "object",
+    "properties": {"ids": CHILD_IDS, "reason": {"type": "string"}},
+    "required": ["ids", "reason"],
+    "additionalProperties": False,
+}
+
+
+# A 404 can be about ids in a generated request body, not about the resource the link points to.
+@pytest.mark.parametrize(
+    ("body_schema", "link_body", "expected"),
+    [
+        (CHILD_IDS_BODY, None, []),
+        (CHILD_IDS, None, []),
+        (CHILD_IDS_WITH_REASON_BODY, {"ids": ["$response.body#/id"]}, []),
+        (CHILD_IDS_BODY, {"ids": ["$response.body#/id"]}, ["Created resource not found"]),
+    ],
+    ids=["generated-body", "generated-array-body", "partially-linked-body", "linked-body"],
+)
+def test_ensure_resource_availability_with_request_body(ctx, app_runner, stop_event, body_schema, link_body, expected):
+    link = {"operationId": "deleteChildren", "parameters": {"parentId": "$response.body#/id"}}
+    if link_body is not None:
+        link["requestBody"] = link_body
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/parents": {
+                "post": {
+                    "operationId": "createParent",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                            "links": {"DeleteChildren": link},
+                        }
+                    },
+                }
+            },
+            "/parents/{parentId}/children": {
+                "delete": {
+                    "operationId": "deleteChildren",
+                    "parameters": [{"name": "parentId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+                    "responses": {"200": {"description": "Deleted"}, "404": {"description": "Not Found"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/parents", methods=["POST"])
+    def create_parent():
+        return jsonify({"id": "parent"}), 201
+
+    @app.route("/parents/<parent_id>/children", methods=["DELETE"])
+    def delete_children(parent_id):
+        return jsonify({"message": "Children not found"}), 404
+
+    config = schemathesis.Config.from_dict(
+        {
+            "max-failures": 1,
+            "checks": {"enabled": False, "ensure_resource_availability": {"enabled": True}},
+            "generation": {"mode": "positive", "max-examples": 10, "database": "none"},
+            "phases": {"stateful": {"inference": {"algorithms": []}}},
+        }
+    )
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app), config=config)
+    result = collect_result(
+        stateful.execute(
+            engine=EngineContext(schema=schema, stop_event=stop_event),
+            phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
+        )
+    )
+
+    assert [failure.failure_info.failure.title for failure in result.failures] == expected
+
+
 @pytest.mark.parametrize("media_type", ["application/json", "application/x-www-form-urlencoded"])
 def test_inferred_body_link_sends_a_listed_value(ctx, app_runner, stop_event, media_type):
     language = {
