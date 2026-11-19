@@ -1,0 +1,101 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+__________________________________ GET /items __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- ST108 Response header does not conform to the schema (2 violations)
+
+    "first" is not of type "integer"
+
+    Schema:
+
+        {
+            "type": "integer"
+        }
+
+    Value:
+
+        "first"
+
+    "second" is not of type "integer"
+
+    Schema:
+
+        {
+            "type": "integer"
+        }
+
+    Value:
+
+        "second"
+
+- ST108 Response violates schema
+
+    "text" is not of type "integer"
+
+    Validated against the response schema for status code 200.
+
+    Schema:
+
+        {
+            "type": "integer"
+        }
+
+    Value:
+
+        "text"
+
+[200] OK:
+
+    `"text"`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ❌ Fuzzing
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ ST108 Response header does not conform to the schema: 2
+  ❌ ST108 Response violates schema: 1
+
+For more information, run `st explain ST108`.
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================= 3 failures in 1.00s ==============================

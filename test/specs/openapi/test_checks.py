@@ -7825,6 +7825,31 @@ def test_header_conformance_reports_multiple_errors_from_one_header(ctx, respons
     assert schema_paths == {"minimum", "maximum"}
 
 
+def test_validate_response_keeps_header_and_body_violations_at_the_same_schema_path(ctx, response_factory):
+    limit = {"type": "object", "properties": {"limit": {"type": "integer", "maximum": 10}}}
+    operation = ctx.openapi.load_operation(
+        "GET /data",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "headers": {"X-Limit": {"schema": limit, "explode": True}},
+                    "content": {"application/json": {"schema": limit}},
+                }
+            }
+        },
+    )
+    response = response_factory.core(headers={"x-limit": ["limit=50"]}, content=b'{"limit": 50}')
+
+    with pytest.raises(FailureGroup) as exc:
+        operation.Case().validate_response(response, checks=[response_headers_conformance, response_schema_conformance])
+
+    assert [(failure.title, failure.validation_message) for failure in exc.value.exceptions] == [
+        ("Response header does not conform to the schema", "50 is greater than the maximum of 10"),
+        ("Response violates schema", "50 is greater than the maximum of 10"),
+    ]
+
+
 def test_header_conformance_names_negated_reference(ctx, response_factory):
     operation = ctx.openapi.load_operation(
         "GET /data",
