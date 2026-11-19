@@ -5,7 +5,7 @@ from collections.abc import Callable
 import hypothesis
 import hypothesis.errors
 import jsonschema_rs
-from flask import request
+from flask import jsonify, request
 
 import schemathesis
 from schemathesis.core.errors import InvalidRegexPattern, InvalidRegexType, InvalidSchema
@@ -13,6 +13,7 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from test.apps.catalog.openapi import basic
+from test.apps.runtime import OpenAPIApp
 from test.engine.helpers import (
     raise_invalid_argument,
     raise_keyboard_interrupt,
@@ -456,3 +457,39 @@ def test_coverage_phase_negative_empty_array_path_parameter(ctx):
     ).execute()
 
     assert stream.find_all(events.NonFatalError) == []
+
+
+def test_coverage_phase_sends_oversized_strings_after_every_other_case(ctx):
+    # A very long string may break a server for good, so it must not cut off the operations tested after it.
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/notes": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"text": {"type": "string"}}}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/tags": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/notes", methods=["POST"])
+    def notes():
+        return jsonify({})
+
+    @app.route("/tags", methods=["GET"])
+    def tags():
+        return jsonify([])
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+    _coverage_only(schemathesis.openapi.from_url(api.schema_url))
+
+    sent = ["oversized" if len(item.body) > 65536 else f"{item.method} {item.path}" for item in api.requests]
+    assert sent[sent.index("oversized") :] == ["oversized"]

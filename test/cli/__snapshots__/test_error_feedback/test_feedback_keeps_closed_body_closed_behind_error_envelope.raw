@@ -24,6 +24,14 @@ Schemathesis dev
 
      ✅ 1 passed
 
+=================================== WARNINGS ===================================
+
+Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation
+
+  - POST /api/redeem
+
+💡 Check your schema constraints - API validation may be stricter than documented
+
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -36,9 +44,12 @@ Test Phases:
   ✅ Fuzzing
   ⏭  Stateful (disabled)
 
+Warnings:
+  ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
+
 Test cases:
   N generated, N passed
 
 Seed: 42
 
-=========================== No issues found in 1.00s ===========================
+============================== 1 warning in 1.00s ==============================

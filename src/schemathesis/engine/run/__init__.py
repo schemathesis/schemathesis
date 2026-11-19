@@ -13,10 +13,12 @@ from typing import TYPE_CHECKING, TypeVar
 from schemathesis.engine import Status
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from types import FrameType
 
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.events import EventGenerator
+    from schemathesis.generation.case import Case
 
 T = TypeVar("T")
 
@@ -203,7 +205,13 @@ def relay_events(event_queue: queue.Queue[T], threads: Sequence[threading.Thread
         raise KeyboardInterrupt
 
 
-def execute(ctx: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> EventGenerator:
+def execute(
+    ctx: EngineContext,
+    phase: Phase,
+    *,
+    only: frozenset[str] | None = None,
+    held_back: Mapping[str, list[Case]] | None = None,
+) -> EventGenerator:
     from urllib3.exceptions import InsecureRequestWarning
 
     from schemathesis.engine import fuzz
@@ -216,7 +224,7 @@ def execute(ctx: EngineContext, phase: Phase, *, only: frozenset[str] | None = N
         if phase.name == PhaseName.SETUP:
             yield from setup.execute(ctx, phase)
         elif phase.name in UNIT_PHASES:
-            yield from unit.execute(ctx, phase, only=only)
+            yield from unit.execute(ctx, phase, only=only, held_back=held_back)
         elif phase.name == PhaseName.STATEFUL_TESTING:
             yield from stateful.execute(ctx, phase)
         elif phase.name == PhaseName.CONTINUOUS_FUZZING:

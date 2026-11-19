@@ -26,7 +26,7 @@ from schemathesis.engine import Status, StopReason, events, from_schema
 from schemathesis.engine.recorder import Request
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.meta import TestPhase
+from schemathesis.generation.meta import CoverageScenario, TestPhase, coverage_scenario
 from schemathesis.generation.stateful.state_machine import APIStateMachine
 from schemathesis.specs.openapi.checks import (
     content_type_conformance,
@@ -1715,11 +1715,14 @@ def test_stateful_phase_missing_deserializer_warnings(ctx):
 
 
 def _coverage_passes(stream):
-    return sum(
-        1
-        for event in stream.events
-        if isinstance(event, events.PhaseStarted) and event.phase.name == PhaseName.COVERAGE
-    )
+    # Sending the held back oversized strings generates nothing, so it does not count as a pass.
+    scenarios: list[set[CoverageScenario | None]] = []
+    for event in stream.events:
+        if isinstance(event, events.PhaseStarted) and event.phase.name == PhaseName.COVERAGE:
+            scenarios.append(set())
+        elif isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.COVERAGE:
+            scenarios[-1].update(coverage_scenario(node.value) for node in event.recorder.cases.values())
+    return sum(1 for seen in scenarios if seen != {CoverageScenario.OVERSIZED_STRING})
 
 
 def test_max_time_repeats_coverage_once_feedback_is_learned(ctx):

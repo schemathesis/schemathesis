@@ -79,6 +79,7 @@
 #### Coverage phase
 
 - Skipping the valid request when an earlier case fails.
+- Oversized strings that crash the server cutting off coverage cases of later operations.
 - `TypeError` in the coverage phase for schemas with non-array `examples`.
 - Internal error for `format` beside a `pattern` with an oversized quantifier like `^a{100000}$`.
 - Missing positive values when `minLength` exceeds what an unanchored `pattern` matches. [#6085](https://github.com/schemathesis/schemathesis/issues/6085)

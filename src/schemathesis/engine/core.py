@@ -26,9 +26,10 @@ from schemathesis.hooks import defines_teardown
 from schemathesis.python.application import application_roots
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Generator, Mapping
 
     from schemathesis.core.spec import ApiSchema
+    from schemathesis.generation.case import Case
 
 
 @dataclass(slots=True)
@@ -236,6 +237,7 @@ class ExecutionPlan:
         yield from self._run_phase(engine, phase)
         if not engine.is_interrupted:
             yield from self._coverage_catchup(engine)
+            yield from self._send_held_back(engine)
 
     def _run_cycles(self, engine: EngineContext) -> EventGenerator:
         """Give the elastic phases another turn until the time budget runs out or a turn sends nothing."""
@@ -269,6 +271,7 @@ class ExecutionPlan:
             yield event
         if not engine.is_interrupted:
             yield from self._coverage_catchup(engine)
+            yield from self._send_held_back(engine)
         return idle
 
     def _coverage_catchup(self, engine: EngineContext) -> EventGenerator:
@@ -288,11 +291,27 @@ class ExecutionPlan:
             self.catchup_passes += 1
             yield from self._run_phase(engine, coverage, only=frozenset(learned))
 
+    def _send_held_back(self, engine: EngineContext) -> EventGenerator:
+        """Send the coverage cases a server may not survive, once every other coverage case went out."""
+        held_back = engine.held_back_cases
+        if not held_back or engine.has_to_stop:
+            return
+        engine.held_back_cases = {}
+        coverage = next(item for item in self.phases if item.name == PhaseName.COVERAGE)
+        yield from self._run_phase(engine, coverage, only=frozenset(held_back), held_back=held_back)
+
     def _feedback_counts(self, engine: EngineContext) -> dict[str, int]:
         store = engine.error_feedback
         return store.observation_counts() if store is not None else {}
 
-    def _run_phase(self, engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> EventGenerator:
+    def _run_phase(
+        self,
+        engine: EngineContext,
+        phase: Phase,
+        *,
+        only: frozenset[str] | None = None,
+        held_back: Mapping[str, list[Case]] | None = None,
+    ) -> EventGenerator:
         try:
             payload = self._adapt_execution(engine, phase)
         except HookExecutionError as exc:
@@ -305,7 +324,7 @@ class ExecutionPlan:
         engine.reserve_time(self._time_to_reserve_after(phase, engine))
         if phase.should_execute(engine):
             # Never bind this generator to a local: an error thrown at the yield must close it and stop its workers
-            for event in run.execute(engine, phase, only=only):
+            for event in run.execute(engine, phase, only=only, held_back=held_back):
                 if isinstance(event, events.NonFatalError):
                     key = (event.info.title, event.info.message)
                     if event.related_to_operation:

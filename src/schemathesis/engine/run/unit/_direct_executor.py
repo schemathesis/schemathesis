@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from schemathesis.auths import set_learned_on_case
@@ -20,14 +22,16 @@ from schemathesis.engine.run.unit._errors import (
     translate_iteration_exception,
 )
 from schemathesis.engine.run.unit._scenario import finish_scenario, iter_closing_events, start_scenario
+from schemathesis.generation.drivers import Controller
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
-from schemathesis.generation.meta import order_for_lifo_execution
+from schemathesis.generation.meta import CoverageScenario, coverage_scenario, order_for_lifo_execution
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.case import Case
     from schemathesis.generation.drivers import CaseGenerator
+    from schemathesis.schemas import APIOperation
 
 _NO_CASES_REASONS = {
     PhaseName.EXAMPLES: "No examples in schema",
@@ -47,6 +51,29 @@ def _collect_within_budget(generator: CaseGenerator, ctx: EngineContext) -> list
             ctx.release_operation_slice()
             break
     return cases
+
+
+@dataclass(slots=True)
+class HeldBackCases:
+    """Coverage cases of one operation sent after every other coverage case."""
+
+    operation: APIOperation
+    cases: list[Case]
+    controller: Controller = field(default_factory=Controller)
+
+    def __iter__(self) -> Iterator[Case]:
+        return iter(self.cases)
+
+
+def _hold_back(generator: CaseGenerator, cases: list[Case]) -> tuple[list[Case], list[Case]]:
+    """Split off the cases a server may not survive, so they cannot cut off the cases of other operations."""
+    if isinstance(generator, HeldBackCases):
+        return cases, []
+    ready: list[Case] = []
+    held_back: list[Case] = []
+    for case in cases:
+        (held_back if coverage_scenario(case) is CoverageScenario.OVERSIZED_STRING else ready).append(case)
+    return ready, held_back
 
 
 def run_driver(
@@ -78,7 +105,8 @@ def run_driver(
         # Silence Hypothesis stderr chatter so it doesn't leak into the engine's event stream.
         with ignore_hypothesis_output():
             # Match LIFO order from Hypothesis `Phase.explicit` so engine output matches the pytest path.
-            for case in reversed(order_for_lifo_execution(_collect_within_budget(generator, ctx))):
+            cases, held_back = _hold_back(generator, order_for_lifo_execution(_collect_within_budget(generator, ctx)))
+            for case in reversed(cases):
                 # Read the stop reason once: a second clock read could pass the deadline and fake an interrupt.
                 raise_if_stopped(ctx.stop_reason)
                 # Cases are generated before any is sent, so security learned from an earlier response is added here.
@@ -90,6 +118,9 @@ def run_driver(
                     # Already in `errors`; later cases still run and their errors surface together.
                     any_case_errored = True
                     continue
+            # A scenario cut short drops them, like any other case it never reached.
+            if held_back:
+                ctx.held_back_cases[operation.label] = held_back
     except (FailureGroup, Failure):
         status = Status.FAILURE
     except BudgetExpired:
