@@ -2105,6 +2105,41 @@ def test_response_schema_conformance_groups_multiple_violations(ctx, cli, snapsh
     )
 
 
+def test_schema_violations_at_the_same_path_in_headers_and_body(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "headers": {
+                                "X-First": {"schema": {"type": "integer"}},
+                                "X-Second": {"schema": {"type": "integer"}},
+                            },
+                            "content": {"application/json": {"schema": {"type": "integer"}}},
+                        }
+                    }
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify("text"), 200, {"X-First": "first", "X-Second": "second"}
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--checks=response_headers_conformance,response_schema_conformance",
+            "--max-examples=1",
+            "--phases=fuzzing",
+        )
+        == snapshot_cli
+    )
+
+
 def test_negative_data_rejection_nested_body_description(ctx, cli, snapshot_cli):
     # Without `type` on outer levels, coverage only violates property constraints, exposing the nested path.
     app, _ = ctx.openapi.make_flask_app(

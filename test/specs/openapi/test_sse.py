@@ -755,6 +755,19 @@ def test_sse_stream_schema_violation_on_every_response():
             case.validate_response(response, checks=[response_schema_conformance])
 
 
+def test_sse_event_and_payload_violations_at_the_same_schema_path():
+    item_schema = {**SSE_VALUE_ITEM_SCHEMA, "required": ["data", "id"]}
+    case, response = _call_sse(_sse_schema(item_schema), 'data: {"value": 1}\n\nid: 2\ndata: {}\n\n')
+
+    with pytest.raises(FailureGroup) as exc:
+        case.validate_response(response, checks=[response_schema_conformance])
+
+    assert [(failure.title, failure.validation_message) for failure in exc.value.exceptions] == [
+        ("SSE event violates schema", '"id" is a required property'),
+        ("SSE event payload violates content schema", '"value" is a required property'),
+    ]
+
+
 def test_sse_stream_schema_with_unresolvable_reference_is_skipped():
     raw_schema = _sse_stream_schema({"schema": {"$ref": "#/components/schemas/Missing"}})
     case, response = _call_sse(raw_schema, TWO_EVENTS)

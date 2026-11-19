@@ -256,6 +256,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
                     root_schema=header.schema,
                     config=case.operation.schema.config.output,
                     name_to_uri=header.name_to_uri,
+                    location=("headers", name),
                 )
             )
 

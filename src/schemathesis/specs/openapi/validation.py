@@ -217,6 +217,8 @@ def _sse_failure(
             root_schema=cause.content_schema,
             config=operation.schema.config.output,
             name_to_uri=resolved.name_to_uri,
+            # The event schema reports the failure at `contentMediaType`, next to the `contentSchema` that failed.
+            location=(*exc.schema_path[:-1], "contentSchema"),
         )
     assert resolved.schema is not None
     return JsonSchemaError.from_exception(
