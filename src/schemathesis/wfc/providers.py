@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlsplit
 
 import requests
 
-from schemathesis.auths import InProcessAuthRequestError, send_auth_request
+from schemathesis.auths import TOKEN_FETCH_BREAKER_COOLDOWN, InProcessAuthRequestError, send_auth_request
 
-from .errors import WFCLoginError
+from .errors import WFCLoginError, WFCLoginUnavailable
 from .payloads import format_login_payload
 from .tokens import extract_token_from_body, extract_token_from_header, format_token
 
@@ -17,6 +18,11 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
     from .auth import Header, LoginEndpoint
+
+# Answers from a server that is up but cannot serve yet, or from a proxy in front of one that is not up.
+UNAVAILABLE_STATUSES = frozenset({502, 503, 504})
+# Pause between logins while waiting for the login endpoint to come up.
+LOGIN_RETRY_INTERVAL = 0.5
 
 
 @dataclass(slots=True)
@@ -38,8 +44,27 @@ class LoginEndpointAuthProvider:
     """Call a login endpoint (over the run's transport) to obtain a token or cookies for later requests."""
 
     config: LoginEndpoint
+    # Until the first login succeeds, an auth server still starting gets as long as a tripped token fetch breaker waits.
+    startup_wait: float = TOKEN_FETCH_BREAKER_COOLDOWN
+    _startup_ends: float | None = field(default=None, init=False)
 
     def get(self, case: Case, context: AuthContext) -> dict[str, str] | str:
+        while True:
+            try:
+                data = self._log_in(context)
+            except WFCLoginUnavailable:
+                now = time.monotonic()
+                if self._startup_ends is None:
+                    self._startup_ends = now + self.startup_wait
+                if now >= self._startup_ends:
+                    raise
+                time.sleep(LOGIN_RETRY_INTERVAL)
+            else:
+                # Later outages are left to the token fetch breaker.
+                self._startup_ends = time.monotonic()
+                return data
+
+    def _log_in(self, context: AuthContext) -> dict[str, str] | str:
         # An external login endpoint is reached over the network even when the API runs in-process.
         app = context.app if self.config.external_endpoint_url is None else None
         url = self._url(context)
@@ -60,7 +85,12 @@ class LoginEndpointAuthProvider:
         except InProcessAuthRequestError as exc:
             raise WFCLoginError(f"{exc.interface} login request failed: {exc.cause}") from exc.cause
         except requests.exceptions.RequestException as exc:
-            raise WFCLoginError(f"Login endpoint call failed: {exc}") from exc
+            # A refused or dropped connection may only mean the auth server has not started yet; a TLS failure may not.
+            unavailable = isinstance(exc, requests.exceptions.ConnectionError) and not isinstance(
+                exc, requests.exceptions.SSLError
+            )
+            error = WFCLoginUnavailable if unavailable else WFCLoginError
+            raise error(f"Login endpoint call failed: {exc}") from exc
         # Header values outside latin-1 and unparsable URLs fail before anything is sent.
         except ValueError as exc:
             raise WFCLoginError(f"Login endpoint call failed for {url}: {exc}") from exc
@@ -130,7 +160,8 @@ class LoginEndpointAuthProvider:
             )
         if response.status_code not in (200, 201) and not accepts_redirect:
             expected = "200, 201 or a redirect" if is_cookie_login else "200 or 201"
-            raise WFCLoginError(
+            error = WFCLoginUnavailable if response.status_code in UNAVAILABLE_STATUSES else WFCLoginError
+            raise error(
                 f"Login endpoint returned status {response.status_code}. Expected {expected}. "
                 f"Response: {response.text[:200]}"
             )

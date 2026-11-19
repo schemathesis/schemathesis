@@ -58,6 +58,24 @@ def wfc_login_failing() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def wfc_login_starting_up() -> OpenAPIApp:
+    # Answers 503 to the first logins, like an auth server that comes up after the API.
+    spec = build_schema(_PROTECTED)
+    app = make_flask_app_from_schema(spec)
+    _register_protected(app)
+    attempts = 0
+
+    @app.route("/api/login", methods=["POST"])
+    def login() -> object:
+        nonlocal attempts
+        attempts += 1
+        if attempts <= 2:
+            return jsonify({"error": "starting up"}), 503
+        return jsonify({"access_token": WFC_TOKEN})
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def wfc_login_plain() -> OpenAPIApp:
     # 200 with a non-JSON body and no cookies.
     spec = build_schema(_PROTECTED)

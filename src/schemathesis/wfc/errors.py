@@ -19,5 +19,9 @@ class WFCLoginError(WFCError):
     """Login endpoint call failed."""
 
 
+class WFCLoginUnavailable(WFCLoginError):
+    """Login endpoint could not be reached or answered that it cannot serve yet."""
+
+
 class WFCTokenExtractionError(WFCError):
     """Failed to extract a token from the login response."""
