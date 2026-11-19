@@ -1260,6 +1260,34 @@ def test_interrupted_outside_test(ctx):
         pytest.fail("KeyboardInterrupt should be handled")
 
 
+# Ctrl-C can land between phase events, outside the phase's own handling.
+@pytest.mark.parametrize(
+    "phase",
+    [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.STATEFUL_TESTING],
+    ids=["examples", "skipped", "stateful"],
+)
+@pytest.mark.parametrize(
+    ("boundary", "expected"),
+    [
+        (events.PhaseStarted, [events.Interrupted, events.PhaseFinished, events.EngineFinished]),
+        (events.PhaseFinished, [events.Interrupted, events.EngineFinished]),
+    ],
+    ids=["after-start", "after-finish"],
+)
+def test_interrupt_at_phase_boundary(ctx, phase, boundary, expected):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.phases.update(phases=[PhaseName.EXAMPLES.value, PhaseName.STATEFUL_TESTING.value])
+    stream = from_schema(schema).execute()
+    for event in stream:
+        if isinstance(event, boundary) and event.phase.name == phase:
+            break
+    remaining = [stream.generator.throw(KeyboardInterrupt), *stream]
+    assert [type(event) for event in remaining] == expected
+    closing = [(event.phase.name, event.status) for event in remaining if isinstance(event, events.PhaseFinished)]
+    assert closing == [(phase, Status.INTERRUPTED)] * expected.count(events.PhaseFinished)
+
+
 # Only the main thread may set signal handlers, so a run elsewhere leaves Ctrl-C handling alone.
 def test_run_from_a_background_thread(ctx):
     api = ctx.openapi.apps.success()

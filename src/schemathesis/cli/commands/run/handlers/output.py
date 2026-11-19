@@ -1379,9 +1379,10 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         phase = event.phase
 
         if phase.name == PhaseName.SETUP:
-            assert self.setup_manager is not None
-            self.setup_manager.stop()
-            self.setup_manager = None
+            # An interrupt has already closed the setup progress
+            if self.setup_manager is not None:
+                self.setup_manager.stop()
+                self.setup_manager = None
             if event.payload is not None:
                 display_setup(self.console, event.payload)
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and self.stateful_tests_manager is not None:

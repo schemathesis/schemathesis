@@ -673,6 +673,7 @@ def test_fuzz_exception_thrown_into_stream_stops_workers(ctx):
     thrower.join(timeout=30)
     assert not thrower.is_alive(), "Fuzz workers kept running after the exception"
     assert raised == [error]
+    assert not [thread for thread in threading.enumerate() if thread.name.startswith("schemathesis_fuzz")]
 
 
 def test_fuzz_runs_class_based_checks(ctx):
