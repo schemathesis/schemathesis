@@ -143,7 +143,8 @@ def test_failure_reported_once_is_one_test_case(ctx, cli, tmp_path):
     assert (len(report["testCases"]), len(report["faults"]["foundFaults"])) == (1, 1)
 
 
-def test_undeclared_method_fault_names_the_probed_method(ctx, cli, tmp_path):
+def test_undeclared_method_fault_belongs_to_declared_operation(ctx, cli, tmp_path):
+    # WFC requires every fault to name an operation listed in `endpointIds`.
     app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
     @app.route("/items", methods=["GET", "TRACE"])
@@ -155,7 +156,11 @@ def test_undeclared_method_fault_names_the_probed_method(ctx, cli, tmp_path):
         app, f"--report-wfc-path={path}", "--phases=coverage", "--checks=unsupported_method", "--max-examples=1"
     )
 
-    assert [fault["operationId"] for fault in load_report(path)["faults"]["foundFaults"]] == ["TRACE:/items"]
+    report = load_report(path)
+    assert [
+        (fault["operationId"], fault["faultCategories"][0]["context"]) for fault in report["faults"]["foundFaults"]
+    ] == [("GET:/items", "TRACE:/items -> UnsupportedMethodResponse: Wrong response to undeclared method")]
+    assert [case["name"] for case in report["testCases"]] == ["TRACE /items: Wrong response to undeclared method"]
 
 
 @pytest.mark.parametrize(
