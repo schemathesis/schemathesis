@@ -114,6 +114,7 @@
 #### pytest and Python API
 
 - Shrink failing inputs to a minimal example in pytest, Hypothesis and stateful tests.
+- Show argument values in failing examples of other Hypothesis tests run alongside Schemathesis.
 - `AttributeError` in `validate_response()` for unsupported response types.
 - ASGI applications receiving requests before lifespan startup completes when tested with several workers.
 - Replay expired-token requests with fresh credentials from per-test and `as_strategy()` auth providers.

@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from schemathesis.core.cache import MISSING, BoundedCache
+
+if TYPE_CHECKING:
+    from io import TextIOBase
+
+    from hypothesis.control import BuildContext
 
 # Sentinel cached when generation raised `Unsatisfiable`.
 UNSATISFIABLE_RESULT: Final = object()
@@ -29,6 +34,7 @@ def setup() -> None:
     from hypothesis.vendor import pretty
 
     from schemathesis.core import INTERNAL_BUFFER_SIZE
+    from schemathesis.generation.hypothesis.marks import ApiOperationMark
 
     if getattr(setup, "_is_patched", False):
         return
@@ -64,9 +70,19 @@ def setup() -> None:
     core.is_first_param_referenced_in_function = _is_first_param_referenced_in_function
 
     class RepresentationPrinter(pretty.RepresentationPrinter):
-        def pretty(self, obj: object, *, cycle: bool = False) -> None:
-            # Pretty-printing large values is costly, most of all in the coverage phase
-            return None
+        def __init__(self, output: TextIOBase | None = None, *, context: BuildContext | None = None) -> None:
+            super().__init__(output, context=context)
+            # Older Hypothesis versions do not expose the running test; printing stays off for every test there
+            test = getattr(context, "wrapped_test", None)
+            self._is_silent = test is None or ApiOperationMark.is_set(test)
+
+        # Older Hypothesis versions take no `cycle` argument
+        def pretty(self, obj: object, **kwargs: bool) -> None:
+            # Pretty-printing large values is costly, most of all in the coverage phase.
+            # Tests built by Schemathesis report their failures on their own; other tests keep Hypothesis output
+            if self._is_silent:
+                return None
+            super().pretty(obj, **kwargs)
 
     # Hypothesis exposes no hook for its printer, so the class is swapped in place.
     root_core.RepresentationPrinter = RepresentationPrinter  # type: ignore[misc]

@@ -9,7 +9,7 @@ from flask import jsonify, request
 
 from schemathesis.generation.modes import GenerationMode
 from test.apps.catalog.openapi import basic
-from test.pytest.utils import has_hypothesis_failure_header
+from test.pytest.utils import HYPOTHESIS_FAILURE_HEADERS, has_hypothesis_failure_header
 
 
 def test_missing_base_url_error_message(testdir):
@@ -691,7 +691,7 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 20$"])
 
 
-def test_trimmed_output(testdir, ctx):
+def test_output_trimmed_only_for_schemathesis_tests(testdir, ctx):
     api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
@@ -704,15 +704,24 @@ def test_a(case):
 @given(st.integers())
 @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow])
 def test_b(v):
+    1 / v
+
+@given(case=schema["/users"]["GET"].as_strategy(), v=st.integers())
+@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow])
+def test_c(case, v):
     1 / v""",
     )
     result = testdir.runpytest()
-    result.assert_outcomes(failed=2)
+    result.assert_outcomes(failed=3)
     stdout = result.stdout.str()
     # No internal Schemathesis frames.
     assert "def validate_response(" not in stdout
     assert not has_hypothesis_failure_header(stdout, "test_a(")
-    assert has_hypothesis_failure_header(stdout, "test_b(")
+    header = "|".join(HYPOTHESIS_FAILURE_HEADERS)
+    result.stdout.re_match_lines([rf"E\s+({header}): test_b\($", r"E\s+v=0,$", r"E\s+\)$"], consecutive=True)
+    result.stdout.re_match_lines(
+        [rf"E\s+({header}): test_c\($", r"E\s+case=,$", r"E\s+v=0,$", r"E\s+\)$"], consecutive=True
+    )
 
 
 def test_verbose_hypothesis_output_is_hidden_for_schemathesis_tests(testdir):
