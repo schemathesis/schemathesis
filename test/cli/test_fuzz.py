@@ -343,10 +343,12 @@ def test_fuzz_request_cut_by_time_limit_is_not_a_passed_scenario(cli, app_runner
         release.wait()
         return jsonify([])
 
+    started = time.monotonic()
     try:
         result = cli.main("fuzz", app_runner.openapi_url(app), "--max-time=1", "--request-timeout=30", "--workers=1")
     finally:
         release.set()
+    assert time.monotonic() - started < 15
     assert result == snapshot_cli
 
 
@@ -1065,28 +1067,6 @@ def test_fuzz_interrupted_while_waiting_for_a_response(cli, app_runner, ctx):
     result = cli.main("fuzz", app_runner.openapi_url(app), "--max-time=30", "--workers=1")
     assert result.exit_code == 130, result.stdout
     assert re.fullmatch(r"=+ Interrupted after \d+\.\d{2}s =+", result.stdout.strip().splitlines()[-1])
-
-
-def test_fuzz_time_limit_cuts_hanging_request(cli, app_runner, ctx):
-    app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
-    release = threading.Event()
-
-    @app.route("/users")
-    def users():
-        release.wait()
-        return jsonify([])
-
-    started = time.monotonic()
-    try:
-        result = cli.main("fuzz", app_runner.openapi_url(app), "--max-time=1", "--request-timeout=30", "--workers=1")
-    finally:
-        release.set()
-    assert time.monotonic() - started < 15
-    assert "Network Error" not in result.stdout, result.stdout
-    assert _parse_operations_summary(result.stdout) == (
-        {"selected": 1, "tested": 0, "skipped": 1},
-        {"Time limit reached"},
-    ), result.stdout
 
 
 PING_PATHS = {"/ping": {"get": {"responses": {"200": {"description": "OK"}}}}}
