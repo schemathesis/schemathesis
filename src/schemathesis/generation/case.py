@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import jsonschema_rs
 from jsonschema_rs import Validator
 
-from schemathesis.auths import apply_configured_auth, reauth_and_replay
+from schemathesis.auths import apply_configured_auth, reauth_and_replay, reauth_state_for
 from schemathesis.checks import (
     CheckContext,
     CheckFunction,
@@ -650,7 +650,7 @@ class Case(Generic[OperationT]):
         response = reauth_and_replay(
             self,
             response,
-            self.operation.schema.reauth_state,
+            reauth_state_for(self),
             lambda: self.call(base_url, session, headers, **call_kwargs),
         )
         transport_kwargs = dict(kwargs)
