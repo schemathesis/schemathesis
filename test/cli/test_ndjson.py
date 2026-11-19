@@ -29,6 +29,7 @@ def get_event_data(event):
 
 
 LARGE_RESPONSE_BODY = json.dumps({"padding": "x" * 2000}).encode()
+SECRET = "secret-token"
 
 
 def test_ndjson_records_truncated_response_body(cli, ctx, ndjson_path):
@@ -253,8 +254,24 @@ def test_binary_body_base64(ctx, cli, ndjson_path):
     assert all(b"\x89PNG" in base64.b64decode(body["$base64"]) for body in bodies)
 
 
-def test_enum_serialization_without_sanitization(cli, ctx, ndjson_path):
-    app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+def test_serialization_without_sanitization(cli, ctx, ndjson_path):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "api_key",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string", "example": SECRET},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
 
     @app.route("/users")
     def users():
@@ -266,9 +283,16 @@ def test_enum_serialization_without_sanitization(cli, ctx, ndjson_path):
         "--max-examples=10",
         "--seed=1",
         "--phases=coverage",
+        "--mode=positive",
         "--output-sanitize=false",
     )
     events = load_ndjson(ndjson_path)
+    assert [
+        (node["value"]["query"], node["value"]["meta"]["raw_containers"])
+        for event in events
+        if get_event_type(event) == "ScenarioFinished"
+        for node in get_event_data(event)["recorder"]["cases"].values()
+    ] == [({"api_key": SECRET}, {"query": {"api_key": SECRET}})]
     assert get_event_type(events[0]) == "Initialize"
     assert get_event_type(events[-1]) == "EngineFinished"
 
@@ -346,25 +370,33 @@ def test_form_data_string_body(cli, ctx, ndjson_path):
 
 
 @pytest.mark.parametrize(
-    ("parameters", "args", "config", "expected"),
+    ("parameters", "args", "config", "expected", "raw_containers"),
     [
-        ([], ["-H", "Authorization: Bearer secret-token"], None, {"headers": {"Authorization": "[Filtered]"}}),
         (
-            [{"name": "api_key", "in": "query", "required": True, "schema": {"type": "string"}}],
+            [{"name": "X-API-Key", "in": "header", "required": True, "schema": {"type": "string", "example": SECRET}}],
+            ["-H", f"Authorization: Bearer {SECRET}"],
+            {"parameters": {"X-API-Key": SECRET}},
+            {"headers": {"Authorization": "[Filtered]", "X-API-Key": "[Filtered]"}},
+            {"header": {"X-API-Key": "[Filtered]"}},
+        ),
+        (
+            [{"name": "api_key", "in": "query", "required": True, "schema": {"type": "string", "example": SECRET}}],
             [],
-            {"parameters": {"api_key": "secret-token"}},
+            {"parameters": {"api_key": SECRET}},
+            {"query": {"api_key": "[Filtered]"}},
             {"query": {"api_key": "[Filtered]"}},
         ),
         (
-            [{"name": "session", "in": "cookie", "required": True, "schema": {"type": "string"}}],
+            [{"name": "session", "in": "cookie", "required": True, "schema": {"type": "string", "example": SECRET}}],
             [],
-            {"parameters": {"session": "secret-token"}},
+            {"parameters": {"session": SECRET}},
             {"cookies": {"session": "[Filtered]"}},
+            {"cookie": {"session": "[Filtered]"}},
         ),
     ],
     ids=["header", "query", "cookie"],
 )
-def test_recorded_cases_sanitized(cli, ctx, ndjson_path, parameters, args, config, expected):
+def test_recorded_cases_sanitized(cli, ctx, ndjson_path, parameters, args, config, expected, raw_containers):
     app, _ = ctx.openapi.make_flask_app(
         {"/foo": {"get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}}}}
     )
@@ -377,20 +409,24 @@ def test_recorded_cases_sanitized(cli, ctx, ndjson_path, parameters, args, confi
         app,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=1",
-        "--phases=fuzzing",
+        "--phases=coverage,fuzzing",
+        "--mode=positive",
         *args,
         config=config,
     )
-    assert "secret-token" not in ndjson_path.read_text()
+    assert SECRET not in ndjson_path.read_text()
     cases = [
         node["value"]
         for event in load_ndjson(ndjson_path)
         if get_event_type(event) == "ScenarioFinished"
         for node in get_event_data(event)["recorder"]["cases"].values()
     ]
-    assert cases
+    assert {case["meta"]["phase"]["name"] for case in cases} == {"coverage", "fuzzing"}
     for case in cases:
         assert {key: case[key] for key in expected} == expected
+    assert [case["meta"].get("raw_containers") for case in cases if case["meta"]["phase"]["name"] == "coverage"] == [
+        raw_containers
+    ]
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")

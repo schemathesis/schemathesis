@@ -14,6 +14,7 @@ from typing import IO, TYPE_CHECKING, Any
 from schemathesis.core import NOT_SET
 from schemathesis.core.failures import Failure
 from schemathesis.core.output.sanitization import sanitize_headers, sanitize_url, sanitize_value
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transforms import Unresolvable
 from schemathesis.core.transport import Response
@@ -167,13 +168,27 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
                 dc_data[public_name] = value
         # A recorded case carries the same credentials as the request sent from it.
         if sanitization is not None and cls_name == "Case":
-            headers = dc_data.get("headers")
-            if isinstance(headers, dict):
-                sanitize_headers(headers, config=sanitization)
-            for name in ("cookies", "query"):
-                sanitize_value(dc_data.get(name), config=sanitization)
+            _sanitize_parameters(
+                dc_data.get("headers"), dc_data.get("cookies"), dc_data.get("query"), config=sanitization
+            )
+        # Typed copies of the case's parameters carry the same credentials as the case itself.
+        if sanitization is not None and cls_name == "CaseMetadata":
+            raw_containers = dc_data.get("raw_containers", {})
+            _sanitize_parameters(
+                raw_containers.get(ParameterLocation.HEADER),
+                raw_containers.get(ParameterLocation.COOKIE),
+                raw_containers.get(ParameterLocation.QUERY),
+                config=sanitization,
+            )
         return dc_data
     return str(obj)
+
+
+def _sanitize_parameters(headers: object, cookies: object, query: object, *, config: SanitizationConfig) -> None:
+    if isinstance(headers, dict):
+        sanitize_headers(headers, config=config)
+    sanitize_value(cookies, config=config)
+    sanitize_value(query, config=config)
 
 
 class NdjsonWriter:

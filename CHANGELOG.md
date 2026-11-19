@@ -45,6 +45,7 @@
 #### Reporting
 
 - Crash in HAR reports when the base URL contains credentials.
+- Mask sensitive parameters in `meta.raw_containers` of NDJSON reports and crash files.
 - Lost or misattributed pytest report entries for stateful tests and calls to other operations.
 - Missing Open API 3.2 `query` operations in the WFC report.
 - WFC report faults for undeclared methods naming operations missing from `endpointIds`.

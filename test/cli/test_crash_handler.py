@@ -202,43 +202,41 @@ def test_no_crash_file_on_success(cli, ctx, tmp_path):
     assert not _crash_files(crash_cache_dir(tmp_path))
 
 
-def test_crash_file_sanitizes_url_and_response_headers(cli, ctx, tmp_path):
+LEAK_PARAMETERS = [
+    {"name": "api_key", "in": "query", "required": True, "schema": {"type": "string", "example": "SECRETVALUE"}}
+]
+
+
+def test_crash_file_sanitizes_url_headers_and_typed_values(cli, ctx, tmp_path):
     app, _ = ctx.openapi.make_flask_app(
-        {
-            "/leak": {
-                "get": {
-                    "parameters": [{"name": "api_key", "in": "query", "required": True, "schema": {"type": "string"}}],
-                    "responses": {"500": {"description": "Error"}},
-                }
-            }
-        }
+        {"/leak": {"get": {"parameters": LEAK_PARAMETERS, "responses": {"500": {"description": "Error"}}}}}
     )
 
     @app.route("/leak")
     def leak():
         return jsonify({"error": "boom"}), 500, {"Authorization": "super-secret-token"}
 
-    cli.run_openapi_app(app, "--max-examples=1", config={"parameters": {"api_key": "SECRETVALUE"}})
+    cli.run_openapi_app(
+        app,
+        "--max-examples=1",
+        "--phases=coverage",
+        "--mode=positive",
+        config={"parameters": {"api_key": "SECRETVALUE"}},
+    )
 
     crash = json.loads(_crash_files(crash_cache_dir(tmp_path))[0].read_text())
     step = crash["sequence"][0]
     assert "super-secret-token" not in json.dumps(crash)
-    assert "SECRETVALUE" not in step["url"], step["url"]
+    assert "SECRETVALUE" not in json.dumps(crash)
     assert "%5BFiltered%5D" in step["url"] or "[Filtered]" in step["url"], step["url"]
     assert step["response"]["headers"].get("authorization") == "[Filtered]"
+    assert step["meta"]["raw_containers"] == {"QUERY": {"api_key": "[Filtered]"}}
 
 
 def test_crash_file_respects_disabled_sanitization(cli, ctx, tmp_path):
     # Crash files follow the output.sanitization rules; disabling sanitization persists raw values.
     app, _ = ctx.openapi.make_flask_app(
-        {
-            "/leak": {
-                "get": {
-                    "parameters": [{"name": "api_key", "in": "query", "required": True, "schema": {"type": "string"}}],
-                    "responses": {"500": {"description": "Error"}},
-                }
-            }
-        }
+        {"/leak": {"get": {"parameters": LEAK_PARAMETERS, "responses": {"500": {"description": "Error"}}}}}
     )
 
     @app.route("/leak")
@@ -248,11 +246,14 @@ def test_crash_file_respects_disabled_sanitization(cli, ctx, tmp_path):
     cli.run_openapi_app(
         app,
         "--max-examples=1",
+        "--phases=coverage",
+        "--mode=positive",
         config={"parameters": {"api_key": "SECRETVALUE"}, "output": {"sanitization": {"enabled": False}}},
     )
 
-    crash = json.loads(_crash_files(crash_cache_dir(tmp_path))[0].read_text())
-    assert "SECRETVALUE" in crash["sequence"][0]["url"]
+    step = json.loads(_crash_files(crash_cache_dir(tmp_path))[0].read_text())["sequence"][0]
+    assert "SECRETVALUE" in step["url"]
+    assert step["meta"]["raw_containers"] == {"QUERY": {"api_key": "SECRETVALUE"}}
 
 
 def test_crash_file_stores_structured_case(cli, ctx, tmp_path):

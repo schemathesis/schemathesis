@@ -15,7 +15,7 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.failures import Failure, is_reproducible_failure
 from schemathesis.core.fs import file_exists
 from schemathesis.core.output.sanitization import sanitize_headers, sanitize_url, sanitize_value
-from schemathesis.core.parameters import CONTAINER_TO_LOCATION
+from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.storage import atomic_write_text, retry_while_locked
 from schemathesis.core.timing import format_timestamp
 from schemathesis.core.transforms import deepclone
@@ -422,6 +422,15 @@ def build_crashes_from_recorder(
         url_template = sanitize_uri(case.operation.schema.build_url_template(case, base_url))
 
         meta_dict = case.meta.to_dict() if case.meta is not None else None
+        if meta_dict is not None and enabled:
+            # Typed copies of the case's parameters carry the same credentials as the case itself.
+            raw_containers = deepclone(meta_dict["raw_containers"])
+            for location, container in raw_containers.items():
+                if location == ParameterLocation.HEADER.name and isinstance(container, dict):
+                    sanitize_headers(container, config=sanitization)
+                else:
+                    sanitize_value(container, config=sanitization)
+            meta_dict["raw_containers"] = raw_containers
 
         case_path_parameters = dict(case.path_parameters)
         sanitize_mapping(case_path_parameters)
