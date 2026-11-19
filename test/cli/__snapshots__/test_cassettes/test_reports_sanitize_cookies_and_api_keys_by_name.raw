@@ -32,7 +32,7 @@ __________________________________ GET /items __________________________________
 
 Reproduce with:
 
-    curl -X GET -H 'Cookie: sessionid=[Filtered]; lang=en' http://127.0.0.1/items
+    curl -X GET -H 'X-Access: [Filtered]' -H 'Cookie: sessionid=[Filtered]; lang=en; jwt=[Filtered]' 'http://127.0.0.1/items?k=%5BFiltered%5D'
 
     st replay <PLACEHOLDER>
 

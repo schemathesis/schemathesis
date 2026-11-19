@@ -53,9 +53,7 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
         response = load_from_url(client.get, url=path, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=path)
     schema = load_content(decode_lossy(response.content, response.encoding), content_type)
-    loaded = _from_dict(schema, config=config, stringify=False, app=app)
-    loaded.location = path
-    return loaded
+    return _from_dict(schema, config=config, stringify=False, app=app, location=path)
 
 
 def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, **kwargs: Any) -> OpenApiSchema:
@@ -87,9 +85,7 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     content_type = detect_content_type(headers=response.headers, path=path)
     encoding = response.mimetype_params.get("charset", "utf-8")
     schema = load_content(decode_lossy(response.get_data(), encoding), content_type)
-    loaded = _from_dict(schema, config=config, stringify=False, app=app)
-    loaded.location = path
-    return loaded
+    return _from_dict(schema, config=config, stringify=False, app=app, location=path)
 
 
 def from_url(
@@ -131,9 +127,7 @@ def from_url(
     response = load_from_url(requests.get, url=url, wait_for_schema=wait_for_schema, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=url)
     schema = load_content(decode_lossy(response.content, response.encoding), content_type)
-    loaded = _from_dict(schema, config=config, stringify=False)
-    loaded.location = url
-    return loaded
+    return _from_dict(schema, config=config, stringify=False, location=url)
 
 
 def from_path(
@@ -171,9 +165,7 @@ def _from_path(
         except UnicodeDecodeError as exc:
             raise LoaderError(LoaderErrorKind.SYNTAX_ERROR, SCHEMA_SYNTAX_ERROR, extras=[str(exc)]) from exc
         schema = load_content(content, content_type)
-    loaded = _from_dict(schema, config=config, stringify=False, app=app)
-    loaded.location = Path(path).absolute().as_uri()
-    return loaded
+    return _from_dict(schema, config=config, stringify=False, app=app, location=Path(path).absolute().as_uri())
 
 
 def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) -> OpenApiSchema:
@@ -233,7 +225,12 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
 
 
 def _from_dict(
-    schema: dict[str, Any], *, config: SchemathesisConfig | None, stringify: bool, app: Any = None
+    schema: dict[str, Any],
+    *,
+    config: SchemathesisConfig | None,
+    stringify: bool,
+    app: Any = None,
+    location: str | None = None,
 ) -> OpenApiSchema:
     if not isinstance(schema, dict):
         raise LoaderError(LoaderErrorKind.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)
@@ -262,11 +259,14 @@ def _from_dict(
             )
         from schemathesis.specs.openapi.schemas import OpenApiSchema
 
-        instance = OpenApiSchema(raw_schema=schema, config=project_config, app=app)
+        instance = OpenApiSchema(raw_schema=schema, config=project_config, app=app, location=location)
         wfc.setup_auth(instance, project_config, LoaderErrorKind.OPEN_API_INVALID_SCHEMA)
         return instance
 
-    return load_with_hooks(schema, config, build)
+    loaded = load_with_hooks(schema, config, build)
+    # API keys can go under names no sanitization key matches, e.g. a `jwt` cookie
+    loaded.config.output.sanitization.add_keys(loaded.security.api_key_names())
+    return loaded
 
 
 class ContentType(enum.Enum):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -99,6 +100,11 @@ class SanitizationConfig(DiffBase):
 
     def update(self, *, enabled: bool | None = None) -> None:
         self._apply(enabled=enabled)
+
+    def add_keys(self, keys: Iterable[str]) -> None:
+        """Sanitize `keys` as well, matched case-insensitively like the configured ones."""
+        added = [key for key in dict.fromkeys(key.lower() for key in keys) if key not in self.keys_to_sanitize]
+        self.keys_to_sanitize = (*self.keys_to_sanitize, *added)
 
 
 MAX_PAYLOAD_SIZE = 512

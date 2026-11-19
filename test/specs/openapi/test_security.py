@@ -308,6 +308,43 @@ def test_only_schemes_demanded_by_every_alternative_are_required(ctx, version, s
     } == expected
 
 
+API_KEY_SCHEMES = {
+    "AccessHeader": {"type": "apiKey", "name": "X-Access", "in": "header"},
+    "QueryKey": {"type": "apiKey", "name": "k", "in": "query"},
+}
+
+
+@pytest.mark.parametrize(
+    ("version", "definitions", "sanitization"),
+    [
+        ("2.0", {"basePath": "/", "securityDefinitions": API_KEY_SCHEMES}, {}),
+        ("3.0.2", {"components": {"securitySchemes": API_KEY_SCHEMES}}, {}),
+        (
+            "3.0.2",
+            {
+                "components": {
+                    "securitySchemes": {name: {"$ref": f"#/components/x-schemes/{name}"} for name in API_KEY_SCHEMES},
+                    "x-schemes": API_KEY_SCHEMES,
+                }
+            },
+            {},
+        ),
+        ("3.0.2", {"components": {"securitySchemes": API_KEY_SCHEMES}}, {"keys-to-sanitize": ["lang"]}),
+    ],
+    ids=["swagger-2.0", "openapi-3.0", "referenced-schemes", "custom-keys"],
+)
+def test_api_key_credentials_are_sanitized(ctx, version, definitions, sanitization):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {"responses": {"200": {"description": "OK"}}},
+        version=version,
+        config=schemathesis.Config.from_dict({"output": {"sanitization": sanitization}}),
+        **definitions,
+    )
+    case = operation.Case(headers={"X-Access": "secret"}, query={"k": "secret"})
+    assert case.as_curl_command() == "curl -X GET -H 'X-Access: [Filtered]' 'http://localhost/items?k=%5BFiltered%5D'"
+
+
 AUTH_CONFIGS = {
     "ApiKeyHeader": {"api_key": "valid-key"},
     "ApiKeyQuery": {"api_key": "valid-key"},

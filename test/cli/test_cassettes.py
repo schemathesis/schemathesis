@@ -6,6 +6,7 @@ import sys
 import threading
 from pathlib import Path
 from unittest.mock import ANY
+from urllib.parse import urlsplit
 
 import flask
 import harfile
@@ -306,7 +307,7 @@ def test_har_cookies(ctx, cli, cassette_path):
 
 # HAR headers and crash files keep only the first value of a repeated header.
 @pytest.mark.snapshot(replace_reproduce_with=False)
-def test_reports_sanitize_cookies_by_name(ctx, cli, tmp_path, snapshot_cli):
+def test_reports_sanitize_cookies_and_api_keys_by_name(ctx, cli, tmp_path, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -315,10 +316,18 @@ def test_reports_sanitize_cookies_by_name(ctx, cli, tmp_path, snapshot_cli):
                         {"name": "sessionid", "in": "cookie", "required": True, "schema": {"type": "string"}},
                         {"name": "lang", "in": "cookie", "required": True, "schema": {"type": "string"}},
                     ],
+                    "security": [{"JwtCookie": [], "AccessHeader": [], "QueryKey": []}],
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        }
+        },
+        components={
+            "securitySchemes": {
+                "JwtCookie": {"type": "apiKey", "in": "cookie", "name": "jwt"},
+                "AccessHeader": {"type": "apiKey", "in": "header", "name": "X-Access"},
+                "QueryKey": {"type": "apiKey", "in": "query", "name": "k"},
+            }
+        },
     )
 
     @app.route("/items")
@@ -327,6 +336,7 @@ def test_reports_sanitize_cookies_by_name(ctx, cli, tmp_path, snapshot_cli):
         response.status_code = 500
         response.headers.add("Set-Cookie", "sessionid=xyz; Path=/; HttpOnly")
         response.headers.add("Set-Cookie", "lang=en; Path=/")
+        response.headers.add("Set-Cookie", "jwt=issued; Path=/")
         return response
 
     assert (
@@ -338,7 +348,16 @@ def test_reports_sanitize_cookies_by_name(ctx, cli, tmp_path, snapshot_cli):
             f"--report-har-path={tmp_path / 'report.har'}",
             f"--report-vcr-path={tmp_path / 'report.yaml'}",
             f"--report-ndjson-path={tmp_path / 'report.ndjson'}",
-            config={"parameters": {"sessionid": "abc", "lang": "en"}},
+            config={
+                "parameters": {"sessionid": "abc", "lang": "en"},
+                "auth": {
+                    "openapi": {
+                        "JwtCookie": {"api_key": "jwt-secret"},
+                        "AccessHeader": {"api_key": "header-secret"},
+                        "QueryKey": {"api_key": "query-secret"},
+                    }
+                },
+            },
         )
         == snapshot_cli
     )
@@ -352,31 +371,54 @@ def test_reports_sanitize_cookies_by_name(ctx, cli, tmp_path, snapshot_cli):
     )
     [crash_file] = [path for path in crash_cache_dir(tmp_path).rglob("*.json") if path.name != "manifest.json"]
     [crash] = load_json_or_fail(crash_file)["sequence"]
-    cookie = "sessionid=[Filtered]; lang=en"
-    set_cookie = ["sessionid=[Filtered]; Path=/; HttpOnly", "lang=en; Path=/"]
+    cookie = "sessionid=[Filtered]; lang=en; jwt=[Filtered]"
+    set_cookie = ["sessionid=[Filtered]; Path=/; HttpOnly", "lang=en; Path=/", "jwt=[Filtered]; Path=/"]
+    query = "k=%5BFiltered%5D"
     assert {
         "har": (
-            [header["value"] for header in har["request"]["headers"] if header["name"] == "Cookie"],
+            [header["value"] for header in har["request"]["headers"] if header["name"] in ("Cookie", "X-Access")],
             har["request"]["cookies"],
+            urlsplit(har["request"]["url"]).query,
             [header["value"] for header in har["response"]["headers"] if header["name"] == "set-cookie"],
             har["response"]["cookies"],
         ),
-        "vcr": (vcr["request"]["headers"]["Cookie"], vcr["response"]["headers"]["set-cookie"]),
-        "ndjson": (ndjson["request"]["headers"]["Cookie"], ndjson["response"]["headers"]["set-cookie"]),
-        "crash": (crash["headers"]["Cookie"], crash["response"]["headers"]["set-cookie"]),
+        "vcr": (
+            vcr["request"]["headers"]["Cookie"],
+            vcr["request"]["headers"]["X-Access"],
+            urlsplit(vcr["request"]["uri"]).query,
+            vcr["response"]["headers"]["set-cookie"],
+        ),
+        "ndjson": (
+            ndjson["request"]["headers"]["Cookie"],
+            ndjson["request"]["headers"]["X-Access"],
+            urlsplit(ndjson["request"]["uri"]).query,
+            ndjson["response"]["headers"]["set-cookie"],
+        ),
+        "crash": (
+            crash["headers"]["Cookie"],
+            crash["headers"]["X-Access"],
+            urlsplit(crash["url"]).query,
+            crash["response"]["headers"]["set-cookie"],
+        ),
     } == {
         "har": (
-            [cookie],
-            [{"name": "sessionid", "value": "[Filtered]"}, {"name": "lang", "value": "en"}],
+            ["[Filtered]", cookie],
+            [
+                {"name": "sessionid", "value": "[Filtered]"},
+                {"name": "lang", "value": "en"},
+                {"name": "jwt", "value": "[Filtered]"},
+            ],
+            query,
             set_cookie[:1],
             [
                 {"name": "sessionid", "value": "[Filtered]", "path": "/", "httpOnly": True},
                 {"name": "lang", "value": "en", "path": "/"},
+                {"name": "jwt", "value": "[Filtered]", "path": "/"},
             ],
         ),
-        "vcr": ([cookie], set_cookie),
-        "ndjson": ([cookie], set_cookie),
-        "crash": (cookie, set_cookie[0]),
+        "vcr": ([cookie], ["[Filtered]"], query, set_cookie),
+        "ndjson": ([cookie], ["[Filtered]"], query, set_cookie),
+        "crash": (cookie, "[Filtered]", query, set_cookie[0]),
     }
 
 

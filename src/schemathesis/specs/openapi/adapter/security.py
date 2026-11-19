@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 
 from schemathesis.config import ApiKeyAuthConfig, DynamicTokenAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
 from schemathesis.config._error import ConfigError
-from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.errors import InvalidSchema, SchemathesisError
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.meta import negated_parameters
@@ -94,6 +94,22 @@ class OpenApiSecurity:
         if self._resolved_definitions is None:
             self._resolved_definitions = self.adapter.extract_security_definitions(self.raw_schema, self.resolver)
         return self._resolved_definitions
+
+    def api_key_names(self) -> list[str]:
+        """Header, query parameter and cookie names that the schema's API keys are sent under."""
+        try:
+            definitions = self.security_definitions
+        except SchemathesisError:
+            # Operations that use broken security schemes report them when they load
+            return []
+        return [
+            definition["name"]
+            for definition in definitions.values()
+            # Swagger 2.0 definitions are not validated
+            if isinstance(definition, Mapping)
+            and definition.get("type") == "apiKey"
+            and isinstance(definition.get("name"), str)
+        ]
 
     def auth_provider_for(
         self,
@@ -320,7 +336,9 @@ def has_effective_optional_auth(operation: APIOperation, raw_schema: Mapping[str
 
 
 def extract_security_definitions_v2(schema: Mapping[str, Any], resolver: Resolver) -> Mapping[str, Any]:
-    return schema.get("securityDefinitions", {})
+    definitions = schema.get("securityDefinitions", {})
+    # Swagger 2.0 schemas are not validated; a `securityDefinitions` that is not an object defines nothing
+    return definitions if isinstance(definitions, Mapping) else {}
 
 
 def extract_security_definitions_v3(schema: Mapping[str, Any], resolver: Resolver) -> Mapping[str, Any]:
