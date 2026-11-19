@@ -54,6 +54,7 @@
 - `HookExecutionError` in pytest reports when tests validate responses from their own HTTP client.
 - `st fuzz` counting a scenario as passed when the time limit cuts its only request.
 - `ModuleNotFoundError` for `allure_commons` in pytest reports when `allure-pytest` is not installed.
+- Mask `apiKey` security scheme credentials in output whatever their header, query or cookie name.
 - Mask credentials in `repr(case)` following `output.sanitization`, like the cURL reproduction command.
 - Mask sensitive query parameters in network error messages, like the cURL reproduction command.
 - Keep URL credentials out of network error messages, crash files and `st replay` output.

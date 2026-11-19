@@ -379,6 +379,9 @@ Rules:
     In `Cookie` and `Set-Cookie` headers, each cookie name is a key: `Cookie: sessionid=abc; lang=en` becomes
     `Cookie: sessionid=[Filtered]; lang=en`. A cookie header that is not `name=value` pairs is replaced whole.
 
+    The names of the schema's `apiKey` security schemes are keys too, in addition to `keys-to-sanitize`: an API key
+    sent as the `jwt` cookie or the `X-Access` header is masked.
+
     **Response bodies are written verbatim** — to the terminal and to every report format. A secret the
     API returns in a body is not redacted, whatever its key is named. Treat failure output and report
     artifacts as sensitive.

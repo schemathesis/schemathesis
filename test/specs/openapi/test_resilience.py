@@ -229,6 +229,16 @@ def test_malformed_components_node_v3(ctx, components):
     assert "Location:\n    components" in str(result.err())
 
 
+@pytest.mark.parametrize(
+    "definitions", ["oops", 42, ["oops"], {"api_key": "oops"}], ids=["string", "integer", "list", "string_scheme"]
+)
+def test_malformed_security_definitions_without_requirements_v2(ctx, definitions):
+    schema = ctx.openapi.load_schema(
+        {"/things": {"post": _OK_RESPONSES}}, version="2.0", securityDefinitions=definitions
+    )
+    assert isinstance(_first_operation(schema), Ok)
+
+
 @pytest.mark.parametrize("version", ["2.0", "3.0.2"], ids=["v2", "v3"])
 @pytest.mark.parametrize("parameters", [{"a": 1}, "not-a-list", 42], ids=["mapping", "string", "integer"])
 def test_malformed_path_item_parameters(ctx, version, parameters):
