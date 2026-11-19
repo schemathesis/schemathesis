@@ -772,26 +772,41 @@ def test_api(case):
     result.assert_outcomes(passed=1)
 
 
-PER_TEST_AUTH = "@schema.auth(ScopedAuth)\n@schema.parametrize()"
+PER_TEST_AUTH = "@schema.auth(ScopedAuth, retry_on={retry_on})\n@schema.parametrize()"
 STRATEGY_AUTH = """
 scoped = AuthStorage()
-scoped.auth()(ScopedAuth)
+scoped.auth(retry_on={retry_on})(ScopedAuth)
 
 @given(case=schema["/items"]["GET"].as_strategy(auth_storage=scoped))
 """
 
 
 @pytest.mark.parametrize(
-    ("retry_source", "test_auth"),
+    ("retry_source", "test_auth", "expected_status"),
     [
-        ("@schema.auth(retry_on=[401])", PER_TEST_AUTH),
-        ("@schemathesis.auth(retry_on=[401])", PER_TEST_AUTH),
-        ('@schema.auth(retry_on=[401]).apply_to(path="/other")', PER_TEST_AUTH),
-        ("@schema.auth(retry_on=[401])", STRATEGY_AUTH),
+        ("@schema.auth(retry_on=[401])", PER_TEST_AUTH.format(retry_on="[]"), 200),
+        ("@schemathesis.auth(retry_on=[401])", PER_TEST_AUTH.format(retry_on="[]"), 200),
+        ('@schema.auth(retry_on=[401]).apply_to(path="/other")', PER_TEST_AUTH.format(retry_on="[]"), 200),
+        ("@schema.auth(retry_on=[401])", STRATEGY_AUTH.format(retry_on="[]"), 200),
+        ("", PER_TEST_AUTH.format(retry_on="[401]"), 200),
+        ("", STRATEGY_AUTH.format(retry_on="[401]"), 200),
+        ("", PER_TEST_AUTH.format(retry_on="None"), 200),
+        ("", STRATEGY_AUTH.format(retry_on="None"), 200),
+        ("", PER_TEST_AUTH.format(retry_on="[]"), 401),
     ],
-    ids=["schema-auth", "global-auth", "schema-auth-for-other-paths", "strategy-auth"],
+    ids=[
+        "schema-auth",
+        "global-auth",
+        "schema-auth-for-other-paths",
+        "strategy-auth",
+        "per-test-auth-retry-on",
+        "strategy-auth-retry-on",
+        "per-test-auth-default-retry-on",
+        "strategy-auth-default-retry-on",
+        "per-test-auth-retry-on-disabled",
+    ],
 )
-def test_reactive_reauth_refreshes_auth_the_case_was_generated_with(testdir, ctx, retry_source, test_auth):
+def test_reactive_reauth_with_auth_the_case_was_generated_with(testdir, ctx, retry_source, test_auth, expected_status):
     testdir.makefile(".toml", schemathesis='[generation]\nmode = "positive"\n')
     testdir.make_test(
         f"""
@@ -838,7 +853,7 @@ class ScopedAuth:
 def test_api(case):
     response = case.call_and_validate(excluded_checks=[ignored_auth])
     latest = f"Bearer scoped-{{counter['n']}}"
-    assert (response.status_code, response.request.headers["Authorization"]) == (200, latest)
+    assert (response.status_code, response.request.headers["Authorization"]) == ({expected_status}, latest)
 """,
         schema=ctx.openapi.build_schema(
             {

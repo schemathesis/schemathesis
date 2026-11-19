@@ -777,17 +777,33 @@ class ReauthState:
                 self._token_independent.add(label)
 
 
+def _retry_on_statuses_in(storage: AuthStorage, schema: BaseSchema) -> set[int]:
+    statuses: set[int] = set()
+    for provider in _caching_providers_in(storage):
+        if provider.retry_on is None:
+            statuses.add(schema.status_code_for(StatusClass.UNAUTHENTICATED))
+        else:
+            statuses.update(provider.retry_on)
+    return statuses
+
+
 def compute_retry_on_statuses(schema: BaseSchema) -> frozenset[int]:
     """Union of `retry_on` across configured dynamic schemes and registered `@auth` providers; empty means off."""
     statuses: set[int] = set()
     for scheme in schema.config.auth.dynamic.schemes.values():
         statuses.update(scheme.retry_on)
-    for provider in (*_caching_providers_in(schema.auth), *_caching_providers_in(GLOBAL_AUTH_STORAGE)):
-        if provider.retry_on is None:
-            statuses.add(schema.status_code_for(StatusClass.UNAUTHENTICATED))
-        else:
-            statuses.update(provider.retry_on)
+    statuses.update(_retry_on_statuses_in(schema.auth, schema))
+    statuses.update(_retry_on_statuses_in(GLOBAL_AUTH_STORAGE, schema))
     return frozenset(statuses)
+
+
+def reauth_state_for(case: Case) -> ReauthState:
+    """Fresh reauth state for one call of `case`, adding `retry_on` of the auth the case was generated with."""
+    schema = case.operation.schema
+    statuses = schema.reauth_retry_statuses
+    if case._auth_storage is not None:
+        statuses |= _retry_on_statuses_in(case._auth_storage, schema)
+    return ReauthState(retry_on_statuses=statuses)
 
 
 def reauth_and_replay(case: Case, response: Response, state: ReauthState, recall: Callable[[], Response]) -> Response:
