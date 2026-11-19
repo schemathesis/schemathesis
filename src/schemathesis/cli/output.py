@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from rich.text import Text
 
     from schemathesis.cli.context import BaseExecutionContext
-    from schemathesis.config import OutputConfig, ProjectConfig
+    from schemathesis.config import OutputConfig, ProjectConfig, SanitizationConfig
     from schemathesis.core.failures import MessageBlock
     from schemathesis.engine import events
     from schemathesis.engine.statistic import GroupedFailures, Statistic
@@ -486,14 +486,16 @@ def display_test_cases(test_cases: TestCasesSummary) -> None:
     click.echo(style(", ".join(parts) + "\n"))
 
 
-def display_errors(errors: Iterable[events.NonFatalError], *, base_url_is_set: bool) -> None:
+def display_errors(
+    errors: Iterable[events.NonFatalError], *, base_url_is_set: bool, sanitization: SanitizationConfig
+) -> None:
     display_section_name("ERRORS")
     sorted_errors = sorted(errors, key=lambda r: (r.phase.value if r.phase is not None else "", r.label, r.info.title))
     for label, group_errors in groupby(sorted_errors, key=lambda r: r.label):
         display_section_name(label, "_", fg="red")
         _errors = list(group_errors)
         for idx, error in enumerate(_errors, 1):
-            click.echo(error.info.format(bold=_bold, base_url_is_set=base_url_is_set))
+            click.echo(error.info.format(bold=_bold, base_url_is_set=base_url_is_set, sanitization=sanitization))
             if idx < len(_errors):
                 click.echo()
     click.echo(style(f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}", fg="red"))

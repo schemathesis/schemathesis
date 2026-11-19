@@ -270,7 +270,7 @@ def test_fuzz_live_progress_on_terminal(cli, app_runner, ctx, make_app, args, ex
 def test_fuzz_unreachable_server_has_no_passed_scenarios(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.success()
 
-    result = cli.main("fuzz", api.schema_url, "--url=http://127.0.0.1:1/api", "--max-time=30")
+    result = cli.main("fuzz", api.schema_url, "--url=http://user:secret@127.0.0.1:1/api", "--max-time=30")
     assert result == snapshot_cli
     assert re.search(r"Test cases:\n  (\d+) generated, \1 errored\n", result.stdout), result.stdout
 

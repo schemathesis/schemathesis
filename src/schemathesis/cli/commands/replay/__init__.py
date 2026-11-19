@@ -15,6 +15,7 @@ from schemathesis.cli.output import make_console, make_progress_bar
 from schemathesis.cli.validation import validate_auth_overlap, validate_wfc_user
 from schemathesis.core import storage
 from schemathesis.core.app_output import hidden_application_output
+from schemathesis.core.output.sanitization import sanitized
 from schemathesis.core.timing import Instant
 
 if TYPE_CHECKING:
@@ -165,7 +166,8 @@ def _replay_directory(
 
     schema = _load_schema(ctx, effective_schema_location)
     if schema is None:
-        click.echo(f"Error: failed to load schema from {effective_schema_location}", err=True)
+        location = sanitized(effective_schema_location, ctx.obj.output.sanitization)
+        click.echo(f"Error: failed to load schema from {location}", err=True)
         return False, True, False
 
     project_config = ctx.obj.projects.get(schema.raw_schema)

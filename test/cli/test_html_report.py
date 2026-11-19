@@ -6,6 +6,7 @@ import threading
 import time
 from html import escape, unescape
 from types import SimpleNamespace
+from xml.etree import ElementTree
 
 import pytest
 from flask import Response, jsonify, request
@@ -31,6 +32,7 @@ from schemathesis.reporting.html.timeline import (
     tick_groups,
 )
 from test.apps.catalog.openapi.modifiers.stateful import FailAfterRequests
+from test.utils import allure_results
 
 
 @pytest.fixture
@@ -1099,10 +1101,24 @@ def before_call(ctx, case, **kwargs):
     assert html == snapshot_html
 
 
-def test_html_report_network_error_details(ctx, cli, report_dir, snapshot_html):
+def test_html_report_network_error_details(ctx, cli, report_dir, tmp_path, snapshot_html):
     api = ctx.openapi.apps.success()
-    html = run_with_report(cli, report_dir, api.schema_url, "--url=http://127.0.0.1:1", exit_code=ExitCode.FAILURES)
+    xml_path = tmp_path / "junit.xml"
+    allure_dir = tmp_path / "allure-results"
+    html = run_with_report(
+        cli,
+        report_dir,
+        api.schema_url,
+        "--url=http://user:secret@127.0.0.1:1",
+        f"--report-junit-path={xml_path}",
+        f"--report-allure-path={allure_dir}",
+        exit_code=ExitCode.FAILURES,
+    )
     assert html == snapshot_html
+    junit_errors = [element.text for element in ElementTree.parse(xml_path).getroot().iter("error")]
+    allure_errors = [result["statusDetails"]["message"] for result in allure_results(allure_dir)]
+    tip = "Tip: Check that the API is running and reachable at `http://[Filtered]@127.0.0.1:1`."
+    assert [message.splitlines()[-1] for message in junit_errors + allure_errors] == [tip, tip]
 
 
 def test_html_report_run_level_failure(ctx, cli, report_dir, snapshot_html, ensure_reachability_module):

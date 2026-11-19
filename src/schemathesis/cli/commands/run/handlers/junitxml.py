@@ -38,7 +38,10 @@ class JunitXMLHandler(EventHandler):
             )
         if isinstance(event, events.NonFatalError) and event not in self.errors:
             self.errors.add(event)
-            self.writer.record_error(label=event.label, message=event.info.format(base_url_is_set=ctx.base_url_is_set))
+            message = event.info.format(
+                base_url_is_set=ctx.base_url_is_set, sanitization=ctx.config.output.sanitization
+            )
+            self.writer.record_error(label=event.label, message=message)
         elif isinstance(event, events.FatalError):
             # A run stopped before testing, e.g. by a schema that fails to load, must not read as an empty passing report
             self.writer.record_error(

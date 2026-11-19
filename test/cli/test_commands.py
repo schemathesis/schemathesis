@@ -41,7 +41,7 @@ from test.apps.catalog.openapi import stateful
 from test.apps.fragments import handlers
 from test.apps.fragments.schemas import PAYLOAD_SCHEMA, linked_users
 from test.fixtures.app_runner import accept_connections, wait_for_port
-from test.utils import HERE, get_schema_path, refusing_url
+from test.utils import HERE, crash_cache_dir, get_schema_path, refusing_url
 
 SIMPLE_PATH = get_schema_path("simple_swagger.yaml")
 
@@ -1009,13 +1009,21 @@ def test_multiple_failures_different_check(ctx, cli, snapshot_cli):
     )
 
 
+def recorded_urls(tmp_path):
+    # Replay sends requests to these URLs, so credentials are dropped rather than masked with a placeholder.
+    [manifest] = crash_cache_dir(tmp_path).glob("*/manifest.json")
+    data = json.loads(manifest.read_text())
+    return {"schema_location": data["schema_location"], "base_url": data["base_url"]}
+
+
 @pytest.mark.parametrize("workers", [1, 2])
-def test_connection_error(ctx, cli, workers, snapshot_cli):
+def test_connection_error(ctx, cli, tmp_path, workers, snapshot_cli):
     api = ctx.openapi.apps.success_and_failure()
     assert (
-        cli.run(api.schema_url, "--url=http://127.0.0.1:1/api", f"--workers={workers}", "--mode=positive")
+        cli.run(api.schema_url, "--url=http://user:secret@127.0.0.1:1/api", f"--workers={workers}", "--mode=positive")
         == snapshot_cli
     )
+    assert recorded_urls(tmp_path) == {"schema_location": api.schema_url, "base_url": "http://127.0.0.1:1/api"}
 
 
 # A listener with a full accept queue drops new connection attempts, so they time out instead of being refused.
@@ -2562,10 +2570,14 @@ def test_auth_override_on_protected_operation(ctx, cli, extra, snapshot_cli):
 
 
 @pytest.mark.parametrize("sanitize", ["true", "false"])
-def test_url_credentials_in_output(ctx, cli, snapshot_cli, sanitize):
+def test_url_credentials_in_output(ctx, cli, tmp_path, snapshot_cli, sanitize):
     api = ctx.openapi.apps.success()
     schema_url = api.schema_url.replace("http://", "http://user:secret@")
     assert cli.run(schema_url, f"--output-sanitize={sanitize}", "--max-examples=1", "--phases=fuzzing") == snapshot_cli
+    assert recorded_urls(tmp_path) == {
+        "schema_location": schema_url if sanitize == "false" else api.schema_url,
+        "base_url": "",
+    }
 
 
 @pytest.mark.snapshot(replace_reproduce_with=False)
