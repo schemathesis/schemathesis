@@ -25,6 +25,7 @@ from schemathesis.cli.output import (
 from schemathesis.core import NOT_SET
 from schemathesis.core.failures import case_header, format_failures
 from schemathesis.core.output import pluralize, truncate_text
+from schemathesis.core.output.sanitization import sanitized
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.core.transport import StatusClass, status_label
 from schemathesis.generation.meta import report_label
@@ -90,7 +91,9 @@ def render_replay(
 ) -> None:
     if console is None:
         console = make_console()
-    _print_run_header(console, count=len(crashes), source=source, base_url=base_url)
+    _print_run_header(
+        console, count=len(crashes), source=source, base_url=sanitized(base_url, output_config.sanitization)
+    )
 
     # One rollup line per case; multi-line entries set themselves off with a trailing blank.
     trailing_blank = False

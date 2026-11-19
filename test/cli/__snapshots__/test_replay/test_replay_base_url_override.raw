@@ -4,7 +4,7 @@ Stdout:
 
 Replaying 1 case from /tmp/test_replay_base_url_override0
 
-  Base URL: http://127.0.0.1
+  Base URL: http://[Filtered]@127.0.0.1
 
   + FIXED  GET /users
 

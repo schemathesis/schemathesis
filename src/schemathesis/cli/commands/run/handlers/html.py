@@ -48,6 +48,7 @@ from schemathesis.reporting.html.model import (
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
+    from schemathesis.config import SanitizationConfig
     from schemathesis.engine.recorder import RecordedScenario
     from schemathesis.engine.statistic import GroupedFailures, Statistic
     from schemathesis.engine.summary import SummaryData, WarningBlock
@@ -112,7 +113,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         elif isinstance(event, events.FuzzScenarioFinished):
             self._on_fuzz_scenario_finished(ctx, event)
         elif isinstance(event, events.NonFatalError):
-            self._on_error(event, base_url_is_set=ctx.base_url_is_set)
+            self._on_error(event, base_url_is_set=ctx.base_url_is_set, sanitization=ctx.config.output.sanitization)
         elif isinstance(event, events.FatalError):
             self.fatal_error = _fatal_entry(event.exception, wait_for_schema=ctx.config.wait_for_schema)
         elif isinstance(event, events.EngineFinished):
@@ -148,12 +149,16 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         self._record(event.recorder)
         self._record_found(ctx, event.recorder, PhaseName.CONTINUOUS_FUZZING.display, event.timestamp)
 
-    def _on_error(self, event: events.NonFatalError, *, base_url_is_set: bool) -> None:
+    def _on_error(
+        self, event: events.NonFatalError, *, base_url_is_set: bool, sanitization: SanitizationConfig
+    ) -> None:
         entries = self.errors.setdefault(event.label, {})
         if event.related_to_operation:
             self.errored_labels.add(event.label)
         if event.error_type not in entries:
-            entries[event.error_type] = _error_entry(event.info, base_url_is_set=base_url_is_set)
+            entries[event.error_type] = _error_entry(
+                event.info, base_url_is_set=base_url_is_set, sanitization=sanitization
+            )
         if event.phase is not None:
             self.phase_errors.setdefault(event.phase, set()).add((event.label, event.error_type))
 
@@ -492,11 +497,11 @@ def _extraction_commands(failure: ExtractionFailure) -> list[Command]:
     return commands
 
 
-def _error_entry(info: EngineErrorInfo, *, base_url_is_set: bool) -> ErrorEntry:
+def _error_entry(info: EngineErrorInfo, *, base_url_is_set: bool, sanitization: SanitizationConfig) -> ErrorEntry:
     return ErrorEntry(
         title=info.title,
         message=info.message or str(info),
-        tip=info.suggestion(base_url_is_set=base_url_is_set),
+        tip=info.suggestion(base_url_is_set=base_url_is_set, sanitization=sanitization),
         details=info.details,
         reproduce=info.code_sample,
     )

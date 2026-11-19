@@ -234,7 +234,7 @@ def test_replay_base_url_override(cli, app_runner, ctx, crash_factory, tmp_path,
         body='{"error": "broken"}',
     )
 
-    assert cli.main("replay", str(tmp_path), "--url", base) == snapshot_cli
+    assert cli.main("replay", str(tmp_path), "--url", base.replace("http://", "http://user:secret@")) == snapshot_cli
 
 
 def test_replay_uses_recorded_base_url_without_override(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
@@ -1598,8 +1598,8 @@ def test_replay_without_schema_bails(cli, app_runner, ctx, tmp_path, crash_facto
     crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     writer = CrashWriter(directory=crash_dir)
-    # Point the schema location at a URL that serves non-schema content.
-    writer.open(schema_location=f"{base}/users", base_url=base)
+    # Point the schema location at a URL that serves non-schema content; older versions recorded its credentials.
+    writer.open(schema_location=f"{base}/users".replace("http://", "http://user:secret@"), base_url=base)
     crash = crash_factory.single(
         path="/users",
         status=500,

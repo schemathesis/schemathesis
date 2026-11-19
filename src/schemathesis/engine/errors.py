@@ -31,11 +31,13 @@ from schemathesis.core.errors import (
     split_traceback,
 )
 from schemathesis.core.output import escape_surrogates
+from schemathesis.core.output.sanitization import sanitize_url
 
 if TYPE_CHECKING:
     import hypothesis.errors
     import requests
 
+    from schemathesis.config import SanitizationConfig
     from schemathesis.engine._rate_limit_retry import TransportError
     from schemathesis.generation.case import Case
 
@@ -218,14 +220,20 @@ class EngineErrorInfo:
     def code_sample(self) -> str | None:
         return self._code_sample
 
-    def suggestion(self, *, bold: Callable[[str], str] = str, base_url_is_set: bool = False) -> str | None:
+    def suggestion(
+        self,
+        *,
+        bold: Callable[[str], str] = str,
+        base_url_is_set: bool = False,
+        sanitization: SanitizationConfig | None = None,
+    ) -> str | None:
         if isinstance(self._error, (UnsupportedType, errors.NoLinksFound)):
             return self._error.suggestion
         import requests
 
         if isinstance(self._error, requests.ConnectionError) and is_connection_refused(self._error):
             # Nothing listened at the address; resets and proxy errors come from a server that did answer.
-            address = _refused_address(self._error)
+            address = _refused_address(self._error, sanitization)
             target = "its base URL" if address is None else bold(f"`{address}`")
             if base_url_is_set:
                 return f"Check that the API is running and reachable at {target}."
@@ -237,7 +245,14 @@ class EngineErrorInfo:
                 return CRASH_MAY_BE_OLDER
         return get_runtime_error_suggestion(self._kind, bold=bold)
 
-    def format(self, *, bold: Callable[[str], str] = str, indent: str = "    ", base_url_is_set: bool = False) -> str:
+    def format(
+        self,
+        *,
+        bold: Callable[[str], str] = str,
+        indent: str = "    ",
+        base_url_is_set: bool = False,
+        sanitization: SanitizationConfig | None = None,
+    ) -> str:
         """Format error message with optional styling and traceback."""
         message = []
 
@@ -257,7 +272,7 @@ class EngineErrorInfo:
         if self._code_sample is not None:
             message.append(f"\nReproduce with:\n\n    {self._code_sample}")
 
-        suggestion = self.suggestion(bold=bold, base_url_is_set=base_url_is_set)
+        suggestion = self.suggestion(bold=bold, base_url_is_set=base_url_is_set, sanitization=sanitization)
         if suggestion is not None:
             message.append(f"\nTip: {suggestion}")
 
@@ -554,12 +569,20 @@ class ServerUnavailable(Exception):
         self.culprit_listed = culprit_listed
 
 
-def _refused_address(exc: requests.ConnectionError) -> str | None:
+def _refused_address(exc: requests.ConnectionError, sanitization: SanitizationConfig | None) -> str | None:
     request = exc.request
     if request is None or not request.url:
         return None
-    parts = urlsplit(str(request.url))
-    return f"{parts.scheme}://{parts.netloc}"
+    return server_address(str(request.url), sanitization)
+
+
+def server_address(url: str, sanitization: SanitizationConfig | None) -> str:
+    """Scheme and authority of `url`, with credentials masked when `sanitization` is enabled."""
+    parts = urlsplit(url)
+    address = f"{parts.scheme}://{parts.netloc}"
+    if sanitization is None or not sanitization.enabled:
+        return address
+    return sanitize_url(address, config=sanitization)
 
 
 def is_connection_refused(exc: requests.ConnectionError) -> bool:

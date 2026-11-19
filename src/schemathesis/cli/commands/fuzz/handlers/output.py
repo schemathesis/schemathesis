@@ -281,7 +281,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         self.console.print()
 
         if ctx.errors:
-            display_errors(ctx.errors, base_url_is_set=ctx.base_url_is_set)
+            display_errors(ctx.errors, base_url_is_set=ctx.base_url_is_set, sanitization=ctx.config.output.sanitization)
 
         display_failures(ctx.statistic, ctx.config.output, record_crashes=ctx.config.cache.enabled)
 

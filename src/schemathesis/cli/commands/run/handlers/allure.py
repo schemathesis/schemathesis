@@ -35,7 +35,10 @@ class AllureHandler(EventHandler):
         if isinstance(event, LoadingFinished):
             self.writer.api_title = event.title
         elif isinstance(event, events.NonFatalError):
-            self.writer.record_error(label=event.label, message=event.info.format(base_url_is_set=ctx.base_url_is_set))
+            message = event.info.format(
+                base_url_is_set=ctx.base_url_is_set, sanitization=ctx.config.output.sanitization
+            )
+            self.writer.record_error(label=event.label, message=message)
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.writer.unskip(ctx.statistic.tested_operations)

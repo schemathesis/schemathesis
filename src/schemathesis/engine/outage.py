@@ -19,6 +19,7 @@ from schemathesis.engine.errors import (
     build_code_sample,
     is_connection_refused,
     is_unrecoverable_network_error,
+    server_address,
 )
 from schemathesis.engine.health import HealthState
 
@@ -214,7 +215,11 @@ class ServerMonitor:
             timed_out = [
                 item for item in recent if isinstance(item.error, requests.ReadTimeout) and item.finished > last_answer
             ][:1]
-            self._message = _render_outage(url, cut_off + in_flight + timed_out + after_crash + answered)
+            # Masked like the reproduction commands listed under it.
+            sanitization = newest[0].case.operation.schema.config.output.sanitization
+            self._message = _render_outage(
+                server_address(url, sanitization), cut_off + in_flight + timed_out + after_crash + answered
+            )
             self._recordable = _scheme(url).recordable
             self._culprit_error = next((item.error for item in cut_off + timed_out), None)
         return True
@@ -237,13 +242,12 @@ class ServerMonitor:
         )
 
 
-def _render_outage(url: str, candidates: list[SentRequest]) -> str:
-    parts = urlsplit(url)
+def _render_outage(address: str, candidates: list[SentRequest]) -> str:
     # A case sent again reproduces the same way, so it is listed once.
     listed = list(dict.fromkeys(item.as_reproduction_command() for item in candidates))[:REPORTED_REQUESTS]
     noun = "request" if len(listed) == 1 else "requests"
     commands = "\n\n".join(textwrap.indent(command, "    ") for command in listed)
-    return f"{parts.scheme}://{parts.netloc} stopped responding. Last {noun} before it went away:\n\n{commands}"
+    return f"{address} stopped responding. Last {noun} before it went away:\n\n{commands}"
 
 
 def _is_reset(exc: requests.RequestException) -> bool:

@@ -1623,7 +1623,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         assert self.unit_tests_manager is None
         assert self.stateful_tests_manager is None
         if ctx.errors:
-            display_errors(ctx.errors, base_url_is_set=ctx.base_url_is_set)
+            display_errors(ctx.errors, base_url_is_set=ctx.base_url_is_set, sanitization=ctx.config.output.sanitization)
         display_failures(ctx.statistic, ctx.config.output, record_crashes=ctx.config.cache.enabled)
         if not ctx.warnings.is_empty:
             self.display_warnings(ctx)

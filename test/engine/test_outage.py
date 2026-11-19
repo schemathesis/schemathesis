@@ -75,6 +75,30 @@ def test_outage_lists_the_newest_requests_in_send_order(operation):
     assert report.info.message == expected_message(operation, list(reversed(cases))[:REPORTED_REQUESTS])
 
 
+@pytest.mark.parametrize(
+    ("sanitization", "credentials"),
+    [({}, "[Filtered]"), ({"enabled": False}, "user:secret")],
+    ids=["sanitized", "sanitization-disabled"],
+)
+def test_outage_masks_credentials_in_the_server_address(ctx, sanitization, credentials):
+    schema = ctx.openapi.load_schema(
+        {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        config=schemathesis.Config.from_dict({"output": {"sanitization": sanitization}}),
+    )
+    with refusing_url() as url:
+        base_url = url.replace("http://", "http://user:secret@")
+        schema.config.update(base_url=base_url)
+        case = schema["/users"]["GET"].Case()
+        monitor = ServerMonitor()
+        monitor.track(case, lambda: answer(case), transport_kwargs={})
+
+        assert monitor.is_down(refusal(base_url))
+        assert monitor.take_report(PhaseName.FUZZING).info.message == (
+            f"{url.replace('http://', f'http://{credentials}@')} stopped responding. "
+            f"Last request before it went away:\n\n    {case.as_curl_command(headers={}, verify=True)}"
+        )
+
+
 def test_outage_lists_a_request_sent_several_times_once(operation):
     monitor = ServerMonitor()
     first = operation.Case(query={"q": "first"})

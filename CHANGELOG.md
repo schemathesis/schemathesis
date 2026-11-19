@@ -55,6 +55,7 @@
 - `ModuleNotFoundError` for `allure_commons` in pytest reports when `allure-pytest` is not installed.
 - Mask credentials in `repr(case)` following `output.sanitization`, like the cURL reproduction command.
 - Mask sensitive query parameters in network error messages, like the cURL reproduction command.
+- Keep URL credentials out of network error messages, crash files and `st replay` output.
 - `<BINARY>` shown for text responses cut mid-character by `max-recorded-payload-size`.
 
 #### Request serialization
