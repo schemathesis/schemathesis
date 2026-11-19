@@ -185,6 +185,8 @@ class ExecutionPlan:
     # Error-feedback observation counts per operation that coverage has already generated with.
     taught: dict[str, int] = field(default_factory=dict)
     requests: OperationRequests = field(default_factory=OperationRequests)
+    # Phase whose start went out without its finish.
+    unfinished: Phase | None = None
 
     def execute(self, engine: EngineContext) -> EventGenerator:
         """Execute all phases in sequence."""
@@ -208,6 +210,9 @@ class ExecutionPlan:
         except KeyboardInterrupt:
             engine.stop()
             yield events.Interrupted(phase=None)
+            # Ctrl-C outside a phase's own handling, e.g. while the phase sets up, must still close the phase
+            if self.unfinished is not None:
+                yield events.PhaseFinished(phase=self.unfinished, status=Status.INTERRUPTED, payload=None)
 
         # Always finish
         yield from self._finish(engine)
@@ -293,9 +298,13 @@ class ExecutionPlan:
         except HookExecutionError as exc:
             yield from events.fail_phase(phase, exc, label=f"`{exc.hook_name}` hook")
             return
-        yield events.PhaseStarted(phase=phase, payload=payload, operations=only)
+        started = events.PhaseStarted(phase=phase, payload=payload, operations=only)
+        # Marked only once the start event exists, so an interrupt never finishes a phase that did not start
+        self.unfinished = phase
+        yield started
         engine.reserve_time(self._time_to_reserve_after(phase, engine))
         if phase.should_execute(engine):
+            # Never bind this generator to a local: an error thrown at the yield must close it and stop its workers
             for event in run.execute(engine, phase, only=only):
                 if isinstance(event, events.NonFatalError):
                     key = (event.info.title, event.info.message)
@@ -305,12 +314,15 @@ class ExecutionPlan:
                     elif key in self.operation_errors:
                         continue
                 self.requests.fold(event)
+                if isinstance(event, events.PhaseFinished):
+                    self.unfinished = None
                 yield event
         else:
             if engine.has_reached_the_failure_limit:
                 phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
             elif phase.is_enabled and engine.control.is_server_unavailable:
                 phase.skip_reason = PhaseSkipReason.SERVER_UNAVAILABLE
+            self.unfinished = None
             yield events.PhaseFinished(phase=phase, status=Status.SKIP, payload=None)
 
     def _settle_stateful(self, engine: EngineContext) -> None:
