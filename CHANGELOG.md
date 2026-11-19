@@ -47,6 +47,7 @@
 - Crash in HAR reports when the base URL contains credentials.
 - Lost or misattributed pytest report entries for stateful tests and calls to other operations.
 - Missing Open API 3.2 `query` operations in the WFC report.
+- WFC report faults for undeclared methods naming operations missing from `endpointIds`.
 - HAR, VCR and WFC reports created or overwritten by runs refused before testing starts.
 - Record schema loading errors in JUnit reports as an errored test case.
 - `HookExecutionError` in pytest reports when tests validate responses from their own HTTP client.
