@@ -40,7 +40,7 @@ Common causes:
   - Logic error in the authentication provider implementation
 
     Traceback (most recent call last):
-      File "/package-root/auths.py", line XXX, in get
+      File "/package-root/auths.py", line XXX, in _get_or_fetch
         data: Auth = self.provider.get(case, context)  # type: ignore[assignment]
       File "/tmp/module.py", line XXX, in get
         raise AttributeError("'str' object has no attribute 'get'")

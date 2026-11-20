@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import threading
 import time
 from collections.abc import Callable, Iterator, Mapping, MutableMapping
@@ -73,6 +74,8 @@ class AuthContext:
     """API operation currently being processed for authentication."""
     app: Any | None
     """Python application instance (ASGI/WSGI app) when using app integration, `None` otherwise."""
+    # The API rejected the cached credentials; a failed re-login must fail, not replay the request with them.
+    _reauth: bool = False
 
 
 @dataclass(slots=True)
@@ -254,8 +257,21 @@ class CachingAuthProvider(Generic[Auth]):
     _refresh_lock: threading.Lock = field(default_factory=threading.Lock)
     _fetch_failures: dict[str | int | None, int] = field(default_factory=dict)
     _fetch_disabled_until: dict[str | int | None, float] = field(default_factory=dict)
+    # Error that tripped the breaker, shown while its cooldown lasts.
+    _fetch_errors: dict[str | int | None, str] = field(default_factory=dict)
 
     def get(self, case: Case, context: AuthContext) -> Auth | None:
+        __tracebackhide__ = True
+        try:
+            return self._get_or_fetch(case, context)
+        except AuthenticationError:
+            last = self._get_cache_entry(case, context)
+            # The API may still accept the last credentials, e.g. after a test changed the login password.
+            if last is None or context._reauth:
+                raise
+            return last.data
+
+    def _get_or_fetch(self, case: Case, context: AuthContext) -> Auth | None:
         __tracebackhide__ = True
         cache_entry = self._get_cache_entry(case, context)
         if cache_entry is None or self.timer() >= cache_entry.expires:
@@ -274,18 +290,19 @@ class CachingAuthProvider(Generic[Auth]):
                             self.provider.__class__.__name__,
                             "get",
                             f"Token fetch failed {TOKEN_FETCH_BREAKER_THRESHOLD} times in a row; "
-                            f"retrying after a {TOKEN_FETCH_BREAKER_COOLDOWN:.0f}s cooldown",
+                            f"retrying after a {TOKEN_FETCH_BREAKER_COOLDOWN:.0f}s cooldown\n\n"
+                            f"Last error: {self._fetch_errors[key]}",
                         )
                     # The cooldown elapsed, so a transient outage gets one probe.
                     del self._fetch_disabled_until[key]
                 # Optional auth exists only inside a higher-level wrapper
                 try:
                     data: Auth = self.provider.get(case, context)  # type: ignore[assignment]
-                except AuthenticationError:
-                    self._note_fetch_failure(key)
+                except AuthenticationError as exc:
+                    self._note_fetch_failure(key, exc.message)
                     raise
                 except Exception as exc:
-                    self._note_fetch_failure(key)
+                    self._note_fetch_failure(key, str(exc))
                     provider_name = self.provider.__class__.__name__
                     raise AuthenticationError(
                         provider_name,
@@ -302,11 +319,12 @@ class CachingAuthProvider(Generic[Auth]):
     def _fetch_key(self, case: Case, context: AuthContext) -> str | int | None:
         return None
 
-    def _note_fetch_failure(self, key: str | int | None) -> None:
+    def _note_fetch_failure(self, key: str | int | None, message: str) -> None:
         count = self._fetch_failures.get(key, 0) + 1
         self._fetch_failures[key] = count
         if count >= TOKEN_FETCH_BREAKER_THRESHOLD:
             self._fetch_disabled_until[key] = self.timer() + TOKEN_FETCH_BREAKER_COOLDOWN
+            self._fetch_errors[key] = message
 
     def _get_cache_entry(self, case: Case, context: AuthContext) -> CacheEntry[Auth] | None:
         return self.cache_entry
@@ -318,7 +336,9 @@ class CachingAuthProvider(Generic[Auth]):
         self.provider.set(case, data, context)
 
     def invalidate(self) -> None:
-        self.cache_entry = None
+        # Expire without dropping, so a failed refetch can fall back to the last credentials.
+        if self.cache_entry is not None:
+            self.cache_entry.expires = -math.inf
 
 
 def _noop_key_function(case: Case, context: AuthContext) -> str:
@@ -343,7 +363,9 @@ class KeyedCachingAuthProvider(CachingAuthProvider[Auth]):
         return self.cache_by_key(case, context)
 
     def invalidate(self) -> None:
-        self.cache_entries.clear()
+        for entry in self.cache_entries.values():
+            if entry is not None:
+                entry.expires = -math.inf
 
 
 class _FilterChain(Protocol):
@@ -737,10 +759,10 @@ def apply_configured_auth(case: Case) -> None:
 
 def refresh_auth(case: Case) -> None:
     """Invalidate cached auth for `case` and re-apply it, so the next request carries a fresh token."""
-    # Concurrent callers share one refetch behind the provider's lock; invalidating only clears the cache.
+    # Concurrent callers share one refetch behind the provider's lock; invalidating only expires the cache.
     for provider in _iter_caching_providers(case):
         provider.invalidate()
-    apply_configured_auth(case)
+    set_on_case(case, AuthContext(operation=case.operation, app=case.operation.app, _reauth=True), case._auth_storage)
 
 
 @dataclass(slots=True)

@@ -1357,6 +1357,52 @@ def test_breaker_bounds_login_attempts(ctx, cli, app_runner):
     assert result.stdout.count("⚠️ Authentication stopped working mid-run - credentials likely invalidated") == 1
 
 
+# A test changed the login password: re-login after an unrelated 401 fails, while the issued token still works.
+def test_failed_reactive_refresh_keeps_last_token(ctx, cli, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "security": [{"OAuth2": []}],
+                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={"securitySchemes": {"OAuth2": OAUTH2_SCHEME}},
+    )
+    logins = itertools.count()
+    sent = []
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        if next(logins) == 0:
+            return jsonify({"access_token": "t"})
+        return jsonify({"error": "invalid credentials"}), 401
+
+    @app.route("/protected")
+    def protected():
+        authorization = request.headers.get("Authorization")
+        sent.append(authorization)
+        if len(sent) == 1 or authorization != "Bearer t":
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify({"result": "ok"})
+
+    _run_cli(
+        cli,
+        app_runner,
+        app,
+        "--phases=fuzzing",
+        "--mode=positive",
+        "-n 1",
+        "--max-examples=10",
+        "--seed=42",
+        config={"checks": {"ignored_auth": {"enabled": False}}, "auth": _dynamic_auth("OAuth2", retry_on=[401])},
+    )
+    assert sent == ["Bearer t"] * 10
+
+
 # An API that answers 401 for unknown ids keeps answering 401 after a successful re-login: credentials are fine.
 def test_401_after_successful_relogin_is_not_invalidated_credentials(ctx, cli, app_runner):
     app, _ = ctx.openapi.make_flask_app(
