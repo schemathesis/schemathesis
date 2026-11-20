@@ -20,7 +20,14 @@ from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.spec import Scheduler
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.engine.run import UNIT_PHASES, PhaseName, PhaseProgress, relay_events, report_outage
+from schemathesis.engine.run import (
+    UNIT_PHASES,
+    PhaseName,
+    PhaseProgress,
+    deferred_interrupt,
+    relay_events,
+    report_outage,
+)
 from schemathesis.engine.run.unit._direct_executor import run_driver
 from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
 from schemathesis.engine.run.unit._pool import WORKER_FINISHED, DefaultScheduler, WorkerPool, split_results
@@ -98,22 +105,27 @@ def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None 
     progress = PhaseProgress()
 
     try:
-        with WorkerPool(
-            # A worker beyond the entry count would find nothing to run, yet its thread still costs memory.
-            workers_num=min(engine.config.workers, total_entries),
-            scheduler=scheduler,
-            worker_factory=worker_task,
-            ctx=engine,
-            phase=phase.name,
-            suite_id=suite_started.id,
-        ) as pool:
+        # Ctrl-C while workers start or are joined must stop the run as well as one during the relay
+        with (
+            deferred_interrupt() as interrupted,
+            WorkerPool(
+                # A worker beyond the entry count would find nothing to run, yet its thread still costs memory.
+                workers_num=min(engine.config.workers, total_entries),
+                scheduler=scheduler,
+                worker_factory=worker_task,
+                ctx=engine,
+                phase=phase.name,
+                suite_id=suite_started.id,
+            ) as pool,
+        ):
             try:
                 yield from _consume_worker_events(pool, engine, phase.name, progress)
             except KeyboardInterrupt:
                 # Soft stop, waiting for workers to terminate
-                engine.stop()
-                progress.status = Status.INTERRUPTED
-                yield events.Interrupted(phase=phase.name)
+                yield from _interrupt(engine, phase.name, progress)
+        # Ctrl-C after the last event, while workers wound down
+        if interrupted.is_set() and progress.status != Status.INTERRUPTED:
+            yield from _interrupt(engine, phase.name, progress)
     except KeyboardInterrupt as exc:
         # Hard stop, don't wait for worker threads
         if isinstance(exc.__context__, GeneratorExit):
@@ -127,6 +139,12 @@ def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None 
     # A unit phase has one suite, so the two events go back to back
     yield events.SuiteFinished(id=suite_started.id, phase=phase.name, status=status)
     yield events.PhaseFinished(phase=phase, status=status, payload=None)
+
+
+def _interrupt(engine: EngineContext, phase: PhaseName, progress: PhaseProgress) -> events.EventGenerator:
+    engine.stop()
+    progress.status = Status.INTERRUPTED
+    yield events.Interrupted(phase=phase)
 
 
 def _consume_worker_events(
