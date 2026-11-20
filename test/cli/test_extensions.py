@@ -349,7 +349,16 @@ def test_suggested_value_exposes_a_failure(ctx, cli, snapshot_cli):
 
     module = ctx.write_pymodule(SUGGEST_AFTER_CALL)
     assert (
-        cli.run_openapi_app(app, "--max-examples=30", "--phases=fuzzing", "-c", "not_a_server_error", hooks=module)
+        cli.run_openapi_app(
+            app,
+            "--max-examples=30",
+            # Shrinking this seed's failure replays a case drawn before the value was suggested.
+            "--seed=8",
+            "--phases=fuzzing",
+            "-c",
+            "not_a_server_error",
+            hooks=module,
+        )
         == snapshot_cli
     )
 

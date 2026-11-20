@@ -484,16 +484,18 @@ def clear_hypothesis_notes(exc: BaseException) -> None:
         exc.__notes__ = filtered_notes
 
 
-def is_inconsistent_replay(exc: BaseException) -> TypeGuard[AssertionError]:
+def is_inconsistent_replay(exc: BaseException) -> TypeGuard[AssertionError | IndexError]:
     # Hypothesis asserts rather than raising `Flaky` when a replay draws past a value an earlier run rejected.
-    if not isinstance(exc, AssertionError):
+    # Its shrinker indexes past the spans of a cached case drawn before a suggested value changed the strategy.
+    if not isinstance(exc, (AssertionError, IndexError)):
         return False
     traceback = exc.__traceback__
     while traceback is not None and traceback.tb_next is not None:
         traceback = traceback.tb_next
-    return (
-        traceback is not None and traceback.tb_frame.f_globals["__name__"] == "hypothesis.internal.conjecture.datatree"
-    )
+    module = traceback.tb_frame.f_globals["__name__"] if traceback is not None else ""
+    if isinstance(exc, AssertionError):
+        return module == "hypothesis.internal.conjecture.datatree"
+    return module.startswith("hypothesis.internal.conjecture.")
 
 
 def is_unrecoverable_network_error(exc: Exception) -> bool:
