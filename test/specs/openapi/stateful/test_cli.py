@@ -59,6 +59,8 @@ def test_max_failures(ctx, cli, snapshot_cli):
             "--no-shrink",
             # The bug needs a specific call sequence, which takes many scenarios to reach.
             "--max-examples=80",
+            # Some random seeds never reach that sequence within the budget.
+            "--seed=1",
             "--max-failures=2",
             "-c not_a_server_error",
             "--phases=fuzzing,stateful",

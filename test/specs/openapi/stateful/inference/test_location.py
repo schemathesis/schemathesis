@@ -757,6 +757,8 @@ def test_link_inference_discovers_corruption_bug(cli, snapshot_cli, user_api_app
         cli.run_openapi_app(
             user_api_app,
             "--max-examples=10",
+            # Some random seeds never reach the corrupting call sequence within the budget.
+            "--seed=1",
             "-c response_schema_conformance",
             "--phases=fuzzing,stateful",
             config={"phases": {"stateful": {"inference": {"algorithms": ["location-headers"]}}}},
