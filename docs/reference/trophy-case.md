@@ -28,6 +28,7 @@ Real-world defects uncovered by Schemathesis’ property-based testing engine.
 
 | Project | Type | What Schemathesis found |
 | --- | --- | --- |
+| [OpenBot](https://github.com/CopilotKit/OpenBot/pull/1815) | 🔗 Integration Issues | 25 text patterns in the spec accepted a NUL byte that the server refuses. |
 | [OpenProject](https://github.com/opf/openproject/pull/26583) | 💥 Server Crashes | Internal error responses exposed raw exception messages, such as database connection failures. |
 | [PipesHub](https://github.com/pipeshub-ai/pipeshub-ai/pull/4176) | 📋 Schema Violations | Connector setup routes returned `null` fields and status codes the spec didn't declare. |
 | [Firezone](https://github.com/firezone/firezone/pull/15023) | 💥 Server Crashes | A null address on a CIDR, IP or DNS resource returned 500 instead of 422. |
