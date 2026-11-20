@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import io
 import json
 import os
@@ -19,6 +20,7 @@ CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 CACHE_DIR = CURRENT_DIR / ".schemastore-cache"
 SCHEMAS_DIR = CACHE_DIR / "schemas" / "json"
 REF_FILE = CACHE_DIR / "REF"
+LOCK_FILE = CURRENT_DIR / ".schemastore-cache.lock"
 # Pinned upstream commit so XFAIL_SCHEMAS stays meaningful. Override with SCHEMASTORE_REF
 # (commit SHA, branch, or tag) when rebaselining against a newer schemastore.
 DEFAULT_SCHEMASTORE_REF = "49de45f91f2f8e6be4108d61b44ccd392da0815f"
@@ -170,15 +172,18 @@ def _download_and_extract(ref: str) -> None:
 
 
 def _ensure_schemastore() -> None:
-    desired = _resolved_ref()
-    cached = REF_FILE.read_text().strip() if REF_FILE.exists() else None
-    if cached == desired and SCHEMAS_DIR.is_dir() and any(SCHEMAS_DIR.iterdir()):
-        return
-    if CACHE_DIR.exists():
-        shutil.rmtree(CACHE_DIR)
-    _download_and_extract(desired)
-    if not (SCHEMAS_DIR.is_dir() and any(SCHEMAS_DIR.iterdir())):
-        raise RuntimeError(f"Schemastore extract produced no files under {SCHEMAS_DIR}")
+    # xdist workers collect concurrently; the lock keeps one from wiping files another is still extracting
+    with LOCK_FILE.open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        desired = _resolved_ref()
+        cached = REF_FILE.read_text().strip() if REF_FILE.exists() else None
+        if cached == desired and SCHEMAS_DIR.is_dir() and any(SCHEMAS_DIR.iterdir()):
+            return
+        if CACHE_DIR.exists():
+            shutil.rmtree(CACHE_DIR)
+        _download_and_extract(desired)
+        if not (SCHEMAS_DIR.is_dir() and any(SCHEMAS_DIR.iterdir())):
+            raise RuntimeError(f"Schemastore extract produced no files under {SCHEMAS_DIR}")
 
 
 def _collect_schema_paths() -> list[pathlib.Path]:

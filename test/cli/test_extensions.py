@@ -288,7 +288,11 @@ def _code_app(ctx, seen):
 
     @app.route("/check")
     def check():
-        seen.append(request.args.get("code"))
+        code = request.args.get("code")
+        seen.append(code)
+        # Fuzzing stops at the first failure, so the suggested value ends the run instead of the time limit.
+        if code == "SECRET42":
+            return jsonify({"error": "boom"}), 500
         return jsonify({})
 
     return app
@@ -314,18 +318,22 @@ class Codes:
 """
 
 
-@pytest.mark.parametrize("args", [("run", "--max-examples=30"), ("fuzz", "--max-time=1")], ids=["run", "fuzz"])
+@pytest.mark.parametrize(
+    "args",
+    [("run", "--max-examples=30"), ("fuzz", "--max-time=30", "-c", "not_a_server_error")],
+    ids=["run", "fuzz"],
+)
 def test_values_suggested_in_setup_reach_requests(ctx, cli, app_runner, args):
     seen = []
     url = app_runner.openapi_url(_code_app(ctx, seen))
-    cli.main(args[0], url, args[1], hooks=ctx.write_pymodule(SUGGEST_IN_SETUP))
+    cli.main(args[0], url, *args[1:], hooks=ctx.write_pymodule(SUGGEST_IN_SETUP))
     assert "SECRET42" in seen
 
 
 def test_values_suggested_during_fuzzing_reach_later_requests(ctx, cli, app_runner):
     seen = []
     url = app_runner.openapi_url(_code_app(ctx, seen))
-    cli.main("fuzz", url, "--max-time=1", hooks=ctx.write_pymodule(SUGGEST_AFTER_CALL))
+    cli.main("fuzz", url, "--max-time=30", "-c", "not_a_server_error", hooks=ctx.write_pymodule(SUGGEST_AFTER_CALL))
     assert "SECRET42" in seen
 
 

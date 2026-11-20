@@ -510,7 +510,8 @@ def test_teardown_hook_runs_after_interrupt(ctx, cli, app_runner):
     assert (result.exit_code, [call for call, _ in groupby(calls)]) == (130, ["setup", "test", "teardown"])
 
 
-@pytest.mark.parametrize("args", [("run", "--max-examples=1"), ("fuzz", "--max-time=1")], ids=["run", "fuzz"])
+# Fuzzing completes once the only operation runs out of inputs; slow runners must not hit the time limit first.
+@pytest.mark.parametrize("args", [("run", "--max-examples=1"), ("fuzz", "--max-time=30")], ids=["run", "fuzz"])
 def test_setup_and_teardown_hook_errors(ctx, cli, snapshot_cli, args):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(
