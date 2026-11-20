@@ -102,6 +102,10 @@
 - Links filling path, query or header parameters with object or array fields, e.g. `productId: {...}`.
 - Links filling `runner_id` with the id of another resource named after it, like a runner group.
 
+#### gRPC
+
+- Report gRPC `UNAVAILABLE` statuses from slow-to-connect servers as responses, not network errors.
+
 #### `st replay`
 
 - Crash files deleted or replayed against the wrong schema after a run against another API.

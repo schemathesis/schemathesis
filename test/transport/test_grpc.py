@@ -194,6 +194,13 @@ def test_server_unavailable_once_the_target_refuses_connections_is_a_connection_
     assert isinstance(exc_info.value.__cause__, ConnectionAbortedError)
 
 
+def test_server_unavailable_behind_a_slow_connection_is_a_response(ctx, app_runner):
+    server = ctx.grpc.apps.users()
+    port = app_runner.run_port_proxy(int(server.target.rsplit(":", 1)[1]), delay=1)
+    _, response = get_user(server, 503, config={"base-url": f"grpc://127.0.0.1:{port}"})
+    assert response.status_line == "UNAVAILABLE"
+
+
 def test_status_code_agrees_with_call_outcome(ctx):
     case, response = get_user(ctx.grpc.apps.users(), 9)
     assert (response.status_code, case.operation.schema.classify_call_outcome(case, response)) == (

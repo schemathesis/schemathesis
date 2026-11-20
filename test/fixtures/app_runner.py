@@ -250,8 +250,11 @@ def run_resetting_server() -> int:
     return listener.getsockname()[1]
 
 
-def run_port_proxy(port: int, *, resets: int = 0) -> int:
-    """Relay connections to `port` after resetting the first `resets`; reset them while nothing listens there."""
+def run_port_proxy(port: int, *, resets: int = 0, delay: float = 0.0) -> int:
+    """Relay connections to `port`, each `delay` seconds after it arrives, after resetting the first `resets`.
+
+    Connections are reset while nothing listens on `port`.
+    """
     listener = socket.create_server(("127.0.0.1", 0))
 
     def relay(source: socket.socket, target: socket.socket) -> None:
@@ -280,6 +283,7 @@ def run_port_proxy(port: int, *, resets: int = 0) -> int:
             resets -= 1
             reset(connection)
             return
+        sleep(delay)
         try:
             upstream = socket.create_connection(("127.0.0.1", port))
         except OSError:

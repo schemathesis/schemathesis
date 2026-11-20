@@ -34,8 +34,8 @@ if TYPE_CHECKING:
 
     from schemathesis.generation.case import Case
 
-# How long a failed call waits for the channel to connect before blaming the network.
-READY_TIMEOUT = 0.5
+# How long the check for a server that speaks TLS waits to connect and finish the handshake.
+TLS_CHECK_TIMEOUT = 0.5
 # Coarse platform timers can fire a deadline this long before it is due on the client's clock.
 DEADLINE_CLOCK_SLACK = 0.05
 CHANNEL_OPTIONS = (
@@ -186,7 +186,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             except grpc.RpcError as error:
                 if not (cast(grpc.Call, error).details() or "").startswith(NOT_CONNECTED):
                     raise
-                unreachable = not _is_reachable(address, tls, verify, cert)
+                unreachable = not _is_reachable(address, tls, verify, cert, timeout)
                 if unreachable:
                     raise
                 # The server is up; a channel that failed to connect fails calls unsent until it retries
@@ -202,7 +202,9 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             # Servers send DEADLINE_EXCEEDED with any text too; only one arriving at the timeout is a read timeout.
             if code == grpc.StatusCode.DEADLINE_EXCEEDED and started_at.elapsed >= timeout - DEADLINE_CLOCK_SLACK:
                 raise read_timeout_error(base_url, timeout, request) from error
-            if code == grpc.StatusCode.UNAVAILABLE and (unreachable or not _is_reachable(address, tls, verify, cert)):
+            if code == grpc.StatusCode.UNAVAILABLE and (
+                unreachable or not _is_reachable(address, tls, verify, cert, timeout)
+            ):
                 cause = _unavailable_error(
                     outcome.details() or "",
                     address=address,
@@ -317,10 +319,12 @@ def _credentials(verify: bool | str, cert: str | tuple[str, str] | None) -> grpc
     return grpc.ssl_channel_credentials(root_certificates, private_key, certificate_chain)
 
 
-def _is_reachable(address: str, tls: bool, verify: bool | str, cert: str | tuple[str, str] | None) -> bool:
+def _is_reachable(
+    address: str, tls: bool, verify: bool | str, cert: str | tuple[str, str] | None, timeout: float
+) -> bool:
     # A new connection, since the one a dropped call used may still look connected for a moment afterwards.
     with create_channel(address, tls, verify, cert, options=PROBE_CHANNEL_OPTIONS) as channel:
-        return _is_ready(channel)
+        return _is_ready(channel, timeout)
 
 
 def accepts_tls(address: str) -> bool:
@@ -331,7 +335,7 @@ def accepts_tls(address: str) -> bool:
     context.verify_mode = ssl.CERT_NONE
     try:
         # gRPC targets without a port use 443.
-        with socket.create_connection((parts.hostname, parts.port or 443), timeout=READY_TIMEOUT) as sock:
+        with socket.create_connection((parts.hostname, parts.port or 443), timeout=TLS_CHECK_TIMEOUT) as sock:
             context.wrap_socket(sock, server_hostname=parts.hostname).close()
     except (OSError, ValueError):
         return False
@@ -372,7 +376,7 @@ def connection_configuration_hint(address: str, tls: bool, details: str) -> str 
     return None
 
 
-def _is_ready(channel: grpc.Channel) -> bool:
+def _is_ready(channel: grpc.Channel, timeout: float) -> bool:
     event = threading.Event()
     reachable = False
 
@@ -384,7 +388,8 @@ def _is_ready(channel: grpc.Channel) -> bool:
 
     channel.subscribe(on_state_change, try_to_connect=True)
     try:
-        event.wait(READY_TIMEOUT)
+        # A connection gets as long as a call to set up, so a slow network or a busy server does not read as down.
+        event.wait(timeout)
         return reachable
     finally:
         channel.unsubscribe(on_state_change)
