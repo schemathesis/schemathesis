@@ -155,12 +155,17 @@ def _record_interrupt(signum: int, frame: FrameType | None) -> None:
 
 
 @contextmanager
-def _deferred_interrupt() -> Iterator[threading.Event]:
+def deferred_interrupt() -> Iterator[threading.Event]:
     """Record Ctrl-C instead of raising it in whatever lock or event-handling code the main thread is running."""
     global _pending_interrupt
+    is_main_thread = threading.current_thread() is threading.main_thread()
+    # A relay inside a phase that already defers Ctrl-C shares its record
+    if is_main_thread and _pending_interrupt is not None:
+        yield _pending_interrupt
+        return
     interrupted = threading.Event()
     # Only the default handler raises `KeyboardInterrupt`; custom and ignored handlers are left alone.
-    if threading.current_thread() is threading.main_thread() and signal.getsignal(signal.SIGINT) in (
+    if is_main_thread and signal.getsignal(signal.SIGINT) in (
         signal.default_int_handler,
         _record_interrupt,
     ):
@@ -181,7 +186,7 @@ def _deferred_interrupt() -> Iterator[threading.Event]:
 
 def relay_events(event_queue: queue.Queue[T], threads: Sequence[threading.Thread], *, timeout: float) -> Iterator[T]:
     """Yield queued events until every producer thread has exited and nothing is left to drain."""
-    with _deferred_interrupt() as interrupted:
+    with deferred_interrupt() as interrupted:
         while True:
             try:
                 event = event_queue.get(timeout=timeout)

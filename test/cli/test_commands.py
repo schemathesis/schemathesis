@@ -1413,6 +1413,23 @@ def test_keyboard_interrupt_while_handling_an_event(ctx, cli):
     assert [thread.name for thread in threading.enumerate() if thread.name == "schemathesis_stateful_tests"] == []
 
 
+# Ctrl-C lands while the CLI displays the failure that ends the phase at the failure limit.
+def test_keyboard_interrupt_while_handling_the_last_event_of_a_phase(ctx, cli):
+    interrupted = []
+
+    @schemathesis.cli.handler()
+    class Interrupter(schemathesis.cli.EventHandler):
+        def handle_event(self, context, event) -> None:
+            if isinstance(event, events.ScenarioFinished) and event.status == Status.FAILURE and not interrupted:
+                interrupted.append(True)
+                signal.raise_signal(signal.SIGINT)
+
+    api = ctx.openapi.apps.failure()
+    result = cli.run(api.schema_url, "--phases=fuzzing", "--max-examples=1", "--max-failures=1")
+    assert result.exit_code == 130, result.stdout
+    assert re.fullmatch(r"=+ 1 failure, interrupted after \d+\.\d{2}s =+", result.stdout.strip().splitlines()[-1])
+
+
 def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
     api = ctx.openapi.apps.teapot()
     uri = pathlib.Path(HERE).as_uri() + "/"
