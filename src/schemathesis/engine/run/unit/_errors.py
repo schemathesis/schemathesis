@@ -179,7 +179,7 @@ def _non_string_pattern_error(exc: Exception) -> InvalidRegexType | None:
 
 
 def _classify_flaky(
-    exc: hypothesis.errors.Flaky | AssertionError,
+    exc: hypothesis.errors.Flaky | AssertionError | IndexError,
     *,
     state: TestingState,
     errors: list[Exception],
