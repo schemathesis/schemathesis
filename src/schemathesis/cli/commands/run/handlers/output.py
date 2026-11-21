@@ -1404,7 +1404,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 self.cycle_phase = self.cycle_phase_before_coverage
                 self.cycle_phase_before_coverage = None
                 return
-            if phase.name == PhaseName.COVERAGE and self.config.max_time is not None:
+            # Another coverage pass may follow, so the block is printed once the next phase starts.
+            if phase.name == PhaseName.COVERAGE:
                 unit_manager.stop()
                 unit_manager.end_pass()
                 self._merge_status(phase.name, event.status)

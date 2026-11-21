@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 import warnings
+from functools import partial
 from queue import Queue
 from typing import TYPE_CHECKING
 
@@ -28,7 +29,7 @@ from schemathesis.engine.run import (
     relay_events,
     report_outage,
 )
-from schemathesis.engine.run.unit._direct_executor import run_driver
+from schemathesis.engine.run.unit._direct_executor import HeldBackCases, run_driver
 from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
 from schemathesis.engine.run.unit._pool import WORKER_FINISHED, DefaultScheduler, WorkerPool, split_results
 from schemathesis.engine.supervisor import SchedulingDirective, Verdict
@@ -39,9 +40,12 @@ from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, Hyp
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from schemathesis.config import PhasesConfig
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.run import Phase
+    from schemathesis.generation.case import Case
     from schemathesis.generation.overrides import Override
     from schemathesis.schemas import APIOperation
 
@@ -90,8 +94,17 @@ def _scheduler_for_layers(
     return LayeredScheduler(layers, errors=errors)
 
 
-def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> events.EventGenerator:
-    """Run one unit-test phase; worker threads pull operations from the scheduler and test them."""
+def execute(
+    engine: EngineContext,
+    phase: Phase,
+    *,
+    only: frozenset[str] | None = None,
+    held_back: Mapping[str, list[Case]] | None = None,
+) -> events.EventGenerator:
+    """Run one unit-test phase; worker threads pull operations from the scheduler and test them.
+
+    With `held_back`, each coverage operation sends these cases instead of generating its own.
+    """
     try:
         scheduler, total_entries = _create_scheduler(engine, phase, only=only)
     except HookExecutionError as exc:
@@ -112,7 +125,7 @@ def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None 
                 # A worker beyond the entry count would find nothing to run, yet its thread still costs memory.
                 workers_num=min(engine.config.workers, total_entries),
                 scheduler=scheduler,
-                worker_factory=worker_task,
+                worker_factory=partial(worker_task, held_back=held_back),
                 ctx=engine,
                 phase=phase.name,
                 suite_id=suite_started.id,
@@ -212,6 +225,7 @@ def worker_task(
     ctx: EngineContext,
     phase: PhaseName,
     suite_id: uuid.UUID,
+    held_back: Mapping[str, list[Case]] | None,
 ) -> None:
     from hypothesis.errors import HypothesisWarning
 
@@ -224,7 +238,14 @@ def worker_task(
                     break
 
                 if isinstance(result, Ok):
-                    _run_operation(result.ok(), events_queue=events_queue, ctx=ctx, phase=phase, suite_id=suite_id)
+                    _run_operation(
+                        result.ok(),
+                        events_queue=events_queue,
+                        ctx=ctx,
+                        phase=phase,
+                        suite_id=suite_id,
+                        held_back=held_back,
+                    )
                 else:
                     _put_error(events_queue, result.err(), phase=phase, suite_id=suite_id)
         except KeyboardInterrupt:
@@ -238,6 +259,7 @@ def _run_operation(
     ctx: EngineContext,
     phase: PhaseName,
     suite_id: uuid.UUID,
+    held_back: Mapping[str, list[Case]] | None,
 ) -> None:
     """Test one operation in this phase, or report why it is skipped."""
     ctx.take_operation_slice()
@@ -251,7 +273,7 @@ def _run_operation(
             events_queue, operation.label, phase, suite_id, skip_reason=verdict.reason, skip_warning=verdict.warning
         )
         return
-    _run_scenario(operation, events_queue=events_queue, ctx=ctx, phase=phase, suite_id=suite_id)
+    _run_scenario(operation, events_queue=events_queue, ctx=ctx, phase=phase, suite_id=suite_id, held_back=held_back)
 
 
 _DISABLED_VERDICT = Verdict(directive=SchedulingDirective.SKIP, reason="Disabled for this operation")
@@ -271,6 +293,7 @@ def _run_scenario(
     ctx: EngineContext,
     phase: PhaseName,
     suite_id: uuid.UUID,
+    held_back: Mapping[str, list[Case]] | None,
 ) -> None:
     scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
     events_queue.put(scenario_started)
@@ -278,7 +301,7 @@ def _run_scenario(
         override = overrides.with_config_headers(ctx.config, operation=operation)
         feedback = ctx.feedback_for(operation=operation, phase=phase)
         if phase in (PhaseName.COVERAGE, PhaseName.EXAMPLES):
-            generator = _build_driver_generator(operation, ctx, phase, override, feedback)
+            generator = _build_driver_generator(operation, ctx, phase, override, feedback, held_back)
             _put_all(
                 events_queue,
                 run_driver(
@@ -306,8 +329,11 @@ def _build_driver_generator(
     phase: PhaseName,
     override: Override,
     feedback: FeedbackSources,
+    held_back: Mapping[str, list[Case]] | None,
 ) -> CaseGenerator:
     if phase == PhaseName.COVERAGE:
+        if held_back is not None:
+            return HeldBackCases(operation=operation, cases=held_back[operation.label])
         return build_coverage_generator(
             ctx.config, operation, override=override, feedback=feedback, session=ctx.coverage_session
         )

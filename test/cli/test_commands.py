@@ -2507,6 +2507,38 @@ def test_max_time_reports_coverage_once_beside_fuzzing(ctx, cli, snapshot_cli):
     )
 
 
+def test_reports_coverage_once_with_held_back_oversized_strings(ctx, cli, snapshot_cli):
+    # Oversized strings go out in a pass of their own; its failures still show in the one coverage block.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/notes": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"text": {"type": "string"}}}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/notes", methods=["POST"])
+    def notes():
+        if len(request.get_data()) > 1000:
+            return jsonify({"detail": "Too long"}), 400
+        return jsonify({})
+
+    assert (
+        cli.run_openapi_app(app, "--phases=coverage", "--mode=positive", "--checks=positive_data_acceptance")
+        == snapshot_cli
+    )
+
+
 def test_long_operation_output(ctx, cli, snapshot_cli):
     # See GH-990
     # A narrow screen and a long operation name.
