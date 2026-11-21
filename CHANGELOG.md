@@ -44,6 +44,7 @@
 
 #### Reporting
 
+- Reject two CLI report formats targeting the same output file.
 - Crash in HAR reports when the base URL contains credentials.
 - Mask sensitive parameters in `meta.raw_containers` of NDJSON reports and crash files.
 - Lost or misattributed pytest report entries for stateful tests and calls to other operations.

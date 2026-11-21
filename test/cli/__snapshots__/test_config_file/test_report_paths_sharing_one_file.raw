@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: JUnit and JSON reports share an output file '/tmp/report.xml'. Choose separate output paths.

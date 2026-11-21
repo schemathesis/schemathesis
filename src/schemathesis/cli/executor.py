@@ -20,7 +20,7 @@ from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
 from schemathesis.cli.commands.run.handlers.vcr import VcrHandler
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL, ExitCode
-from schemathesis.cli.ext.fs import load_baseline, open_file, prepare_directory
+from schemathesis.cli.ext.fs import display_path, load_baseline, open_file, prepare_directory
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.cli.json_report import JsonReportHandler
 from schemathesis.cli.pytest_report import PytestReportHandler
@@ -31,7 +31,7 @@ from schemathesis.hooks import bind_extensions, unbind_extensions
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
-    from schemathesis.config import ProjectConfig
+    from schemathesis.config import ProjectConfig, ReportsConfig
     from schemathesis.engine import events
     from schemathesis.engine.events import EventGenerator
 
@@ -74,6 +74,25 @@ def _report_option(config: ProjectConfig, params: dict[str, Any], format: Report
     return None
 
 
+def _validate_report_file_paths(reports: ReportsConfig) -> None:
+    seen: dict[Path, ReportFormat] = {}
+    for report_format in ReportFormat:
+        if report_format.is_directory or not reports.get(report_format).enabled:
+            continue
+        path = reports.get_path(report_format)
+        try:
+            destination = path.resolve()
+        except (OSError, RuntimeError, ValueError):
+            # Invalid or unreadable paths are reported when the report file is opened, naming the option that set them.
+            continue
+        if other := seen.get(destination):
+            raise click.UsageError(
+                f"{other.display_name} and {report_format.display_name} reports share an output file "
+                f"'{display_path(path)}'. Choose separate output paths."
+            )
+        seen[destination] = report_format
+
+
 def initialize_report_handlers(
     *,
     config: ProjectConfig,
@@ -81,6 +100,7 @@ def initialize_report_handlers(
     params: dict[str, Any],
 ) -> list[EventHandler]:
     handlers: list[EventHandler] = []
+    _validate_report_file_paths(config.reports)
     # Checked before any report file is created.
     if config.reports.allure.enabled and importlib.util.find_spec("allure_commons") is None:
         raise click.ClickException("Allure reports require the `allure` extra: `pip install schemathesis[allure]`")
