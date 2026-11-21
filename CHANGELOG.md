@@ -50,6 +50,7 @@
 - Missing Open API 3.2 `query` operations in the WFC report.
 - WFC report faults for undeclared methods naming operations missing from `endpointIds`.
 - HAR, VCR and WFC reports created or overwritten by runs refused before testing starts.
+- `--report` dropping output paths set in `[reports.<format>]`.
 - Record schema loading errors in JUnit reports as an errored test case.
 - `HookExecutionError` in pytest reports when tests validate responses from their own HTTP client.
 - `st fuzz` counting a scenario as passed when the time limit cuts its only request.

@@ -166,7 +166,8 @@ class ReportsConfig(DiffBase):
             if path is not None or report_format in formats:
                 report = self.get(report_format)
                 report.enabled = True
-                report.path = Path(path) if path is not None else None
+                if path is not None:
+                    report.path = Path(path)
         if directory != DEFAULT_REPORT_DIRECTORY:
             self.directory = directory
         if preserve_bytes:

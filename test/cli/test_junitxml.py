@@ -41,6 +41,7 @@ def test_junitxml_file(ctx, cli, hypothesis_max_examples, tmp_path, path, in_con
     kwargs = {}
     if in_config:
         kwargs["config"] = {"reports": {"junit": {"path": str(xml_path)}}}
+        args.append("--report=junit")
     else:
         args.append(f"--report-junit-path={xml_path}")
     cli.run_and_assert(api.schema_url, *args, exit_code=ExitCode.TESTS_FAILED, **kwargs)
