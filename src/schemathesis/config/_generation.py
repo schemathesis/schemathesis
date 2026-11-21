@@ -29,6 +29,8 @@ class GenerationConfig(DiffBase):
     allow_x00: bool
     # Allow generating unexpected parameters in generated requests
     allow_extra_parameters: bool
+    # Allow spelling integers in JSON bodies as floats (`2.0`)
+    allow_whole_floats: bool
     # Generate strings using the given codec
     codec: str | None
     maximize: list[MetricFunction]
@@ -51,6 +53,7 @@ class GenerationConfig(DiffBase):
         deterministic: bool = False,
         allow_x00: bool = True,
         allow_extra_parameters: bool = True,
+        allow_whole_floats: bool = True,
         codec: str | None = "utf-8",
         maximize: list[MetricFunction] | None = None,
         with_security_parameters: bool = True,
@@ -68,6 +71,7 @@ class GenerationConfig(DiffBase):
         self.deterministic = deterministic
         self.allow_x00 = allow_x00
         self.allow_extra_parameters = allow_extra_parameters
+        self.allow_whole_floats = allow_whole_floats
         self.codec = codec
         self.maximize = maximize or []
         self.with_security_parameters = with_security_parameters
@@ -87,6 +91,7 @@ class GenerationConfig(DiffBase):
             and deterministic is False
             and allow_x00 is True
             and allow_extra_parameters is True
+            and allow_whole_floats is True
             and codec == "utf-8"
             and maximize is None
             and with_security_parameters is True
@@ -126,6 +131,7 @@ class GenerationConfig(DiffBase):
             deterministic=data.get("deterministic", False),
             allow_x00=data.get("allow-x00", True),
             allow_extra_parameters=data.get("allow-extra-parameters", True),
+            allow_whole_floats=data.get("allow-whole-floats", True),
             codec=data.get("codec", "utf-8"),
             maximize=maximize,
             with_security_parameters=data.get("with-security-parameters", True),
@@ -145,6 +151,7 @@ class GenerationConfig(DiffBase):
         deterministic: bool | None = None,
         allow_x00: bool | None = None,
         allow_extra_parameters: bool | None = None,
+        allow_whole_floats: bool | None = None,
         codec: str | None = None,
         maximize: list[MetricFunction] | None = None,
         with_security_parameters: bool | None = None,
@@ -168,6 +175,7 @@ class GenerationConfig(DiffBase):
             deterministic=deterministic,
             allow_x00=allow_x00,
             allow_extra_parameters=allow_extra_parameters,
+            allow_whole_floats=allow_whole_floats,
             codec=codec,
             maximize=maximize,
             with_security_parameters=with_security_parameters,

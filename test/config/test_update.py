@@ -77,6 +77,7 @@ def test_update_keeps_flags_set_by_earlier_update(config):
         deterministic=True,
         allow_x00=False,
         allow_extra_parameters=False,
+        allow_whole_floats=False,
         graphql_allow_null=False,
         unique_inputs=True,
     )
@@ -86,6 +87,7 @@ def test_update_keeps_flags_set_by_earlier_update(config):
         config.generation.deterministic,
         config.generation.allow_x00,
         config.generation.allow_extra_parameters,
+        config.generation.allow_whole_floats,
         config.generation.graphql_allow_null,
         config.generation.unique_inputs,
-    ) == (True, True, False, False, False, True)
+    ) == (True, True, False, False, False, False, True)

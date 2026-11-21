@@ -1546,6 +1546,23 @@ The following settings control how Schemathesis generates test data for your API
 !!! info "Configuration file only"
     Unlike its siblings in this section, this option has no CLI flag. Set it in `schemathesis.toml`.
 
+#### `generation.allow-whole-floats`
+
+!!! note ""
+
+    **Type:** `Boolean`  
+    **Default:** `true`  
+
+    Controls whether integer fields in JSON bodies are also sent as floats with a zero fractional part (`2.0`). JSON Schema counts `2.0` as an integer from Open API 3.1 on; set it to `false` when your API rejects that spelling on purpose, for example with strict parsing.
+
+    ```toml
+    [generation]
+    allow-whole-floats = false
+    ```
+
+!!! info "Configuration file only"
+    This option has no CLI flag. Set it in `schemathesis.toml`.
+
 
 #### `generation.exclude-header-characters`
 

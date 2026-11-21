@@ -18,6 +18,7 @@
 - `@schemathesis.extension` registers a hook class with its own `[extensions.<name>]` settings.
 - `schemathesis.scoped_extensions()` removes hooks, auth providers and other extensions registered inside a block.
 - `hooks` config option accepts a list of modules, loaded in order.
+- `generation.allow-whole-floats` config option to stop sending integers in JSON bodies as floats (`2.0`).
 - `Case.reapply_auth()` refreshes expired auth tokens on cases generated earlier, honoring `refresh_interval`.
 
 ### :racing_car: Performance

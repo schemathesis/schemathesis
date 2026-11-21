@@ -1289,7 +1289,7 @@ def _canonical_strategy(
         format_lengths=format_lengths_for(formats),
         alphabet=alphabet,
         # Every other carrier renders the value as text, where `2.0` is a different string than `2`.
-        whole_floats=media_types.is_json_lenient(media_type),
+        whole_floats=generation_config.allow_whole_floats and media_types.is_json_lenient(media_type),
     )
 
 
