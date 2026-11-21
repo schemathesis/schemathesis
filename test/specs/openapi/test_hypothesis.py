@@ -3512,10 +3512,11 @@ def test_canonical_contains_demand_behind_a_branch_pointer(ctx):
 BOUNDED_INTEGER = {"type": "integer", "minimum": 1, "maximum": 100}
 
 
-def _positive_values(schema, location, media_type, validator_cls, count=25):
+def _positive_values(schema, location, media_type, validator_cls, count=25, config=None):
     # Both spellings need enough draws to show up.
     return generate_many(
-        make_positive_strategy(schema, "test", location, media_type, GenerationConfig(), validator_cls), count
+        make_positive_strategy(schema, "test", location, media_type, config or GenerationConfig(), validator_cls),
+        count,
     )
 
 
@@ -3529,6 +3530,19 @@ def test_integer_json_body_drawn_as_whole_float():
     assert any(isinstance(value, float) for value in values)
     is_valid = jsonschema_rs.Draft202012Validator(BOUNDED_INTEGER).is_valid
     assert all(is_valid(value) for value in values), values
+
+
+def test_integer_json_body_stays_whole_when_whole_floats_are_off():
+    # A strict decoder rejects `2.0` for an integer on purpose.
+    values = _positive_values(
+        BOUNDED_INTEGER,
+        ParameterLocation.BODY,
+        "application/json",
+        jsonschema_rs.Draft202012Validator,
+        config=GenerationConfig.from_dict({"allow-whole-floats": False}),
+    )
+
+    assert all(isinstance(value, int) for value in values), values
 
 
 def test_integer_json_body_stays_whole_on_draft_4():

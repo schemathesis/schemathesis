@@ -792,6 +792,9 @@
         "allow-extra-parameters": {
           "type": "boolean"
         },
+        "allow-whole-floats": {
+          "type": "boolean"
+        },
         "codec": {
           "type": "string"
         },
