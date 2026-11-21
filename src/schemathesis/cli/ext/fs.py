@@ -8,6 +8,7 @@ import click
 from schemathesis.core.output import escape_nonprintable
 
 if TYPE_CHECKING:
+    from schemathesis.baseline import Baseline
     from schemathesis.config import ProjectConfig
 
 
@@ -41,12 +42,12 @@ def prepare_directory(directory: Path, option: str | None) -> None:
         ) from exc
 
 
-def load_baseline(config: ProjectConfig) -> None:
+def load_baseline(config: ProjectConfig) -> Baseline | None:
     # Opening a directory fails with "Permission denied" on Windows, which hides the real problem.
     if config.baseline is not None and Path(config.baseline).is_dir():
         raise click.BadParameter(f"Could not load baseline file {config.baseline!r}: Is a directory")
     try:
-        config.load_baseline()
+        return config.load_baseline()
     except (OSError, ValueError) as exc:
         raise click.BadParameter(
             f"Could not load baseline file {config.baseline!r}: {describe_path_error(exc)}"
