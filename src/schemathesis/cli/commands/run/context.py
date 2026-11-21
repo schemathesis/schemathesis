@@ -8,7 +8,8 @@ from schemathesis.baseline import Baseline, BaselineEntry
 from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.events import LoadingFinished
-from schemathesis.cli.ext.fs import describe_path_error
+from schemathesis.cli.ext.fs import describe_path_error, load_baseline
+from schemathesis.cli.validation import validate_baseline_flags
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core.failures import is_reproducible_failure
 from schemathesis.engine import Status, StopReason, events
@@ -52,6 +53,9 @@ class ExecutionContext(BaseExecutionContext):
     def on_event(self, event: events.EngineEvent) -> None:
         collector = self.warning_collector
         if isinstance(event, LoadingFinished):
+            validate_baseline_flags(event.config.baseline, update=self.baseline_update, prune=self.baseline_prune)
+            # Read and write the same baseline, including the selected project's existing annotations.
+            self.statistic.baseline = load_baseline(event.config)
             # Unmatched filter warnings are judged against the configuration the schema was loaded with.
             self.config = event.config
             collector.config = event.config

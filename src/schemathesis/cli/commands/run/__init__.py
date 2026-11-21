@@ -74,7 +74,12 @@ from schemathesis.cli.options import (
     WARNINGS,
     WORKERS,
 )
-from schemathesis.cli.validation import CONFLICTING_URL_MESSAGE, validate_auth_overlap, validate_wfc_user
+from schemathesis.cli.validation import (
+    CONFLICTING_URL_MESSAGE,
+    validate_auth_overlap,
+    validate_baseline_flags,
+    validate_wfc_user,
+)
 from schemathesis.config import (
     HealthCheck,
     ProjectConfig,
@@ -276,11 +281,11 @@ def run(
     apply_report_options(config.reports, ctx.params)
     # Other CLI options work as an override for all defined projects
     apply_project_options(config.projects.override, ctx.params, baseline=baseline, origin=origin)
-    if (baseline_update or baseline_prune) and config.projects.get_default().baseline is None:
-        flag = "--baseline-update" if baseline_update else "--baseline-prune"
-        raise click.UsageError(
-            f"{flag} needs a baseline file - pass `--baseline PATH` or set `baseline` in your configuration file"
-        )
+    # A named project's baseline can only be resolved once the schema title is known.
+    if (baseline_update or baseline_prune) and not any(
+        named.baseline is not None for named in config.projects.named.values()
+    ):
+        validate_baseline_flags(config.projects.get_default().baseline, update=baseline_update, prune=baseline_prune)
 
     filter_set = build_filter_set(ctx.params)
     config.projects.override.phases.update(phases=phases)

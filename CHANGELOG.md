@@ -116,6 +116,7 @@
 - Runs ending in authentication errors when the `--auth-wfc` login endpoint starts after the API.
 - Internal error or ignored Ctrl-C when interrupting `st run` and `st fuzz`.
 - `st explain ST112` suggesting `--exclude-checks max_response_time`, which `st run` rejects.
+- Baseline of the matching `[[project]]` ignored by the run summary, `--baseline-update` and `--baseline-prune`.
 - Login-based auth dropping still-valid credentials when a re-login fails, and hiding the login error.
 - Shrink `st run` failures to a minimal example, so `--no-shrink` takes effect.
 - Stop `schemathesis.toml` discovery at the root of a git worktree or submodule.

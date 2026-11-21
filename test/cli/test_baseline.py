@@ -9,6 +9,8 @@ from schemathesis.baseline import BaselineEntry
 
 BASELINE = "schemathesis-baseline.json"
 WITH_BASELINE = {"baseline": BASELINE}
+# Catalog apps are titled "Test".
+WITH_PROJECT_BASELINE = {"project": [{"title": "Test", "baseline": BASELINE}]}
 SERVER_ERROR = {
     "operation": "GET /api/failure",
     "check": "not_a_server_error",
@@ -129,10 +131,11 @@ def test_known_failure_does_not_fail_a_flaky_stateful_suite(ctx, cli, tmp_path):
     assert "Known failures: 1\n" in result.stdout
 
 
-def test_known_failure_output(ctx, cli, tmp_path, snapshot_cli):
+@pytest.mark.parametrize("config", [WITH_BASELINE, WITH_PROJECT_BASELINE], ids=["top-level", "project"])
+def test_known_failure_output(ctx, cli, tmp_path, snapshot_cli, config):
     write_baseline(tmp_path, SERVER_ERROR, {**SERVER_ERROR, "operation": "GET /api/never-tested"})
 
-    assert run(cli, ctx.openapi.apps.failure(), "--phases=fuzzing", config=WITH_BASELINE) == snapshot_cli
+    assert run(cli, ctx.openapi.apps.failure(), "--phases=fuzzing", config=config) == snapshot_cli
 
 
 def test_json_report_includes_baseline(ctx, cli, tmp_path):
@@ -171,13 +174,20 @@ def test_recorded_failures_are_green_on_the_next_run(ctx, cli, tmp_path):
     assert run(cli, api, "--phases=fuzzing", config=WITH_BASELINE).exit_code == ExitCode.OK
 
 
-def test_update_keeps_user_annotations(ctx, cli, tmp_path):
+@pytest.mark.parametrize(
+    "config",
+    [WITH_BASELINE, WITH_PROJECT_BASELINE, {"baseline": "default.json", **WITH_PROJECT_BASELINE}],
+    ids=["top-level", "project", "project-over-top-level"],
+)
+def test_update_keeps_user_annotations(ctx, cli, tmp_path, config):
     write_baseline(tmp_path, {**SERVER_ERROR, "reason": "tracked in API-1", "ticket": "API-1"})
 
-    run(cli, ctx.openapi.apps.failure(), "--phases=fuzzing", "--baseline-update", config=WITH_BASELINE)
+    result = run(cli, ctx.openapi.apps.failure(), "--phases=fuzzing", "--baseline-update", config=config)
 
+    assert result.exit_code == ExitCode.OK, result.output
     entry = read_entries(tmp_path)[0]
     assert (entry["reason"], entry["ticket"]) == ("tracked in API-1", "API-1")
+    assert not (tmp_path / "default.json").exists()
 
 
 def test_update_stamps_dates(ctx, cli, tmp_path):
@@ -197,11 +207,11 @@ def test_update_keeps_first_seen_and_refreshes_last_seen(ctx, cli, tmp_path):
     assert (entry["first_seen"], entry["last_seen"]) == ("2020-01-01", date.today().isoformat())
 
 
-def test_update_without_a_configured_baseline_is_an_error(ctx, cli):
-    result = run(cli, ctx.openapi.apps.failure(), "--baseline-update")
-
-    assert result.exit_code == 2, result.output
-    assert "needs a baseline file" in result.output, result.output
+@pytest.mark.parametrize(
+    "config", [None, {"project": [{"title": "Another API", "baseline": BASELINE}]}], ids=["none", "other-project"]
+)
+def test_update_without_a_configured_baseline_is_an_error(ctx, cli, snapshot_cli, config):
+    assert run(cli, ctx.openapi.apps.failure(), "--baseline-update", config=config) == snapshot_cli
 
 
 def test_update_skips_response_time_failures(ctx, cli, tmp_path):
@@ -218,10 +228,11 @@ def test_update_skips_response_time_failures(ctx, cli, tmp_path):
     assert read_entries(tmp_path) == []
 
 
-def test_prune_removes_entries_the_run_disproved(ctx, cli, tmp_path):
+@pytest.mark.parametrize("config", [WITH_BASELINE, WITH_PROJECT_BASELINE], ids=["top-level", "project"])
+def test_prune_removes_entries_the_run_disproved(ctx, cli, tmp_path, config):
     write_baseline(tmp_path, {**SERVER_ERROR, "operation": "GET /api/success"})
 
-    run(cli, ctx.openapi.apps.success(), "--phases=fuzzing", "--baseline-prune", config=WITH_BASELINE)
+    run(cli, ctx.openapi.apps.success(), "--phases=fuzzing", "--baseline-prune", config=config)
 
     assert read_entries(tmp_path) == []
 

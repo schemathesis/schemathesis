@@ -38,6 +38,14 @@ WFC_USER_REQUIRES_PATH_MESSAGE = "--auth-wfc-user requires --auth-wfc or path un
 MISSING_TLS_VERIFY_FILE_MESSAGE = "TLS verification CA bundle does not exist: `{}`"
 
 
+def validate_baseline_flags(baseline: str | None, *, update: bool, prune: bool) -> None:
+    if baseline is None and (update or prune):
+        flag = "--baseline-update" if update else "--baseline-prune"
+        raise click.UsageError(
+            f"{flag} needs a baseline file - pass `--baseline PATH` or set `baseline` in your configuration file"
+        )
+
+
 def validate_wfc_user(config: SchemathesisConfig, path: str | None, user: str | None) -> None:
     if user is None or path is not None:
         return
