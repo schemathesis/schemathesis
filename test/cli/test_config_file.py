@@ -184,6 +184,21 @@ def test_report_path_parent_dir_not_writable(cli, tmp_path, snapshot_cli):
         os.chmod(readonly, 0o755)
 
 
+def test_report_paths_sharing_one_file(cli, tmp_path, snapshot_cli):
+    output = tmp_path / "report.xml"
+    output.write_text("existing report", encoding="utf-8")
+    assert (
+        cli.main(
+            "run",
+            "http://127.0.0.1",
+            f"--report-json-path={output}",
+            config={"reports": {"junit": {"path": "./report.xml"}}},
+        )
+        == snapshot_cli
+    )
+    assert output.read_text(encoding="utf-8") == "existing report"
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="chmod doesn't work the same way on Windows")
 def test_report_path_file_not_writable(cli, tmp_path, snapshot_cli):
     readonly = tmp_path / "readonly"
