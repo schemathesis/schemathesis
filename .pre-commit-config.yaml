@@ -57,7 +57,7 @@ repos:
         exclude: ^(docs/|test/|test-corpus/|examples/|benches/).*$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.5
+    rev: v0.17.6
     hooks:
       - id: ruff-format
       - id: ruff-check
