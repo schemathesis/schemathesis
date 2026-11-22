@@ -11525,7 +11525,7 @@ BODY_TYPE_VIOLATIONS = [[None, None], "AAA", None, False, 0]
                 0,
             ],
         ),
-        ("3.0.2", {"enum": []}, None, [], ["AAA"]),
+        ("3.0.2", {"enum": []}, None, [], [{}, [None, None], 2**63, 0, OVERSIZED, "", False, True, None]),
         ("3.0.2", {"type": "string", "enum": ["AAA"]}, None, ["AAA"], [-58800, {}, [None, None], None, False, 0]),
         (
             "3.1.0",

@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any, TypeGuard, TypeVar, overload
 
+import jsonschema_rs
+
 from schemathesis.core.jsonschema import DRAFT_03_DIALECT, bundled_name, is_unsatisfiable
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.numeric import INT32_RANGE, INT64_RANGE, is_numeric_bound
@@ -132,6 +134,7 @@ def _to_json_schema(
     if schema_type == "file":
         schema["type"] = "string"
         schema["format"] = "binary"
+    _normalize_enum(schema)
 
     if not is_response_schema:
         _restrict_integer_format(schema)
@@ -560,6 +563,31 @@ def _restrict_integer_format(schema: dict[str, Any]) -> None:
         schema["maximum"] = min(current, maximum)
     else:
         schema["maximum"] = maximum
+
+
+def _normalize_enum(schema: dict[str, Any]) -> None:
+    # Draft 4 rejects an empty `enum` or one with equal members; both have an equivalent valid spelling.
+    enum = schema.get("enum")
+    if not isinstance(enum, list):
+        return
+    if not enum:
+        del schema["enum"]
+        schema["not"] = {}
+        return
+    seen = set()
+    unique = []
+    for value in enum:
+        try:
+            key = jsonschema_rs.canonical.json.to_string(value)
+        except ValueError:
+            # Binary YAML values have no JSON form to compare by.
+            unique.append(value)
+            continue
+        if key not in seen:
+            seen.add(key)
+            unique.append(value)
+    if len(unique) != len(enum):
+        schema["enum"] = unique
 
 
 def _upgrade_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:
