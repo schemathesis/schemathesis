@@ -99,7 +99,7 @@ Nothing satisfies `minimum: 100` and `maximum: 10`"""
             None,
             "Nothing satisfies `minimum: 10` and `maximum: 1` at /items",
         ),
-        ({"enum": []}, None, "Nothing satisfies `enum: []`"),
+        ({"enum": []}, None, "Nothing satisfies `not: {}`"),
     ],
     ids=["a dead required property", "branches behind references", "an element no value fits", "an empty enum"],
 )

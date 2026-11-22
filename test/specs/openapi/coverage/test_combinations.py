@@ -147,7 +147,7 @@ class AnyString:
         ({"enum": ["a", "b"]}, ["AAA", 0, 0.5, "true", "null", ["null", "null"]]),
         # Enum entries outside the declared type are negatives; integers fit `number`, "true" reads as a boolean.
         (
-            {"type": "number", "enum": [2.5, 1, "a", "a", True]},
+            {"type": "number", "enum": [2.5, 1, "a", True]},
             ["true", "null", "AAA", ["null", "null"], "", -58800, "a", True],
         ),
         ({"type": "boolean", "enum": ["true", True, "x"]}, [2, 0.5, "null", "AAA", ["null", "null"], -58800, "x"]),

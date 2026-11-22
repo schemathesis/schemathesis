@@ -2215,6 +2215,26 @@ def test_empty_enum_body_is_omitted(ctx):
     test()
 
 
+def test_enum_with_repeated_members_body(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /data",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"enum": ["a", "a", 1, 1.0]}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+
+    @given(operation.as_strategy())
+    @settings(max_examples=5, deadline=None, database=InMemoryExampleDatabase())
+    def test(case):
+        assert case.body in ("a", 1)
+
+    test()
+
+
 def test_multitype_null_boolean_body(ctx):
     # A 3.1 `type: [null, boolean]` body lifts to a multi-type union; values stay null or boolean.
     operation = ctx.openapi.load_operation(
