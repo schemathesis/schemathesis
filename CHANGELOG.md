@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.34.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positives in `positive_data_acceptance` and `ensure_resource_availability` when reusing a captured `2.0` as an integer parameter.
+
 ## [4.34.0](https://github.com/schemathesis/schemathesis/compare/v4.33.4...v4.34.0) - 2026-11-22
 
 ### :rocket: Added

@@ -1336,6 +1336,58 @@ def test_wildcard_link_values_come_from_one_list_item(ctx, response_factory, tar
     assert [pair for pair in pairs if pair not in {("a", 1), ("b", 2), ("c", 3)}] == []
 
 
+@pytest.mark.parametrize(
+    ("link_values", "content"),
+    [
+        ({"parameters": {"userId": "$response.body#/id"}}, b'{"id": 2.0}'),
+        (
+            {"parameters": {"userId": "$response.body#/items/*/id"}, "x-schemathesis": {"is_inferred": True}},
+            b'{"items": [{"id": 2.0}, {"id": 3.0}]}',
+        ),
+    ],
+    ids=["single", "wildcard"],
+)
+def test_linked_whole_float_sent_as_integer(ctx, response_factory, link_values, content):
+    # A JSON `2.0` is the integer `2`, but as text it reads "2.0", which servers may reject.
+    user = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": user}}},
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {"GetUser": {"operationId": "getUser", **link_values}},
+                        }
+                    },
+                }
+            },
+            "/users/{userId}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    source = schema["/users"]["POST"]
+    [link] = collect_transitions([source, schema["/users/{userId}"]["GET"]]).operations[source.label].outgoing
+    response = Response.from_requests(response_factory.requests(content=content, status_code=201), True)
+    strategy = into_step_input(target=link.target, link=link, modes=[GenerationMode.POSITIVE])(
+        StepOutput(response=response, case=source.Case())
+    )
+    values = []
+
+    @run_given(input=strategy, max_examples=10)
+    def test(input):
+        if (ParameterLocation.PATH, "userId") in input.applied_parameters:
+            values.append(input.case.path_parameters["userId"])
+
+    assert {type(value) for value in values} == {int}
+
+
 def test_test_case_runs_in_process(ctx):
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
