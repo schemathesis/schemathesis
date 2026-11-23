@@ -883,6 +883,37 @@ def test_captured_values_reach_body_behind_ref(ctx, note, phase):
         assert any(isinstance(case.body, dict) and case.body.get("itemId") == 987654 for case in cases)
 
 
+@pytest.mark.parametrize("phase", [TestPhase.EXAMPLES, TestPhase.FUZZING], ids=["examples", "fuzzing"])
+def test_captured_whole_float_reused_as_integer(ctx, phase):
+    # A JSON `2.0` is the integer `2`, but as text it reads "2.0", which servers may reject.
+    item = {"type": "object", "properties": {"id": {"type": "integer"}}}
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "responses": {"201": {"description": "OK", "content": {"application/json": {"schema": item}}}}
+                },
+                "get": {
+                    "parameters": [{"name": "itemId", "in": "query", "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+        version="3.1.0",
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": 2.0})
+    operation = schema["/items"]["GET"]
+    feedback = FeedbackSources(extra_data_source=data_source)
+
+    if phase == TestPhase.EXAMPLES:
+        strategies = get_strategies_from_examples(operation, feedback=feedback, fill_missing=True)
+        cases = [examples.generate_one(strategy) for strategy in strategies]
+    else:
+        cases = generate_many(operation.as_strategy(feedback=feedback), 30)
+    assert {json.dumps(case.query["itemId"]) for case in cases if case.query.get("itemId") == 2} == {"2"}
+
+
 def test_top_level_body_requirement_takes_precedence_over_nested_requirement(ctx):
     repository = ResourceRepository(
         [
@@ -1508,7 +1539,7 @@ def test_collect_values(user_data_source, payloads, expected):
         pytest.param(
             "id",
             [{"id": "123"}, {"id": 123}, {"id": 123.0}],
-            ["123", 123, 123.0],
+            ["123", 123],
             id="type-aware-deduplication",
         ),
     ],

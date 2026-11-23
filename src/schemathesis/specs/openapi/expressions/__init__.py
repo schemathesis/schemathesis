@@ -11,7 +11,13 @@ from typing import Any
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.deserialization import DeserializationContext, deserialize_response
-from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable, resolve_pointer_all, to_wire_text
+from schemathesis.core.transforms import (
+    UNRESOLVABLE,
+    Unresolvable,
+    resolve_pointer_all,
+    to_wire_text,
+    whole_float_as_integer,
+)
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi.expressions import lexer, nodes, parser
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
@@ -33,7 +39,7 @@ def evaluate(expr: Any, output: StepOutput, evaluate_nested: bool = False) -> An
     if not isinstance(expr, str):
         # Can be a non-string constant
         return expr
-    parts = [node.evaluate(output) for node in parser.parse(expr)]
+    parts = [whole_float_as_integer(node.evaluate(output)) for node in parser.parse(expr)]
     if len(parts) == 1:
         return parts[0]  # keep the return type the same as the internal value type
     if any(isinstance(part, Unresolvable) for part in parts):
@@ -58,6 +64,7 @@ def evaluate_wildcard(expr: Any, output: StepOutput) -> Any:
     document = deserialize_response(response, content_type, context=context)
     matches = resolve_pointer_all(document, node.pointer[1:])
     if isinstance(matches, list):
+        matches = [whole_float_as_integer(match) for match in matches]
         if len(matches) == 1:
             return matches[0]
         if matches:

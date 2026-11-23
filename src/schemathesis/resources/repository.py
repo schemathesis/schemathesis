@@ -9,7 +9,13 @@ from typing import TYPE_CHECKING, Any
 import jsonschema_rs
 
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
-from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable, resolve_pointer, resolve_pointer_all
+from schemathesis.core.transforms import (
+    UNRESOLVABLE,
+    Unresolvable,
+    resolve_pointer,
+    resolve_pointer_all,
+    whole_float_as_integer,
+)
 from schemathesis.core.transport import status_code_matches
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor, ResourceFieldRef
 
@@ -262,6 +268,7 @@ class ResourceRepository:
         """Store an instance, capping instances per context and evicting the oldest context when full."""
         # Delimited markers carry transport-only data; resource identifiers use the plain form.
         data = plain_str_values(data)
+        data = {key: whole_float_as_integer(value) for key, value in data.items()}
         context = plain_str_values(context) if context else context
         context_key = jsonschema_rs.canonical.json.to_string(context) if context else ""
 

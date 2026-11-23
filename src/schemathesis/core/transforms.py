@@ -59,6 +59,13 @@ def to_wire_text(value: object) -> str:
     return to_wire_string(value)
 
 
+def whole_float_as_integer(value: object) -> object:
+    """`2.0` as `2`: JSON reads both as one integer, but as text, e.g. in a path or query, they differ."""
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
+
+
 def stringify_keys(document: object) -> None:
     """Spell every non-string mapping key in place as the wire does, e.g. a YAML 1.1 `on:` read as `True`."""
     try:
