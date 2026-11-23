@@ -590,6 +590,8 @@ def _captured_variants(
     operation: APIOperation,
     location: ParameterLocation,
     schema: JsonSchema,
+    *,
+    media_type: str | None = None,
 ) -> tuple[list[CapturedVariant], VariantUsageTracker] | None:
     """Values captured from earlier responses that fit this location, with the tracker that records their use."""
     if extra_data_source is None:
@@ -600,7 +602,27 @@ def _captured_variants(
     variants = extra_data_source.get_captured_variants(operation=operation, location=location, schema=schema)
     if not variants:
         return None
+    # A value captured from a JSON body may be a whole float, the same integer as `2` there. Every other carrier
+    # renders it as text, where `2.0` is a different string, so it gets the spelling the generator gives such a
+    # carrier (`_hypothesis.py`, `whole_floats`).
+    if location != ParameterLocation.BODY or not media_types.is_json_lenient(media_type):
+        variants = [replace(variant, overlay=_spelled_as_integers(variant.overlay)) for variant in variants]
     return variants, extra_data_source.usage_tracker
+
+
+# Past this magnitude a float no longer spells one integer exactly; such a value is left as captured.
+_EXACT_FLOAT_INTEGERS = 2**53
+
+
+def _spelled_as_integers(value: Any) -> Any:
+    """`value` with every whole float written as the integer it equals, at any depth."""
+    if isinstance(value, float) and value.is_integer() and -_EXACT_FLOAT_INTEGERS <= value <= _EXACT_FLOAT_INTEGERS:
+        return int(value)
+    if isinstance(value, dict):
+        return {key: _spelled_as_integers(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_spelled_as_integers(item) for item in value]
+    return value
 
 
 def _with_semantic_values(
@@ -1722,7 +1744,11 @@ class OpenApiBody(OpenApiComponent):
             return cached[1]
 
         captured = _captured_variants(
-            feedback.extra_data_source, operation, ParameterLocation.BODY, self.optimized_schema
+            feedback.extra_data_source,
+            operation,
+            ParameterLocation.BODY,
+            self.optimized_schema,
+            media_type=self.media_type,
         )
         schema = _adjusted_schema(self.optimized_schema, operation, ParameterLocation.BODY, feedback.error_feedback)
         if captured is not None and generation_mode.is_negative:

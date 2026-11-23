@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.34.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Whole floats captured from a JSON body sent as `2.0` in query, path, header, cookie or form values, where an integer is `2`.
+
 ## [4.34.0](https://github.com/schemathesis/schemathesis/compare/v4.33.4...v4.34.0) - 2026-11-22
 
 ### :rocket: Added

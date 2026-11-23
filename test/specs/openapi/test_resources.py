@@ -832,6 +832,108 @@ def test_captured_variants_filter_values_invalid_for_destination(ctx):
     assert variants[0].draws[0].parameter_name == "itemId"
 
 
+def _whole_float_item_schema(ctx):
+    item_id = {"type": "integer"}
+    body = {"type": "object", "properties": {"itemId": item_id}, "required": ["itemId"]}
+    return ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                }
+                            }
+                        }
+                    },
+                },
+                "get": {
+                    "operationId": "listItems",
+                    "parameters": [{"name": "itemId", "in": "query", "schema": item_id}],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+            "/items/{itemId}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": item_id}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/notes": {
+                "post": {
+                    "operationId": "createNote",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": body},
+                            "application/x-www-form-urlencoded": {"schema": body},
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        # From 3.1 on, JSON Schema counts `2.0` as an integer, so the pool keeps it for an integer input.
+        version="3.1.0",
+    )
+
+
+@pytest.mark.parametrize(
+    ("path", "method", "location", "media_type", "expected"),
+    [
+        ("/items", "GET", ParameterLocation.QUERY, None, 2),
+        ("/items/{itemId}", "GET", ParameterLocation.PATH, None, 2),
+        ("/notes", "POST", ParameterLocation.BODY, "application/x-www-form-urlencoded", 2),
+        ("/notes", "POST", ParameterLocation.BODY, "application/json", 2.0),
+    ],
+    ids=["query", "path", "form-body", "json-body"],
+)
+def test_captured_whole_float_is_spelled_as_an_integer_outside_json(ctx, path, method, location, media_type, expected):
+    # A JSON body accepted `2.0` as the integer it is; a text carrier would send the string "2.0", another value.
+    from schemathesis.specs.openapi.adapter.parameters import _captured_variants
+
+    schema = _whole_float_item_schema(ctx)
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": 2.0})
+    operation = schema[path][method]
+    if location == ParameterLocation.BODY:
+        container = next(body for body in operation.body if body.media_type == media_type).optimized_schema
+        captured = _captured_variants(data_source, operation, location, container, media_type=media_type)
+    else:
+        container = (operation.query if location == ParameterLocation.QUERY else operation.path_parameters).schema
+        captured = _captured_variants(data_source, operation, location, container)
+
+    assert captured is not None
+    [(value,)] = [tuple(variant.overlay.values()) for variant in captured[0]]
+    assert (value, type(value)) == (expected, type(expected))
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (2.0, 2),
+        (-0.0, 0),
+        (2.5, 2.5),
+        (float(2**53), 2**53),
+        (float(2**53) * 2, float(2**53) * 2),
+        (True, True),
+        ({"a": [1.0, {"b": 3.0}], "c": "4.0"}, {"a": [1, {"b": 3}], "c": "4.0"}),
+    ],
+    ids=["whole", "negative-zero", "fractional", "last-exact", "past-exact", "bool", "nested"],
+)
+def test_spelled_as_integers(value, expected):
+    from schemathesis.specs.openapi.adapter.parameters import _spelled_as_integers
+
+    result = _spelled_as_integers(value)
+
+    assert result == expected
+    assert repr(result) == repr(expected)
+
+
 @pytest.mark.parametrize("phase", [TestPhase.EXAMPLES, TestPhase.FUZZING], ids=["examples", "fuzzing"])
 @pytest.mark.parametrize(
     "note", [{"type": "string"}, {"$ref": "#/components/schemas/Note"}], ids=["flat", "nested-ref"]
