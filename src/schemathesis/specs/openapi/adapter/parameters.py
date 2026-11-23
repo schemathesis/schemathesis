@@ -602,9 +602,7 @@ def _captured_variants(
     variants = extra_data_source.get_captured_variants(operation=operation, location=location, schema=schema)
     if not variants:
         return None
-    # A value captured from a JSON body may be a whole float, the same integer as `2` there. Every other carrier
-    # renders it as text, where `2.0` is a different string, so it gets the spelling the generator gives such a
-    # carrier (`_hypothesis.py`, `whole_floats`).
+    # Outside JSON a value is sent as text, where a whole float like `2.0` is not the integer `2`.
     if location != ParameterLocation.BODY or not media_types.is_json_lenient(media_type):
         variants = [replace(variant, overlay=_spelled_as_integers(variant.overlay)) for variant in variants]
     return variants, extra_data_source.usage_tracker

@@ -27,6 +27,7 @@ from schemathesis.resources.repository import (
     ResourceRepository,
 )
 from schemathesis.specs.openapi._hypothesis import openapi_cases
+from schemathesis.specs.openapi.adapter.parameters import _captured_variants, _spelled_as_integers
 from schemathesis.specs.openapi.examples import get_strategies_from_examples
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource, ParameterRequirement
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex
@@ -894,8 +895,6 @@ def _whole_float_item_schema(ctx):
 )
 def test_captured_whole_float_is_spelled_as_an_integer_outside_json(ctx, path, method, location, media_type, expected):
     # A JSON body accepted `2.0` as the integer it is; a text carrier would send the string "2.0", another value.
-    from schemathesis.specs.openapi.adapter.parameters import _captured_variants
-
     schema = _whole_float_item_schema(ctx)
     data_source = schema.create_extra_data_source()
     data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": 2.0})
@@ -926,8 +925,6 @@ def test_captured_whole_float_is_spelled_as_an_integer_outside_json(ctx, path, m
     ids=["whole", "negative-zero", "fractional", "last-exact", "past-exact", "bool", "nested"],
 )
 def test_spelled_as_integers(value, expected):
-    from schemathesis.specs.openapi.adapter.parameters import _spelled_as_integers
-
     result = _spelled_as_integers(value)
 
     assert result == expected
