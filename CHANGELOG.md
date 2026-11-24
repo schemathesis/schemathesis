@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Valid-input rates in reports counting only oversized strings in the coverage phase. [#6210](https://github.com/schemathesis/schemathesis/issues/6210)
+- False `Schema validation mismatch` warning when an API refuses only oversized strings. [#6210](https://github.com/schemathesis/schemathesis/issues/6210)
 
 ## [4.34.2](https://github.com/schemathesis/schemathesis/compare/v4.34.1...v4.34.2) - 2026-11-24
 

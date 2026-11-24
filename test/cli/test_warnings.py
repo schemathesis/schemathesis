@@ -1016,6 +1016,44 @@ def test_validation_mismatch_ignores_conflicts(ctx, cli, status, expected):
     assert ("Schema validation mismatch" in result.stdout) is expected
 
 
+# Oversized strings go out after the other coverage cases; a size limit refusing them is not a schema mismatch.
+def test_no_validation_mismatch_when_only_oversized_strings_are_rejected(ctx, cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/notes": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"note": {"type": "string"}},
+                                    "required": ["note"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "Stored"}, "400": {"description": "Too long"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/notes", methods=["POST"])
+    def notes():
+        if len(request.get_data()) > 1000:
+            return jsonify({"detail": "Too long"}), 400
+        return jsonify({}), 201
+
+    result = cli.run_openapi_app(
+        app, "--phases=coverage", "--mode=positive", "--exclude-checks=positive_data_acceptance"
+    )
+
+    assert "Schema validation mismatch" not in result.stdout
+
+
 def test_missing_test_data_ignores_negative_not_found(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {

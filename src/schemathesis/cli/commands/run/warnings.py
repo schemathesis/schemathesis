@@ -42,6 +42,11 @@ class StatusCodeStatistic:
         counts = aggregate_status_codes(recorder, classify_status, positive_only=positive_only)
         return cls(counts=counts, total=sum(counts.values()), classify_status=classify_status)
 
+    def add(self, other: StatusCodeStatistic) -> None:
+        for code, count in other.counts.items():
+            self.counts[code] = self.counts.get(code, 0) + count
+        self.total += other.total
+
     def ratio_for(self, status_class: StatusClass) -> float:
         if self.total == 0:
             return 0.0
@@ -96,6 +101,22 @@ class StatusCodeStatistic:
             return False
 
         return (count_other_4xx / total_4xx) >= OTHER_CLIENT_ERRORS_THRESHOLD
+
+
+@dataclass(slots=True)
+class PhaseResponses:
+    """Responses to an operation's positive cases across every scenario a phase tested it in."""
+
+    operation: APIOperation | None
+    warnings: WarningsConfig
+    positive: StatusCodeStatistic
+    generated_positive: bool = False
+    accepted: bool = False
+    failed: bool = False
+
+    @property
+    def all_positive_are_rejected(self) -> bool:
+        return self.generated_positive and not self.accepted
 
 
 AUTH_ERRORS_THRESHOLD = 0.9
@@ -241,6 +262,8 @@ class WarningCollector:
     fails_on_missing_test_data: set[str]
     # Warnings config of each operation with a valid-input rate, to judge the rate once the run is over.
     valid_rate_warnings: dict[str, WarningsConfig]
+    # Positive responses per operation and phase, to judge rejections once the run is over.
+    phase_responses: dict[tuple[str, PhaseName], PhaseResponses]
 
     def __init__(self, config: ProjectConfig) -> None:
         self.config = config
@@ -251,12 +274,17 @@ class WarningCollector:
         self.fails_on_auth = set()
         self.fails_on_missing_test_data = set()
         self.valid_rate_warnings = {}
+        self.phase_responses = {}
 
     def fails_the_run(self) -> bool:
         """Whether a warning configured with `fail-on` still stands."""
         return self.fails or bool(self.fails_on_auth) or bool(self.fails_on_missing_test_data)
 
     def on_engine_finished(self) -> None:
+        # One scenario that served positive data clears the rejections of the phase's other scenarios.
+        for (label, _), responses in self.phase_responses.items():
+            if responses.all_positive_are_rejected:
+                self._check_rejections(label, responses)
         # A phase can test an operation in several scenarios, so its rate is known only once the run is over.
         for label, phases in self.data.valid_rates.items():
             warnings = self.valid_rate_warnings[label]
@@ -312,7 +340,8 @@ class WarningCollector:
 
         warnings = self.config.warnings_for(operation=operation)
 
-        if any_positive_is_accepted(event.recorder):
+        accepted = any_positive_is_accepted(event.recorder)
+        if accepted:
             self._mark_authenticated(event.recorder.label)
             self._mark_served(event.recorder.label)
 
@@ -338,45 +367,33 @@ class WarningCollector:
                 SchemathesisWarning.NOT_SERVED, lambda: self.data.not_served.add(event.recorder.label), warnings
             )
 
-        # Not gated on success, unlike the 404 warning below: a wrong base URL 404s everything and fails other checks.
-        if (
-            warnings.should_display(SchemathesisWarning.BASE_URL_MISMATCH)
-            and GenerationMode.POSITIVE
-            in self.config.generation_for(operation=operation, phase=event.phase.value).modes
-            and all_positive_are_rejected(event.recorder)
-            and positive.should_warn_about_missing_test_data()
-        ):
-            missing = missing_base_path(operation) if operation is not None else None
-            if missing is not None:
-                assert operation is not None
-                self.data.base_url_suggestion = f"{(operation.schema.config.base_url or '').rstrip('/')}{missing}"
-                self._handle_warning(
-                    SchemathesisWarning.BASE_URL_MISMATCH,
-                    lambda: self.data.base_url_mismatch.add(event.recorder.label),
-                    warnings,
+        generates_positive = (
+            GenerationMode.POSITIVE in self.config.generation_for(operation=operation, phase=event.phase.value).modes
+        )
+        if generates_positive:
+            key = (event.recorder.label, event.phase)
+            responses = self.phase_responses.get(key)
+            if responses is None:
+                empty = StatusCodeStatistic(counts={}, total=0, classify_status=ctx.classify_status)
+                responses = self.phase_responses[key] = PhaseResponses(
+                    operation=operation, warnings=warnings, positive=empty
                 )
+            responses.positive.add(positive)
+            responses.generated_positive |= any(is_positive(case) for case in event.recorder.cases.values())
+            responses.accepted |= accepted
+            responses.failed |= event.status != Status.SUCCESS
 
         # All positive test cases got 4xx and no failure was found
         if (
             event.status == Status.SUCCESS
-            and (
-                warnings.should_display(SchemathesisWarning.MISSING_TEST_DATA)
-                or warnings.should_display(SchemathesisWarning.VALIDATION_MISMATCH)
-            )
-            and GenerationMode.POSITIVE
-            in self.config.generation_for(operation=operation, phase=event.phase.value).modes
+            and warnings.should_display(SchemathesisWarning.MISSING_TEST_DATA)
+            and generates_positive
             and all_positive_are_rejected(event.recorder)
         ):
             if positive.should_warn_about_missing_test_data():
                 self._handle_warning(
                     SchemathesisWarning.MISSING_TEST_DATA,
                     lambda: self._record_missing_test_data(event.recorder.label, operation),
-                    warnings,
-                )
-            if positive.should_warn_about_validation_mismatch():
-                self._handle_warning(
-                    SchemathesisWarning.VALIDATION_MISMATCH,
-                    lambda: self.data.validation_mismatch.add(event.recorder.label),
                     warnings,
                 )
             # When served and refused requests share a status, only the response bodies tell them apart.
@@ -390,10 +407,7 @@ class WarningCollector:
                 )
 
         # Without positive generation, the few positive cases other phases add give no valid-input rate worth reporting.
-        if (
-            GenerationMode.POSITIVE
-            not in self.config.generation_for(operation=operation, phase=event.phase.value).modes
-        ):
+        if not generates_positive:
             return
 
         outcomes = positive_call_outcomes(event.recorder)
@@ -401,6 +415,27 @@ class WarningCollector:
             phases = self.data.valid_rates.setdefault(event.recorder.label, {})
             phases.setdefault(event.phase.value, ValidRate()).add(outcomes)
             self.valid_rate_warnings[event.recorder.label] = warnings
+
+    def _check_rejections(self, label: str, responses: PhaseResponses) -> None:
+        operation = responses.operation
+        warnings = responses.warnings
+        positive = responses.positive
+        # Not gated on success, unlike the mismatch below: a wrong base URL 404s everything and fails other checks.
+        if (
+            warnings.should_display(SchemathesisWarning.BASE_URL_MISMATCH)
+            and positive.should_warn_about_missing_test_data()
+        ):
+            missing = missing_base_path(operation) if operation is not None else None
+            if missing is not None:
+                assert operation is not None
+                self.data.base_url_suggestion = f"{(operation.schema.config.base_url or '').rstrip('/')}{missing}"
+                self._handle_warning(
+                    SchemathesisWarning.BASE_URL_MISMATCH, partial(self.data.base_url_mismatch.add, label), warnings
+                )
+        if not responses.failed and positive.should_warn_about_validation_mismatch():
+            self._handle_warning(
+                SchemathesisWarning.VALIDATION_MISMATCH, partial(self.data.validation_mismatch.add, label), warnings
+            )
 
     def _record_missing_test_data(self, label: str, operation: APIOperation | None) -> None:
         """Record the operation, capturing the link graph the first time one warns."""

@@ -35,14 +35,6 @@ Reproduce with:
 
     st replay <PLACEHOLDER>
 
-=================================== WARNINGS ===================================
-
-Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation
-
-  - POST /users
-
-💡 Check your schema constraints - API validation may be stricter than documented
-
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -60,12 +52,9 @@ Failures:
 
 For more information, run `st explain ST101`.
 
-Warnings:
-  ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
-
 Test cases:
   N generated, N found N unique failures
 
 Seed: 42
 
-======================== 1 failure, 1 warning in 1.00s =========================
+============================== 1 failure in 1.00s ==============================
