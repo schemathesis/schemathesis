@@ -17,7 +17,7 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import RecordedScenario
 from schemathesis.engine.run import UNIT_PHASES, PhaseName
 from schemathesis.engine.run.outcomes import aggregate_status_codes, is_positive, positive_call_outcomes
-from schemathesis.engine.summary import WarningData
+from schemathesis.engine.summary import ValidRate, WarningData
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
 
@@ -239,6 +239,8 @@ class WarningCollector:
     fails_on_auth: set[str]
     # Operations whose missing-test-data warning is configured with `fail-on`; a later success withdraws them.
     fails_on_missing_test_data: set[str]
+    # Warnings config of each operation with a valid-input rate, to judge the rate once the run is over.
+    valid_rate_warnings: dict[str, WarningsConfig]
 
     def __init__(self, config: ProjectConfig) -> None:
         self.config = config
@@ -248,10 +250,25 @@ class WarningCollector:
         self.fails = False
         self.fails_on_auth = set()
         self.fails_on_missing_test_data = set()
+        self.valid_rate_warnings = {}
 
     def fails_the_run(self) -> bool:
         """Whether a warning configured with `fail-on` still stands."""
         return self.fails or bool(self.fails_on_auth) or bool(self.fails_on_missing_test_data)
+
+    def on_engine_finished(self) -> None:
+        # A phase can test an operation in several scenarios, so its rate is known only once the run is over.
+        for label, phases in self.data.valid_rates.items():
+            warnings = self.valid_rate_warnings[label]
+            if any(
+                rate.accepted
+                and rate.total >= MIN_CALLS_FOR_VALID_RATE
+                and rate.rate < warnings.low_valid_rate.threshold
+                for rate in phases.values()
+            ):
+                self._handle_warning(
+                    SchemathesisWarning.LOW_VALID_RATE, partial(self.data.low_valid_rate.add, label), warnings
+                )
 
     def on_startup_warning(self, kind: SchemathesisWarning) -> None:
         if self.config.warnings.should_fail(kind):
@@ -381,18 +398,9 @@ class WarningCollector:
 
         outcomes = positive_call_outcomes(event.recorder)
         if outcomes.total:
-            self.data.valid_rates.setdefault(event.recorder.label, {})[event.phase.value] = outcomes
-            # Operations nothing reached get the two warnings above; this one covers the middle ground they leave out.
-            if (
-                outcomes.accepted
-                and outcomes.total >= MIN_CALLS_FOR_VALID_RATE
-                and outcomes.rate < warnings.low_valid_rate.threshold
-            ):
-                self._handle_warning(
-                    SchemathesisWarning.LOW_VALID_RATE,
-                    lambda: self.data.low_valid_rate.add(event.recorder.label),
-                    warnings,
-                )
+            phases = self.data.valid_rates.setdefault(event.recorder.label, {})
+            phases.setdefault(event.phase.value, ValidRate()).add(outcomes)
+            self.valid_rate_warnings[event.recorder.label] = warnings
 
     def _record_missing_test_data(self, label: str, operation: APIOperation | None) -> None:
         """Record the operation, capturing the link graph the first time one warns."""

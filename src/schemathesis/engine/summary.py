@@ -42,6 +42,12 @@ class ValidRate:
     def rate(self) -> float:
         return self.accepted / self.total if self.total else 0.0
 
+    def add(self, other: ValidRate) -> None:
+        self.accepted += other.accepted
+        self.unreachable += other.unreachable
+        self.conflicts += other.conflicts
+        self.rejected += other.rejected
+
 
 @dataclass(slots=True)
 class WarningData:

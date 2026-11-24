@@ -3,6 +3,7 @@ import json
 import click
 import pytest
 from _pytest.main import ExitCode
+from flask import jsonify, request
 
 import schemathesis
 from schemathesis.cli.commands.fuzz.handlers.output import FuzzOutputHandler
@@ -112,6 +113,49 @@ def test_report_records_failures(ctx, cli, json_path):
             "operations": ["GET /api/failure"],
         }
     ]
+
+
+def test_valid_rates_count_held_back_oversized_strings_with_other_coverage_cases(ctx, cli, json_path):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/notes": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"note": {"type": "string"}},
+                                    "required": ["note"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "Stored"}, "400": {"description": "Too long"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/notes", methods=["POST"])
+    def notes():
+        if len(request.get_data()) > 1000:
+            return jsonify({"detail": "Too long"}), 400
+        return jsonify({}), 201
+
+    cli.run_openapi_app(
+        app,
+        f"--report-json-path={json_path}",
+        "--phases=coverage",
+        "--mode=positive",
+        "--exclude-checks=positive_data_acceptance",
+    )
+
+    assert load_report(json_path)["valid_rates"] == {
+        "POST /notes": {"coverage": {"accepted": 1, "unreachable": 0, "conflicts": 0, "rejected": 1}}
+    }
 
 
 def test_missing_parent_directory(ctx, cli, tmp_path):

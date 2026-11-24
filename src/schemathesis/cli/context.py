@@ -126,6 +126,7 @@ class BaseExecutionContext:
             if event.failures:
                 self.statistic.record_run_check_failures(event.failures, label=RUN_CHECKS_LABEL)
                 self.exit_code = ExitCode.FAILURES
+            self.warning_collector.on_engine_finished()
             # Decided once the run is over, since a later success can withdraw a warning.
             if self.warning_collector.fails_the_run() and self.exit_code == ExitCode.OK:
                 self.exit_code = ExitCode.FAILURES
