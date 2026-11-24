@@ -76,16 +76,12 @@ def _collect(metrics, case, response):
     collector.maximize()
 
 
-def test_maximize_targets_success_and_configured_metrics(metric_function, case_factory, response_factory):
+def test_maximize_targets_only_configured_metrics(metric_function, case_factory, response_factory):
     case = case_factory()
     response = response_factory.requests(status_code=200)
-    success = f"{case.operation.label}:success_rate"
 
-    assert _observed_targets(lambda: maximize([], case=case, response=response)) == {success: 1.0}
-    assert _observed_targets(lambda: maximize([metric_function], case=case, response=response)) == {
-        success: 1.0,
-        "new_metric": 0.5,
-    }
+    assert _observed_targets(lambda: maximize([], case=case, response=response)) == {}
+    assert _observed_targets(lambda: maximize([metric_function], case=case, response=response)) == {"new_metric": 0.5}
 
 
 def test_metric_collector_targets_only_configured_metrics(metric_function, case_factory, response_factory):

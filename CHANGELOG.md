@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.34.2...HEAD) - TBD
 
+### :racing_car: Performance
+
+- Up to 1.9x more requests per second in the fuzzing phase.
+
 ### :bug: Fixed
 
 - Valid-input rates in reports counting only oversized strings in the coverage phase. [#6210](https://github.com/schemathesis/schemathesis/issues/6210)

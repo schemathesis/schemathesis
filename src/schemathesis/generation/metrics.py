@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from schemathesis.core.registries import Registry
-from schemathesis.core.transport import Response, StatusClass
+from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 
 
@@ -48,11 +48,6 @@ def response_time(ctx: MetricContext) -> float:
     return ctx.response.elapsed
 
 
-def success_rate(ctx: MetricContext) -> float:
-    """Return 1.0 for successful responses, 0.0 otherwise."""
-    return 1.0 if ctx.case.operation.schema.classify_status(ctx.response.status_code) is StatusClass.SUCCESS else 0.0
-
-
 class MetricCollector:
     __slots__ = ("metrics", "observations")
 
@@ -85,9 +80,6 @@ def maximize(metrics: Sequence[MetricFunction], case: Case, response: Response) 
     # Coverage runs outside Hypothesis: metrics still run, so buggy ones raise, but `target()` is a no-op there.
     in_test_context = currently_in_test_context()
     ctx = MetricContext(case=case, response=response)
-    # Fuzzing leans toward inputs an operation accepts; stateful testing does not, since its steps repeat such inputs.
-    if in_test_context:
-        hypothesis.target(success_rate(ctx), label=f"{case.operation.label}:{success_rate.__name__}")
     for metric in metrics:
         value = metric(ctx)
         if in_test_context:
