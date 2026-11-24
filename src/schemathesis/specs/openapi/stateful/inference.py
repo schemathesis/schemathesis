@@ -185,12 +185,12 @@ class LinkInferencer:
             if parsed.scheme != base_parsed.scheme or parsed.netloc != base_parsed.netloc:
                 return None
 
-            return self._strip_base_path_from_location(parsed.path)
+            return self.strip_base_path(parsed.path)
 
-        stripped = self._strip_base_path_from_location(location)
+        stripped = self.strip_base_path(location)
         return stripped if stripped is not None else location
 
-    def _strip_base_path_from_location(self, path: str) -> str | None:
+    def strip_base_path(self, path: str) -> str | None:
         """None when `path` lies outside the base path."""
         base_path = self._base_path.rstrip("/")
         if path != base_path and not path.startswith(f"{base_path}/"):

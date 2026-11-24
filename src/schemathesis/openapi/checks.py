@@ -373,6 +373,33 @@ class DiscriminatorMismatch(Failure):
         return ""
 
 
+class InvalidLocation(Failure):
+    """`Location` header of a created resource leads to `404 Not Found`."""
+
+    code = "ST120"
+    checks = ("invalid_location",)
+    kind_title = "Invalid Location"
+
+    __slots__ = ("location",)
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        location: str,
+        message: str,
+        title: str | None = None,
+        case_id: str | None = None,
+    ) -> None:
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
+        self.location = location
+
+    @property
+    def _unique_key(self) -> str:
+        # One finding per operation, whatever the created resource.
+        return ""
+
+
 class UndefinedContentType(Failure):
     """Response has Content-Type that is not documented in the schema."""
 

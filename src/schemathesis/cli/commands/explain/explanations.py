@@ -143,6 +143,13 @@ EXPLANATIONS: dict[str, Explanation] = {
             others, the same failure is ST101.
         """,
     ),
+    "ST120": Explanation(
+        summary="`Location` header of a `201` or `202` response that leads to `404 Not Found`.",
+        notes="""
+            Schemathesis sends one `GET` to the URL in `Location`, resolved against the request URL: `42` returned
+            by `POST /items` leads to `/42`, and to `/items/42` only after `POST /items/`.
+        """,
+    ),
     "ST201": Explanation(
         summary="Schema-violating request accepted.",
         notes="""

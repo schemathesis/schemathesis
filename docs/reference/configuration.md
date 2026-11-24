@@ -1161,6 +1161,7 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
       - `object_level_authorization`
       - `unsupported_method`
       - `allow_header_conformance`
+      - `invalid_location` (default: `false`)
 
     ```toml
     [checks]

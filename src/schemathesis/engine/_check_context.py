@@ -47,6 +47,7 @@ class CheckContextData:
             response_checks=ctx.checks.for_responses(),
             phase=phase,
             auth_enforced_operations=ctx.checks.auth_enforced_operations,
+            followed_location_paths=ctx.checks.followed_location_paths,
         )
 
 

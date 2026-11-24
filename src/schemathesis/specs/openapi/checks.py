@@ -11,7 +11,7 @@ from email.policy import HTTP
 from functools import wraps
 from http.cookies import CookieError, SimpleCookie
 from typing import TYPE_CHECKING, Any, NoReturn, cast
-from urllib.parse import ParseResult, parse_qs, unquote, urlparse
+from urllib.parse import ParseResult, parse_qs, unquote, urljoin, urlparse, urlsplit
 
 import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
@@ -56,6 +56,7 @@ from schemathesis.generation.meta import (
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     EnsureResourceAvailability,
+    InvalidLocation,
     JsonSchemaError,
     MalformedMediaType,
     MissingContentType,
@@ -1245,6 +1246,65 @@ def allow_header_conformance(ctx: CheckContext, response: Response, case: Case) 
         undocumented_methods=[method.upper() for method in undocumented],
         message=f"`Allow: {allow_header}` does not match the schema. {'. '.join(parts)}\n\nList exactly the methods this resource supports in `Allow`",
     )
+
+
+CREATED_STATUSES = frozenset({201, 202})
+
+
+@schemathesis.check
+@requires_openapi_schema
+def invalid_location(ctx: CheckContext, response: Response, case: Case) -> bool | None:
+    """Check that the `Location` header of a created resource does not lead to `404 Not Found`."""
+    if response.status_code not in CREATED_STATUSES:
+        return None
+    # The link inferred from `Location` already sends this `GET` in stateful scenarios.
+    if case.meta is not None and isinstance(case.meta.phase.data, StatefulPhaseData):
+        return None
+    values = response.headers.get("location")
+    if not values:
+        return None
+    location = values[0]
+    request_url = cast(str, response.request.url)
+    origin = urlsplit(request_url)
+    target = urlsplit(urljoin(request_url, location))
+    if (target.scheme, target.netloc) != (origin.scheme, origin.netloc):
+        return None
+    schema = _get_openapi_schema(case)
+    inferencer = schema.analysis.inferencer
+    path = inferencer.strip_base_path(unquote(target.path))
+    # Braces would be read as a path template.
+    if path is None or "{" in path or "}" in path:
+        return None
+    operation = schema.find_operation_by_path("GET", path)
+    # The schema gives the path no `GET`, so a `404` there does not mean a missing resource.
+    if operation is None and inferencer.match(path) is not None:
+        return None
+    followed = ctx.followed_location_paths
+    template = operation.path if operation is not None else path
+    if template in followed:
+        return None
+    followed.add(template)
+    query: dict[str, object] = dict(parse_qs(target.query, keep_blank_values=True))
+    for parameter in get_security_parameters(case.operation):
+        if parameter.location == ParameterLocation.QUERY and parameter.name in case.query:
+            query.setdefault(parameter.name, case.query[parameter.name])
+    probe = case.derive(query=query, keep_auth=True)
+    if operation is not None:
+        probe.operation = operation
+    probe.method = "GET"
+    probe.path = path
+    probe.path_parameters = {}
+    probe.body = NOT_SET
+    probe.media_type = None
+    probe_response = ctx.internals.send_probe(case, probe, dict(ctx.internals.transport_kwargs or {}))
+    if probe_response.status_code == 404:
+        raise InvalidLocation(
+            operation=case.operation.label,
+            location=location,
+            message=f"`Location: {location}` leads to `GET {target.path}`, which answered `404 Not Found`\n\n"
+            "Return a `Location` that points to the created resource",
+        )
+    return None
 
 
 def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
