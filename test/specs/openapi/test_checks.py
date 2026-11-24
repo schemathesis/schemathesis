@@ -2740,7 +2740,7 @@ MULTIPART = "multipart/form-data"
 URLENCODED = "application/x-www-form-urlencoded"
 
 
-def _load_form_operation(ctx, app_runner, media_type, properties=None, encoding=None, version="3.0.2"):
+def _load_form_operation(ctx, app_runner, media_type, properties=None, encoding=None, version="3.0.2", components=None):
     definition = {
         "schema": {
             "type": "object",
@@ -2765,6 +2765,7 @@ def _load_form_operation(ctx, app_runner, media_type, properties=None, encoding=
             }
         },
         version=version,
+        **({"components": components} if components else {}),
     )
 
     @app.route("/post", methods=["POST"])
@@ -2786,6 +2787,26 @@ def _load_form_operation(ctx, app_runner, media_type, properties=None, encoding=
         (MULTIPART, None, ["x", {"b": None}], b'name="description"\r\n\r\n{"b": null}\r\n'),
         (MULTIPART, {"count": {"type": "integer", "maximum": 10}}, 5, b'name="count"\r\n\r\n5\r\n'),
         (URLENCODED, None, {"x": 1}, "description=x"),
+        (MULTIPART, {"file": {"type": "string", "format": "binary"}}, True, b"octet-stream\r\n\r\ntrue\r\n"),
+        (
+            MULTIPART,
+            {"files": {"type": "array", "items": {"type": "string", "format": "binary"}}},
+            [None, None],
+            b"octet-stream\r\n\r\nnull\r\n",
+        ),
+        (MULTIPART, {"tags": {"type": "array", "items": {"type": "string"}}}, [1, 2], b'name="tags"\r\n\r\n2\r\n'),
+        (MULTIPART, {"ids": {"type": "array", "items": {"type": "integer"}}}, ["1", "2"], b'name="ids"\r\n\r\n2\r\n'),
+        (
+            MULTIPART,
+            {
+                "files": {
+                    "anyOf": [{"type": "array", "items": {"type": "string", "format": "binary"}}, {"type": "null"}]
+                }
+            },
+            [True, 1],
+            b"octet-stream\r\n\r\ntrue\r\n",
+        ),
+        (MULTIPART, {"files": {"$ref": "#/components/schemas/Files"}}, [True, 1], b"octet-stream\r\n\r\ntrue\r\n"),
     ],
     ids=[
         "multipart-boolean",
@@ -2797,13 +2818,20 @@ def _load_form_operation(ctx, app_runner, media_type, properties=None, encoding=
         "repeated-values-with-object",
         "integer-read-from-text",
         "object-sent-as-its-keys",
+        "file-part",
+        "file-parts-of-array",
+        "parts-of-string-array",
+        "parts-of-integer-array",
+        "file-parts-of-optional-array",
+        "file-parts-of-referenced-array",
     ],
 )
-def test_negative_data_rejection_accepts_form_scalars_sent_as_valid_strings(
+def test_negative_data_rejection_accepts_form_fields_valid_as_sent(
     ctx, app_runner, media_type, properties, value, wire
 ):
-    operation = _load_form_operation(ctx, app_runner, media_type, properties)
-    name = "count" if properties else "description"
+    components = {"schemas": {"Files": {"type": "array", "items": {"type": "string", "format": "binary"}}}}
+    operation = _load_form_operation(ctx, app_runner, media_type, properties, components=components)
+    name = next(iter(properties)) if properties else "description"
     case = operation.Case(
         _meta=build_metadata(body=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
         body={"reason": "dmca", name: value},
@@ -2911,16 +2939,32 @@ def test_negative_data_rejection_reads_multipart_without_parts_as_empty_array(
             {"tags": True},
             None,
         ),
-        (MULTIPART, {"file": {"type": "string", "format": "binary"}}, None, "3.0.2", {"file": True}, None),
+        (
+            MULTIPART,
+            {"files": {"type": "array", "items": {"type": "string", "format": "binary"}, "maxItems": 1}},
+            None,
+            "3.0.2",
+            {"files": [b"a", b"b"]},
+            None,
+        ),
+        (MULTIPART, {"ids": {"type": "array", "items": {"type": "integer"}}}, None, "3.0.2", {"ids": ["a"]}, None),
+        (
+            URLENCODED,
+            {"tags": {"type": "array", "items": {"type": "string"}, "maxItems": 1}},
+            {"tags": {"explode": False}},
+            "3.0.2",
+            {"tags": ["a", "b"]},
+            None,
+        ),
         (MULTIPART, None, None, "3.0.2", {"reason": ["bad", "worse"]}, None),
         (MULTIPART, None, None, "3.0.2", {"reason": []}, None),
         (URLENCODED, None, None, "3.0.2", {"reason": {}}, None),
         (
             MULTIPART,
-            {"file": {"type": "string", "format": "binary"}},
+            {'fi"le': {"type": "string", "format": "binary"}},
             None,
             "3.0.2",
-            {"file": b"\x00", "description": True},
+            {'fi"le': b"\x00", "description": True},
             None,
         ),
         (
@@ -2951,7 +2995,9 @@ def test_negative_data_rejection_reads_multipart_without_parts_as_empty_array(
         "json-encoded-part",
         "object-field",
         "array-field",
-        "binary-field",
+        "too-many-file-parts",
+        "array-item-text",
+        "urlencoded-joined-array-items",
         "repeated-field-all-invalid",
         "required-field-omitted",
         "urlencoded-required-field-omitted",
@@ -2961,7 +3007,7 @@ def test_negative_data_rejection_reads_multipart_without_parts_as_empty_array(
         "nullable-max-length",
     ],
 )
-def test_negative_data_rejection_reports_form_scalars_invalid_when_sent(
+def test_negative_data_rejection_reports_form_fields_invalid_as_sent(
     ctx, app_runner, media_type, properties, encoding, version, body, query
 ):
     operation = _load_form_operation(ctx, app_runner, media_type, properties, encoding, version)
