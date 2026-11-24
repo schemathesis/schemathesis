@@ -10,6 +10,7 @@
 
 - Valid-input rates in reports counting only oversized strings in the coverage phase. [#6210](https://github.com/schemathesis/schemathesis/issues/6210)
 - `--max-time` runs with consecutive `--seed` values generating mostly the same test cases.
+- False positive `negative_data_rejection` for file uploads and array fields in `multipart/form-data` bodies.
 - Spring validation errors not learned from when answered as plain text or listing constraint arguments.
 - False `Schema validation mismatch` warning when an API refuses only oversized strings. [#6210](https://github.com/schemathesis/schemathesis/issues/6210)
 

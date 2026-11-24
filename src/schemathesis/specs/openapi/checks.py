@@ -415,7 +415,7 @@ def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str)
     if alternative is None:
         return False
     # Urlencoded names round-trip exactly, while multipart escapes some characters in part names.
-    names_are_exact = media_types.is_form_urlencoded(media_type)
+    is_urlencoded = media_types.is_form_urlencoded(media_type)
     try:
         validator_cls = _get_openapi_schema(case).adapter.jsonschema_validator_cls
         validator = make_validator(alternative.optimized_schema, validator_cls)
@@ -424,11 +424,11 @@ def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str)
         sent: dict[str, object] = {
             name: value
             for name, value in body.items()
-            if name not in fields and not names_are_exact and value not in ([], {})
+            if name not in fields and not is_urlencoded and value not in ([], {})
         }
         for name, texts in fields.items():
             if None in texts:
-                # Typed or file parts are not plain text, so they keep the generated value.
+                # Typed parts are not plain text, so they keep the generated value.
                 if name in body:
                     sent[name] = body[name]
                 continue
@@ -436,7 +436,11 @@ def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str)
                 # Object members are read as in a query: the text sent, or the repeated value that fits the member.
                 sent[name] = texts[0] if len(texts) == 1 else list(texts)
                 continue
-            readings = [reading for text in texts for reading in _form_text_readings(cast(str, text))]
+            part_readings = [_form_text_readings(cast(str, text)) for text in texts]
+            readings: list[object] = [reading for part in part_readings for reading in part]
+            if not is_urlencoded:
+                # Multipart sends each array item as its own part; urlencoded styles may join items into one value.
+                readings = [[part[0] for part in part_readings], [part[-1] for part in part_readings], *readings]
             # Servers read one of the repeated values and may parse it into the declared type.
             sent[name] = next(
                 (reading for reading in readings if not _has_errors_at(validator, {**sent, name: reading}, name)),
@@ -462,7 +466,7 @@ def _has_errors_at(validator: jsonschema_rs.Validator, instance: dict[str, objec
 
 
 def _sent_form_fields(response: Response, media_type: str) -> Mapping[str, Sequence[str | None]] | None:
-    """Field values in the sent form body; `None` marks a value not sent as plain text."""
+    """Field values in the sent form body; `None` marks a typed value, sent neither as plain text nor as a file."""
     content = response.request.body
     if isinstance(content, str):
         content = content.encode()
@@ -480,8 +484,8 @@ def _sent_form_fields(response: Response, media_type: str) -> Mapping[str, Seque
         name = cast(str, part.get_param("name", header="content-disposition"))
         text = None
         payload = part.get_payload(decode=True)
-        # Parts with a filename or their own content type are files or typed values, not plain text.
-        if isinstance(payload, bytes) and part.get_filename() is None and "content-type" not in part:
+        # Parts with their own content type are typed values; files, marked by a filename, reach the server as is.
+        if isinstance(payload, bytes) and (part.get_filename() is not None or "content-type" not in part):
             # Servers decode form text leniently, replacing bytes that are not valid UTF-8.
             text = payload.decode(errors="replace")
         fields.setdefault(name, []).append(text)
