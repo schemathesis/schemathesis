@@ -1832,23 +1832,33 @@ def test_max_time_repeats_coverage_until_feedback_stops_arriving(ctx):
     assert _coverage_passes(stream) >= 3
 
 
-def test_max_time_cycles_do_not_repeat_the_same_cases(ctx):
-    # Repeating a phase is only worth the time if each cycle explores somewhere the last one did not.
-    api = ctx.openapi.apps.path_variable()
+def _cases_per_fuzzing_cycle(api, seed):
     schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = execute(schema, max_time=2, max_examples=20, seed=1, phases=[PhaseName.FUZZING])
-    rounds: list[set[str]] = []
+    stream = execute(schema, max_time=2, max_examples=20, seed=seed, phases=[PhaseName.FUZZING])
+    cycles: list[set[str]] = []
     for event in stream.events:
         if isinstance(event, events.PhaseStarted) and event.phase.name == PhaseName.FUZZING:
-            rounds.append(set())
+            cycles.append(set())
         elif isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.FUZZING:
-            rounds[-1].update(
+            cycles[-1].update(
                 str((case.value.path_parameters, case.value.query, case.value.body))
                 for case in event.recorder.cases.values()
             )
+    assert len(cycles) > 1, len(cycles)
+    return cycles
 
-    assert len(rounds) > 1, len(rounds)
-    assert rounds[1] - rounds[0], "cycle 2 generated nothing cycle 1 had not"
+
+def test_max_time_cycles_do_not_repeat_the_same_cases(ctx):
+    # Repeating a phase is only worth the time if each cycle explores somewhere the last one did not.
+    cycles = _cases_per_fuzzing_cycle(ctx.openapi.apps.path_variable(), seed=1)
+
+    assert cycles[1] - cycles[0], "cycle 2 generated nothing cycle 1 had not"
+
+
+def test_max_time_cycles_differ_between_consecutive_seeds(ctx):
+    api = ctx.openapi.apps.path_variable()
+
+    assert _cases_per_fuzzing_cycle(api, seed=1)[1] != _cases_per_fuzzing_cycle(api, seed=2)[0]
 
 
 def test_max_time_stops_cycling_when_a_cycle_runs_nothing(ctx):

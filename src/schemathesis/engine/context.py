@@ -21,7 +21,7 @@ from schemathesis.engine.outage import ServerMonitor
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.cache import Cache
 from schemathesis.engine.supervisor import Supervisor
-from schemathesis.generation import derive_operation_seed
+from schemathesis.generation import derive_operation_seed, derive_repeat_seed
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.feedback import AuthHeaderLog, FeedbackSources
@@ -281,9 +281,8 @@ class EngineContext:
 
     @property
     def cycle_seed(self) -> int | None:
-        """Run seed shifted by the cycle, so a repeat covers ground the last one did not."""
-        seed = self.config.seed
-        return None if seed is None else seed + self.cycle_index
+        """Run seed mixed with the cycle, so a repeat covers ground the last one did not."""
+        return derive_repeat_seed(self.config.seed, self.cycle_index)
 
     def operation_seed(self, operation: APIOperation) -> int | None:
         """Cycle seed mixed with the operation label, so operations with identical parameters draw different inputs."""
@@ -291,10 +290,9 @@ class EngineContext:
 
     def next_stateful_seed(self) -> int | None:
         """Seed for the next stateful suite; every suite in the run gets its own, cycles included."""
-        seed = self.config.seed
-        offset = self._stateful_suites
+        index = self._stateful_suites
         self._stateful_suites += 1
-        return None if seed is None else seed + offset
+        return derive_repeat_seed(self.config.seed, index)
 
     def reserve_time(self, seconds: float) -> None:
         """Hold back part of the budget so a later phase is not starved by the ones before it."""
