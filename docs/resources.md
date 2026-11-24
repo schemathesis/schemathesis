@@ -7,11 +7,13 @@ This page collects articles, papers, videos, tutorials, and integrations about S
 
 ## Integrations
 
-- [TraceCov](https://docs.tracecov.sh) by **@Stranger6667**
+- [TraceCov](https://tracecov.sh)
 
-    - **Description**: Schema-level API coverage analysis. Measures test coverage at the constraint level (minLength, pattern, enum, etc.) rather than just endpoints.
+    - **Description**: Shows which parts of your OpenAPI spec your tests never exercise: operations, parameters, schema keywords, responses.
 
     - **Documentation**: [docs.tracecov.sh](https://docs.tracecov.sh)
+
+    - **Issues and releases**: [schemathesis/tracecov](https://github.com/schemathesis/tracecov)
 
     - **Installation**: `uv pip install tracecov`
 

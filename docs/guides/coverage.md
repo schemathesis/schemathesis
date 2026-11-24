@@ -63,7 +63,7 @@ Colors indicate coverage status:
 
 </div>
 
-For more details, see the [TraceCov documentation](https://docs.tracecov.sh).
+For more details, see the [TraceCov documentation](https://docs.tracecov.sh). Report TraceCov problems and ask questions in the [TraceCov repository](https://github.com/schemathesis/tracecov).
 
 ## Reading the Numbers
 
