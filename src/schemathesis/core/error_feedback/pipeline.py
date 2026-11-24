@@ -12,6 +12,7 @@ from schemathesis.core.deserialization import (
 from schemathesis.core.error_feedback.parsers import PARSERS, ResponseParser
 from schemathesis.core.error_feedback.store import Observation
 from schemathesis.core.errors import MalformedMediaType
+from schemathesis.core.media_types import is_plain_text
 from schemathesis.core.transport import response_content_type
 
 if TYPE_CHECKING:
@@ -54,6 +55,11 @@ class FeedbackPipeline:
                 content_type,
                 context=DeserializationContext(operation=operation, case=case),
             )
+        except NotImplementedError:
+            # Plain text has no built-in deserializer; some servers answer with the exception text as the whole body.
+            if not is_plain_text(content_type):
+                return ()
+            body = response.text_lossy()
         except Exception:
             # A user deserializer failed; that error is reported elsewhere.
             return ()

@@ -293,6 +293,37 @@ def test_spring_parser_uuid_takes_precedence_over_uri_when_both_match(make_opera
     assert obs[0].payload == FormatPayload(name="uuid")
 
 
+SPRING_UNHANDLED_VALIDATION_TEXT = (
+    "Validation failed for argument [0] in public com.example.AuthResponse "
+    "com.example.UserController.register(com.example.RegisterRequest) with 2 errors: "
+    "[Field error in object 'registerRequest' on field 'username': rejected value []; "
+    "codes [NotBlank.registerRequest.username,NotBlank.username,NotBlank.java.lang.String,NotBlank]; "
+    "arguments [org.springframework.context.support.DefaultMessageSourceResolvable: "
+    "codes [registerRequest.username,username]; arguments []; default message [username]]; "
+    "default message [must not be blank]] "
+    "[Field error in object 'registerRequest' on field 'email': rejected value [a]; "
+    "codes [Email.registerRequest.email,Email.email,Email.java.lang.String,Email]; "
+    "arguments [org.springframework.context.support.DefaultMessageSourceResolvable: "
+    "codes [registerRequest.email,email]; arguments []; default message [email],[Ljavax.validation.constraints."
+    "Pattern$Flag;@1b2c3d,.*]; default message [must be a well-formed email address]] "
+)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [SPRING_UNHANDLED_VALIDATION_TEXT, {"detail": SPRING_UNHANDLED_VALIDATION_TEXT}],
+    ids=["plain-text", "problemDetail"],
+)
+def test_spring_parser_reads_constraint_message_after_argument_messages(body, make_operation, case_factory):
+    parser = SpringParser()
+    assert parser.can_parse(body=body) is True
+    obs = parse_observations(parser, body, make_operation, case_factory)
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (("username",), ObservationKind.MUST_NOT_BE_BLANK, None),
+        (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
+    ]
+
+
 @pytest.mark.parametrize(
     "message, expected_bound, expected_direction, expected_exclusive",
     [

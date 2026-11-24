@@ -114,11 +114,10 @@ _JAVA_TYPE_MAX = {"Integer": 2_147_483_647, "Long": 9_223_372_036_854_775_807}
 # Top-level keys with a standalone Spring exception message; custom `@ControllerAdvice` envelopes use `msg`.
 _TOP_LEVEL_KEYS = ("message", "detail", "error", "msg")
 
-# ProblemDetail embeds field errors in `detail`: `... on field 'Y': ...; default message [must not be null]]`.
-_PROBLEM_DETAIL = re.compile(
-    r"on field '([^']+)':.*?default message \[([^\]]+)\]",
-    re.DOTALL,
-)
+# Bean Validation's exception text: one `[Field error in object 'X' on field 'Y': ...; default message [...]]` per error.
+_FIELD_ERROR_MARKER = "Field error in object"
+_FIELD_ERROR_NAME = re.compile(r"on field '([^']+)':")
+_DEFAULT_MESSAGE_MARKER = "default message ["
 
 
 # Error arrays, and the keys of their entries, that carry a user-facing message.
@@ -198,6 +197,20 @@ def _classify(message: str) -> tuple[tuple[ObservationKind, ObservationPayload],
     return ()
 
 
+def _iter_field_errors(text: str) -> Iterable[tuple[str, str]]:
+    for entry in text.split(_FIELD_ERROR_MARKER)[1:]:
+        name = _FIELD_ERROR_NAME.search(entry)
+        # The constraint message comes last; earlier `default message [...]` entries are the constraint's arguments.
+        _, marker, message = entry.rpartition(_DEFAULT_MESSAGE_MARKER)
+        if name is not None and marker:
+            yield name.group(1), message.partition("]")[0]
+
+
+def _emit_field_errors(operation: APIOperation, text: str) -> Iterable[Observation]:
+    for field, message in _iter_field_errors(text):
+        yield from _emit(operation, field, message)
+
+
 def _emit(operation: APIOperation, field: str, message: str) -> list[Observation]:
     if not field:
         return []
@@ -228,6 +241,9 @@ class SpringParser:
     priority = 10
 
     def can_parse(self, *, body: object) -> bool:
+        # An unhandled validation exception is answered with its text as the whole body.
+        if isinstance(body, str):
+            return _FIELD_ERROR_MARKER in body
         if not isinstance(body, dict):
             return False
         messages = body.get("messages")
@@ -235,7 +251,7 @@ class SpringParser:
             return True
         if isinstance(body.get("subErrors"), list):
             return True
-        if isinstance(body.get("detail"), str) and "Field error in object" in body["detail"]:
+        if isinstance(body.get("detail"), str) and _FIELD_ERROR_MARKER in body["detail"]:
             return True
         errors = body.get("errors")
         if isinstance(errors, list) and errors and isinstance(errors[0], dict):
@@ -264,6 +280,8 @@ class SpringParser:
         body: object,
         case: Case,
     ) -> tuple[Observation, ...]:
+        if isinstance(body, str):
+            return tuple(_emit_field_errors(operation, body))
         if not isinstance(body, dict):
             return ()
         observations: list[Observation] = []
@@ -324,10 +342,8 @@ class SpringParser:
     def _extract_problem_detail(operation: APIOperation, body: dict) -> Iterable[Observation]:
         # RFC 7807 ProblemDetail embeds field/message pairs in `detail`.
         detail = body.get("detail")
-        if not isinstance(detail, str):
-            return
-        for match in _PROBLEM_DETAIL.finditer(detail):
-            yield from _emit(operation, match.group(1), match.group(2))
+        if isinstance(detail, str):
+            yield from _emit_field_errors(operation, detail)
 
     @staticmethod
     def _extract_errors(operation: APIOperation, body: dict) -> Iterable[Observation]:

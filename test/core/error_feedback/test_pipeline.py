@@ -5,6 +5,7 @@ from schemathesis.core.error_feedback.pipeline import FeedbackPipeline
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from test.core.error_feedback.parsers.helpers import SPRING_MESSAGES
+from test.core.error_feedback.parsers.test_spring import SPRING_UNHANDLED_VALIDATION_TEXT
 
 
 def test_pipeline_dispatches_to_spring_parser_for_spring_shape(case_factory, response_factory):
@@ -22,6 +23,19 @@ def test_pipeline_dispatches_to_spring_parser_for_spring_shape(case_factory, res
         response=response,
     )
     assert [o.parameter_path for o in obs] == [("zipcode",), ("city",)]
+
+
+def test_pipeline_reads_plain_text_spring_validation_errors(case_factory, response_factory):
+    case = case_factory()
+    response = Response.from_any(
+        response_factory.requests(
+            content=SPRING_UNHANDLED_VALIDATION_TEXT.encode(),
+            content_type="text/plain;charset=UTF-8",
+            status_code=400,
+        )
+    )
+    obs = FeedbackPipeline.from_registry().parse(operation=case.operation, case=case, response=response)
+    assert [o.parameter_path for o in obs] == [("username",), ("email",)]
 
 
 def test_pipeline_skips_responses_with_no_known_deserializer(case_factory, response_factory):
