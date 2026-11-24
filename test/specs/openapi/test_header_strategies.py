@@ -5,6 +5,7 @@ from hypothesis import given, settings
 
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.examples import generate_many
+from schemathesis.specs.openapi.formats import header_values
 from schemathesis.specs.openapi.headers import (
     KNOWN_HEADER_FORMATS,
     get_header_format_strategies,
@@ -73,7 +74,7 @@ def test_known_header_formats_lookup(name, expected):
 
 
 def test_positive_mode_range_always_valid():
-    strategies = get_header_format_strategies(GenerationMode.POSITIVE)
+    strategies = get_header_format_strategies(GenerationMode.POSITIVE, header_values())
 
     @run_given(strategies["_range_header"], max_examples=50)
     def inner(value):
@@ -85,7 +86,7 @@ def test_positive_mode_range_always_valid():
 
 
 def test_negative_mode_range_has_three_tiers():
-    strategies = get_header_format_strategies(GenerationMode.NEGATIVE)
+    strategies = get_header_format_strategies(GenerationMode.NEGATIVE, header_values())
     # Every expected variant must appear at least once, which takes many draws.
     values = generate_many(strategies["_range_header"], 200)
 

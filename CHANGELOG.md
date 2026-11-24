@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.34.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- `exclude-header-characters` ignored for negative-mode `If-Match`, `If-*-Since` and `Range` values. [#6208](https://github.com/schemathesis/schemathesis/issues/6208)
+
 ## [4.34.1](https://github.com/schemathesis/schemathesis/compare/v4.34.0...v4.34.1) - 2026-11-23
 
 ### :bug: Fixed
