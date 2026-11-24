@@ -4,7 +4,7 @@ from datetime import UTC
 from email.utils import format_datetime
 from typing import TYPE_CHECKING
 
-from schemathesis.specs.openapi.formats import HEADER_FORMAT, header_values
+from schemathesis.specs.openapi.formats import HEADER_FORMAT
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -80,7 +80,9 @@ def range_slightly_invalid_values() -> st.SearchStrategy[str]:
     return st.one_of(inverted, neg_first, constants)
 
 
-def get_header_format_strategies(mode: GenerationMode) -> dict[str, st.SearchStrategy[str]]:
+def get_header_format_strategies(
+    mode: GenerationMode, header_values: st.SearchStrategy[str]
+) -> dict[str, st.SearchStrategy[str]]:
     from hypothesis import strategies as st
 
     if mode.is_positive:
@@ -95,14 +97,14 @@ def get_header_format_strategies(mode: GenerationMode) -> dict[str, st.SearchStr
         rng = draw(st.randoms())
         if rng.random() < STRUCTURED_HEADER_PROBABILITY:
             return draw(if_match_values())
-        return draw(header_values())
+        return draw(header_values)
 
     @st.composite
     def mixed_http_date(draw: st.DrawFn) -> str:
         rng = draw(st.randoms())
         if rng.random() < STRUCTURED_HEADER_PROBABILITY:
             return draw(http_date_values())
-        return draw(header_values())
+        return draw(header_values)
 
     @st.composite
     def mixed_range(draw: st.DrawFn) -> str:
@@ -112,7 +114,7 @@ def get_header_format_strategies(mode: GenerationMode) -> dict[str, st.SearchStr
             return draw(range_values())
         elif r < 0.75:
             return draw(range_slightly_invalid_values())
-        return draw(header_values())
+        return draw(header_values)
 
     return {
         "_if_match_header": mixed_if_match(),

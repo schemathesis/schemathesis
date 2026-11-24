@@ -1141,7 +1141,7 @@ def _build_custom_formats_uncached(
             custom_formats[HEADER_FORMAT] = header_strategy()
     # Bearer tokens follow the header character set in force, so positive ones stay ASCII.
     custom_formats["_bearer_auth"] = custom_formats[HEADER_FORMAT].map("Bearer {}".format)
-    custom_formats.update(get_header_format_strategies(mode))
+    custom_formats.update(get_header_format_strategies(mode, custom_formats[HEADER_FORMAT]))
     # Pinned to the character set in force, since this map goes to callers that cannot supply one.
     alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec).as_strategy()
     for name, make_strategy in get_alphabet_format_strategies().items():

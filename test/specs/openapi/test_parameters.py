@@ -955,6 +955,30 @@ def test_exclude_chars_and_no_x00_for_headers(ctx):
         assert all(ch not in case.headers["X-Token"] for ch in schema.config.generation.exclude_header_characters)
 
 
+CONTROL_CHARACTERS = "".join(chr(code) for code in [*range(0x00, 0x09), *range(0x0A, 0x20), *range(0x7F, 0xA0)])
+
+
+def test_exclude_chars_for_known_headers_in_negative_mode(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [
+                {"name": name, "in": "header", "required": True, "schema": {"type": "string"}}
+                for name in ("If-Match", "If-Modified-Since", "Range")
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    operation.schema.config.generation.exclude_header_characters = CONTROL_CHARACTERS
+
+    # Free-form values are a minority of draws for these headers.
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=100)
+    def test(case):
+        for name in ("If-Match", "If-Modified-Since", "Range"):
+            value = case.headers.get(name, "")
+            assert not set(value) & set(CONTROL_CHARACTERS), f"{name}: {value!r}"
+
+
 def test_parameter_with_boolean_true_schema(ctx, cli, snapshot_cli):
     paths = {
         "/success": {
