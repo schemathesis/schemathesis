@@ -858,6 +858,22 @@ def test_replay_graphql_lists_no_link_for_explored_id(cli, ctx, tmp_path):
     assert ["from step 1" in step for step in steps] == [False, True, True, False], result.output
 
 
+def test_replay_graphql_crash_on_generated_id_is_fixed_once_the_server_accepts_it(cli, ctx, tmp_path):
+    # The failing step sent a generated id, so no value from an earlier response can go stale.
+    api = ctx.graphql.serve(bookstore.unknown_id_failure())
+    cli.run(api.schema_url, "--max-examples=50", "--phases=stateful", "--mode=positive", "--seed=2")
+    crash_file = _list_crash_files(crash_cache_dir(tmp_path))[0]
+    assert len(json.loads(crash_file.read_text())["sequence"]) == 2
+    fixed = ctx.graphql.serve(bookstore.unknown_id_failure(fixed=True))
+
+    result = cli.main("replay", f"--url={fixed.schema_url}")
+
+    assert (re.findall(r"^  ([+x!] [A-Z]+)", result.stdout, re.MULTILINE), crash_file.exists()) == (
+        ["+ FIXED"],
+        False,
+    ), result.output
+
+
 def test_graphql_crash_url_template_is_endpoint_url(cli, ctx, tmp_path):
     @strawberry.type
     class Query:
@@ -1678,6 +1694,7 @@ def test_replay_query_link_param_falls_back_to_recorded_when_unresolvable(
 ):
     # When a query link can't re-extract from a fresh response, the recorded value is reused instead of bailing.
     received = []
+    status = {"code": 500}
     app, _ = ctx.openapi.make_flask_app(
         {
             "/first": {"get": {"responses": {"200": {"description": "OK"}}}},
@@ -1697,7 +1714,7 @@ def test_replay_query_link_param_falls_back_to_recorded_when_unresolvable(
     @app.route("/second")
     def second():
         received.append(request.args.get("token"))
-        return jsonify({"error": "boom"}), 500
+        return jsonify({"error": "boom"}), status["code"]
 
     schema_url = app_runner.openapi_url(app)
     writer = _open_writer(tmp_path, schema_url)
@@ -1722,6 +1739,70 @@ def test_replay_query_link_param_falls_back_to_recorded_when_unresolvable(
 
     assert cli.main("replay", "--keep") == snapshot_cli
     assert received == ["recorded"]
+
+    # A pass with the recorded value does not show that the bug is fixed.
+    status["code"] = 200
+    result = cli.main("replay")
+    assert (
+        re.findall(r"^  ([+x!] [A-Z]+)", result.stdout, re.MULTILINE),
+        len(_list_crash_files(crash_cache_dir(tmp_path))),
+    ) == (["! ERROR"], 1), result.output
+
+
+@pytest.mark.parametrize(
+    "link",
+    [
+        {"parameters": {"id": "$response.body#/id", "extra": "$response.body#/extra"}},
+        {"parameters": {"id": "$response.body#/id"}, "requestBody": {"extra": "$response.body#/extra"}},
+    ],
+    ids=["parameter", "request-body"],
+)
+def test_replay_fixed_when_link_value_was_missing_from_recorded_response(cli, app_runner, ctx, tmp_path, link):
+    # The run could not extract `extra` either, so the recorded step never carried a linked value to go stale.
+    status = {"code": 500}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "201": {"description": "OK", "links": {"UpdateItem": {"operationId": "updateItem", **link}}}
+                    }
+                }
+            },
+            "/items/{id}": {
+                "put": {
+                    "operationId": "updateItem",
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}},
+                        {"name": "extra", "in": "query", "schema": {"type": "string"}},
+                    ],
+                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+                    "responses": {"200": {"description": "OK"}, "500": {"description": "Error"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/items/<int:item_id>", methods=["PUT"])
+    def update_item(item_id):
+        return jsonify({}), status["code"]
+
+    cli.run(app_runner.openapi_url(app), "--max-examples=10", "--phases=stateful", "--mode=positive", "--seed=1")
+    crash_dir = crash_cache_dir(tmp_path)
+    [crash_file] = _list_crash_files(crash_dir)
+    assert len(json.loads(crash_file.read_text())["sequence"]) == 2
+    status["code"] = 200
+
+    result = cli.main("replay")
+
+    assert (
+        re.findall(r"^  ([+x!] [A-Z]+)", result.stdout, re.MULTILINE),
+        len(_list_crash_files(crash_dir)),
+    ) == (["+ FIXED"], 0), result.output
 
 
 @pytest.mark.parametrize("consumer", ["path", "body"])

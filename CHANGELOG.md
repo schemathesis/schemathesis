@@ -8,6 +8,7 @@
 
 ### :bug: Fixed
 
+- `st replay` reporting a case as fixed after resending a recorded value it could not re-extract.
 - Valid-input rates in reports counting only oversized strings in the coverage phase. [#6210](https://github.com/schemathesis/schemathesis/issues/6210)
 - `--max-time` runs with consecutive `--seed` values generating mostly the same test cases.
 - Spring validation errors not learned from when answered as plain text or listing constraint arguments.
