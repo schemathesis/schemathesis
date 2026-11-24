@@ -175,7 +175,7 @@ def _make_use_after_create() -> strawberry.Schema:
     return strawberry.Schema(Query, Mutation, config=_book_id_config())
 
 
-def _make_unknown_id_failure() -> strawberry.Schema:
+def _make_unknown_id_failure(*, fixed: bool) -> strawberry.Schema:
     @strawberry.type
     class Note:
         id: strawberry.ID
@@ -187,7 +187,7 @@ def _make_unknown_id_failure() -> strawberry.Schema:
     class Query:
         @strawberry.field
         def note(self, id: strawberry.ID) -> Note | None:
-            if notes and id not in notes:
+            if notes and id not in notes and not fixed:
                 raise RuntimeError("planted: unknown-id")
             return notes.get(id)
 
@@ -578,8 +578,8 @@ def use_after_create() -> GraphQLApp:
     return _wrap(_make_use_after_create(), "/graphql", "flask")
 
 
-def unknown_id_failure() -> GraphQLApp:
-    return _wrap(_make_unknown_id_failure(), "/graphql", "flask")
+def unknown_id_failure(*, fixed: bool = False) -> GraphQLApp:
+    return _wrap(_make_unknown_id_failure(fixed=fixed), "/graphql", "flask")
 
 
 def tombstone_pool() -> GraphQLApp:

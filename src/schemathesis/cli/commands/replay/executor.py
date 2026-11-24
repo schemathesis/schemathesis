@@ -169,7 +169,16 @@ def _replay_with_retries(
 
 
 def _unverified_without_recorded_values(outcome: ReplayOutcome, *, unrestorable: bool) -> ReplayOutcome:
-    """A pass without the values the recorded request carried proves nothing, so it never counts as fixed."""
+    """A pass without the values the recorded request carried, or with stale linked values, never counts as fixed."""
+    stale = next(
+        (
+            (number, value.name)
+            for number, step in enumerate(outcome.step_outcomes, start=1)
+            for value in step.links
+            if value.fresh is UNRESOLVABLE
+        ),
+        None,
+    )
     if outcome.unsupplied_masked:
         message = _missing_credentials_message(outcome.unsupplied_masked)
         note = f"{_masked_names(outcome.unsupplied_masked)} masked in the crash file"
@@ -182,6 +191,13 @@ def _unverified_without_recorded_values(outcome: ReplayOutcome, *, unrestorable:
             "record it with `output.sanitization.enabled = false` to replay it"
         )
         note = "masked values in the crash file"
+    elif stale is not None:
+        number, name = stale
+        message = (
+            f"`{name}` at step {number} was sent as recorded, not re-extracted from an earlier response; "
+            "a passing replay does not show the bug is fixed"
+        )
+        note = "linked value not re-extracted"
     else:
         return outcome
     if outcome.status is ReplayStatus.FIXED:

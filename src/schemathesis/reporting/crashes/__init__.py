@@ -16,9 +16,10 @@ from schemathesis.core.failures import Failure, is_reproducible_failure
 from schemathesis.core.fs import file_exists
 from schemathesis.core.output.sanitization import sanitize_headers, sanitize_url, sanitize_value
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
+from schemathesis.core.result import Ok
 from schemathesis.core.storage import atomic_write_text, retry_while_locked
 from schemathesis.core.timing import format_timestamp
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import UNRESOLVABLE, deepclone
 from schemathesis.core.transport import HttpMethod
 from schemathesis.engine import Status
 from schemathesis.reporting.crashes.encoding import decode_case_body, encode_case_body, from_json_safe, to_json_safe
@@ -414,8 +415,17 @@ def build_crashes_from_recorder(
             for container_name, parameter_dict in transition.parameters.items():
                 location = CONTAINER_TO_LOCATION[container_name]
                 for parameter_name, extracted in parameter_dict.items():
-                    link_parameters[f"{location.value}.{parameter_name}"] = extracted.definition
-            request_body = transition.request_body.definition if transition.request_body is not None else None
+                    # Values the run could not extract were generated, so replay keeps them as recorded.
+                    if isinstance(extracted.value, Ok) and extracted.value.ok() not in (None, UNRESOLVABLE):
+                        link_parameters[f"{location.value}.{parameter_name}"] = extracted.definition
+            extracted_body = transition.request_body
+            request_body = (
+                extracted_body.definition
+                if extracted_body is not None
+                and isinstance(extracted_body.value, Ok)
+                and extracted_body.value.ok() is not UNRESOLVABLE
+                else None
+            )
             link = CrashLink(operation_id=transition.id, parameters=link_parameters, request_body=request_body)
 
         base_url = case.operation.base_url or ""
