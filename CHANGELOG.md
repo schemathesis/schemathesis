@@ -5,6 +5,7 @@
 ### :racing_car: Performance
 
 - Up to 1.9x more requests per second in the fuzzing phase.
+- Fewer repeated requests in the stateful phase after the API keeps refusing the same request.
 
 ### :bug: Fixed
 

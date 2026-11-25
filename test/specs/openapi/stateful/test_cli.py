@@ -15,6 +15,7 @@ from test.apps.catalog.openapi.modifiers.stateful import (
     Slowdown,
     SlowOperations,
 )
+from test.apps.runtime import OpenAPIApp
 from test.utils import load_yaml_or_fail, refusing_url
 
 
@@ -1428,3 +1429,123 @@ def before_call(context, case, **kwargs):
     )
     result = cli.run_openapi_app(app, "--phases=stateful", "--max-examples=10", "--seed=1", hooks=module)
     assert "⏭  Stateful" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("status_code", "exit_code"), [(403, ExitCode.OK), (500, ExitCode.TESTS_FAILED)], ids=["refused", "server-error"]
+)
+def test_request_the_api_keeps_refusing_is_not_repeated(ctx, cli, status_code, exit_code):
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                            "links": {
+                                "DeleteItem": {"operationId": "deleteItem", "parameters": {"id": "$response.body#/id"}}
+                            },
+                        }
+                    }
+                }
+            },
+            "/items/{id}": {
+                "delete": {
+                    "operationId": "deleteItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {
+                        "204": {"description": "Deleted"},
+                        "403": {"description": "Forbidden"},
+                        "500": {"description": "Error"},
+                    },
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/items/<int:item_id>", methods=["DELETE"])
+    def delete_item(item_id):
+        return jsonify({"error": "Refused"}), status_code
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    result = cli.run(api.schema_url, "--phases=stateful", "--max-examples=30", "-c", "not_a_server_error")
+
+    assert result.exit_code == exit_code, result.stdout
+    assert "Flaky" not in result.stdout
+    refused = [request for request in api.requests if request.method == "DELETE" and request.path == "/items/1"]
+    assert len(refused) == 5, len(refused)
+
+
+@pytest.mark.parametrize("status_code", [429, 503], ids=["rate-limited", "unavailable"])
+def test_request_refused_by_a_temporary_condition_is_sent_again(ctx, cli, status_code):
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                            "links": {
+                                "DeleteItem": {"operationId": "deleteItem", "parameters": {"id": "$response.body#/id"}}
+                            },
+                        }
+                    }
+                }
+            },
+            "/items/{id}": {
+                "delete": {
+                    "operationId": "deleteItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {
+                        "204": {"description": "Deleted"},
+                        "403": {"description": "Forbidden"},
+                        "500": {"description": "Error"},
+                    },
+                }
+            },
+        }
+    )
+
+    refusals = 6
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/items/<int:item_id>", methods=["DELETE"])
+    def delete_item(item_id):
+        if len(deletions) < refusals:
+            deletions.append(status_code)
+            return jsonify({"error": "Try later"}), status_code
+        deletions.append(204)
+        return "", 204
+
+    deletions = []
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    cli.run(api.schema_url, "--phases=stateful", "--max-examples=30", "-c", "not_a_server_error")
+
+    assert deletions[refusals:] != [], deletions

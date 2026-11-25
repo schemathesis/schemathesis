@@ -302,10 +302,23 @@ def _reject_unusable_operation(engine: EngineContext, operation_label: str) -> N
 
 
 def _send_step(
-    machine: RecordingStateMachine, case: Case, *, engine: EngineContext, event_queue: queue.Queue
-) -> Response:
-    """Send the step's request and validate the response, waiting out rate limits when configured."""
+    machine: RecordingStateMachine, case: Case, *, engine: EngineContext, ctx: StatefulContext, event_queue: queue.Queue
+) -> Response | None:
+    """Send the step's request and validate the response, waiting out rate limits when configured.
+
+    `None` when the request is a dead end and is not sent.
+    """
     machine.before_call(case)
+    request_key = (case.operation.label, hash(case))
+    # The final replay of a failure must reach the server, or Hypothesis reports it as flaky.
+    if ctx.is_dead_end(request_key) and not current_build_context().is_final:
+        machine.recorder.forget_case(case_id=case.id)
+        return None
+
+    def validate_step(response: Response) -> None:
+        ctx.record_request_outcome(request_key, response.status_code)
+        machine.validate_response(response, case)
+
     kwargs = machine.get_call_kwargs(case)
     rate_limited, response = send_tracked(
         engine,
@@ -318,7 +331,7 @@ def _send_step(
     return validate_with_rate_limited(
         rate_limited,
         response,
-        lambda response: machine.validate_response(response, case),
+        validate_step,
         machine.recorder,
         case.id,
     )
@@ -520,7 +533,9 @@ def _run_step(
             # The request is never sent, so the case must not count in the summary
             machine.recorder.forget_case(case_id=case.id)
     try:
-        response = _send_step(machine, case, engine=engine, event_queue=event_queue)
+        response = _send_step(machine, case, engine=engine, ctx=ctx, event_queue=event_queue)
+        if response is None:
+            return None
         result = StepOutput(response, case)
         ctx.current_step_status = Status.SUCCESS
     except UnsatisfiedAssumption:
