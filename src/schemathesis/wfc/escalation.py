@@ -34,19 +34,14 @@ class _AnonymousAuthProvider:
         pass
 
 
-# A 403 got past authentication into authorization; a 401 did not reach that far.
-_DENIAL_RANK = {401: 0, 403: 1}
-
-
 class EscalatingAuthProvider:
-    """Try each identity in document order, moving on from the ones an operation refuses."""
+    """Try each identity in document order, moving on from the ones an operation refuses until one is admitted."""
 
     __slots__ = (
         "providers",
         "names",
         "_assigned",
         "_settled",
-        "_best",
         "_accounts_proven",
         "_refused_early",
         "_checks_credentials",
@@ -71,8 +66,6 @@ class EscalatingAuthProvider:
         self._assigned: dict[str, int] = {}
         # Operations that have been admitted keep their identity for the rest of the run.
         self._settled: set[str] = set()
-        # Best (rank, index) seen per operation, so an exhausted chain keeps its furthest rung.
-        self._best: dict[str, tuple[int, int]] = {}
         # An API may create its accounts mid-run, so a 401 before any credentials are known to work is not final.
         self._accounts_proven = False
         # Earliest identity each operation refused with a 401 before then.
@@ -142,18 +135,9 @@ class EscalatingAuthProvider:
                 return
             if status_code == 401 and not self._accounts_proven and self.names[sent] != ANONYMOUS:
                 self._refused_early.setdefault(label, sent)
-            rank = _DENIAL_RANK[status_code]
-            best = self._best.get(label)
-            # Ties go to the later rung: equally far, it has the most privilege and the best chance with later requests.
-            if best is None or rank >= best[0]:
-                self._best[label] = (rank, current)
             # One denial is enough: an operation may get only a couple of requests, below any higher threshold.
-            if current + 1 < len(self.providers):
-                self._assigned[label] = current + 1
-                return
-            # Chain exhausted: keep whichever rung got furthest and stop moving.
-            self._assigned[label] = self._best[label][1]
-            self._settled.add(label)
+            # A server may also deny a request for the data it carries, so after the last identity the walk starts over.
+            self._assigned[label] = (current + 1) % len(self.providers)
 
     def _retry_refused_early(self) -> None:
         for label, index in self._refused_early.items():
