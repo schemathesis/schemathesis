@@ -935,7 +935,8 @@ def test_explicit_hypothesis_default_max_steps(ctx):
         phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
     )
 
-    assert [len(event.recorder.cases) for event in engine if isinstance(event, events.ScenarioFinished)][-1] == 50
+    # Three of the 50 steps repeat a request the API keeps refusing and are not sent.
+    assert [len(event.recorder.cases) for event in engine if isinstance(event, events.ScenarioFinished)][-1] == 47
 
 
 def test_stateful_harvest_flows_into_pool(ctx):
