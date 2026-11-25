@@ -24,6 +24,23 @@ ValueChannelKeyword: TypeAlias = Literal[
     "required",
 ]
 
+STRING_KEYWORDS = ("pattern", "minLength", "maxLength", "enum")
+NUMBER_KEYWORDS = ("minimum", "maximum", "multipleOf", "enum")
+FORMATS = ("uuid", "email", "date-time", "date")
+
+
+def has_value_targets(schema: JsonValue) -> bool:
+    """Whether any subschema carries a keyword the value channel can break; over-approximates."""
+    if isinstance(schema, dict):
+        if schema.get("format") in FORMATS or any(
+            keyword in schema for keyword in (*STRING_KEYWORDS, *NUMBER_KEYWORDS, "required")
+        ):
+            return True
+        return any(has_value_targets(value) for value in schema.values())
+    if isinstance(schema, list):
+        return any(has_value_targets(item) for item in schema)
+    return False
+
 
 def violate_uuid(original: str) -> str:
     # 'g' is not hex: a UUID-shaped value stays UUID-like; anything else gets a fixed near-miss
@@ -149,14 +166,14 @@ def collect_value_targets(
                     collect_value_targets(item, items, path + (index,), bundle, schema_pointer + "/items", name_to_uri)
                 )
     elif isinstance(body, str):
-        for keyword in ("pattern", "minLength", "maxLength", "enum"):
+        for keyword in STRING_KEYWORDS:
             if keyword in schema:
                 targets.append((path, schema_pointer, body, keyword, schema))
         format_value = schema.get("format")
-        if isinstance(format_value, str) and format_value in ("uuid", "email", "date-time", "date"):
+        if isinstance(format_value, str) and format_value in FORMATS:
             targets.append((path, schema_pointer, body, f"format:{format_value}", schema))
     elif isinstance(body, (int, float)) and not isinstance(body, bool):
-        for keyword in ("minimum", "maximum", "multipleOf", "enum"):
+        for keyword in NUMBER_KEYWORDS:
             if keyword in schema:
                 targets.append((path, schema_pointer, body, keyword, schema))
     return targets
