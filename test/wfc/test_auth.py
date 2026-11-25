@@ -1188,9 +1188,8 @@ def test_escalation_settles_each_operation_on_its_identity(cli, ctx, tmp_path):
         for r in api.requests
         if r.method == "DELETE" and r.path.startswith("/api/nobody")
     ]
-    assert seen, "operation was never dispatched"
-    # Every identity is refused; the last one to reach authorization is the one a later request has any chance with.
-    assert seen[-1] == "admin", f"settled on a weaker identity: {seen}"
+    # Every identity is refused, so none of them is kept and each gets another chance with later requests.
+    assert seen[:8] == ["viewer", "", "editor", "admin"] * 2
 
 
 EXPIRING_AUTH = {
@@ -1276,6 +1275,34 @@ def test_content_type_probe_refusal_does_not_move_the_identity(cli, ctx, tmp_pat
     cli.run_openapi_app(app, "--max-examples=5", f"--auth-wfc={auth}", "--phases=coverage,fuzzing")
 
     assert set(sent) == {"ApiKey viewer"}
+
+
+def test_denial_caused_by_request_data_does_not_cost_an_operation_its_identity(cli, ctx, tmp_path):
+    # A server may answer 403 for what a request carries, whoever sends it.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "page", "in": "query", "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}, "403": {"description": "Forbidden"}},
+                }
+            }
+        }
+    )
+    sent = []
+
+    @app.route("/items")
+    def items():
+        sent.append(request.headers.get("Authorization", ""))
+        # One refusal for each identity in the document and one for the request without credentials.
+        if len(sent) <= len(ROLE_AUTH["auth"]) + 1 or sent[-1] != "ApiKey admin":
+            return jsonify({}), 403
+        return jsonify({}), 200
+
+    auth = _write(tmp_path, {"auth": ROLE_AUTH["auth"][::-1]})
+    cli.run_openapi_app(app, "--max-examples=20", f"--auth-wfc={auth}", "--phases=fuzzing")
+
+    assert sent[-1] == "ApiKey admin", f"settled on an identity the operation refuses: {sent}"
 
 
 BASIC_AUTH = {
@@ -1424,14 +1451,6 @@ def test_ndjson_records_the_identity(cli, ctx, tmp_path):
         for node in event.get("ScenarioFinished", {}).get("recorder", {}).get("cases", {}).values()
     }
     assert "admin" in identities
-    seen = [
-        (r.headers.get("Authorization") or "").removeprefix("ApiKey ")
-        for r in api.requests
-        if r.method == "DELETE" and r.path.startswith("/api/nobody")
-    ]
-    assert seen, "operation was never dispatched"
-    # No identity can reach this operation and dropping credentials is no better, so it stops moving.
-    assert len(set(seen[-3:])) == 1, f"kept cycling through the chain: {seen}"
 
 
 def test_unknown_cached_identity_is_ignored(cli, ctx, tmp_path):
