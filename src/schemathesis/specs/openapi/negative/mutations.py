@@ -898,8 +898,8 @@ def negate_constraints(
             if key in candidates or enabled_keywords.is_enabled(key):
                 is_negated = True
                 negated_keys.append(key)
-                # Dropping `format` frees the draw to ignore it; barring it would ask for the complement of
-                # a format, which has no spelling. The validator filter still decides what counts as invalid.
+                # Dropping `format` frees the draw to ignore it; barring it would need a schema for every value
+                # outside the format, and none exists. The validator filter still decides what counts as invalid.
                 if key != "format":
                     negated = schema.setdefault("not", {})
                     negated[key] = value

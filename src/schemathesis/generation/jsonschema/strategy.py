@@ -195,7 +195,7 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
         return _all_of(view, ctx)
     if isinstance(view, canonical.OneOfView):
         return _one_of(schema, view, ctx)
-    raise UnsupportedSchema.from_reason(f"this part of it:\n\n{_displayed(schema)}")
+    raise UnsupportedSchema.from_reason(f"this schema:\n\n{_displayed(schema)}")
 
 
 def _displayed(schema: jsonschema_rs.CanonicalSchema) -> str:
@@ -263,21 +263,23 @@ def _not(
     if isinstance(barred_view, canonical.ReferenceView):
         barred = _target(barred, barred_view.uri, ctx)
     complement = _negated(barred)
-    if complement is None or _bars_its_input(complement, barred):
-        # With no spelled complement, or the bar handed back unchanged, the bar judges the draw itself.
-        # Only the document can be judged that way: below it, a pointer to `#` names something else.
+    if complement is None:
+        # No schema describes the rejected values, so the barred schema filters the draw instead. Only the
+        # document can be filtered that way: below it, a pointer to `#` names something else.
         if schema != ctx.root:
-            raise UnsupportedSchema.from_reason("a `not` whose complement is not spelled out, below the document root")
+            raise UnsupportedSchema.from_reason(
+                f"`not` of this schema inside a property or array item:\n\n{_displayed(barred)}"
+            )
         return _anything(ctx).filter(_validator(schema))
-    spelled = complement.to_json_schema()
-    if _points_on(spelled):
+    complement_json = complement.to_json_schema()
+    if _points_on(complement_json):
         # A pointer naming a carried definition reads against the complement; one naming the document
         # still means where the bar appeared, which the complement is not.
-        if _names_document(spelled):
-            raise UnsupportedSchema.from_reason("a `not` whose complement names the whole document")
+        if _names_document(complement_json):
+            raise UnsupportedSchema.from_reason('`not` of a schema containing `"$ref": "#"`')
         # A bar reached back through its own complement names a value no finite draw settles on.
         if barred in ctx.complementing:
-            raise UnsupportedSchema.from_reason("a `not` reaching back into its own complement")
+            raise UnsupportedSchema.from_reason("`not` of a recursive schema that refers back to itself")
         nested = StrategyContext(
             root=complement,
             alphabet=ctx.alphabet,
@@ -935,15 +937,18 @@ def _intersected(
 def _negated(schema: jsonschema_rs.CanonicalSchema) -> jsonschema_rs.CanonicalSchema | None:
     """Every value the schema rejects, or `None` when that cannot be expressed as a schema."""
     try:
-        return schema.negate()
+        negated = schema.negate()
     except canonical.CanonicalizationError:
         return None
+    if _bars_its_input(negated, schema):
+        return None
+    return negated
 
 
 def _subtracted(
     left: jsonschema_rs.CanonicalSchema | None, right: jsonschema_rs.CanonicalSchema
 ) -> jsonschema_rs.CanonicalSchema | None:
-    """`left` without what `right` admits, or `None` where the complement cannot be spelled."""
+    """`left` without what `right` admits, or `None` when no schema describes what `right` rejects."""
     negated = _negated(right)
     if negated is None:
         return None
@@ -1183,7 +1188,7 @@ def _violation_entry(
 
 
 def _rejected_by(admitted: SearchStrategy[JsonT], schema: jsonschema_rs.CanonicalSchema) -> SearchStrategy[JsonT]:
-    """A demand met by filtering, for a schema whose complement the canonical form cannot spell."""
+    """A demand met by filtering, for a schema whose rejected values no schema describes."""
     # `to_json_schema` carries the draft the node was canonicalized under, so the facets that only
     # assert on some drafts - `contentEncoding` and friends - are judged the same way here.
     admits = _validator(schema)

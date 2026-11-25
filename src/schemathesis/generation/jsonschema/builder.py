@@ -116,7 +116,7 @@ def _build(
         if canonical_key is not None:
             canonical_form_cache[canonical_key] = canonical_schema
     if canonical_schema.kind is canonical.CanonicalKind.RAW:
-        raise UnsupportedSchema.from_reason(f"this part of it:\n\n{_displayed(canonical_schema)}")
+        raise UnsupportedSchema.from_reason(f"this schema:\n\n{_displayed(canonical_schema)}")
     # Spelled out so the caller reports an unsatisfiable schema; no other engine gets a say.
     if canonical_schema.satisfiability() is canonical.Satisfiability.NO:
         return EMPTY_STRATEGY
