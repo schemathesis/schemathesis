@@ -1979,22 +1979,48 @@ def test_canonical_object_unsatisfiable_when_required_name_is_not_admitted():
     assert built.is_empty
 
 
-UNSPELLABLE_OBJECT_DEMANDS = [
-    # Draft 7 asserts content facets, which no complement can spell.
+INEXPRESSIBLE_OBJECT_NEGATIONS = [
+    # Draft 7 asserts content keywords, and no schema describes the values they reject.
     (
         {"not": {"type": "object", "propertyNames": {"contentEncoding": "base64"}}},
         jsonschema_rs.Draft7Validator,
     ),
     ({"not": {"type": "object", "additionalProperties": {"const": [1]}}}, jsonschema_rs.Draft202012Validator),
+    (
+        {
+            "not": {
+                "type": "object",
+                "additionalProperties": {
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["kind", f"{kind}_value"],
+                            "properties": {
+                                "kind": {"type": "string", "enum": [kind]},
+                                f"{kind}_value": {"type": "string", **value_format},
+                            },
+                        }
+                        for kind, value_format in (
+                            ("int", {"format": "int32"}),
+                            ("string", {}),
+                            ("bytes", {"format": "byte"}),
+                        )
+                    ]
+                },
+            }
+        },
+        jsonschema_rs.Draft4Validator,
+    ),
 ]
 
 
 @pytest.mark.parametrize(
     ("schema", "validator_cls"),
-    UNSPELLABLE_OBJECT_DEMANDS,
-    ids=[str(schema) for schema, _ in UNSPELLABLE_OBJECT_DEMANDS],
+    INEXPRESSIBLE_OBJECT_NEGATIONS,
+    ids=[str(schema) for schema, _ in INEXPRESSIBLE_OBJECT_NEGATIONS],
 )
-def test_canonical_object_demand_without_a_spellable_complement(schema, validator_cls):
+def test_canonical_object_negation_inexpressible_as_a_schema(schema, validator_cls):
     built = _canonical_strategy(schema, GenerationConfig(), validator_cls)
     is_valid = validator_cls(schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS).is_valid
 
