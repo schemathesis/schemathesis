@@ -452,3 +452,66 @@ def test_value_channel_keeps_earlier_bodies_intact(ctx):
         for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 100)
     ]
     assert [snapshot for body, snapshot in drawn if body != snapshot] == []
+
+
+@pytest.mark.parametrize("location", ["query", "header", "cookie", "path"])
+def test_value_channel_breaks_one_parameter_value(ctx, location):
+    operation = ctx.openapi.load_operation(
+        "GET /items/{code}" if location == "path" else "GET /items",
+        {
+            "parameters": [
+                {"name": "code", "in": location, "required": True, "schema": {"type": "string", "enum": ["alpha"]}}
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = find_first(
+        operation.as_strategy(generation_mode=GenerationMode.NEGATIVE),
+        lambda case: any(mutation.channel == MutationChannel.VALUE for mutation in case.meta.phase.data.mutations),
+        # The value channel fires on a minority of draws.
+        max_examples=200,
+    )
+    assert [
+        (mutation.parameter_location, mutation.keywords, mutation.original_value, mutation.new_value)
+        for mutation in case.meta.phase.data.mutations
+    ] == [(ParameterLocation(location), ("enum",), "alpha", "__not_in_enum__")]
+
+
+@pytest.mark.parametrize(
+    ("location", "parameter_schema", "keyword"),
+    [
+        # Dropping a single character leaves an empty segment, which routes to another URL.
+        (ParameterLocation.PATH, {"type": "string", "minLength": 1, "maxLength": 5}, "minLength"),
+        # The broken integer `4` reads off the wire as the valid string "4".
+        (ParameterLocation.QUERY, {"type": ["integer", "string"], "maximum": 3}, "maximum"),
+    ],
+    ids=["empty-path-segment", "valid-on-the-wire"],
+)
+def test_value_channel_skips_breaks_the_server_cannot_see(location, parameter_schema, keyword):
+    schema = {
+        "type": "object",
+        "properties": {"id": parameter_schema},
+        "required": ["id"],
+        "additionalProperties": False,
+    }
+    with pytest.raises(NoSuchExample):
+        find_first(
+            negative_schema(
+                schema,
+                operation_name="GET /items/{id}",
+                location=location,
+                media_type=None,
+                custom_formats=get_default_format_strategies(),
+                generation_config=GenerationConfig(),
+                validator_cls=jsonschema_rs.Draft4Validator,
+            ),
+            lambda result: (
+                result.meta is not None
+                and any(
+                    mutation.channel == MutationChannel.VALUE and mutation.keywords == (keyword,)
+                    for mutation in result.meta.mutations
+                )
+            ),
+            # The excluded break is rare, so a small budget would pass without looking.
+            max_examples=500,
+        )

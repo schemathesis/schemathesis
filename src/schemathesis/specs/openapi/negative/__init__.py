@@ -40,7 +40,11 @@ from schemathesis.specs.openapi.negative.mutations import (
     MutationTargetDescriptor,
     compute_mutation_targets,
 )
-from schemathesis.specs.openapi.negative.value_channel import apply_value_channel, collect_value_targets
+from schemathesis.specs.openapi.negative.value_channel import (
+    apply_value_channel,
+    collect_value_targets,
+    has_value_targets,
+)
 from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
 from schemathesis.transport.serialization import Binary, contains_binary, json_sequence_readings
 
@@ -362,27 +366,53 @@ def negative_schema(
         target_descriptors=target_descriptors,
     ).flatmap(generate_value_with_metadata)
 
-    if location == ParameterLocation.BODY:
-        positive_strategy = _positive_body_strategy(
+    value_schema = schema if isinstance(schema, dict) else {}
+    # Root `required` breaks of parameters are always declined below.
+    breakable = (
+        {key: value for key, value in value_schema.items() if key != "required"} if is_sent_as_text else value_schema
+    )
+    # A valid value with nothing to break only delays the schema channel.
+    positive_strategy = (
+        _positive_strategy(
             schema, validator_cls, custom_formats=custom_formats, format_lengths=format_lengths, alphabet=alphabet
         )
-        if positive_strategy is not None:
-            # Failing every format would pass an unchanged valid body with a format field as negative data
-            mutated_strategy = _with_value_channel(
-                mutated_strategy,
-                positive_strategy,
-                schema if isinstance(schema, dict) else {},
-                get_real_validator(validator_cache_key),
-                location,
-                name_to_uri,
+        if has_value_targets(breakable)
+        else None
+    )
+    if positive_strategy is not None:
+
+        def is_visible_to_server(value: JsonValue, mutation: Mutation) -> bool:
+            if not is_sent_as_text:
+                return True
+            # Missing required parameters come from the schema channel, which names them.
+            if not mutation.path:
+                return False
+            # An emptied path parameter leaves a URL of another operation.
+            if location == ParameterLocation.PATH and mutation.new_value == "":
+                return False
+            container = cast("dict[str, Any]", value)
+            name = mutation.path[0]
+            return name not in container or not parameter_reads_as_valid(
+                name, container[name], get_real_validator(parameter_cache_key)
             )
-        if media_type is not None and is_json(media_type):
-            return _with_syntax_fuzzing(mutated_strategy, location)
+
+        # Failing every format would pass an unchanged valid value with a format field as negative data
+        mutated_strategy = _with_value_channel(
+            mutated_strategy,
+            positive_strategy,
+            value_schema,
+            get_real_validator(validator_cache_key),
+            location,
+            name_to_uri,
+            is_visible_to_server,
+        )
+    if location == ParameterLocation.BODY and media_type is not None and is_json(media_type):
+        return _with_syntax_fuzzing(mutated_strategy, location)
 
     return mutated_strategy
 
 
-def _positive_body_strategy(
+def _positive_strategy(
     schema: JsonSchema,
     validator_cls: type[jsonschema_rs.Validator],
     *,
@@ -390,7 +420,7 @@ def _positive_body_strategy(
     format_lengths: dict[str, FormatLengths],
     alphabet: Alphabet,
 ) -> st.SearchStrategy | None:
-    """Valid bodies to break one value at a time, or None when the schema has none to offer."""
+    """Valid values to break one leaf at a time, or None when the schema has none to offer."""
     try:
         candidate = build(
             schema,
@@ -410,30 +440,31 @@ def _positive_body_strategy(
 def _with_value_channel(
     mutated_strategy: st.SearchStrategy,
     positive_strategy: st.SearchStrategy,
-    body_schema: JsonSchemaObject,
+    schema: JsonSchemaObject,
     real_validator: jsonschema_rs.Validator,
     location: ParameterLocation,
     name_to_uri: dict[str, str] | None,
+    is_visible_to_server: Callable[[JsonValue, Mutation], bool],
 ) -> st.SearchStrategy:
-    """Sometimes break a single value of a valid body instead of mutating the schema."""
+    """Sometimes break a single leaf of a valid value instead of mutating the schema."""
 
     @st.composite
     def hybrid(draw: Any) -> GeneratedValue:
         random = draw(st.randoms())
         if random.random() < VALUE_CHANNEL_PROBABILITY:
             positive = draw(positive_strategy)
-            targets = collect_value_targets(positive, body_schema, name_to_uri=name_to_uri)
+            targets = collect_value_targets(positive, schema, name_to_uri=name_to_uri)
             if not targets:
                 return draw(mutated_strategy)
             target_path, schema_pointer, _value, keyword, schema_at_path = draw(st.sampled_from(targets))
             # Breaking happens in place, and positive draws can share objects across draws (e.g. `enum` members).
-            new_body, original_value, new_value = apply_value_channel(
+            broken, original_value, new_value = apply_value_channel(
                 cast(JsonValue, deepclone(positive)), target_path, keyword, schema_at_path
             )
             # A permissive schema may accept the broken value; fall back to schema mutation to avoid a false positive.
             # Binary values validate as "", so structure-level keywords still apply.
-            body_for_validation = _strip_binary(new_body) if contains_binary(new_body) else new_body
-            if real_validator.is_valid(body_for_validation):
+            value_for_validation = _strip_binary(broken) if contains_binary(broken) else broken
+            if real_validator.is_valid(value_for_validation):
                 return draw(mutated_strategy)
             mutation = Mutation(
                 path=target_path,
@@ -446,7 +477,9 @@ def _with_value_channel(
                 original_value=original_value,
                 new_value=new_value,
             )
-            return GeneratedValue(new_body, MutationMetadata(mutations=(mutation,)))
+            if not is_visible_to_server(broken, mutation):
+                return draw(mutated_strategy)
+            return GeneratedValue(broken, MutationMetadata(mutations=(mutation,)))
         return draw(mutated_strategy)
 
     return hybrid()
