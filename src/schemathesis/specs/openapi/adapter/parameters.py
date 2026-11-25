@@ -65,6 +65,7 @@ from schemathesis.specs.openapi.adapter.validators import ensure_object
 from schemathesis.specs.openapi.converter import permit_forbidden_properties, to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
 from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS
+from schemathesis.specs.openapi.utils import parameter_types
 from schemathesis.transport.serialization import Binary, quote_all, quote_generated
 
 if TYPE_CHECKING:
@@ -336,7 +337,10 @@ def build_constants_overlay_strategy(
     else:
         leaves = (((name,), schema) for name, schema in schema_properties.items() if isinstance(schema, dict))
     for path, schema in leaves:
-        keys = _constant_types_for(schema, validator_cls)
+        # Property schemas keep bundled `$ref`s into the container; splice the bundle in so they resolve
+        leaf_schema = schema_with_bundle(schema, container_schema) if isinstance(container_schema, dict) else schema
+        # A dict stays a dict with the bundle added
+        keys = _constant_types_for(cast(JsonSchemaObject, leaf_schema), validator_cls)
         if location != "body":
             # Only a request body can carry a `Binary` constant
             keys = tuple(key for key in keys if key != "bytes")
@@ -350,8 +354,6 @@ def build_constants_overlay_strategy(
                     pool_values.append((value, entry.origins[0] if entry.origins else None))
         if not pool_values:
             continue
-        # Property schemas keep bundled `$ref`s into the container; splice the bundle in so the validator resolves them
-        leaf_schema = schema_with_bundle(schema, container_schema) if isinstance(container_schema, dict) else schema
         try:
             validator = make_validator(leaf_schema, validator_cls)
         except Exception:
@@ -504,16 +506,18 @@ def _constant_types_for(schema: JsonSchemaObject, validator_cls: type) -> tuple[
     fmt = schema.get("format")
     if fmt == "binary" and schema.keys() & {"enum", "const", "pattern"}:
         return ()
-    # An unenforced `format` lets through constants the SUT rejects (`phone`); `binary` gets a length check
-    if fmt is not None and fmt != "binary" and fmt not in VALIDATED_FORMATS_BY_DRAFT.get(validator_cls, frozenset()):
-        return ()
+    validated_formats = VALIDATED_FORMATS_BY_DRAFT.get(validator_cls, frozenset())
+    for candidate_format in _branch_formats(schema):
+        # An unenforced `format` lets through constants the SUT rejects (`phone`); `binary` gets a length check
+        if candidate_format != "binary" and candidate_format not in validated_formats:
+            return ()
     result: list[ConstantType] = []
 
     def add(key: ConstantType) -> None:
         if key not in result:
             result.append(key)
 
-    for json_type in get_type(schema):
+    for json_type in parameter_types(schema):
         if json_type == "string":
             add("bytes" if fmt == "binary" else "string")
         elif json_type == "integer":
@@ -522,6 +526,25 @@ def _constant_types_for(schema: JsonSchemaObject, validator_cls: type) -> tuple[
             add("float")
             add("integer")
     return tuple(result)
+
+
+def _branch_formats(schema: JsonSchemaObject) -> Iterator[object]:
+    """`format` values of the schema and of the `allOf`, `anyOf` and `oneOf` branches nested in it."""
+    bundled = schema.get(BUNDLE_STORAGE_KEY)
+    visited: list[JsonSchemaObject] = []
+    pending = [schema]
+    while pending:
+        current = resolve_bundled_ref(pending.pop(), bundled)
+        # A branch reached again, e.g. through a reference cycle, adds nothing new.
+        if any(current is seen for seen in visited):
+            continue
+        visited.append(current)
+        if "format" in current:
+            yield current["format"]
+        for keyword in ("allOf", "anyOf", "oneOf"):
+            branches = current.get(keyword)
+            if isinstance(branches, list):
+                pending.extend(branch for branch in branches if isinstance(branch, dict))
 
 
 def _captured_variants_active(extra_data_source: ExtraDataSource | None, operation: APIOperation) -> bool:

@@ -171,6 +171,40 @@ def test_constant_applied_to_query_parameter():
     assert case.query["code"] == draw.value
 
 
+def _has_constant_draw(case, value):
+    return case._meta is not None and any(draw.value == value for draw in case._meta.constants_draws)
+
+
+@pytest.mark.parametrize("location", ["query", "body"])
+@pytest.mark.parametrize(
+    "limit", [{"type": "integer"}, {"$ref": "#/components/schemas/Limit"}], ids=["inline", "reference"]
+)
+def test_whole_float_constants_skip_optional_integers(ctx, location, limit):
+    # A whole float is a valid integer, but it goes out as `100.0`, which servers expecting integers reject.
+    optional_limit = {"anyOf": [limit, {"type": "null"}]}
+    if location == "query":
+        definition = {"parameters": [{"name": "limit", "in": "query", "schema": optional_limit}]}
+    else:
+        body = {"type": "object", "properties": {"limit": optional_limit}, "required": ["limit"]}
+        definition = {"requestBody": {"required": True, "content": {"application/json": {"schema": body}}}}
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {**definition, "responses": {"200": {"description": "OK"}}},
+        version="3.1.0",
+        components={"schemas": {"Limit": {"type": "integer"}}},
+    )
+    pool = _source("integer", 7)
+    pool.add(ConstantEntry(value=100.0, type="float", origins=(Origin(source="s", module="m", adapter=None),)))
+    strategy = operation.as_strategy(
+        generation_mode=GenerationMode.POSITIVE, feedback=FeedbackSources(constants_value_source=pool)
+    )
+
+    case = find_first(strategy, lambda case: _has_constant_draw(case, 7), max_examples=_MAX_EXAMPLES)
+    assert (case.query if location == "query" else case.body) == {"limit": 7}
+    with pytest.raises(NoSuchExample):
+        find_first(strategy, lambda case: _has_constant_draw(case, 100.0), max_examples=_MAX_EXAMPLES)
+
+
 def test_constant_rejected_by_generation_settings_does_not_hide_the_rest():
     strategy = build_constants_overlay_strategy(
         st.just({"code": "placeholder"}),
@@ -973,17 +1007,45 @@ def test_typeless_object_property_is_not_scalar_substituted(data, schema):
 
 @given(data=st.data())
 @settings(max_examples=5)
-def test_float_constant_is_substituted_into_number_property(data):
-    assert _draw(data, _source("float", 2.5), schema_properties={"blob": {"type": "number"}}) == 2.5
+def test_string_constant_is_substituted_into_recursive_optional_reference(data):
+    blob = {"anyOf": [{"$ref": "#/x-bundled/Name"}, {"type": "null"}]}
+    bundled = {"Name": {"anyOf": [{"$ref": "#/x-bundled/Name"}, {"type": "string"}]}}
+    container = {"type": "object", "properties": {"blob": blob}, "x-bundled": bundled}
+    assert (
+        _draw(data, _source("string", "utf8"), schema_properties={"blob": blob}, container_schema=container) == "utf8"
+    )
 
 
 @given(data=st.data())
 @settings(max_examples=5)
-def test_format_constrained_string_constant_is_not_substituted(data):
+def test_float_constant_is_substituted_into_number_property(data):
+    assert _draw(data, _source("float", 2.5), schema_properties={"blob": {"type": "number"}}) == 2.5
+
+
+@pytest.mark.parametrize(
+    ("blob", "bundled"),
+    [
+        ({"type": "string", "format": "phone"}, {}),
+        ({"anyOf": [{"type": "string", "format": "phone"}, {"type": "null"}]}, {}),
+        (
+            {"anyOf": [{"$ref": "#/x-bundled/Phone"}, {"type": "null"}]},
+            {"Phone": {"type": "string", "format": "phone"}},
+        ),
+        ({"allOf": [{"$ref": "#/x-bundled/Phone"}]}, {"Phone": {"type": "string", "format": "phone"}}),
+        (
+            {"anyOf": [{"allOf": [{"$ref": "#/x-bundled/Phone"}]}, {"type": "null"}]},
+            {"Phone": {"type": "string", "format": "phone"}},
+        ),
+    ],
+    ids=["plain", "optional", "optional-reference", "all-of-reference", "nested-reference"],
+)
+@given(data=st.data())
+@settings(max_examples=5)
+def test_format_constrained_string_constant_is_not_substituted(data, blob, bundled):
     # The validator ignores unknown formats like `phone`, so a substituted literal may break the format the SUT checks.
     source = _source("string", "utf8")
-    schema = {"type": "string", "format": "phone"}
-    assert _draw(data, source, schema_properties={"blob": schema}) == "placeholder"
+    container = {"type": "object", "properties": {"blob": blob}, "x-bundled": bundled}
+    assert _draw(data, source, schema_properties={"blob": blob}, container_schema=container) == "placeholder"
 
 
 @given(data=st.data())
