@@ -12,7 +12,7 @@
 - `st replay` reporting a case as fixed after resending a recorded value it could not re-extract.
 - `UnsupportedSchema` in negative mode for `additionalProperties` referencing a union of objects. [#6224](https://github.com/schemathesis/schemathesis/issues/6224)
 - Valid-input rates in reports counting only oversized strings in the coverage phase. [#6210](https://github.com/schemathesis/schemathesis/issues/6210)
-- Stateful phase skipping operations with optional filters or body fields like `groupId` as starting points.
+- Stateful phase skipping operations with optional filters or body fields like `groupId` as starting points. [#6223](https://github.com/schemathesis/schemathesis/issues/6223)
 - `--max-time` runs with consecutive `--seed` values generating mostly the same test cases.
 - False positive `negative_data_rejection` for file uploads and array fields in `multipart/form-data` bodies.
 - `--auth-wfc` runs with several users keeping an operation on a refused user after a `403` caused by request data.
