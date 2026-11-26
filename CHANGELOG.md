@@ -7,6 +7,10 @@
 - Up to 1.9x more requests per second in the fuzzing phase.
 - Fewer repeated requests in the stateful phase after the API keeps refusing the same request.
 
+### :wrench: Changed
+
+- Independently generated values for every field in fuzzing cases.
+
 ### :bug: Fixed
 
 - `st replay` reporting a case as fixed after resending a recorded value it could not re-extract.
