@@ -1120,6 +1120,113 @@ def test_connection_error(ctx):
     assert expected in str(errors[0].info)
 
 
+@pytest.mark.parametrize("phase", [PhaseName.FUZZING, PhaseName.STATEFUL_TESTING], ids=["fuzzing", "stateful"])
+def test_notes_present_before_the_run_are_not_deleted(ctx, app_runner, phase):
+    note = {
+        "type": "object",
+        "properties": {"id": {"type": "integer"}, "text": {"type": "string"}},
+        "required": ["id", "text"],
+    }
+    note_id = {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/notes": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "array", "items": {"$ref": "#/components/schemas/Note"}}
+                                }
+                            },
+                        }
+                    }
+                },
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"id": {"type": "integer"}, "text": {"type": "string"}},
+                                    "required": ["text"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Note"}}},
+                        }
+                    },
+                },
+            },
+            "/notes/{id}": {
+                "get": {
+                    "parameters": [note_id],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Note"}}},
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                },
+                "delete": {
+                    "parameters": [note_id],
+                    "responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found"}},
+                },
+            },
+        },
+        components={"schemas": {"Note": note}},
+    )
+    present = {1, 2, 3}
+    notes = {number: {"id": number, "text": "kept"} for number in present}
+    deleted = []
+
+    @app.route("/notes", methods=["GET"])
+    def list_notes():
+        return flask.jsonify(list(notes.values()))
+
+    @app.route("/notes", methods=["POST"])
+    def create_note():
+        body = flask.request.get_json(silent=True)
+        if not isinstance(body, dict) or not isinstance(body.get("text"), str):
+            return flask.jsonify({"error": "invalid"}), 400
+        number = body.get("id")
+        if number not in notes:
+            number = 100 + len(notes) + len(deleted)
+        notes[number] = {"id": number, "text": body["text"]}
+        return flask.jsonify(notes[number]), 201
+
+    @app.route("/notes/<int:number>", methods=["GET"])
+    def get_note(number):
+        if number not in notes:
+            return flask.jsonify({"error": "missing"}), 404
+        return flask.jsonify(notes[number])
+
+    @app.route("/notes/<int:number>", methods=["DELETE"])
+    def delete_note(number):
+        if notes.pop(number, None) is None:
+            return flask.jsonify({"error": "missing"}), 404
+        deleted.append(number)
+        return "", 204
+
+    # Small ids are reached by guessing only after a few dozen cases.
+    EventStream(
+        schemathesis.openapi.from_url(app_runner.openapi_url(app)),
+        phases=[phase],
+        modes=[GenerationMode.POSITIVE],
+        max_examples=60,
+        seed=2,
+    ).execute()
+
+    assert (present & set(deleted), bool(deleted)) == (set(), True)
+
+
 def test_reserved_characters_in_operation_name(ctx):
     # See GH-992
     api = ctx.openapi.serve(basic.reserved())

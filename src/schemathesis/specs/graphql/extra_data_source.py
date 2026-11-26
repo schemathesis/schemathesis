@@ -104,6 +104,12 @@ class GraphQLResourcePool:
     def record_request(self, *, operation: APIOperation, case: Case, status_code: int) -> None:
         return None  # pragma: no cover
 
+    def record_origin(self, *, operation: APIOperation, response: Response, case: Case) -> None:
+        return None
+
+    def deletes_existing_data(self, *, operation: APIOperation, case: Case) -> bool:
+        return False
+
     def record_successful_delete(self, *, operation: APIOperation, case: Case) -> None:
         # Runs right after the call, so later cases of the same operation stop drawing the deleted ids.
         if not _is_cleanup(operation):

@@ -336,6 +336,11 @@ class OpenApiExtraDataSource(ExtraDataSource):
         self.semantic_eligible_operations = semantic_eligible_operations
         # Operations whose strategies bind captured variants at build time (consumer side).
         self.consumer_labels: frozenset[str] = frozenset(key[0] for key in requirements)
+        repository.track_origin(
+            (requirement.resource_name, requirement.resource_field)
+            for (label, location, _), requirement in requirements.items()
+            if location == ParameterLocation.PATH and label.startswith("DELETE ")
+        )
         # Values that have been successfully DELETEd; pool draws skip them.
         self._tombstoned: set[tuple[str, Any]] = set()
         # Body fields below the top level, e.g. `data/0/groupId`, by operation label.
@@ -697,6 +702,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         operation: APIOperation,
         response: Response,
         case: Case,
+        origin_only: bool = False,
     ) -> None:
         """Deserialize a response and record its values for later generation."""
         # An echoed oversized string would reach later requests as an identifier.
@@ -708,6 +714,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             self.semantic_index is not None
             and operation.label in self.semantic_eligible_operations
             and 200 <= response.status_code < 300
+            and not origin_only
         )
         if not has_descriptors and not semantic_active:
             return
@@ -735,6 +742,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 and documented.status_code != "default"
                 and declared_response_schema(operation, response.status_code, content_type) is not None
                 else None,
+                origin_only=origin_only,
             )
         if semantic_active:
             # Without a usable schema, fall back to a schemaless walk.
@@ -754,6 +762,34 @@ class OpenApiExtraDataSource(ExtraDataSource):
                     value=leaf.value,
                     source_operation=operation.label,
                 )
+
+    def record_origin(self, *, operation: APIOperation, response: Response, case: Case) -> None:
+        if not self.repository.tracks_origin_of(operation.label):
+            return
+        try:
+            self.record_response(operation=operation, response=response, case=case, origin_only=True)
+        except Exception:
+            # A failing custom deserializer is reported when the response is recorded for later generation.
+            pass
+
+    def _deleted_resource(self, operation: APIOperation, case: Case) -> tuple[ParameterRequirement, Any] | None:
+        """The resource the trailing path parameter names, even before `.json`, and the value sent for it."""
+        if operation.method.lower() != "delete" or not case.path_parameters:
+            return None
+        name = trailing_path_parameter(re.sub(r"\.\w+$", "", operation.path.rstrip("/")))
+        if name is None or name not in case.path_parameters:
+            return None
+        requirement = self.requirements.get((operation.label, ParameterLocation.PATH, name))
+        if requirement is None:
+            return None
+        return requirement, case.path_parameters[name]
+
+    def deletes_existing_data(self, *, operation: APIOperation, case: Case) -> bool:
+        target = self._deleted_resource(operation, case)
+        if target is None:
+            return False
+        requirement, value = target
+        return self.repository.is_existing_data(requirement.resource_name, requirement.resource_field, value)
 
     def record_successful_delete(
         self,
@@ -781,14 +817,11 @@ class OpenApiExtraDataSource(ExtraDataSource):
         variant_key = jsonschema_rs.canonical.json.to_string(plain_str_values(resource_params))
         self.usage_tracker.record_successful_delete(variant_key)
 
-        # Tombstone and evict the resource the trailing path parameter names, even before `.json`; parents stay.
-        name = trailing_path_parameter(re.sub(r"\.\w+$", "", operation.path.rstrip("/")))
-        if name is None or name not in case.path_parameters:
+        # Tombstone and evict the deleted resource; parents stay.
+        target = self._deleted_resource(operation, case)
+        if target is None:
             return
-        requirement = self.requirements.get((operation.label, ParameterLocation.PATH, name))
-        if requirement is None:
-            return
-        value = case.path_parameters[name]
+        requirement, value = target
         try:
             self._tombstoned.add((requirement.resource_name, value))
         except TypeError:

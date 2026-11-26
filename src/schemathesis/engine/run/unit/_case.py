@@ -22,7 +22,7 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import metrics
 from schemathesis.generation.case import Case
-from schemathesis.generation.meta import CONTENT_TYPE_PROBES, coverage_scenario
+from schemathesis.generation.meta import CONTENT_TYPE_PROBES, TestPhase, coverage_scenario
 from schemathesis.resources import record_delete_attempt, record_interaction
 from schemathesis.wfc.escalation import record_auth_outcome
 
@@ -84,6 +84,8 @@ def run_one_case(
         # A SKIP verdict can flip mid-scenario; cases already drawn or queued must not reach the server.
         if _is_skipped_by_supervisor(case, ctx):
             return
+        if _deletes_existing_data(case, ctx):
+            return
         if scenario.generation.unique_inputs:
             _call_and_validate_once(case=case, ctx=ctx, scenario=scenario, pending_events=pending_events)
         else:
@@ -108,6 +110,16 @@ def _is_skipped_by_supervisor(case: Case, ctx: EngineContext) -> bool:
     return (
         _is_ordinary_request(case)
         and ctx.supervisor.verdict(case.operation.label).directive is SchedulingDirective.SKIP
+    )
+
+
+def _deletes_existing_data(case: Case, ctx: EngineContext) -> bool:
+    # Data the API had before the run may be what the run depends on, such as the account it signs in with.
+    return (
+        ctx.extra_data_source is not None
+        and case.meta is not None
+        and case.meta.phase.name is TestPhase.FUZZING
+        and ctx.extra_data_source.deletes_existing_data(operation=case.operation, case=case)
     )
 
 
