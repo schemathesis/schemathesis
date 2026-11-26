@@ -67,7 +67,7 @@ Reproduce with:
 
 Reproduce with:
 
-    curl -X GET 'http://127.0.0.1/api/multiple_failures?id=100000000001'
+    curl -X GET 'http://127.0.0.1/api/multiple_failures?id=22934'
 
     st replay <PLACEHOLDER>
 

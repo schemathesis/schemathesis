@@ -60,6 +60,9 @@ class ResourceRepository:
         "_resource_buckets",
         "_example_turns",
         "_context_order",
+        "_origin_fields",
+        "_existing",
+        "_created",
         "_lock",
     )
 
@@ -70,6 +73,11 @@ class ResourceRepository:
         self._example_turns: dict[str, int] = {}
         # Context insertion order, for FIFO eviction
         self._context_order: dict[str, deque[str]] = {}
+        # resource_name -> fields whose values are told apart by origin
+        self._origin_fields: dict[str, set[str]] = {}
+        # Values the API returned that no `POST` of this run created, and the ones such a `POST` did create
+        self._existing: set[tuple[str, str, Any]] = set()
+        self._created: set[tuple[str, str, Any]] = set()
         self._lock = threading.Lock()
 
         for descriptor in descriptors:
@@ -102,6 +110,40 @@ class ResourceRepository:
                 return tuple(instances)
             return live
 
+    def track_origin(self, fields: Iterable[tuple[str, str]]) -> None:
+        """Tell values the API already had from ones this run created, for each `(resource_name, field)`."""
+        for resource_name, resource_field in fields:
+            self._origin_fields.setdefault(resource_name, set()).add(resource_field)
+
+    def tracks_origin_of(self, operation_label: str) -> bool:
+        """Whether a response of this operation carries values told apart by origin."""
+        return any(
+            descriptor.resource_name in self._origin_fields
+            for descriptor in self._descriptors_by_operation.get(operation_label, ())
+        )
+
+    def is_existing_data(self, resource_name: str, resource_field: str, value: object) -> bool:
+        """Whether the API returned `value` for a resource that no `POST` of this run created."""
+        with self._lock:
+            # Only strings and integers are tracked.
+            return isinstance(value, (str, int)) and (resource_name, resource_field, value) in self._existing
+
+    def _track_origin(self, instance: ResourceInstance, resource_name: str) -> None:
+        if instance.from_example:
+            return
+        for resource_field in self._origin_fields.get(resource_name, ()):
+            value = instance.data.get(resource_field)
+            if not isinstance(value, (str, int)):
+                continue
+            key = (resource_name, resource_field, value)
+            if key in self._existing or key in self._created:
+                # A later create or read of the same value does not change where it came from.
+                continue
+            if instance.source_operation.startswith("POST ") and str(value) not in instance.referenced:
+                self._created.add(key)
+            else:
+                self._existing.add(key)
+
     def remove_by_value(self, resource_name: str, resource_field: str, value: object) -> int:
         """Drop instances whose `resource_field` equals `value`, e.g. after a DELETE; returns the number removed."""
         context_buckets = self._resource_buckets.get(resource_name)
@@ -117,6 +159,8 @@ class ResourceRepository:
                 removed += len(bucket) - len(kept)
                 bucket.clear()
                 bucket.extend(kept)
+            if isinstance(value, (str, int)):
+                self._created.discard((resource_name, resource_field, value))
         return removed
 
     def record_response(
@@ -131,11 +175,12 @@ class ResourceRepository:
         query: dict[str, Any] | None = None,
         referenced: frozenset[str] = frozenset(),
         documented_status: str | None = None,
+        origin_only: bool = False,
     ) -> None:
         """Capture resources from a response with the operation's descriptors.
 
         `documented_status` is the schema's response key for `status_code`; without it, or with no descriptor for it,
-        any 2xx descriptor matches.
+        any 2xx descriptor matches. With `origin_only`, values are told apart by origin and not offered to later draws.
         """
         descriptors = self._descriptors_by_operation.get(operation, [])
         if documented_status is not None and all(
@@ -165,6 +210,7 @@ class ResourceRepository:
                     identity=identity,
                     query=query or {},
                     referenced=referenced,
+                    origin_only=origin_only,
                 )
 
     def seed_input_values(self, by_resource: dict[str, dict[str, Any]], *, source: str) -> None:
@@ -264,6 +310,7 @@ class ResourceRepository:
         identity: str | None = None,
         query: dict[str, Any] | None = None,
         referenced: frozenset[str] = frozenset(),
+        origin_only: bool = False,
     ) -> None:
         """Store an instance, capping instances per context and evicting the oldest context when full."""
         # Delimited markers carry transport-only data; resource identifiers use the plain form.
@@ -284,6 +331,9 @@ class ResourceRepository:
         )
 
         with self._lock:
+            self._track_origin(instance, resource_name)
+            if origin_only:
+                return
             context_buckets = self._resource_buckets.get(resource_name)
             if context_buckets is None:
                 # A resource without descriptors, e.g. one captured only from request slots

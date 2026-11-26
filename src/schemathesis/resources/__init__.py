@@ -67,6 +67,10 @@ class ResourcePool(Protocol):
         """Correlated pool values for every resource-bound slot of `operation`, with provenance."""
         ...  # pragma: no cover
 
+    def deletes_existing_data(self, *, operation: APIOperation, case: Case) -> bool:
+        """Whether `case` deletes a resource the API had before the run."""
+        ...  # pragma: no cover
+
 
 class ResourceRecorder(Protocol):
     """Record side: captures values from responses and requests as they happen."""
@@ -82,6 +86,10 @@ class ResourceRecorder(Protocol):
         response: Response,
         case: Case,
     ) -> None: ...  # pragma: no cover
+
+    def record_origin(self, *, operation: APIOperation, response: Response, case: Case) -> None:
+        """Note which returned resources the API already had, without offering their values to later draws."""
+        ...  # pragma: no cover
 
     def record_request(
         self,

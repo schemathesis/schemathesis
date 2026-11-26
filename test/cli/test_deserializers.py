@@ -198,7 +198,11 @@ def test_deserializer_error_in_stateful_phase(ctx, cli, snapshot_cli):
                     "operationId": "getItem",
                     "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"200": {"description": "OK", "content": custom}},
-                }
+                },
+                "delete": {
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"204": {"description": "Deleted"}},
+                },
             },
         }
     )
@@ -206,6 +210,10 @@ def test_deserializer_error_in_stateful_phase(ctx, cli, snapshot_cli):
     @app.route("/items", methods=["POST"])
     def create_item():
         return Response("{}", status=201, content_type="application/vnd.custom")
+
+    @app.route("/items/<int:item_id>", methods=["DELETE"])
+    def delete_item(item_id):
+        return Response(status=204)
 
     @app.route("/items/<int:item_id>", methods=["GET"])
     def get_item(item_id):

@@ -317,6 +317,9 @@ def _send_step(
 
     def validate_step(response: Response) -> None:
         ctx.record_request_outcome(request_key, response.status_code)
+        # The pool stays frozen during a scenario, but a later step must know what an earlier one created.
+        if engine.extra_data_source is not None:
+            engine.extra_data_source.record_origin(operation=case.operation, response=response, case=case)
         machine.validate_response(response, case)
 
     kwargs = machine.get_call_kwargs(case)
@@ -527,6 +530,11 @@ def _run_step(
             key = hash(case)
             if key in ctx.passed_steps:
                 return None
+        # Data the API had before the run may be what the run depends on, such as the account it signs in with.
+        if engine.extra_data_source is not None and engine.extra_data_source.deletes_existing_data(
+            operation=case.operation, case=case
+        ):
+            return None
         will_send = True
     finally:
         if not will_send:
