@@ -28,7 +28,7 @@ _______________________________ GET /api/twin_a ________________________________
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 405, 406, 409, 415, 422, 428, 429, 5xx
-    Invalid component: parameter `q` in query - violates `required` (was q)
+    Invalid component: parameter `q` in query - violates `additionalProperties`, `required` (was q)
 
 [200] OK:
 

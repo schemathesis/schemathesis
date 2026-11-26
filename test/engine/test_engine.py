@@ -37,6 +37,7 @@ from schemathesis.specs.openapi.checks import (
 from test.apps.catalog.openapi import basic, error_feedback
 from test.apps.fragments import handlers
 from test.apps.fragments.schemas import linked_users
+from test.apps.runtime import OpenAPIApp
 from test.utils import EventStream
 
 IS_PYPY = platform.python_implementation() == "PyPy"
@@ -2467,3 +2468,46 @@ def test_operation_that_hung_in_earlier_phases_gets_a_shorter_timeout(ctx, app_r
         "Read timed out after 1.4 seconds",
         "Read timed out after 1.0 seconds",
     ]
+
+
+def test_fuzzing_does_not_copy_values_between_fields(ctx):
+    field = {"type": "string", "minLength": 6}
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/notes": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"title": field, "text": field},
+                                    "required": ["title", "text"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/notes", methods=["POST"])
+    def notes():
+        return flask.jsonify({})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+    # Copies show up only after the first few dozen cases.
+    EventStream(
+        schemathesis.openapi.from_url(api.schema_url),
+        phases=[PhaseName.FUZZING],
+        modes=[GenerationMode.POSITIVE],
+        max_examples=100,
+        seed=1,
+    ).execute()
+
+    bodies = [request.json() for request in api.requests if request.path == "/notes"]
+    assert [body for body in bodies if body["title"] == body["text"] and len(set(body["title"])) > 1] == []

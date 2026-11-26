@@ -84,6 +84,18 @@ def setup() -> None:
                 return None
             super().pretty(obj, **kwargs)
 
+    generate_mutations_from = engine.ConjectureRunner.generate_mutations_from
+
+    def _generate_mutations_from(self: engine.ConjectureRunner, data: object) -> None:
+        # Mutation copies a generated value over its siblings, so half of the cases repeat one value in several
+        # fields. State machines keep it: repeating a step is how they revisit a resource
+        test = getattr(getattr(self._test_function, "__self__", None), "wrapped_test", None)
+        if test is not None and ApiOperationMark.is_set(test):
+            return None
+        return generate_mutations_from(self, data)  # type: ignore[arg-type]
+
+    # Hypothesis has no setting for its mutation pass.
+    engine.ConjectureRunner.generate_mutations_from = _generate_mutations_from  # type: ignore[method-assign]
     # Hypothesis exposes no hook for its printer, so the class is swapped in place.
     root_core.RepresentationPrinter = RepresentationPrinter  # type: ignore[misc]
     root_core.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
