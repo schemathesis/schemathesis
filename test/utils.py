@@ -30,7 +30,7 @@ from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalErro
 from schemathesis.engine.recorder import Interaction
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, APIStateMachine
-from schemathesis.schemas import BaseSchema
+from schemathesis.schemas import APIOperation, BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -376,3 +376,10 @@ def saved_example_keys(state_machine: type[APIStateMachine]) -> set[bytes]:
     with pytest.raises(AssertionError):
         Failing.run(settings=settings(DEFAULT_STATE_MACHINE_SETTINGS, database=database, max_examples=1))
     return set(database.data)
+
+
+def always_suggest(operation: APIOperation, *schemas: dict, parameter: str) -> None:
+    """Suggest `schemas` so that every generated case takes one of them, which a few cases are then enough to show."""
+    operation.schema.suggestions.add(
+        schemas, source="hooks", operation=operation.label, parameter=parameter, probability=1.0
+    )

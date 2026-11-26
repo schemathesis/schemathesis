@@ -12,11 +12,10 @@ from schemathesis.generation.dictionaries import DictionaryDraw
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.meta import TestPhase
-from schemathesis.hooks import HookContext
 from schemathesis.python._constants.pool import ConstantEntry, ConstantsPool, Origin
 from schemathesis.specs.graphql.dictionaries import resolve_bindings, substitute_dictionaries
 from schemathesis.specs.graphql.schemas import graphql_cases
-from test.utils import run_given
+from test.utils import always_suggest, run_given
 
 SDL = """
 interface Media {
@@ -493,12 +492,51 @@ def test_invalid_binding_keys(key, expected):
 
 def test_suggested_values_fill_arguments(ctx):
     operation = load(ctx, {})["Query"]["bookByTitle"]
-    HookContext(operation=operation).suggest(["Dune"], parameter="Query.bookByTitle.title", probability=1.0)
+    always_suggest(operation, {"const": "Dune"}, parameter="Query.bookByTitle.title")
     assert collect_bodies(operation, max_examples=5, containing='title: "Dune"')
+
+
+def test_suggested_schemas_fill_arguments(ctx):
+    operation = load(ctx, {})["Query"]["bookByTitle"]
+    always_suggest(operation, {"type": "string", "pattern": "^VC-[0-9]{2}$"}, parameter="Query.bookByTitle.title")
+    bodies = collect_bodies(operation, max_examples=10)
+    assert len(set(bodies)) > 1 and all(re.search(r'title: "VC-[0-9]{2}"', body) for body in bodies)
+
+
+def test_suggested_schema_draws_carry_the_value_sent(ctx):
+    operation = load(ctx, {})["Query"]["bookByTitle"]
+    always_suggest(operation, {"const": "Emma"}, parameter="Query.bookByTitle.title")
+    cases = generate_many(operation.as_strategy(), 5)
+    assert {draw.value for case in cases for draw in case._meta.dictionary_draws} == {"Emma"}
+
+
+def test_suggested_schemas_and_values_share_an_argument(ctx):
+    operation = load(ctx, {})["Query"]["bookByTitle"]
+    always_suggest(operation, {"const": "Dune"}, {"const": "Emma"}, parameter="Query.bookByTitle.title")
+    bodies = collect_bodies(operation, max_examples=30)
+    assert {re.search(r'title: "(\w+)"', body).group(1) for body in bodies} == {"Dune", "Emma"}
+
+
+@pytest.mark.parametrize(
+    "suggested",
+    [
+        {"type": "string", "pattern": "^[a-z]{3}$"},
+        {"type": "array", "items": {"type": "integer"}},
+        {"type": "boolean"},
+        {"type": "string", "minLength": 5, "maxLength": 1},
+        {"type": "string", "pattern": "["},
+    ],
+    ids=["text-for-a-number", "array", "boolean", "no-values", "unusable-pattern"],
+)
+def test_suggested_schema_value_that_does_not_fit_the_argument_is_not_sent(ctx, suggested):
+    operation = load(ctx, {})["Query"]["rated"]
+    always_suggest(operation, suggested, parameter="Query.rated.score")
+    cases = generate_many(operation.as_strategy(), 10)
+    assert not any(case._meta.dictionary_draws for case in cases)
 
 
 def test_values_suggested_after_generation_started_fill_arguments(ctx):
     operation = load(ctx, {})["Query"]["bookByTitle"]
     before = collect_bodies(operation, max_examples=5, containing='title: "Dune"')
-    HookContext(operation=operation).suggest(["Dune"], parameter="Query.bookByTitle.title", probability=1.0)
+    always_suggest(operation, {"const": "Dune"}, parameter="Query.bookByTitle.title")
     assert not before and collect_bodies(operation, max_examples=5, containing='title: "Dune"')

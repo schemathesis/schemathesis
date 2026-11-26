@@ -305,7 +305,7 @@ class Codes:
         pass
 
     def setup(self, context, schema):
-        context.suggest(["SECRET42"], parameter="query.code")
+        context.suggest({"const": "SECRET42"}, parameter="query.code")
 """
 SUGGEST_AFTER_CALL = """
 @schemathesis.extension("codes")
@@ -314,7 +314,7 @@ class Codes:
         pass
 
     def after_call(self, context, case, response):
-        context.suggest(["SECRET42"], parameter="query.code")
+        context.suggest({"const": "SECRET42"}, parameter="query.code")
 """
 
 

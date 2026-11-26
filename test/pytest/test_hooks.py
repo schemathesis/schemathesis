@@ -692,7 +692,7 @@ def test_values_suggested_by_a_hook_reach_later_requests(ctx, testdir, app_runne
         f"""
 @schemathesis.hook
 def after_call(context, case, response):
-    context.suggest(["SECRET42"], parameter="query.code")
+    context.suggest({{"const": "SECRET42"}}, parameter="query.code")
 
 schema = schemathesis.openapi.from_url("{app_runner.openapi_url(app)}")
 

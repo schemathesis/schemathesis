@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.config import SchemathesisWarning
+from schemathesis.config._dictionaries import EntrySchema
 from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import make_validator, property_schemas
@@ -142,7 +143,11 @@ def check_dictionary_bindings(
         )
         for parameter_name, binding in bindings.items():
             validator = make_validator(properties[parameter_name], validator_cls)
-            failing = [value for _, value in binding.entries if not validator.is_valid(value)]
+            failing = [
+                value
+                for _, value in binding.entries
+                if not isinstance(value, EntrySchema) and not validator.is_valid(value)
+            ]
             parameter = f"{location.value}.{parameter_name}"
             mismatch = None
             if len(failing) * 2 > len(binding.entries):

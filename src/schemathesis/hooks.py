@@ -2,21 +2,24 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
-from collections.abc import Callable, Generator, Iterable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeVar, cast
 
+import jsonschema_rs
+
 from schemathesis.config import ConfigError, SchemathesisConfig
 from schemathesis.config._parameters import validate_binding_key
+from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import HookExecutionError, format_exception
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import Response
 from schemathesis.filters import FilterSet, attach_filter_chain
-from schemathesis.generation.suggestions import DEFAULT_PROBABILITY, HOOKS_SOURCE
+from schemathesis.generation.suggestions import HOOKS_SOURCE
 
 if TYPE_CHECKING:
     import requests
@@ -64,29 +67,30 @@ class HookContext:
         self._schema = schema if schema is not None or operation is None else operation.schema
         self._hook = None
 
-    def suggest(
-        self,
-        values: Iterable[str | int | float],
-        *,
-        parameter: str | None = None,
-        operation: str | None = None,
-        probability: float = DEFAULT_PROBABILITY,
-    ) -> None:
-        # `parameter` uses the keys of `[parameters]` in the config; without it the values go to every parameter of
-        # a matching type. `operation` is a label, by default the operation this hook runs for, or every operation.
+    def suggest(self, *schemas: JsonSchemaObject, parameter: str, operation: str | None = None) -> None:
+        # Each schema is a JSON Schema for the values to send: `{"const": 57}`, `{"enum": ["open", "held"]}`,
+        # `{"type": "string", "pattern": "^VC-[0-9]{4}$"}`. Every member of a fixed set is a suggestion of its own;
+        # any other schema is one suggestion, and each use draws a value it admits.
+        # `parameter` uses the keys of `[parameters]` in the config. `operation` is a label, by default the operation
+        # this hook runs for, or every operation.
         if self._schema is None:
             raise RuntimeError("`suggest` needs a loaded schema; `before_load_schema` runs before there is one")
-        if parameter is not None:
+        specification = self._schema.specification
+        if not specification.supports_feature(SpecificationFeature.SUGGESTIONS):
+            raise ValueError(f"`suggest` does not work with {specification.name} yet")
+        try:
+            validate_binding_key(parameter)
+        except ConfigError as error:
+            raise ValueError(str(error)) from None
+        for schema in schemas:
             try:
-                validate_binding_key(parameter)
-            except ConfigError as error:
-                raise ValueError(str(error)) from None
+                jsonschema_rs.meta.validate(schema)
+            except jsonschema_rs.ValidationError as error:
+                raise ValueError(f"Invalid schema: {error.message}") from None
         if operation is None and self.operation is not None:
             operation = self.operation.label
         source = _extension_name(self._hook) if self._hook is not None else None
-        self._schema.suggestions.add(
-            values, source=source or HOOKS_SOURCE, operation=operation, parameter=parameter, probability=probability
-        )
+        self._schema.suggestions.add(schemas, source=source or HOOKS_SOURCE, operation=operation, parameter=parameter)
 
 
 def to_filterable_hook(dispatcher: HookDispatcher) -> Callable:

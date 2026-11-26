@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from schemathesis.config._dictionaries import (
     DictionaryDefinition,
@@ -104,7 +104,8 @@ def _load(
     # Each choice is a value of a bound dictionary together with the values it was fetched with.
     # A dictionary whose values another bound dictionary remembers adds no choices of its own.
     choices = [
-        [{leader.name: entry.value} | entry.origin for entry in leader.entries]
+        # Schemas exist only among suggested values, which no source parameter can name.
+        [{leader.name: cast("EntryValue", entry.value)} | entry.origin for entry in leader.entries]
         for leader, _ in pair_groups(dictionaries[binding.dictionary] for binding in bindings.values())
     ]
     combinations = list(itertools.islice(itertools.product(*choices), MAX_SOURCE_REQUESTS + 1))
