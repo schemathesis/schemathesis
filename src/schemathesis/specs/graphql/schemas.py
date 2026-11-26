@@ -619,6 +619,7 @@ def graphql_cases(
                     bindings=dictionary_bindings,
                     operation_label=operation.label,
                     random=draw(st.randoms()),
+                    draw=draw,
                 )
                 dictionary_draws = tuple(applied_dictionary_draws)
         if feedback.constants_value_source is not None and effective_mode.is_positive:

@@ -50,6 +50,8 @@ class SpecificationFeature(enum.StrEnum):
     HTTP_REPORTS = "http_reports"
     # Describing REST endpoints in Web Fuzzing Commons reports.
     WFC_REPORTS = "wfc_reports"
+    # Sending values that hooks suggest for request parameters while tests run.
+    SUGGESTIONS = "suggestions"
 
 
 @dataclass(slots=True)
@@ -105,6 +107,7 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
             SpecificationFeature.OPERATION_DICTIONARIES,
             SpecificationFeature.HTTP_REPORTS,
             SpecificationFeature.WFC_REPORTS,
+            SpecificationFeature.SUGGESTIONS,
         }
     ),
     SpecificationKind.GRAPHQL: frozenset(
@@ -114,6 +117,7 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
             SpecificationFeature.HTTP_PROBES,
             SpecificationFeature.OPERATION_DICTIONARIES,
             SpecificationFeature.HTTP_REPORTS,
+            SpecificationFeature.SUGGESTIONS,
         }
     ),
     SpecificationKind.GRPC: frozenset(

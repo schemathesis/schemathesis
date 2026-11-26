@@ -4,14 +4,20 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+import jsonschema_rs
 
 from schemathesis.config._dictionaries import (
-    DictionaryBinding,
     DictionaryDefinition,
     DictionaryEntry,
+    EntrySchema,
     EntryValue,
     ParameterDictionaryBinding,
 )
+
+if TYPE_CHECKING:
+    from schemathesis.core.jsonschema.types import JsonSchemaObject
 
 # Higher values crowd out generated data and the code paths only it reaches.
 DEFAULT_PROBABILITY = 0.3
@@ -25,7 +31,7 @@ HOOKS_SOURCE = "hooks"
 class Suggestions:
     """Suggested values of one schema, shaped as dictionaries and bindings so they are drawn the same way."""
 
-    __slots__ = ("dictionaries", "_generations", "_parameters", "_types", "_lock")
+    __slots__ = ("dictionaries", "_generations", "_parameters", "_lock")
 
     def __init__(self) -> None:
         self.dictionaries: dict[str, DictionaryDefinition] = {}
@@ -33,31 +39,32 @@ class Suggestions:
         self._generations: dict[str | None, int] = {}
         # Bindings by operation label; `None` holds the ones for every operation.
         self._parameters: dict[str | None, dict[str, ParameterDictionaryBinding]] = {}
-        self._types: dict[str | None, dict[str, DictionaryBinding]] = {}
         self._lock = threading.Lock()
 
     def add(
         self,
-        values: Iterable[EntryValue],
+        schemas: Iterable[JsonSchemaObject],
         *,
         source: str,
         operation: str | None,
-        parameter: str | None,
-        probability: float,
+        parameter: str,
+        probability: float = DEFAULT_PROBABILITY,
     ) -> None:
+        entries: list[EntryValue | EntrySchema] = []
+        for schema in schemas:
+            fixed = _fixed_values(schema)
+            if fixed is not None:
+                entries.extend(fixed)
+            else:
+                entries.append(EntrySchema(jsonschema_rs.canonical.json.to_string(schema)))
+        name = f"{source}:{operation}:{parameter}"
         with self._lock:
-            if parameter is not None:
-                name = f"{source}:{operation}:{parameter}"
-                self._parameters.setdefault(operation, {})[parameter] = ParameterDictionaryBinding(name, probability)
-                self._extend(name, source, operation, values)
-                return
-            for value in values:
-                for ty in _types_of(value):
-                    name = f"{source}:{operation}:{ty}"
-                    self._types.setdefault(operation, {})[ty] = DictionaryBinding(name, probability)
-                    self._extend(name, source, operation, [value])
+            self._parameters.setdefault(operation, {})[parameter] = ParameterDictionaryBinding(name, probability)
+            self._extend(name, source, operation, entries)
 
-    def _extend(self, name: str, source: str, operation: str | None, values: Iterable[EntryValue]) -> None:
+    def _extend(
+        self, name: str, source: str, operation: str | None, values: Iterable[EntryValue | EntrySchema]
+    ) -> None:
         definition = self.dictionaries.get(name)
         if definition is None:
             definition = self.dictionaries[name] = DictionaryDefinition(
@@ -81,14 +88,17 @@ class Suggestions:
         """Parameter bindings for the operation, the most specific first."""
         return tuple(self._parameters[scope] for scope in (operation, None) if scope in self._parameters)
 
-    def types(self, operation: str) -> dict[str, DictionaryBinding]:
-        """Type-wide bindings for the operation."""
-        return {**self._types.get(None, {}), **self._types.get(operation, {})}
 
-
-def _types_of(value: EntryValue) -> tuple[str, ...]:
-    if isinstance(value, str):
-        return ("string",)
-    if isinstance(value, int):
-        return ("integer", "number")
-    return ("number",)
+def _fixed_values(schema: JsonSchemaObject) -> list[EntryValue] | None:
+    """The texts and numbers a schema lists one by one; `None` when it describes its values another way."""
+    try:
+        view = jsonschema_rs.canonicalize(schema).view()
+    except jsonschema_rs.canonical.CanonicalizationError:
+        return None
+    if isinstance(view, jsonschema_rs.canonical.ConstView):
+        members = [view.value]
+    elif isinstance(view, jsonschema_rs.canonical.EnumView):
+        members = view.values
+    else:
+        return None
+    return [member for member in members if isinstance(member, (str, int, float)) and not isinstance(member, bool)]

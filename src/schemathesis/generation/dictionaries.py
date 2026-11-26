@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import random
 from bisect import bisect_left
 from collections.abc import Callable, Container, Iterable, Iterator, Mapping, Sequence
@@ -8,7 +9,6 @@ from operator import itemgetter
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
-import jsonschema_rs
 from hypothesis import strategies as st
 
 from schemathesis.config._dictionaries import (
@@ -18,6 +18,7 @@ from schemathesis.config._dictionaries import (
     DictionaryBinding,
     DictionaryDefinition,
     DictionaryEntry,
+    EntrySchema,
     EntryValue,
     ParameterDictionaryBinding,
     coerce_entries_for_type,
@@ -25,6 +26,7 @@ from schemathesis.config._dictionaries import (
     pair_groups,
     parse_body_path,
 )
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import (
     BUNDLE_STORAGE_KEY,
     example_is_valid,
@@ -36,6 +38,7 @@ from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, Jso
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import split_body_path
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY
 from schemathesis.generation.jsonschema.strategy import json_identity
 from schemathesis.generation.value import GeneratedValue, prune_overwritten_constants
 from schemathesis.resources import PoolDraw, SemanticDraw
@@ -57,28 +60,73 @@ def _eligible_for_mode(matches_schema: bool, mode: GenerationMode) -> bool:
     return not matches_schema
 
 
-def _classify_entries(
-    entries: tuple[tuple[int, EntryValue], ...],
-    schema: JsonSchema | None,
-    validator_cls: type,
-    generation_mode: GenerationMode,
-) -> tuple[tuple[int, EntryValue, bool], ...]:
+def _schema_check(schema: JsonSchema | None, validator_cls: type) -> Callable[[EntryValue], bool]:
     # `None` / non-dict schemas route only into NEGATIVE so unverified entries can't pollute positive cases.
-    accepts_anything = schema is True
-    validator: jsonschema_rs.Validator | None = None
-    if not accepts_anything and isinstance(schema, dict):
-        validator = make_validator(schema, validator_cls)
-    classified: list[tuple[int, EntryValue, bool]] = []
+    if schema is True:
+        return lambda _: True
+    if isinstance(schema, dict):
+        return make_validator(schema, validator_cls).is_valid
+    return lambda _: False
+
+
+def _classify_entries(
+    entries: tuple[tuple[int, EntryValue | EntrySchema], ...],
+    matches: Callable[[EntryValue], bool],
+    generation_mode: GenerationMode,
+) -> tuple[EligibleEntry, ...]:
+    classified: list[EligibleEntry] = []
     for entry_index, entry_value in entries:
-        if accepts_anything:
-            matches_schema = True
-        elif validator is None:
-            matches_schema = False
-        else:
-            matches_schema = validator.is_valid(entry_value)
+        # A schema has no value until one is drawn.
+        if isinstance(entry_value, EntrySchema):
+            continue
+        matches_schema = matches(entry_value)
         if _eligible_for_mode(matches_schema, generation_mode):
             classified.append((entry_index, entry_value, matches_schema))
     return tuple(classified)
+
+
+# Builds the strategy for a suggested schema the way the place it is bound to generates its own values.
+SchemaValues = Callable[[JsonSchemaObject], st.SearchStrategy[JsonValue]]
+
+
+@dataclass(slots=True, frozen=True)
+class SuggestedSchema:
+    """A schema entry bound to one place, with the strategy that draws its values there."""
+
+    entry_index: int
+    values: st.SearchStrategy[JsonValue]
+
+
+def _suggested_schemas(
+    entries: tuple[tuple[int, EntryValue | EntrySchema], ...], schema_values: SchemaValues | None
+) -> tuple[SuggestedSchema, ...]:
+    """Schema entries that have values to draw; none without a way to build their strategies."""
+    if schema_values is None:
+        return ()
+    schemas = []
+    for entry_index, entry_value in entries:
+        if isinstance(entry_value, EntrySchema):
+            try:
+                values = schema_values(json.loads(entry_value.text))
+            except InvalidSchema:
+                continue
+            if values is not EMPTY_STRATEGY:
+                schemas.append(SuggestedSchema(entry_index, values))
+    return tuple(schemas)
+
+
+def _draw_schema_value(
+    draw: st.DrawFn, schema: SuggestedSchema, matches: Callable[[EntryValue], bool], generation_mode: GenerationMode
+) -> EligibleEntry | None:
+    """An entry for a value drawn from the schema; `None` when that value cannot be used."""
+    value = draw(schema.values)
+    # An entry is a text or a number, like the values written in a dictionary.
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        return None
+    matches_schema = matches(value)
+    if _eligible_for_mode(matches_schema, generation_mode):
+        return schema.entry_index, value, matches_schema
+    return None
 
 
 @dataclass(slots=True, frozen=True)
@@ -100,7 +148,7 @@ class _ResolvedBinding:
     parameter_name: str
     dictionary: DictionaryDefinition
     probability: float
-    entries: tuple[tuple[int, EntryValue], ...]
+    entries: tuple[tuple[int, EntryValue | EntrySchema], ...]
     # True when this binding came from `[parameters]` or `[[operations]] parameters`: the user
     # targeted a specific parameter, so a missing optional gets force-inserted on substitution.
     is_parameter_specific: bool
@@ -126,7 +174,7 @@ def resolve_parameter_bindings(
 
     # The user's bindings win over suggested values of the same kind.
     parameter_sources = (operation_config.parameters, config.parameters, *suggestions.parameters(operation.label))
-    type_wide_bindings = {**suggestions.types(operation.label), **generation_config.dictionaries}
+    type_wide_bindings = generation_config.dictionaries
 
     resolved: dict[str, _ResolvedBinding] = {}
     for parameter_name, parameter_schema in properties.items():
@@ -145,6 +193,7 @@ def resolve_parameter_bindings(
 
         dictionary = dictionaries.get(binding.dictionary) or suggestions.dictionaries[binding.dictionary]
         is_parameter_specific = isinstance(binding, ParameterDictionaryBinding)
+        entries: tuple[tuple[int, EntryValue | EntrySchema], ...]
         if is_parameter_specific:
             # Values fetched from the API take the parameter's type, so an integer ID fills a string path parameter.
             if dictionary.source is not None:
@@ -231,8 +280,8 @@ def pair_dictionaries(
     return paired
 
 
-def _entries_by_value(dictionary: DictionaryDefinition) -> dict[EntryValue, list[DictionaryEntry]]:
-    by_value: dict[EntryValue, list[DictionaryEntry]] = {}
+def _entries_by_value(dictionary: DictionaryDefinition) -> dict[EntryValue | EntrySchema, list[DictionaryEntry]]:
+    by_value: dict[EntryValue | EntrySchema, list[DictionaryEntry]] = {}
     for entry in dictionary.entries:
         by_value.setdefault(entry.value, []).append(entry)
     return by_value
@@ -270,7 +319,7 @@ def pair_operation_dictionaries(
         for name, binding in bindings.items():
             if binding.is_parameter_specific:
                 eligible = _classify_entries(
-                    binding.entries, properties.get(name), validator_cls, GenerationMode.POSITIVE
+                    binding.entries, _schema_check(properties.get(name), validator_cls), GenerationMode.POSITIVE
                 )
                 places.append((binding.dictionary, binding.probability, eligible))
     if any(_body_bindings(operation, config)):
@@ -281,7 +330,9 @@ def pair_operation_dictionaries(
                 # A wildcard reaches many fields, while a pair fills one.
                 if WILDCARD not in split_body_path(body_binding.pointer):
                     eligible = _classify_entries(
-                        body_binding.entries, body_binding.leaf_schema, validator_cls, GenerationMode.POSITIVE
+                        body_binding.entries,
+                        _schema_check(body_binding.leaf_schema, validator_cls),
+                        GenerationMode.POSITIVE,
                     )
                     places.append((body_binding.dictionary, body_binding.probability, eligible))
     bound: dict[str, tuple[DictionaryDefinition, float, set[int]]] = {}
@@ -338,21 +389,24 @@ def build_dictionary_overlay_strategy(
     schema_properties: dict[str, JsonSchema],
     validator_cls: type,
     generation_mode: GenerationMode,
+    schema_values: SchemaValues | None = None,
     paired: PairedEntries | None = None,
 ) -> st.SearchStrategy:
     # Build-time mode filter so a substitution can't silently flip the case mode chosen by `inner`.
     location_value = parameter_location.value
 
-    eligible_per_parameter: dict[str, tuple[tuple[int, EntryValue, bool], ...]] = {}
+    eligible_per_parameter: dict[str, tuple[EligibleEntry, ...]] = {}
+    # What a parameter draws from on its own: its eligible entries and its suggested schemas, each with one share.
+    choices: dict[str, tuple[EligibleEntry | SuggestedSchema, ...]] = {}
+    checks: dict[str, Callable[[EntryValue], bool]] = {}
     for parameter_name, binding in bindings.items():
-        classified = _classify_entries(
-            binding.entries,
-            schema_properties.get(parameter_name),
-            validator_cls,
-            generation_mode,
-        )
-        if classified:
+        matches = _schema_check(schema_properties.get(parameter_name), validator_cls)
+        classified = _classify_entries(binding.entries, matches, generation_mode)
+        schemas = _suggested_schemas(binding.entries, schema_values)
+        if classified or schemas:
             eligible_per_parameter[parameter_name] = classified
+            choices[parameter_name] = (*classified, *schemas)
+            checks[parameter_name] = matches
 
     if not eligible_per_parameter:
         return inner
@@ -406,7 +460,13 @@ def build_dictionary_overlay_strategy(
                 # A binding is explicit intent, so it overrides a value the resource pool put in the same slot.
                 if random.random() >= binding.probability:
                     continue
-                entry = draw(st.sampled_from(eligible))
+                choice = draw(st.sampled_from(choices[parameter_name]))
+                if isinstance(choice, SuggestedSchema):
+                    entry = _draw_schema_value(draw, choice, checks[parameter_name], generation_mode)
+                    if entry is None:
+                        continue
+                else:
+                    entry = choice
             entry_index, entry_value, matches_schema = entry
             new_value[parameter_name] = _as_sent(entry_value, parameter_location)
             new_draws.append(record(parameter_name, entry_index, entry_value, matches_schema))
@@ -446,7 +506,7 @@ class _ResolvedBodyBinding:
     pointer: str
     dictionary: DictionaryDefinition
     probability: float
-    entries: tuple[tuple[int, EntryValue], ...]
+    entries: tuple[tuple[int, EntryValue | EntrySchema], ...]
     leaf_schema: JsonSchema
     # One flag per `*` in `pointer`: whether that array declares `uniqueItems`.
     unique_items: tuple[bool, ...]
@@ -474,6 +534,7 @@ def resolve_body_bindings(
         dictionary = dictionaries.get(binding.dictionary) or suggestions.dictionaries[binding.dictionary]
         # Values fetched from the API take the field's type, so an integer ID fills a string field.
         ty = _infer_ty(leaf_schema) if dictionary.source is not None else None
+        entries: tuple[tuple[int, EntryValue | EntrySchema], ...]
         if ty is not None:
             entries = coerce_entries_for_type(dictionary.entries, ty)
         else:
@@ -605,21 +666,31 @@ def build_body_dictionary_overlay_strategy(
     container_schema: JsonSchema,
     validator_cls: type,
     generation_mode: GenerationMode,
+    schema_values: SchemaValues | None = None,
     paired: PairedEntries | None = None,
 ) -> st.SearchStrategy:
     # Build-time mode filter so a substitution can't silently flip the case mode chosen by `inner`.
     eligible_per_binding: list[
-        tuple[_ResolvedBodyBinding, tuple[EligibleEntry, ...], dict[object, list[int]], bool]
+        tuple[
+            _ResolvedBodyBinding,
+            tuple[EligibleEntry, ...],
+            dict[object, list[int]],
+            bool,
+            tuple[SuggestedSchema, ...],
+            Callable[[EntryValue], bool],
+        ]
     ] = []
     for binding in bindings:
-        classified = _classify_entries(binding.entries, binding.leaf_schema, validator_cls, generation_mode)
-        if classified:
+        matches = _schema_check(binding.leaf_schema, validator_cls)
+        classified = _classify_entries(binding.entries, matches, generation_mode)
+        schemas = _suggested_schemas(binding.entries, schema_values)
+        if classified or schemas:
             positions: dict[object, list[int]] = {}
             for position, (_, entry_value, _) in enumerate(classified):
                 positions.setdefault(json_identity(entry_value), []).append(position)
             # A pair fills one field, which a wildcard pointer is not.
             takes_pairs = paired is not None and WILDCARD not in split_body_path(binding.pointer)
-            eligible_per_binding.append((binding, classified, positions, takes_pairs))
+            eligible_per_binding.append((binding, classified, positions, takes_pairs, schemas, matches))
 
     if not eligible_per_binding:
         return inner
@@ -652,7 +723,7 @@ def build_body_dictionary_overlay_strategy(
 
         random = draw(st.randoms())
         new_draws: list[DictionaryDraw] = []
-        for binding, eligible, positions, takes_pairs in eligible_per_binding:
+        for binding, eligible, positions, takes_pairs, schemas, matches in eligible_per_binding:
             mark = len(new_draws)
             substituted = _substitute_entries(
                 value,
@@ -664,6 +735,9 @@ def build_body_dictionary_overlay_strategy(
                     binding=binding,
                     eligible=eligible,
                     positions=positions,
+                    schemas=schemas,
+                    matches=matches,
+                    generation_mode=generation_mode,
                     paired=paired if takes_pairs else None,
                     operation_label=operation_label,
                     new_draws=new_draws,
@@ -726,6 +800,9 @@ def _make_replacement(
     binding: _ResolvedBodyBinding,
     eligible: tuple[EligibleEntry, ...],
     positions: dict[object, list[int]],
+    schemas: tuple[SuggestedSchema, ...],
+    matches: Callable[[EntryValue], bool],
+    generation_mode: GenerationMode,
     # Entries drawn together for the whole case; `None` when this binding draws on its own.
     paired: PairedEntries | None,
     operation_label: str,
@@ -741,16 +818,23 @@ def _make_replacement(
             if random.random() >= binding.probability:
                 return current
             skipped = sorted(position for identity in exclude for position in positions.get(identity, ()))
-            if not skipped:
+            # Entries left to draw, then the suggested schemas, each with one share.
+            left = len(eligible) - len(skipped)
+            if not skipped and not schemas:
                 entry = draw(st.sampled_from(eligible))
-            elif len(skipped) < len(eligible):
-                # Draw among the entries left and step over the skipped ones, so large dictionaries are not scanned.
-                index = draw(st.integers(0, len(eligible) - len(skipped) - 1))
-                for position in skipped:
-                    if position > index:
-                        break
-                    index += 1
-                entry = eligible[index]
+            elif left + len(schemas) > 0:
+                index = draw(st.integers(0, left + len(schemas) - 1))
+                if index < left:
+                    # Step over the skipped entries, so large dictionaries are not scanned.
+                    for position in skipped:
+                        if position > index:
+                            break
+                        index += 1
+                    entry = eligible[index]
+                else:
+                    entry = _draw_schema_value(draw, schemas[index - left], matches, generation_mode)
+                    if entry is None or json_identity(entry[1]) in exclude:
+                        return current
             else:
                 return current
         entry_index, entry_value, matches_schema = entry

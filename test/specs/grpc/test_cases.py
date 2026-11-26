@@ -17,6 +17,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
+from schemathesis.hooks import HookContext
 from schemathesis.specs.grpc.converter import request_message
 from schemathesis.specs.grpc.formats import grpc_formats
 from test.apps.catalog.grpc.descriptors import (
@@ -46,6 +47,12 @@ def path(tmp_path_factory):
 @pytest.fixture
 def schema(path):
     return schemathesis.grpc.from_path(path)
+
+
+def test_suggest_is_not_available(schema):
+    operation = next(operation.ok() for operation in schema.get_all_operations())
+    with pytest.raises(ValueError, match="`suggest` does not work with gRPC yet"):
+        HookContext(operation=operation).suggest({"const": "x"}, parameter="body.name")
 
 
 def test_case_shape(schema):

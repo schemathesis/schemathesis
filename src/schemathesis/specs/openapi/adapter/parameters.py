@@ -753,7 +753,20 @@ def _with_dictionary_values(
         schema_properties=properties,
         validator_cls=operation.schema.adapter.jsonschema_validator_cls,
         generation_mode=generation_mode,
+        schema_values=_schema_values(operation, location, generation_config),
         paired=paired,
+    )
+
+
+def _schema_values(
+    operation: APIOperation, location: ParameterLocation, generation_config: GenerationConfig
+) -> Callable[[JsonSchemaObject], st.SearchStrategy]:
+    """Strategies for suggested schemas, built like the ones for the schemas the API declares at that location."""
+    from schemathesis.specs.openapi._hypothesis import make_positive_strategy
+
+    validator_cls = operation.schema.adapter.jsonschema_validator_cls
+    return lambda schema: make_positive_strategy(
+        schema, operation.label, location, None, generation_config, validator_cls
     )
 
 
@@ -1910,6 +1923,7 @@ class OpenApiBody(OpenApiComponent):
                 container_schema=schema,
                 validator_cls=operation.schema.adapter.jsonschema_validator_cls,
                 generation_mode=generation_mode,
+                schema_values=_schema_values(operation, ParameterLocation.BODY, generation_config),
                 paired=paired,
             )
         body_overrides = resolve_body_overrides(operation=operation, body_schema=schema)

@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 import graphql
+import jsonschema_rs
 
 from schemathesis.config._dictionaries import (
     WILDCARD,
     DictionaryDefinition,
+    DictionaryEntry,
+    EntrySchema,
     EntryValue,
     GraphQLBindingPath,
     ParameterDictionaryBinding,
@@ -17,8 +22,11 @@ from schemathesis.config._dictionaries import (
     is_graphql_binding_key,
     parse_graphql_path,
 )
+from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR
 from schemathesis.core.transforms import format_body_path
 from schemathesis.generation.dictionaries import DictionaryDraw, draw_paired_entries, pair_dictionaries
+from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY, build
 from schemathesis.specs.graphql._helpers import (
     _root_type_for,
     _unwrap,
@@ -31,8 +39,14 @@ from schemathesis.specs.graphql.substitution import fits_graphql_float, fits_gra
 if TYPE_CHECKING:
     from random import Random
 
+    from hypothesis import strategies as st
+
     from schemathesis.config import GenerationConfig
+    from schemathesis.core.jsonschema.types import JsonValue
     from schemathesis.schemas import APIOperation
+
+    # Hypothesis' `draw`, as far as suggested schemas use it.
+    DrawSchemaValue = Callable[[st.SearchStrategy[JsonValue]], JsonValue]
 
 # JSON Schema type that entries for each scalar are coerced to; `Boolean`, enums and custom scalars get no dictionaries.
 _SCALAR_TYPE_KEYS: Final[dict[str, str]] = {
@@ -41,6 +55,8 @@ _SCALAR_TYPE_KEYS: Final[dict[str, str]] = {
     "Int": "integer",
     "Float": "number",
 }
+# Suggested schemas are written for no document in particular, so they are read by the latest draft.
+_SCHEMA_DRAFT: Final = CANONICALIZE_DRAFT_BY_VALIDATOR[jsonschema_rs.Draft202012Validator]
 
 
 @dataclass(slots=True, frozen=True)
@@ -98,7 +114,7 @@ def resolve_bindings(operation: APIOperation, generation: GenerationConfig) -> O
     ranked.sort(key=lambda item: item[0], reverse=True)
     type_wide = {
         type_key: (dictionaries[binding.dictionary], binding.probability)
-        for type_key, binding in {**suggestions.types(operation.label), **generation.dictionaries}.items()
+        for type_key, binding in generation.dictionaries.items()
     }
     return OperationBindings(arguments=tuple(binding for _, binding in ranked), type_wide=type_wide)
 
@@ -108,6 +124,8 @@ class _Context:
     bindings: OperationBindings
     operation_label: str
     random: Random
+    # Draws values for suggested schemas; without it they are left out.
+    draw: DrawSchemaValue | None
     draws: list[DictionaryDraw]
 
 
@@ -118,12 +136,13 @@ def substitute_dictionaries(
     bindings: OperationBindings,
     operation_label: str,
     random: Random,
+    draw: DrawSchemaValue | None = None,
 ) -> tuple[graphql.OperationDefinitionNode, list[DictionaryDraw]]:
     """Replace argument literals with configured dictionary entries; also return the applied draws."""
     root = _root_type_for(client_schema, operation_node.operation)
     if root is None:
         return operation_node, []
-    context = _Context(bindings=bindings, operation_label=operation_label, random=random, draws=[])
+    context = _Context(bindings=bindings, operation_label=operation_label, random=random, draw=draw, draws=[])
     selection_set = _walk(operation_node.selection_set, root, context, ())
     if selection_set is not operation_node.selection_set:
         operation_node = replace_node(operation_node, selection_set=selection_set)
@@ -234,12 +253,42 @@ def _scalar_node(
     dictionary, probability = found
     if context.random.random() >= probability:
         return None
-    eligible = _eligible_entries(dictionary, scalar_name, type_key)
+    eligible: list[tuple[int, EntryValue | EntrySchema]] = [*_eligible_entries(dictionary, scalar_name, type_key)]
+    if context.draw is not None:
+        eligible.extend(
+            (entry.index, entry.value) for entry in dictionary.entries if isinstance(entry.value, EntrySchema)
+        )
     if not eligible:
         return None
-    entry_index, entry_value = context.random.choice(eligible)
+    entry_index, picked = context.random.choice(eligible)
+    if isinstance(picked, EntrySchema):
+        assert context.draw is not None
+        drawn = _schema_value(context.draw, picked, entry_index, scalar_name, type_key)
+        if drawn is None:
+            return None
+        entry_value = drawn
+    else:
+        entry_value = picked
     _record(context, dictionary, entry_index, entry_value, argument_path, body_path)
     return scalar_value_node(scalar_name, entry_value)
+
+
+def _schema_value(
+    draw: DrawSchemaValue, schema: EntrySchema, entry_index: int, scalar_name: str, type_key: str
+) -> EntryValue | None:
+    """A value the suggested schema admits, as the scalar takes it; `None` when there is none or it does not fit."""
+    try:
+        strategy = build(json.loads(schema.text), draft=_SCHEMA_DRAFT, formats={})
+    except InvalidSchema:
+        return None
+    if strategy is EMPTY_STRATEGY:
+        return None
+    value = draw(strategy)
+    # An entry is a text or a number, like the values written in a dictionary.
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        return None
+    fitting = _fitting((DictionaryEntry(value=value, index=entry_index),), scalar_name, type_key)
+    return fitting[0][1] if fitting else None
 
 
 def _draw_pairs(
@@ -340,9 +389,13 @@ def _find_binding(
 def _eligible_entries(
     dictionary: DictionaryDefinition, scalar_name: str, type_key: str
 ) -> list[tuple[int, EntryValue]]:
-    entries = coerce_entries_for_type(dictionary.entries, type_key)
+    return _fitting(dictionary.entries, scalar_name, type_key)
+
+
+def _fitting(entries: tuple[DictionaryEntry, ...], scalar_name: str, type_key: str) -> list[tuple[int, EntryValue]]:
+    coerced = coerce_entries_for_type(entries, type_key)
     if scalar_name == "Int":
-        return [entry for entry in entries if fits_graphql_int(entry[1])]
+        return [entry for entry in coerced if fits_graphql_int(entry[1])]
     if scalar_name == "Float":
-        return [entry for entry in entries if fits_graphql_float(entry[1])]
-    return list(entries)
+        return [entry for entry in coerced if fits_graphql_float(entry[1])]
+    return list(coerced)

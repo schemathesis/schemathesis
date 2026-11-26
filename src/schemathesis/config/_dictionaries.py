@@ -96,8 +96,16 @@ def _is_valid_graphql_name(name: str) -> bool:
 
 
 @dataclass(slots=True, frozen=True)
+class EntrySchema:
+    """A JSON Schema in place of a value: each use of the entry draws a value the schema admits."""
+
+    # Canonical JSON text, so that equal schemas are one entry.
+    text: str
+
+
+@dataclass(slots=True, frozen=True)
 class DictionaryEntry:
-    value: EntryValue
+    value: EntryValue | EntrySchema
     index: int
     # Values of other dictionaries in the request that fetched this entry, by dictionary name.
     origin: dict[str, EntryValue] = field(default_factory=dict)
@@ -343,6 +351,9 @@ def _decode_escapes(body: str, *, name: str, line_no: int, path: str) -> str:
 def coerce_entries_for_type(entries: tuple[DictionaryEntry, ...], ty: str) -> tuple[tuple[int, EntryValue], ...]:
     coerced: list[tuple[int, EntryValue]] = []
     for entry in entries:
+        # A schema is drawn from where it is bound by name; it has no value to convert.
+        if isinstance(entry.value, EntrySchema):
+            continue
         eligible = _coerce_one(entry.value, ty)
         if eligible is not None:
             coerced.append((entry.index, eligible))
