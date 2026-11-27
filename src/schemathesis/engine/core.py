@@ -392,6 +392,7 @@ class ExecutionPlan:
             ),
             reauth_count=ctx.reauth.reauth_count,
             reauth_broke=ctx.reauth.broke,
+            behaviors=ctx.behaviors.counts(),
         )
         # Skip after_run on a partial run (interrupt/abort). Spending the whole time budget is a planned finish,
         # and continuous fuzzing has no natural end, so stopping it is how every such run finishes.

@@ -246,7 +246,7 @@ def _record_response_signals(
     response: Response,
     transport_kwargs: dict[str, Any],
 ) -> None:
-    """Feed the response to error feedback, the supervisor, auth escalation and DELETE decay."""
+    """Feed the response to error feedback, the supervisor, auth escalation, behavior counts and DELETE decay."""
     if ctx.error_feedback is not None:
         ctx.record_error_feedback(
             case=case,
@@ -257,6 +257,7 @@ def _record_response_signals(
         )
     if _is_ordinary_request(case):
         record_auth_outcome(case, response.status_code)
+        ctx.record_behavior(case, response)
         ctx.supervisor.observe(case, response, cache_writer=ctx.cache.writer)
     # Record DELETE attempts now so later strategy draws see them.
     if ctx.extra_data_source is not None:
