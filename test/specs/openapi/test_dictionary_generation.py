@@ -1657,6 +1657,7 @@ def test_configured_body_binding_wins_over_suggested_values(ctx):
 
 _VOUCHER = {"type": "string", "pattern": "^VC-[0-9]{4}$"}
 _ONE_VOUCHER = {"type": "string", "pattern": "^VC-7$"}
+_ANY_VOUCHER = {"type": "string", "pattern": "^VC-[0-9]+$"}
 
 
 def _one_query(schema: dict) -> dict:
@@ -1674,6 +1675,12 @@ def test_suggested_schemas_fill_parameters_of_other_types(ctx):
     operation = ctx.openapi.load_operation("GET /items", _one_query({"type": "integer"}))
     always_suggest(operation, {"type": "integer", "minimum": 999, "maximum": 1001}, parameter="query.q")
     assert set(_queries(operation, max_examples=30)) == {999, 1000, 1001}
+
+
+def test_suggested_schemas_are_narrowed_to_the_declared_schema(ctx):
+    operation = ctx.openapi.load_operation("GET /items", _one_query({"type": "string", "maxLength": 5}))
+    always_suggest(operation, _ANY_VOUCHER, parameter="query.q")
+    assert all(re.fullmatch("VC-[0-9]{1,2}", query) for query in _queries(operation, max_examples=20))
 
 
 def test_suggested_schema_draws_carry_the_value_sent(ctx):
@@ -1753,6 +1760,13 @@ def test_suggested_schemas_fill_body_fields(ctx):
     )
     always_suggest(operation, _ONE_VOUCHER, parameter="body.name")
     assert [case.body for case in generate_many(operation.as_strategy(), 5)] == [{"name": "VC-7"}] * 5
+
+
+def test_suggested_schemas_are_narrowed_to_the_declared_body_field(ctx):
+    body = {"type": "object", "properties": {"name": {"type": "string", "maxLength": 5}}, "required": ["name"]}
+    operation = ctx.openapi.load_operation("POST /items", _path_with_body(body)["/items"]["post"])
+    always_suggest(operation, _ANY_VOUCHER, parameter="body.name")
+    assert all(re.fullmatch("VC-[0-9]{1,2}", case.body["name"]) for case in generate_many(operation.as_strategy(), 20))
 
 
 def test_suggested_schema_value_that_breaks_a_body_field_is_not_sent_as_valid(ctx):
