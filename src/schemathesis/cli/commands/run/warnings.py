@@ -226,7 +226,9 @@ def any_positive_is_accepted(recorder: RecordedScenario) -> bool:
             continue
         if case.value.operation.schema.classify_call_outcome(case.value, interaction.response) is CallOutcome.ACCEPTED:
             return True
-    return False
+    return any(
+        cached.is_positive and cached.call_outcome is CallOutcome.ACCEPTED for cached in recorder.cached_outcomes
+    )
 
 
 def none_served(recorder: RecordedScenario) -> bool:
@@ -239,12 +241,15 @@ def none_served(recorder: RecordedScenario) -> bool:
             or case.operation.schema.classify_call_outcome(case, response) is not CallOutcome.NOT_SERVED
         ):
             return False
-    return True
+    return all(cached.call_outcome is CallOutcome.NOT_SERVED for cached in recorder.cached_outcomes)
 
 
 def all_positive_are_rejected(recorder: RecordedScenario) -> bool:
     """Whether the scenario generated positive test cases and the API served none of them."""
-    return any(is_positive(case) for case in recorder.cases.values()) and not any_positive_is_accepted(recorder)
+    has_positive = any(is_positive(case) for case in recorder.cases.values()) or any(
+        cached.is_positive for cached in recorder.cached_outcomes
+    )
+    return has_positive and not any_positive_is_accepted(recorder)
 
 
 class WarningCollector:

@@ -4,13 +4,13 @@ import base64
 import itertools
 import time
 from collections import defaultdict
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from schemathesis.config._output import MAX_RECORDED_PAYLOAD_SIZE
 from schemathesis.core.failures import Failure
-from schemathesis.core.transport import SAFE_METHODS, Headers, Response
+from schemathesis.core.transport import SAFE_METHODS, CallOutcome, Headers, Response
 from schemathesis.engine import Status
 from schemathesis.generation.case import Case
 
@@ -46,6 +46,9 @@ class RecordedScenario(Protocol):
     def interactions(self) -> Mapping[str, Interaction]: ...  # pragma: no cover
 
     @property
+    def cached_outcomes(self) -> Sequence[CachedCallOutcome]: ...  # pragma: no cover
+
+    @property
     def shrinks_failures(self) -> bool: ...  # pragma: no cover
 
     def find_failure_data(self, *, parent_id: str, failure: Failure) -> FailureData: ...  # pragma: no cover
@@ -78,6 +81,10 @@ class ScenarioRecorder:
     filtered_failures: dict[str, int]
     # Network interactions by test case ID
     interactions: dict[str, Interaction]
+    # Outcome classifications reused when `unique_inputs` skips duplicate calls
+    cached_outcomes: list[CachedCallOutcome]
+    # Input hashes already counted in this scenario (sent or replayed from cache)
+    _seen_outcome_keys: set[int]
     # Whether a failure repeats only while Hypothesis shrinks it, so its latest case is the minimal one
     shrinks_failures: bool
     __slots__ = (
@@ -88,6 +95,8 @@ class ScenarioRecorder:
         "checks",
         "filtered_failures",
         "interactions",
+        "cached_outcomes",
+        "_seen_outcome_keys",
         "shrinks_failures",
         "max_recorded_payload_size",
     )
@@ -98,9 +107,28 @@ class ScenarioRecorder:
         self.checks = {}
         self.filtered_failures = {}
         self.interactions = {}
+        self.cached_outcomes = []
+        self._seen_outcome_keys = set()
         self.shrinks_failures = False
         self.max_recorded_payload_size = (
             config.truncation.max_recorded_payload_size if config is not None else MAX_RECORDED_PAYLOAD_SIZE
+        )
+
+    def mark_outcome_seen(self, key: int) -> None:
+        """Record that `key` already contributed its outcome to this scenario."""
+        self._seen_outcome_keys.add(key)
+
+    def record_cached_outcome(self, key: int, *, response: ResponseOutcome, is_positive: bool) -> None:
+        """Record a skipped duplicate input once per scenario using its cached classification."""
+        if key in self._seen_outcome_keys:
+            return
+        self._seen_outcome_keys.add(key)
+        self.cached_outcomes.append(
+            CachedCallOutcome(
+                status_code=response.status_code,
+                call_outcome=response.call_outcome,
+                is_positive=is_positive,
+            )
         )
 
     def record_case(
@@ -472,6 +500,23 @@ class Interaction:
         self.request = request
         self.response = response
         self.timestamp = time.time()
+
+
+@dataclass(slots=True)
+class ResponseOutcome:
+    """Status code of a response and what it says about the data sent."""
+
+    status_code: int
+    call_outcome: CallOutcome
+
+
+@dataclass(slots=True)
+class CachedCallOutcome:
+    """Outcome summary of an earlier call reused when `unique_inputs` skips a duplicate."""
+
+    status_code: int
+    call_outcome: CallOutcome
+    is_positive: bool
 
 
 @dataclass(slots=True)

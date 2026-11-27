@@ -309,3 +309,32 @@ def after_load_schema(context, schema):
 
 def test_json_and_fuzz_output_handlers_are_built_in(json_path):
     assert (is_built_in_handler(JsonReportHandler(json_path)), is_built_in_handler(FuzzOutputHandler())) == (True, True)
+
+
+def test_valid_rates_include_skipped_duplicates_across_phases(ctx, cli, json_path):
+    calls = []
+    app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/items")
+    def items():
+        calls.append(request.path)
+        return {"ok": True}
+
+    cli.run_openapi_app(
+        app,
+        "--phases=coverage,fuzzing",
+        "--mode=positive",
+        "--generation-unique-inputs",
+        "--max-examples=5",
+        "--seed=1",
+        f"--report-json-path={json_path}",
+    )
+    assert (calls, load_report(json_path)["valid_rates"]) == (
+        ["/items"],
+        {
+            "GET /items": {
+                "coverage": {"accepted": 1, "unreachable": 0, "conflicts": 0, "rejected": 0},
+                "fuzzing": {"accepted": 1, "unreachable": 0, "conflicts": 0, "rejected": 0},
+            }
+        },
+    )

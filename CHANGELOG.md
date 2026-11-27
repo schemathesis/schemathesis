@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- False `low_valid_rate` warnings when `--generation-unique-inputs` skips duplicates sent in earlier phases. [#5577](https://github.com/schemathesis/schemathesis/issues/5577)
 - Fuzzing sending a parameter `example` or one known resource id in most requests. [#4848](https://github.com/schemathesis/schemathesis/issues/4848)
 
 ## [4.34.3](https://github.com/schemathesis/schemathesis/compare/v4.34.2...v4.34.3) - 2026-11-27

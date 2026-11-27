@@ -1,4 +1,5 @@
 import itertools
+import json
 
 import pytest
 import strawberry
@@ -1327,3 +1328,63 @@ def test_method_not_allowed_warning_with_fail_on(cli, ctx):
 
     final_line = result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0]
     assert (result.exit_code, final_line) == (ExitCode.TESTS_FAILED, "Warnings fail the run")
+
+
+def test_low_valid_rate_counts_skipped_duplicates_across_phases(ctx, cli, app_runner, tmp_path, monkeypatch):
+    schema = ctx.openapi.build_schema(
+        {
+            "/items/{item_id}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "item_id",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 1},
+                        }
+                    ],
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "404": {"description": "Not found"},
+                    },
+                }
+            }
+        }
+    )
+
+    def get_item(item_id):
+        if int(item_id) in (1, 2, 3):
+            return jsonify({"id": int(item_id)})
+        return jsonify({"error": "missing"}), 404
+
+    schema_url = _serve_schema(ctx, cli, app_runner, schema, [("GET", "/items/<item_id>", get_item)])
+    (tmp_path / "schemathesis.toml").write_text("""
+[dictionaries.existing_ids]
+values = [1, 2, 3]
+
+[parameters]
+"path.item_id" = { dictionary = "existing_ids", probability = 0.25 }
+
+[warnings]
+display = ["low_valid_rate"]
+""")
+    monkeypatch.chdir(tmp_path)
+    report_path = tmp_path / "report.json"
+
+    result = cli.run(
+        schema_url,
+        "--phases=coverage,fuzzing",
+        "--mode=positive",
+        "--generation-unique-inputs",
+        "--max-examples=15",
+        "--seed=1",
+        "--checks=not_a_server_error",
+        f"--report-json-path={report_path}",
+    )
+
+    report = json.loads(report_path.read_text())
+    assert (
+        report["valid_rates"]["GET /items/{item_id}"]["fuzzing"]["accepted"],
+        report["warnings"]["low_valid_rate"],
+        "Low valid-input rate" in result.stdout,
+    ) == (3, [], False)
