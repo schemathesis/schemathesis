@@ -46,7 +46,7 @@ from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.meta import CaseMetadata, TestPhase
 from schemathesis.generation.suggestions import Suggestions
-from schemathesis.hooks import HookDispatcherMark
+from schemathesis.hooks import HookDispatcherMark, dispatch_classify_call_outcome
 from schemathesis.python.application import application_roots
 from schemathesis.transport.prepare import prepare_path, prepare_request
 
@@ -810,6 +810,13 @@ class BaseSchema(Mapping):
         return hash((request.method, request.url, headers, request.body))
 
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
+        """Decide what the API did with a request carrying positive test data."""
+        outcome = dispatch_classify_call_outcome(self, case, response)
+        if outcome is not None:
+            return outcome
+        return self.default_call_outcome(case, response)
+
+    def default_call_outcome(self, case: Case, response: Response) -> CallOutcome:
         """Decide what the API did with a request carrying positive test data, judging by status code.
 
         Specs that answer 200 regardless of the outcome (e.g. GraphQL) override this to read the body.

@@ -572,3 +572,68 @@ def second(context, schema):
     )
     result = cli.main("run", url, "--max-examples=1", hooks=module)
     assert (result.exit_code, calls[-2:]) == (ExitCode.TESTS_FAILED, ["second", "first"])
+
+
+@pytest.mark.parametrize(
+    ("error_type", "args"),
+    [
+        ("conflict", ["-c positive_data_acceptance", "--phases=fuzzing"]),
+        ("conflict", ["-c not_a_server_error", "--phases=fuzzing"]),
+        ("conflict", ["-c not_a_server_error", "--phases=coverage,fuzzing", "--generation-unique-inputs"]),
+        ("reference_not_found", ["-c not_a_server_error", "--phases=fuzzing"]),
+        ("validation", ["-c not_a_server_error", "--phases=fuzzing"]),
+    ],
+    ids=[
+        "conflict-accepted",
+        "conflict-no-mismatch-warning",
+        "repeated-conflict-no-mismatch-warning",
+        "unreachable-no-mismatch-warning",
+        "validation-mismatch-warning",
+    ],
+)
+def test_classify_call_outcome_reads_body(ctx, cli, snapshot_cli, error_type, args):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "object"}}},
+                    },
+                    "responses": {"201": {"description": "Created"}, "400": {"description": "Refused"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"type": error_type, "message": "Name is already taken"}), 400
+
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def classify_call_outcome(context, case, response):
+    if response.status_code != 400:
+        return None
+    return {
+        "conflict": schemathesis.CallOutcome.CONFLICT,
+        "reference_not_found": schemathesis.CallOutcome.UNREACHABLE,
+    }.get(response.json()["type"])
+"""
+    )
+    assert cli.run_openapi_app(app, *args, "--max-examples=10", hooks=module) == snapshot_cli
+
+
+@pytest.mark.parametrize("phase", ["fuzzing", "stateful"])
+@pytest.mark.snapshot(replace_phase_statistic=True)
+def test_classify_call_outcome_error_is_reported(ctx, cli, snapshot_cli, phase):
+    api = ctx.openapi.apps.users_crud()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def classify_call_outcome(context, case, response):
+    raise AttributeError("test hook error")
+"""
+    )
+    assert cli.main("run", api.schema_url, "--max-examples=1", f"--phases={phase}", hooks=module) == snapshot_cli

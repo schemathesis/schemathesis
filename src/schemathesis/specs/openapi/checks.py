@@ -39,6 +39,7 @@ from schemathesis.core.parameters import (
 from schemathesis.core.transport import (
     AUTH_REJECTION_STATUSES,
     SAFE_METHODS,
+    CallOutcome,
     Response,
     expand_status_code,
     expand_status_codes,
@@ -53,6 +54,7 @@ from schemathesis.generation.meta import (
     StatefulPhaseData,
     coverage_scenario,
 )
+from schemathesis.hooks import dispatch_classify_call_outcome
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     EnsureResourceAvailability,
@@ -1108,6 +1110,11 @@ def _openapi_positive_data_acceptance(ctx: CheckContext, response: Response, cas
     ):
         # A schema promises which requests are well formed, not which credentials exist.
         if response.status_code in CREDENTIAL_REJECTION_STATUSES and _grants_credentials(case.operation):
+            return None
+        if dispatch_classify_call_outcome(case.operation.schema, case, response) in (
+            CallOutcome.UNREACHABLE,
+            CallOutcome.CONFLICT,
+        ):
             return None
         message = f"Valid data should have been accepted\nExpected: {', '.join(config.expected_statuses)}"
         hint = _additional_properties_hint(case, response)

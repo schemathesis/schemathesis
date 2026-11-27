@@ -6,14 +6,13 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from schemathesis.core.transport import CallOutcome
+from schemathesis.core.transport import CallOutcome, StatusClass
 from schemathesis.engine import events
 from schemathesis.engine.summary import ValidRate
 from schemathesis.generation.meta import REQUEST_SHAPE_PROBES, coverage_scenario
 from schemathesis.generation.modes import GenerationMode
 
 if TYPE_CHECKING:
-    from schemathesis.core.transport import StatusClass
     from schemathesis.engine.recorder import CaseNode, RecordedScenario
     from schemathesis.engine.run import PhaseName
     from schemathesis.generation.case import Case
@@ -68,15 +67,22 @@ def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
         if not is_positive(case):
             continue
         interaction = recorder.interactions.get(case.value.id)
-        if interaction is None or interaction.response is None:
+        if interaction is None or interaction.call_outcome is None:
             continue
-        _accumulate_call_outcome(
-            outcomes, case.value.operation.schema.classify_call_outcome(case.value, interaction.response)
-        )
+        _accumulate_call_outcome(outcomes, interaction.call_outcome)
     for cached in recorder.cached_outcomes:
         if cached.is_positive:
             _accumulate_call_outcome(outcomes, cached.call_outcome)
     return outcomes
+
+
+def _is_not_a_refusal(status_class: StatusClass, call_outcome: CallOutcome) -> bool:
+    """Whether a client error leaves the data unjudged, e.g. a cancelled gRPC call or a conflict told by the body."""
+    if not status_class.is_client_error:
+        return False
+    if call_outcome is CallOutcome.UNREACHABLE:
+        return status_class is not StatusClass.NOT_FOUND
+    return call_outcome in (CallOutcome.UNINFORMATIVE, CallOutcome.CONFLICT)
 
 
 def aggregate_status_codes(
@@ -96,13 +102,10 @@ def aggregate_status_codes(
             continue
         if interaction.response is not None:
             status = interaction.response.status_code
-            # A client error that says nothing about the data, e.g. a cancelled gRPC call, is no rejection of it.
             if (
                 positive_only
-                and case is not None
-                and classify_status(status).is_client_error
-                and case.value.operation.schema.classify_call_outcome(case.value, interaction.response)
-                is CallOutcome.UNINFORMATIVE
+                and interaction.call_outcome is not None
+                and _is_not_a_refusal(classify_status(status), interaction.call_outcome)
             ):
                 continue
             counts[status] = counts.get(status, 0) + 1
@@ -111,11 +114,7 @@ def aggregate_status_codes(
         if positive_only and not cached.is_positive:
             continue
         status = cached.status_code
-        if (
-            positive_only
-            and classify_status(status).is_client_error
-            and cached.call_outcome is CallOutcome.UNINFORMATIVE
-        ):
+        if positive_only and _is_not_a_refusal(classify_status(status), cached.call_outcome):
             continue
         counts[status] = counts.get(status, 0) + 1
 

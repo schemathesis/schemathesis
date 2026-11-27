@@ -417,7 +417,7 @@ class GraphQLSchema(BaseSchema):
         return operation.definition.raw.deprecation_reason is not None
 
     @override
-    def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
+    def default_call_outcome(self, case: Case, response: Response) -> CallOutcome:
         """Decide what the API did with a positive case from the body: GraphQL answers the same status either way.
 
         An `errors` entry means the operation was not carried out in full.

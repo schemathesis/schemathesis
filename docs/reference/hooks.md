@@ -68,6 +68,7 @@ Hooks that execute during test case execution.
 | **after_network_error** | `(ctx, case: Case, request: PreparedRequest) -> None` | When HTTP request fails at network level | Record or log failed connection attempts |
 | **after_validate** | `(ctx, case: Case, response: Response, results: list[CheckResult]) -> None` | After all checks run | Observe check outcomes for logging or reporting |
 | **filter_failure** | `(ctx, failure: Failure, case: Case, response: Response) -> bool` | Once per check failure | Drop failures that are not your API's fault |
+| **classify_call_outcome** | `(ctx, case: Case, response: Response) -> CallOutcome \| None` | After each response | Tell business-rule refusals from validation errors by the response body |
 
 **Success flow:** `before_call` -> HTTP Request -> `after_call` -> Checks -> `filter_failure` -> `after_validate`
 
@@ -85,6 +86,25 @@ Filtered: 3 (dropped by `filter_failure`)
 ```
 
 Use it for failures that depend on the response rather than on which operation was hit. For a fixed set of failures you have accepted and want reviewed, use a [baseline](../guides/baseline.md) instead. Network errors and failures raised from a check's `after_run` never reach this hook - they have no response to judge.
+
+Schemathesis judges responses to valid data by status code: `404` means the resource is missing and `409` a conflict with its state, so neither fails `positive_data_acceptance` or counts as a validation error. When your API answers such refusals with `400` and tells them apart in the body, return a `CallOutcome` from `classify_call_outcome`, or `None` to keep the status code rule:
+
+```python
+@schemathesis.hook
+def classify_call_outcome(ctx, case, response):
+    if response.status_code != 400:
+        return None
+    try:
+        error_type = response.json().get("type")
+    except ValueError:
+        # Not every 400 comes from your API code, e.g. a framework's plain-text error page.
+        return None
+    if error_type == "conflict":
+        return schemathesis.CallOutcome.CONFLICT
+    if error_type == "reference_not_found":
+        return schemathesis.CallOutcome.UNREACHABLE
+    return None
+```
 
 **Network error flow:** `before_call` -> HTTP Request -> `after_network_error` -> (re-raises)
 
@@ -180,6 +200,7 @@ Not all hooks apply in every phase.
 | `after_network_error` | ✓ | ✓ | ✓ | ✓ |
 | `after_validate` | ✓ | ✓ | ✓ | ✓ |
 | `filter_failure` | ✓ | ✓ | ✓ | ✓ |
+| `classify_call_outcome` | ✓ | ✓ | ✓ | ✓ |
 
 **Examples phase** runs test cases built from examples embedded in the schema. \* Component-level hooks apply only to the parts Schemathesis generates to complete an example, such as a required parameter without an example, so `map_headers` can still add a header the example lacks. Values taken from schema examples are never changed by hooks. Case-level hooks (`before_generate_case`, `filter_case`, `map_case`, `flatmap_case`) have no effect on example cases. With [`fill-missing`](configuration.md#phasesexamplesfill-missing) enabled, the case generated for an operation without examples gets all data generation hooks.
 

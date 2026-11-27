@@ -115,12 +115,10 @@ def _is_skipped_by_supervisor(case: Case, ctx: EngineContext) -> bool:
 
 
 def _response_outcome(case: Case, recorder: ScenarioRecorder) -> ResponseOutcome | None:
-    response = recorder.find_response(case_id=case.id)
-    if response is None:
+    interaction = recorder.interactions.get(case.id)
+    if interaction is None or interaction.response is None or interaction.call_outcome is None:
         return None
-    return ResponseOutcome(
-        status_code=response.status_code, call_outcome=case.operation.schema.classify_call_outcome(case, response)
-    )
+    return ResponseOutcome(status_code=interaction.response.status_code, call_outcome=interaction.call_outcome)
 
 
 def _deletes_existing_data(case: Case, ctx: EngineContext) -> bool:

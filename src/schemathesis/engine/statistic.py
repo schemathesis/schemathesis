@@ -208,12 +208,7 @@ class Statistic:
             if case.is_probe:
                 continue
             interaction = recorder.interactions.get(case_id)
-            if (
-                interaction is not None
-                and interaction.response is not None
-                and case.value.operation.schema.classify_call_outcome(case.value, interaction.response)
-                is CallOutcome.NOT_SERVED
-            ):
+            if interaction is not None and interaction.call_outcome is CallOutcome.NOT_SERVED:
                 continue
             self.total_cases += 1
             checks = [(case_id, check) for check in recorder.checks.get(case_id, [])]
