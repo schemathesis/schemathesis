@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from _pytest.main import ExitCode
+from flask import jsonify, request
 
 from test.utils import allure_results
 
@@ -49,3 +50,39 @@ def test_after_run_failure_rendering(ctx, cli, snapshot_cli, ensure_reachability
     run_check_results = [r for r in results if r.get("name") == "Run checks"]
     assert run_check_results, [r.get("name") for r in results]
     assert run_check_results[0]["status"] == "failed"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=False)
+def test_extra_request_to_candidate_api(ctx, cli, app_runner, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app({"/value": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/value")
+    def old_value():
+        return jsonify({"version": "old", "auth": request.headers.get("Authorization")})
+
+    @app.route("/v2/value")
+    def candidate_value():
+        return jsonify({"version": "new", "auth": request.headers.get("Authorization")})
+
+    base_url = app_runner.openapi_url(app, path="")
+    module = ctx.write_pymodule(
+        f'''
+@schemathesis.check
+class Differential:
+    def after_response(self, ctx, response, case):
+        candidate = ctx.send(case, base_url="{base_url}/v2", headers={{"Authorization": "Bearer candidate"}})
+        assert candidate.json() == response.json(), f"Old {{response.json()}}, candidate {{candidate.json()}}"
+        '''
+    )
+    assert (
+        cli.run(
+            f"{base_url}/openapi.json",
+            "-c",
+            "Differential",
+            "--phases=fuzzing",
+            "--max-examples=1",
+            "--header=Authorization: Bearer old",
+            hooks=module,
+        )
+        == snapshot_cli
+    )

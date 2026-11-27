@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import schemathesis
 from schemathesis.core import NOT_SET
-from schemathesis.core.failures import Failure, is_reproducible_failure
+from schemathesis.core.failures import CustomFailure, Failure, is_reproducible_failure
 from schemathesis.core.fs import file_exists
 from schemathesis.core.output.sanitization import sanitize_headers, sanitize_url, sanitize_value
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
@@ -135,6 +135,8 @@ class CrashStep:
     auth_identity: str | None = None
     # The step's operation label; None in older crash files, which are looked up by path and method.
     operation: str | None = None
+    # A custom check sent this request with `ctx.send`; replay re-runs the check, which sends it again.
+    sent_by_check: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -160,6 +162,7 @@ class CrashStep:
             "parent_index": self.parent_index,
             "auth_identity": self.auth_identity,
             "operation": self.operation,
+            "sent_by_check": self.sent_by_check,
         }
 
     @classmethod
@@ -186,6 +189,7 @@ class CrashStep:
             parent_index=data.get("parent_index"),
             auth_identity=data.get("auth_identity"),
             operation=data.get("operation"),
+            sent_by_check=data.get("sent_by_check", False),
         )
 
 
@@ -488,6 +492,7 @@ def build_crashes_from_recorder(
         failure_info = check.failure_info
         assert failure_info is not None
         sequence = [replace(step) for step in base_sequence]
+        sequence[-1].sent_by_check = chain[-1].is_probe and isinstance(failure_info.failure, CustomFailure)
         sequence[-1].checks = [
             CrashCheck(
                 name=check.name,

@@ -40,6 +40,7 @@ from test.apps.catalog.openapi.modifiers.under_declared_security import (
     RespondWithStatus,
     RotateTokenOnLogin,
 )
+from test.apps.runtime import OpenAPIApp
 from test.fixtures.crashes import FailingCheck, Link, LinkParameter, Step
 from test.utils import crash_cache_dir
 
@@ -2842,3 +2843,35 @@ def crash():
     )
     case_id = re.search(r"st replay (\S+)", run.stdout).group(1)
     assert cli.main("replay", case_id, f"--app={module}:app") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=False)
+def test_replay_lets_the_check_send_its_extra_request_again(cli, ctx, tmp_path, snapshot_cli):
+    app, spec = ctx.openapi.make_flask_app({"/value": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/value")
+    def old_value():
+        return jsonify({"version": "old"})
+
+    @app.route("/v2/value")
+    def candidate_value():
+        return jsonify({"version": "new"})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+    module = ctx.write_pymodule(
+        f"""
+@schemathesis.check
+def differential(ctx, response, case):
+    candidate = ctx.send(case, base_url="{api.base_url}/v2")
+    assert candidate.json() == response.json(), f"Candidate returned {{candidate.json()}}"
+"""
+    )
+    header = "X-Token: secret"
+    cli.run(api.schema_url, "-c", "differential", "--phases=fuzzing", "--max-examples=1", "-H", header, hooks=module)
+    api.requests.clear()
+
+    assert cli.main("replay", "-H", header, hooks=module) == snapshot_cli
+    assert [(captured.path, captured.headers.get("X-Token")) for captured in api.requests] == [
+        ("/value", "secret"),
+        ("/v2/value", "secret"),
+    ]

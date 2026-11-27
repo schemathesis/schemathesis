@@ -4,7 +4,7 @@ import json
 from collections import Counter
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlsplit
 
 from schemathesis.core import NOT_SET
@@ -268,7 +268,6 @@ def _replay_sequence(
     step_outputs: list[StepOutput] = []
 
     terminal_response: Response | None = None
-    last_index = len(sequence) - 1
     replacement = schema.config.output.sanitization.replacement
     # Masked values no credential source replaced, so the replay sent the placeholder instead.
     unsupplied: list[tuple[ParameterLocation, str]] = []
@@ -284,6 +283,9 @@ def _replay_sequence(
                 elapsed=instant.elapsed_ms,
             )
 
+    recorded_checks = sequence[-1].checks
+    sequence = replayed_steps(sequence)
+    last_index = len(sequence) - 1
     for index, step in enumerate(sequence):
         step_operation = operation if index == last_index else _step_operation(schema, step)
         if step_operation is None:
@@ -374,14 +376,14 @@ def _replay_sequence(
 
     elapsed = instant.elapsed_ms
     assert terminal_response is not None
-    terminal = sequence[-1]
     checked = step_outputs[_checked_index(sequence)]
     try:
         check_outcomes, check_failures = _evaluate_checks(
             case=checked.case,
             response=checked.response,
-            recorded_checks=terminal.checks,
+            recorded_checks=recorded_checks,
             recorder=recorder,
+            transport_kwargs={"base_url": base_url, "session": session},
         )
     except Exception as exc:
         return _errored_outcome(f"check evaluation failed - {exc}", elapsed=elapsed, step_outcomes=step_outcomes)
@@ -400,6 +402,13 @@ def _replay_sequence(
         unsupplied_masked=unsupplied,
         rejected=rejected,
     )
+
+
+def replayed_steps(sequence: list[CrashStep]) -> list[CrashStep]:
+    """Steps replay sends itself; the re-run check sends its extra request again."""
+    if sequence[-1].sent_by_check:
+        return sequence[:-1]
+    return sequence
 
 
 def _checked_index(sequence: list[CrashStep]) -> int:
@@ -490,13 +499,14 @@ def _evaluate_checks(
     response: Response,
     recorded_checks: list[CrashCheck],
     recorder: ScenarioRecorder,
+    transport_kwargs: dict[str, Any],
 ) -> tuple[list[CheckOutcome], list[Failure]]:
     from schemathesis.checks import CHECKS, is_check_class, load_all_checks, run_checks
 
     # Re-run exactly the recorded checks, ignoring the current enabled set; class-based ones report as unavailable.
     load_all_checks()
     registry = {check.__name__: check for check in CHECKS.get_all() if not is_check_class(check)}
-    check_context = _make_check_context(case.operation, recorder)
+    check_context = _make_check_context(case.operation, recorder, transport_kwargs)
 
     runnable = {check.name: registry[check.name] for check in recorded_checks if check.name in registry}
 
@@ -530,7 +540,9 @@ def _evaluate_checks(
     return check_outcomes, sorted(set(all_failures))
 
 
-def _make_check_context(operation: APIOperation, recorder: ScenarioRecorder) -> CheckContext:
+def _make_check_context(
+    operation: APIOperation, recorder: ScenarioRecorder, transport_kwargs: dict[str, Any]
+) -> CheckContext:
     from schemathesis.checks import CheckContext
 
     return CheckContext(
@@ -538,7 +550,8 @@ def _make_check_context(operation: APIOperation, recorder: ScenarioRecorder) -> 
         auth=None,
         headers=None,
         config=operation.schema.config.checks_config_for(operation=operation),
-        transport_kwargs=None,
+        # Requests checks send go through the replay's session and base URL, like the replayed steps.
+        transport_kwargs=transport_kwargs,
         recorder=recorder,
         response_checks=None,
     )

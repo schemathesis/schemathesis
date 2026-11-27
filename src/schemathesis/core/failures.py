@@ -174,7 +174,7 @@ class CustomFailure(Failure):
     checks = ()
     kind_title = "Custom check failed"
 
-    __slots__ = ("exception", "origin")
+    __slots__ = ("exception", "origin", "checked_case_id")
 
     def __init__(
         self,
@@ -185,15 +185,23 @@ class CustomFailure(Failure):
         exception: Exception,
         case_id: str | None = None,
         severity: Severity = Severity.MEDIUM,
+        checked_case_id: str | None = None,
     ) -> None:
         super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=severity)
         self.exception = exception
         self.origin = get_origin(exception)
+        # Set when the check sent extra requests: the failure belongs to the last one, after the checked request.
+        self.checked_case_id = checked_case_id
 
     @property
     def _unique_key(self) -> str:
         # Include `title` (the check) so distinct checks raising at the same line don't collapse.
         return f"{self.title}|{self.origin}"
+
+    def related_case_ids(self) -> tuple[str, ...]:
+        if self.checked_case_id is None:
+            return ()
+        return (self.checked_case_id,)
 
 
 class ResponseTimeExceeded(Failure):
