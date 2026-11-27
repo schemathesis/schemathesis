@@ -1,5 +1,7 @@
 import base64
 import builtins
+import functools
+import itertools
 import json
 import platform
 import sys
@@ -630,6 +632,194 @@ def test_report_writers_do_not_import(cli, ctx, ndjson_path, tmp_path, monkeypat
     assert "ScenarioFinished" in event_types
     assert yaml.safe_load(cassette_path.read_text())["http_interactions"]
     assert json.loads(har_path.read_text())["log"]["entries"]
+
+
+def keyed_operation(schema):
+    return {
+        "/api/items": {
+            "get": {
+                "parameters": [{"name": "key", "in": "query", "required": True, "schema": schema}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+
+def serve_numbered_responses(ctx, schema, make_response):
+    app, _ = ctx.openapi.make_flask_app(keyed_operation(schema))
+    counter = itertools.count()
+
+    @app.route("/api/items")
+    def items():
+        return make_response(next(counter))
+
+    return app
+
+
+MALFORMED_REQUESTS = {"unspecified_http_method", "malformed_content_type"}
+SEEN_EVERY_TIME = {"distinct": 1, "singletons": 0, "doubletons": 0, "discovering": 0, "discoveries": [1]}
+
+
+def load_behaviors(ndjson_path):
+    events = load_ndjson(ndjson_path)
+    scenarios = [
+        recorder["cases"][case_id]["value"]["meta"]["phase"]["data"].get("scenario")
+        for recorder in (get_event_data(event)["recorder"] for event in events if "ScenarioFinished" in event)
+        for case_id in recorder.get("interactions", {})
+    ]
+    return get_event_data(events[-1])["payload"]["behaviors"], scenarios
+
+
+def test_behavior_counts_follow_what_responses_say(cli, ctx, ndjson_path):
+    app = serve_numbered_responses(
+        ctx, {"type": "integer"}, lambda index: jsonify({"state": "ready", "next": None} if index else {"state": "new"})
+    )
+    cli.run_openapi_app(
+        app,
+        f"--report-ndjson-path={ndjson_path}",
+        "--max-examples=10",
+        "--phases=fuzzing",
+        "--mode=positive",
+        "--seed=1",
+    )
+    behaviors, scenarios = load_behaviors(ndjson_path)
+    assert behaviors == {
+        "GET /api/items": {
+            "responses": len(scenarios),
+            "sources": {
+                "status": SEEN_EVERY_TIME,
+                # `state` arrives with the first response, `next` with the second.
+                "structure": {"distinct": 2, "singletons": 0, "doubletons": 0, "discovering": 0, "discoveries": [1, 2]},
+                "parameters": SEEN_EVERY_TIME,
+            },
+        }
+    }
+
+
+@pytest.mark.parametrize(
+    ("make_response", "distinct"),
+    [
+        (lambda index: Response(b"", content_type="application/json"), 0),
+        (lambda index: jsonify({}), 0),
+        (lambda index: jsonify(index), 1),
+        (lambda index: Response(f"Record {index}", content_type="text/plain"), 1),
+        (lambda index: Response(b'{"id": 1}', content_type="application/json; charset=nonexistent"), 1),
+        (lambda index: jsonify({"id": f"id-{index}", "created": f"2020-01-{index % 28 + 1:02}"}), 2),
+        (lambda index: jsonify({"items": [{"name": f"item-{number}"} for number in range(index % 3 + 1)]}), 3),
+        (lambda index: jsonify(functools.reduce(lambda value, _: {"next": value}, range(10), index)), 8),
+    ],
+    ids=[
+        "empty-body",
+        "empty-object",
+        "number",
+        "text",
+        "unknown-charset",
+        "identifiers",
+        "list-of-records",
+        "deep-value",
+    ],
+)
+def test_behavior_structure_ignores_values(cli, ctx, ndjson_path, make_response, distinct):
+    app = serve_numbered_responses(ctx, {"type": "integer"}, make_response)
+    cli.run_openapi_app(app, f"--report-ndjson-path={ndjson_path}", "--max-examples=10", "--phases=fuzzing", "--seed=1")
+    behaviors, _ = load_behaviors(ndjson_path)
+    expected = {"distinct": distinct, "singletons": 0, "doubletons": 0, "discovering": 0, "discoveries": [1] * distinct}
+    assert behaviors["GET /api/items"]["sources"].get("structure") == (expected if distinct else None)
+
+
+@pytest.mark.parametrize(
+    ("make_message", "distinct"),
+    [
+        (lambda index: f"Lock 0x{index:x}f on 'table-{index}' timed out after {index} attempts", 1),
+        (lambda index: f"Unknown column {'abcdefghij'[index % 10]}x", 8),
+    ],
+    ids=["same-wording", "more-wordings-than-kept"],
+)
+def test_behavior_failure_messages(cli, ctx, ndjson_path, make_message, distinct):
+    # The coverage phase sends one request per enum value, enough to repeat every message.
+    app = serve_numbered_responses(
+        ctx, {"type": "integer", "enum": list(range(40))}, lambda index: Response(make_message(index), status=500)
+    )
+    cli.run_openapi_app(
+        app, f"--report-ndjson-path={ndjson_path}", "--phases=coverage", "--continue-on-failure", "--seed=1"
+    )
+    behaviors, scenarios = load_behaviors(ndjson_path)
+    assert set(scenarios) > MALFORMED_REQUESTS
+    assert behaviors == {
+        "GET /api/items": {
+            "responses": len([scenario for scenario in scenarios if scenario not in MALFORMED_REQUESTS]),
+            "sources": {
+                "status": SEEN_EVERY_TIME,
+                "structure": SEEN_EVERY_TIME,
+                "failure": {
+                    "distinct": distinct,
+                    "singletons": 0,
+                    "doubletons": 0,
+                    "discovering": 0,
+                    "discoveries": list(range(1, distinct + 1)),
+                },
+            },
+        }
+    }
+
+
+@pytest.mark.parametrize("optional", [2, 6], ids=["few", "more-than-kept"])
+def test_behavior_parameter_sets_of_accepted_requests(cli, ctx, ndjson_path, optional):
+    names = [f"filter{number}" for number in range(optional)]
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/items": {
+                "get": {
+                    "parameters": [
+                        {"name": name, "in": "query", "schema": {"type": "boolean"}} for name in [*names, "refused"]
+                    ],
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Refused"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/api/items")
+    def items():
+        return (jsonify({}), 400) if "refused" in request.args else jsonify({})
+
+    # Enough requests to send more sets of parameters than are kept.
+    cli.run_openapi_app(
+        app,
+        f"--report-ndjson-path={ndjson_path}",
+        "--max-examples=100",
+        "--phases=fuzzing",
+        "--mode=positive",
+        "--continue-on-failure",
+        "--seed=1",
+    )
+    events = load_ndjson(ndjson_path)
+    accepted = {
+        frozenset(pair.partition("=")[0] for pair in interaction["request"]["uri"].partition("?")[2].split("&") if pair)
+        for recorder in (get_event_data(event)["recorder"] for event in events if "ScenarioFinished" in event)
+        for interaction in recorder.get("interactions", {}).values()
+        if interaction["response"]["status_code"] == 200
+    }
+    assert (len(accepted) > 16) == (optional == 6)
+    behaviors = get_event_data(events[-1])["payload"]["behaviors"]
+    assert behaviors["GET /api/items"]["sources"]["parameters"]["distinct"] == min(16, len(accepted))
+
+
+def test_behavior_counts_include_stateful_responses(cli, ctx, ndjson_path):
+    api = ctx.openapi.apps.users_crud()
+    cli.run(api.schema_url, f"--report-ndjson-path={ndjson_path}", "--max-examples=5", "--phases=stateful", "--seed=1")
+    events = load_ndjson(ndjson_path)
+    recorded = {}
+    for event in events:
+        if get_event_type(event) == "ScenarioFinished":
+            recorder = get_event_data(event)["recorder"]
+            for case_id in recorder.get("interactions", {}):
+                case = recorder["cases"][case_id]["value"]
+                label = f"{case['method']} {case['path']}"
+                recorded[label] = recorded.get(label, 0) + 1
+    behaviors = get_event_data(events[-1])["payload"]["behaviors"]
+    assert {label: counts["responses"] for label, counts in behaviors.items()} == recorded
+    assert set(recorded) == {"POST /users/", "GET /users/{user_id}", "PATCH /users/{user_id}"}
 
 
 def test_writer_thread_error_is_reraised():

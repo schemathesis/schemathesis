@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.auths import ReauthState
 from schemathesis.checks import RunChecks
 from schemathesis.config import CoveragePhaseConfig, ExamplesPhaseConfig, FuzzingPhaseConfig, ProjectConfig
+from schemathesis.core.behaviors import BehaviorCensus, Exchange
 from schemathesis.core.error_feedback import ErrorFeedbackStore
 from schemathesis.core.error_feedback.collector import record_observations
 from schemathesis.core.statistic import StatefulInference
@@ -79,6 +80,7 @@ class EngineContext:
     start_time: float
     observations: Observations | None
     link_calibration: LinkCalibrationState | None
+    behaviors: BehaviorCensus
 
     __slots__ = (
         "schema",
@@ -86,6 +88,7 @@ class EngineContext:
         "outcome_cache",
         "health",
         "server",
+        "behaviors",
         "link_calibration",
         "start_time",
         "observations",
@@ -134,6 +137,7 @@ class EngineContext:
         self.outcome_cache = {}
         self.health = HealthState()
         self.server = ServerMonitor(health=self.health)
+        self.behaviors = BehaviorCensus()
         self.link_calibration = LinkCalibrationState() if schema.config.phases.stateful.link_calibration else None
         self.observations = observations
         self._thread_local = threading.local()
@@ -196,6 +200,15 @@ class EngineContext:
     def record_observations(self, recorder: ScenarioRecorder) -> None:
         if self.observations is not None:
             self.observations.extract_observations_from(recorder)
+
+    def record_behavior(self, case: Case, response: Response) -> None:
+        declared = case.operation.query
+        self.behaviors.record(
+            operation_label=case.operation.label,
+            exchange=Exchange(
+                response=response, query_parameters=frozenset(name for name in case.query if name in declared)
+            ),
+        )
 
     def record_error_feedback(
         self,

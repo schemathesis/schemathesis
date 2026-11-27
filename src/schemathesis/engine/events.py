@@ -6,6 +6,7 @@ from collections.abc import Generator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core.behaviors import BehaviorCounts
 from schemathesis.core.errors import HookExecutionError, InvalidSchema, RejectedSchemaDefinition
 from schemathesis.core.failures import Failure
 from schemathesis.core.schema_analysis import SchemaWarning
@@ -417,6 +418,8 @@ class RunSummary:
     reauth_count: int = 0
     # Whether the reauth circuit breaker tripped this run.
     reauth_broke: bool = False
+    # Behavior counts by operation label.
+    behaviors: dict[str, BehaviorCounts] = field(default_factory=dict)
 
 
 @dataclass

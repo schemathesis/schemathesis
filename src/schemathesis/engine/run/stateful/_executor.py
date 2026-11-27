@@ -435,11 +435,12 @@ def _validate_step_response(
     ctx: StatefulContext,
     check_context_cache: CheckContextCache,
 ) -> None:
-    """Feed the response to link calibration, the supervisor and error feedback, then run the checks."""
+    """Feed the response to link calibration, the supervisor, behavior counts and error feedback, then run the checks."""
     ctx.metric_collector.store(case, response)
     observations = _parse_step_observations(engine, case, response)
     _calibrate_link(engine, response, observations=observations, step_input=step_input, recorder=recorder)
     engine.supervisor.observe(case, response, cache_writer=engine.cache.writer)
+    engine.record_behavior(case, response)
     _feed_error_feedback(engine, case, response, observations=observations, recorder=recorder)
     check_ctx = check_context_cache.get_or_create(
         operation=case.operation, ctx=engine, phase="stateful"
