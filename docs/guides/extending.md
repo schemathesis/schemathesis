@@ -227,6 +227,40 @@ Any key under `[checks.<ClassName>]` that matches an `__init__` keyword argument
 enabled = false
 ```
 
+### Sending extra requests from a check
+
+`ctx.send(case, ...)` sends a copy of the checked request with the run's headers, credentials and TLS settings, and returns its response. Use it to compare the API with a candidate version, or to send the same request as another user:
+
+```python
+@schemathesis.check
+class Differential:
+    def __init__(self, *, candidate_url: str):
+        self.candidate_url = candidate_url
+
+    def after_response(self, ctx, response, case):
+        candidate = ctx.send(case, base_url=self.candidate_url)
+        assert candidate.status_code == response.status_code, (
+            f"Candidate returned {candidate.status_code}, expected {response.status_code}"
+        )
+        assert candidate.json() == response.json(), f"Candidate returned {candidate.json()}"
+```
+
+```toml
+[checks.Differential]
+candidate_url = "http://localhost:8001"
+```
+
+`headers`, `query`, `cookies`, `path_parameters` and `body` replace the corresponding parts of the copy; headers passed to `ctx.send` take precedence over the ones set for the whole run:
+
+```python
+other_user = ctx.send(case, headers={"Authorization": "Bearer other-user-token"})
+```
+
+When the check fails after `ctx.send`, the failure shows the copy's response, and the reproduction steps include both requests.
+
+!!! note
+    In the stateful phase, later steps reuse IDs returned by the API under test. Compare responses from operations that read data, or map IDs between the two APIs in your check.
+
 ## Custom Data Formats
 
 ```python

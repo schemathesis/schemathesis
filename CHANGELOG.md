@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - `classify_call_outcome` hook for telling business-rule refusals from validation errors by response body. [#5549](https://github.com/schemathesis/schemathesis/issues/5549)
+- `ctx.send` for custom checks sending extra requests, shown in reports and reproduction steps.
 
 ## [4.34.4](https://github.com/schemathesis/schemathesis/compare/v4.34.3...v4.34.4) - 2026-11-27
 

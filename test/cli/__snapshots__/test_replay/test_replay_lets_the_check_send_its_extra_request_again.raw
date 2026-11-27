@@ -1,0 +1,27 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from /tmp/.schemathesis/default/cache/crashes/<SCHEMA>
+
+  x FAILED GET /value
+
+=================================== FAILURES ===================================
+__________________________________ GET /value __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- ST901 Custom check failed: `differential`
+
+    Candidate returned {'version': 'new'}
+
+[200] OK:
+
+    `{"version":"old"}`
+
+Reproduce with:
+
+    curl -X GET -H 'X-Token: [Filtered]' http://127.0.0.1/value
+
+    st replay <PLACEHOLDER>
+
+============================== 1 failed in 1.00s ===============================

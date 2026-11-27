@@ -12,6 +12,7 @@ from schemathesis.cli.commands.replay.executor import (
     ReplayOutcome,
     ReplayStatus,
     bodies_equal,
+    replayed_steps,
 )
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.output import (
@@ -113,10 +114,11 @@ def render_replay(
         for label, group in failures.items():
             display_section_name(label, "_", fg="red")
             for index, (crash, outcome) in enumerate(group, 1):
-                if len(crash.sequence) > 1:
+                sequence = replayed_steps(crash.sequence)
+                if len(sequence) > 1:
                     # Set the step chain off as its own block instead of butting it against header and failure.
                     console.print()
-                    _print_step_chain(console, sequence=crash.sequence, outcome=outcome, schema=schema)
+                    _print_step_chain(console, sequence=sequence, outcome=outcome, schema=schema)
                     console.print()
                 case_id = case_header(index, crash.case_id) if crash.case_id else None
                 reproduce = append_replay_command(outcome.code_sample, crash.case_id)

@@ -2,6 +2,7 @@ import datetime
 import re
 
 import pytest
+from flask import jsonify, request
 
 import schemathesis
 from schemathesis.checks import ChecksConfig, RunChecks, collect_after_run_failures
@@ -370,3 +371,32 @@ def test_disabled_class_based_check_skipped_in_validate_response(ctx, response_f
     case.validate_response(response_factory.requests(status_code=200))
 
     assert called == []
+
+
+def test_extra_request_replaces_path_parameters_and_body(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items/{id}": {
+                "put": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items/<int:item_id>", methods=["PUT"])
+    def update_item(item_id):
+        return jsonify({"id": item_id, "body": request.json})
+
+    sent = []
+
+    def send_other_item(ctx, response, case):
+        sent.append(ctx.send(case, path_parameters={"id": 2}, body={"name": "other"}).json())
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    case = schema["/items/{id}"]["PUT"].Case(path_parameters={"id": 1}, body={"name": "checked"})
+    case.call_and_validate(checks=[send_other_item])
+
+    assert sent == [{"id": 2, "body": {"name": "other"}}]

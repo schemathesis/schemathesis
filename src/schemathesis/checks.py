@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Protocol, TypeVar, c
 from typing_extensions import TypeIs
 
 from schemathesis.config import ChecksConfig, ConfigError
+from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import (
     ContentTypeServerError,
@@ -82,6 +83,8 @@ class CheckInternals:
     transport_kwargs: dict[str, Any] | None
     recorder: ScenarioRecorder | None
     checks: list[CheckFunction]
+    # Recorded requests the running check sent with `CheckContext.send`, oldest first.
+    sent_case_ids: list[str] = field(default_factory=list)
 
     def find_parent(self, *, case_id: str) -> Case | None:
         if self.recorder is not None:
@@ -177,6 +180,57 @@ class CheckContext:
         )
         self.phase = phase
         self.auth_enforced_operations = auth_enforced_operations
+
+    def send(
+        self,
+        case: Case,
+        *,
+        base_url: str | None = None,
+        headers: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
+        cookies: dict[str, Any] | None = None,
+        path_parameters: dict[str, Any] | None = None,
+        body: Any = NOT_SET,
+    ) -> Response:
+        """Send a copy of `case` with the run's settings and credentials, and return its response.
+
+        The copy appears in reports next to `case`. A failure the check raises afterwards reports the copy, with
+        `case` as the request before it.
+
+        Args:
+            case: The request to copy, usually the checked one.
+            base_url: Send the copy to another server, e.g. a candidate version of the API.
+            headers: Replace the copy's headers; they also win over headers set for the whole run.
+            query: Replace the copy's query parameters.
+            cookies: Replace the copy's cookies.
+            path_parameters: Replace the copy's path parameters.
+            body: Replace the copy's body.
+
+        """
+        from requests.structures import CaseInsensitiveDict
+
+        copy = case.derive(
+            headers=CaseInsensitiveDict(headers) if headers is not None else None,
+            query=query,
+            cookies=cookies,
+            keep_auth=True,
+        )
+        if path_parameters is not None:
+            copy.path_parameters = path_parameters
+        if not isinstance(body, NotSet):
+            copy.body = body
+        kwargs = dict(self.internals.transport_kwargs or {})
+        sent_base_url = kwargs.pop("base_url", None)
+        run_headers = kwargs.get("headers")
+        if headers and run_headers:
+            replaced = {name.lower() for name in headers}
+            kwargs["headers"] = {name: value for name, value in run_headers.items() if name.lower() not in replaced}
+        self.internals.record_case(parent_id=case.id, case=copy)
+        response = copy.call(base_url=base_url if base_url is not None else sent_base_url, **kwargs)
+        self.internals.record_response(case_id=copy.id, response=response)
+        if self.internals.recorder is not None:
+            self.internals.sent_case_ids.append(copy.id)
+        return response
 
 
 CheckMethodName = Literal["after_response", "after_run"]
@@ -479,7 +533,14 @@ def max_response_time(ctx: CheckContext, response: Response, case: Case) -> bool
     return None
 
 
-def _failures_from_exception(name: str, operation_label: str | None, exc: BaseException) -> Iterator[Failure]:
+def _failures_from_exception(
+    name: str,
+    operation_label: str | None,
+    exc: BaseException,
+    *,
+    checked_case_id: str | None = None,
+    sent_case_ids: list[str] | None = None,
+) -> Iterator[Failure]:
     if isinstance(exc, Failure):
         yield exc.with_traceback(None)
     elif isinstance(exc, FailureGroup):
@@ -490,6 +551,8 @@ def _failures_from_exception(name: str, operation_label: str | None, exc: BaseEx
             title=f"Custom check failed: `{name}`",
             message=str(exc),
             exception=exc,
+            case_id=sent_case_ids[-1] if sent_case_ids else None,
+            checked_case_id=checked_case_id if sent_case_ids else None,
         )
 
 
@@ -506,11 +569,14 @@ def run_checks(
 
     for check in checks:
         name = check.__name__
+        ctx.internals.sent_case_ids.clear()
         try:
             skip_check = check(ctx, response, case)
         except (Failure, AssertionError, FailureGroup) as exc:
             kept = False
-            for failure in _failures_from_exception(name, case.operation.label, exc):
+            for failure in _failures_from_exception(
+                name, case.operation.label, exc, checked_case_id=case.id, sent_case_ids=ctx.internals.sent_case_ids
+            ):
                 if not should_keep_failure(failure, case, response):
                     if ctx.internals.recorder is not None:
                         ctx.internals.recorder.record_filtered_failure(case_id=case.id)
