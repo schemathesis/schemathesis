@@ -2,16 +2,16 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.34.4...HEAD) - TBD
 
+### :rocket: Added
+
+- `classify_call_outcome` hook for telling business-rule refusals from validation errors by response body. [#5549](https://github.com/schemathesis/schemathesis/issues/5549)
+
 ## [4.34.4](https://github.com/schemathesis/schemathesis/compare/v4.34.3...v4.34.4) - 2026-11-27
 
 ### :bug: Fixed
 
 - False `low_valid_rate` warnings when `--generation-unique-inputs` skips duplicates sent in earlier phases. [#5577](https://github.com/schemathesis/schemathesis/issues/5577)
 - Fuzzing sending a parameter `example` or one known resource id in most requests. [#4848](https://github.com/schemathesis/schemathesis/issues/4848)
-
-### :rocket: Added
-
-- `classify_call_outcome` hook for telling business-rule refusals from validation errors by response body. [#5549](https://github.com/schemathesis/schemathesis/issues/5549)
 
 ## [4.34.3](https://github.com/schemathesis/schemathesis/compare/v4.34.2...v4.34.3) - 2026-11-27
 
