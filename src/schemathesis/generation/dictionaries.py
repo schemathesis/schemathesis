@@ -9,6 +9,7 @@ from operator import itemgetter
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
+import jsonschema_rs
 from hypothesis import strategies as st
 
 from schemathesis.config._dictionaries import (
@@ -29,6 +30,8 @@ from schemathesis.config._dictionaries import (
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import (
     BUNDLE_STORAGE_KEY,
+    CANONICALIZE_DRAFT_BY_VALIDATOR,
+    FANCY_REGEX_OPTIONS,
     example_is_valid,
     make_validator,
     schema_with_bundle,
@@ -98,7 +101,11 @@ class SuggestedSchema:
 
 
 def _suggested_schemas(
-    entries: tuple[tuple[int, EntryValue | EntrySchema], ...], schema_values: SchemaValues | None
+    entries: tuple[tuple[int, EntryValue | EntrySchema], ...],
+    schema_values: SchemaValues | None,
+    declared: JsonSchema | None,
+    validator_cls: type,
+    generation_mode: GenerationMode,
 ) -> tuple[SuggestedSchema, ...]:
     """Schema entries that have values to draw; none without a way to build their strategies."""
     if schema_values is None:
@@ -106,13 +113,32 @@ def _suggested_schemas(
     schemas = []
     for entry_index, entry_value in entries:
         if isinstance(entry_value, EntrySchema):
+            schema = json.loads(entry_value.text)
+            # Valid cases take only values the declared schema admits too, so those are the ones to draw.
+            if generation_mode.is_positive and isinstance(declared, dict):
+                schema = _within(declared, schema, validator_cls) or schema
             try:
-                values = schema_values(json.loads(entry_value.text))
+                values = schema_values(schema)
             except InvalidSchema:
                 continue
             if values is not EMPTY_STRATEGY:
                 schemas.append(SuggestedSchema(entry_index, values))
     return tuple(schemas)
+
+
+def _within(declared: JsonSchemaObject, suggested: JsonSchemaObject, validator_cls: type) -> JsonSchemaObject | None:
+    """The suggested schema narrowed to the declared one; `None` unless the two are known to share values."""
+    schema: JsonSchemaObject = {"allOf": [declared, suggested]}
+    try:
+        canonical_schema = jsonschema_rs.canonicalize(
+            schema,
+            draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
+            pattern_options=FANCY_REGEX_OPTIONS,
+            validate_formats=True,
+        )
+    except ValueError:
+        return None
+    return schema if canonical_schema.satisfiability() is jsonschema_rs.canonical.Satisfiability.YES else None
 
 
 def _draw_schema_value(
@@ -402,7 +428,9 @@ def build_dictionary_overlay_strategy(
     for parameter_name, binding in bindings.items():
         matches = _schema_check(schema_properties.get(parameter_name), validator_cls)
         classified = _classify_entries(binding.entries, matches, generation_mode)
-        schemas = _suggested_schemas(binding.entries, schema_values)
+        schemas = _suggested_schemas(
+            binding.entries, schema_values, schema_properties.get(parameter_name), validator_cls, generation_mode
+        )
         if classified or schemas:
             eligible_per_parameter[parameter_name] = classified
             choices[parameter_name] = (*classified, *schemas)
@@ -683,7 +711,9 @@ def build_body_dictionary_overlay_strategy(
     for binding in bindings:
         matches = _schema_check(binding.leaf_schema, validator_cls)
         classified = _classify_entries(binding.entries, matches, generation_mode)
-        schemas = _suggested_schemas(binding.entries, schema_values)
+        schemas = _suggested_schemas(
+            binding.entries, schema_values, binding.leaf_schema, validator_cls, generation_mode
+        )
         if classified or schemas:
             positions: dict[object, list[int]] = {}
             for position, (_, entry_value, _) in enumerate(classified):
