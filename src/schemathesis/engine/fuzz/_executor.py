@@ -15,7 +15,6 @@ from hypothesis.errors import Flaky, FlakyStrategyDefinition, Unsatisfiable, Uns
 from hypothesis.strategies import one_of, sampled_from
 from urllib3.exceptions import InsecureRequestWarning
 
-from schemathesis.core import NotSet
 from schemathesis.core.control import SkipTest
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.result import Ok
@@ -368,7 +367,7 @@ def _claim_input(ctx: EngineContext, case: Case) -> bool:
     # Hooks may change the case before it is sent; it is identified by what was generated.
     key = hash(case)
     with _SENT_INPUTS_LOCK:
-        if not isinstance(ctx.get_cached_outcome(key), NotSet):
+        if ctx.get_cached_outcome(key) is not None:
             return False
         ctx.cache_outcome(key, None)
     return True

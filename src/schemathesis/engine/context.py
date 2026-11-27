@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.auths import ReauthState
 from schemathesis.checks import RunChecks
 from schemathesis.config import CoveragePhaseConfig, ExamplesPhaseConfig, FuzzingPhaseConfig, ProjectConfig
-from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.error_feedback import ErrorFeedbackStore
 from schemathesis.core.error_feedback.collector import record_observations
 from schemathesis.core.statistic import StatefulInference
@@ -38,7 +37,7 @@ if TYPE_CHECKING:
     from schemathesis.core.spec import ApiSchema
     from schemathesis.core.transport import Response
     from schemathesis.engine import StopReason
-    from schemathesis.engine.recorder import ScenarioRecorder
+    from schemathesis.engine.recorder import ResponseOutcome, ScenarioRecorder
     from schemathesis.resources import ExtraDataSource
 
 
@@ -63,11 +62,20 @@ class _SliceBudget:
         return now + max(deadline - now, 0.0) / remaining_operations
 
 
+@dataclass(slots=True)
+class SentInput:
+    """What the first send of an input produced; later copies of the input repeat it."""
+
+    error: BaseException | None
+    traceback: TracebackType | None
+    response: ResponseOutcome | None
+
+
 @dataclass
 class EngineContext:
     schema: ApiSchema
     control: ExecutionControl
-    outcome_cache: dict[int, tuple[BaseException, TracebackType | None] | None]
+    outcome_cache: dict[int, SentInput]
     start_time: float
     observations: Observations | None
     link_calibration: LinkCalibrationState | None
@@ -259,16 +267,15 @@ class EngineContext:
         self.control.is_server_unavailable = True
         return True
 
-    def cache_outcome(self, key: int, outcome: BaseException | None) -> None:
+    def cache_outcome(
+        self, key: int, outcome: BaseException | None, *, response: ResponseOutcome | None = None
+    ) -> None:
         # Keep the first traceback so every replay reports it once instead of stacking frames on it.
-        self.outcome_cache[key] = None if outcome is None else (outcome, outcome.__traceback__)
+        traceback = None if outcome is None else outcome.__traceback__
+        self.outcome_cache[key] = SentInput(error=outcome, traceback=traceback, response=response)
 
-    def get_cached_outcome(self, key: int) -> BaseException | None | NotSet:
-        cached = self.outcome_cache.get(key, NOT_SET)
-        if isinstance(cached, tuple):
-            outcome, traceback = cached
-            return outcome.with_traceback(traceback)
-        return cached
+    def get_cached_outcome(self, key: int) -> SentInput | None:
+        return self.outcome_cache.get(key)
 
     def get_session(self) -> requests.Session:
         session = getattr(self._thread_local, "session", None)

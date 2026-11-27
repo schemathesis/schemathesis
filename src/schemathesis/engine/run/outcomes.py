@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from schemathesis.core.transport import StatusClass
     from schemathesis.engine.recorder import CaseNode, RecordedScenario
     from schemathesis.engine.run import PhaseName
+    from schemathesis.generation.case import Case
 
 
 @dataclass(slots=True)
@@ -38,11 +39,26 @@ class OperationRequests:
 
 
 def is_positive(case: CaseNode) -> bool:
-    return case.value.meta is not None and case.value.meta.generation.mode == GenerationMode.POSITIVE
+    return is_positive_case(case.value)
+
+
+def is_positive_case(case: Case) -> bool:
+    return case.meta is not None and case.meta.generation.mode == GenerationMode.POSITIVE
 
 
 def _is_request_shape_probe(case: CaseNode) -> bool:
     return coverage_scenario(case.value) in REQUEST_SHAPE_PROBES
+
+
+def _accumulate_call_outcome(outcomes: ValidRate, call_outcome: CallOutcome) -> None:
+    if call_outcome is CallOutcome.ACCEPTED:
+        outcomes.accepted += 1
+    elif call_outcome is CallOutcome.UNREACHABLE:
+        outcomes.unreachable += 1
+    elif call_outcome is CallOutcome.CONFLICT:
+        outcomes.conflicts += 1
+    elif call_outcome is CallOutcome.REJECTED:
+        outcomes.rejected += 1
 
 
 def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
@@ -54,15 +70,12 @@ def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
         interaction = recorder.interactions.get(case.value.id)
         if interaction is None or interaction.response is None:
             continue
-        outcome = case.value.operation.schema.classify_call_outcome(case.value, interaction.response)
-        if outcome is CallOutcome.ACCEPTED:
-            outcomes.accepted += 1
-        elif outcome is CallOutcome.UNREACHABLE:
-            outcomes.unreachable += 1
-        elif outcome is CallOutcome.CONFLICT:
-            outcomes.conflicts += 1
-        elif outcome is CallOutcome.REJECTED:
-            outcomes.rejected += 1
+        _accumulate_call_outcome(
+            outcomes, case.value.operation.schema.classify_call_outcome(case.value, interaction.response)
+        )
+    for cached in recorder.cached_outcomes:
+        if cached.is_positive:
+            _accumulate_call_outcome(outcomes, cached.call_outcome)
     return outcomes
 
 
@@ -93,5 +106,17 @@ def aggregate_status_codes(
             ):
                 continue
             counts[status] = counts.get(status, 0) + 1
+
+    for cached in recorder.cached_outcomes:
+        if positive_only and not cached.is_positive:
+            continue
+        status = cached.status_code
+        if (
+            positive_only
+            and classify_status(status).is_client_error
+            and cached.call_outcome is CallOutcome.UNINFORMATIVE
+        ):
+            continue
+        counts[status] = counts.get(status, 0) + 1
 
     return counts

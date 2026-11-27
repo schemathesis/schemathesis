@@ -18,7 +18,8 @@ from schemathesis.engine.errors import (
     UnrecoverableNetworkError,
     build_code_sample,
 )
-from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.recorder import ResponseOutcome, ScenarioRecorder
+from schemathesis.engine.run.outcomes import is_positive_case
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import metrics
 from schemathesis.generation.case import Case
@@ -113,6 +114,15 @@ def _is_skipped_by_supervisor(case: Case, ctx: EngineContext) -> bool:
     )
 
 
+def _response_outcome(case: Case, recorder: ScenarioRecorder) -> ResponseOutcome | None:
+    response = recorder.find_response(case_id=case.id)
+    if response is None:
+        return None
+    return ResponseOutcome(
+        status_code=response.status_code, call_outcome=case.operation.schema.classify_call_outcome(case, response)
+    )
+
+
 def _deletes_existing_data(case: Case, ctx: EngineContext) -> bool:
     # Data the API had before the run may be what the run depends on, such as the account it signs in with.
     return (
@@ -130,20 +140,24 @@ def _call_and_validate_once(
     # Hooks may change the case before it is sent; it is identified by what was generated.
     key = hash(case)
     cached = ctx.get_cached_outcome(key)
-    if isinstance(cached, BaseException):
-        # An earlier cycle already reported this failure; skip the input instead of ending the run on it again.
-        if isinstance(cached, FailureGroup) and scenario.failed_before:
-            return
-        raise cached
-    if cached is None:
+    if cached is not None:
+        if cached.response is not None:
+            scenario.recorder.record_cached_outcome(key, response=cached.response, is_positive=is_positive_case(case))
+        if cached.error is not None:
+            # An earlier cycle already reported this failure; skip the input instead of ending the run on it again.
+            if isinstance(cached.error, FailureGroup) and scenario.failed_before:
+                return
+            raise cached.error.with_traceback(cached.traceback)
         return
     try:
         _do_call_and_validate(case=case, ctx=ctx, scenario=scenario, pending_events=pending_events)
     except BaseException as exc:
-        ctx.cache_outcome(key, exc)
+        ctx.cache_outcome(key, exc, response=_response_outcome(case, scenario.recorder))
+        scenario.recorder.mark_outcome_seen(key)
         raise
     else:
-        ctx.cache_outcome(key, None)
+        ctx.cache_outcome(key, None, response=_response_outcome(case, scenario.recorder))
+        scenario.recorder.mark_outcome_seen(key)
 
 
 def _raise_case_error(
