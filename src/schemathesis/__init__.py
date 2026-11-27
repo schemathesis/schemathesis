@@ -5,7 +5,7 @@ from schemathesis.auths import AuthContext, AuthProvider, auth
 from schemathesis.checks import CheckContext, CheckFunction, CheckResult, check
 from schemathesis.config import SchemathesisConfig as Config
 from schemathesis.core.deserialization import DeserializationContext, deserializer
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import CallOutcome, Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -21,6 +21,7 @@ __all__ = [
     "__version__",
     "Case",
     "Response",
+    "CallOutcome",
     "APIOperation",
     "BaseSchema",
     "Config",

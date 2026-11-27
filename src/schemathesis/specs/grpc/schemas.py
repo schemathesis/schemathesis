@@ -377,7 +377,7 @@ class GrpcSchema(BaseSchema):
         return hash((case.path, payload, tuple(sorted(metadata.items()))))
 
     @override
-    def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
+    def default_call_outcome(self, case: Case, response: Response) -> CallOutcome:
         if _is_library_decode_error(case, response):
             return CallOutcome.UNINFORMATIVE
         return GRPC_STATUSES[response.status_code].outcome

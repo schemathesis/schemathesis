@@ -17,7 +17,7 @@ from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import HookExecutionError, format_exception
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.marks import Mark
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import CallOutcome, Response
 from schemathesis.filters import FilterSet, attach_filter_chain
 from schemathesis.generation.suggestions import HOOKS_SOURCE
 
@@ -477,6 +477,22 @@ def dispatch_before_call(
 
 def dispatch_after_call(*dispatchers: HookDispatcher, context: HookContext, case: Case, response: Response) -> None:
     _dispatch_to_all("after_call", dispatchers, context, case, response)
+
+
+def dispatch_classify_call_outcome(schema: SchemaMetadata, case: Case, response: Response) -> CallOutcome | None:
+    """The outcome the first hook decides on, if any."""
+    name = "classify_call_outcome"
+    context = HookContext(operation=case.operation)
+    for dispatcher in schema_hook_dispatchers(schema):
+        for hook in dispatcher.applicable(name, context):
+            context._hook = hook
+            try:
+                outcome = hook(context, case, response)
+            except (Exception, SystemExit) as exc:
+                raise HookExecutionError(name, exc, extension=_extension_name(hook)) from exc
+            if outcome is not None:
+                return outcome
+    return None
 
 
 def dispatch_after_network_error(

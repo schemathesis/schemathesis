@@ -222,9 +222,7 @@ def any_positive_is_accepted(recorder: RecordedScenario) -> bool:
         if not is_positive(case):
             continue
         interaction = recorder.interactions.get(case.value.id)
-        if interaction is None or interaction.response is None:
-            continue
-        if case.value.operation.schema.classify_call_outcome(case.value, interaction.response) is CallOutcome.ACCEPTED:
+        if interaction is not None and interaction.call_outcome is CallOutcome.ACCEPTED:
             return True
     return any(
         cached.is_positive and cached.call_outcome is CallOutcome.ACCEPTED for cached in recorder.cached_outcomes
@@ -233,13 +231,8 @@ def any_positive_is_accepted(recorder: RecordedScenario) -> bool:
 
 def none_served(recorder: RecordedScenario) -> bool:
     """Whether the server answered every request saying it does not serve the operation."""
-    for case_id, interaction in recorder.interactions.items():
-        response = interaction.response
-        case = recorder.cases[case_id].value
-        if (
-            response is None
-            or case.operation.schema.classify_call_outcome(case, response) is not CallOutcome.NOT_SERVED
-        ):
+    for interaction in recorder.interactions.values():
+        if interaction.call_outcome is not CallOutcome.NOT_SERVED:
             return False
     return all(cached.call_outcome is CallOutcome.NOT_SERVED for cached in recorder.cached_outcomes)
 
@@ -517,9 +510,10 @@ class WarningCollector:
         for key, node in event.recorder.cases.items():
             label = node.value.operation.label
             self.data.stateful_exercised.add(label)
-            if label in self.data.missing_test_data and key in event.recorder.interactions:
-                response = event.recorder.interactions[key].response
-                if response is None:
-                    continue
-                if node.value.operation.schema.classify_call_outcome(node.value, response) is CallOutcome.ACCEPTED:
-                    self._mark_served(label)
+            interaction = event.recorder.interactions.get(key)
+            if (
+                label in self.data.missing_test_data
+                and interaction is not None
+                and interaction.call_outcome is CallOutcome.ACCEPTED
+            ):
+                self._mark_served(label)

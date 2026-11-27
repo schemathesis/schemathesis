@@ -151,10 +151,15 @@ class ScenarioRecorder:
     def record_response(self, *, case_id: str, response: Response) -> None:
         """Record the response, storing an oversized body as a truncated copy so checks still see the whole body."""
         request = Request.from_prepared_request(response.request)
+        node = self.cases.get(case_id)
+        # Judged here, while the run can still report a failing `classify_call_outcome` hook as a case error.
+        call_outcome = (
+            node.value.operation.schema.classify_call_outcome(node.value, response) if node is not None else None
+        )
         limit = self.max_recorded_payload_size
         if limit and response.content and len(response.content) > limit:
             response = response.truncated(limit)
-        self.interactions[case_id] = Interaction(request=request, response=response)
+        self.interactions[case_id] = Interaction(request=request, response=response, call_outcome=call_outcome)
 
     def record_request(self, *, case_id: str, request: requests.PreparedRequest) -> None:
         """Record a request that got no response."""
@@ -494,11 +499,14 @@ class Request:
 class Interaction:
     request: Request
     response: Response | None
+    # What the API did with the request, when the response belongs to a recorded case.
+    call_outcome: CallOutcome | None
     timestamp: float
 
-    def __init__(self, request: Request, response: Response | None) -> None:
+    def __init__(self, request: Request, response: Response | None, call_outcome: CallOutcome | None = None) -> None:
         self.request = request
         self.response = response
+        self.call_outcome = call_outcome
         self.timestamp = time.time()
 
 

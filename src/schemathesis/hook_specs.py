@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from schemathesis.core import Body
     from schemathesis.core.failures import Failure
     from schemathesis.core.jsonschema.types import JsonSchemaObject
-    from schemathesis.core.transport import Response
+    from schemathesis.core.transport import CallOutcome, Response
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation, BaseSchema
 
@@ -244,6 +244,15 @@ def after_call(context: HookContext, case: Case, response: Response) -> None:
     Use cases:
      - Response post-processing, like modifying its payload.
      - Logging
+    """
+
+
+@all_scopes
+def classify_call_outcome(context: HookContext, case: Case, response: Response) -> CallOutcome | None:
+    """Decide what the API did with a request, or return `None` to judge by status code.
+
+    Use cases:
+     - APIs that answer business-rule refusals, like a duplicate name, with 400 and tell them apart in the body.
     """
 
 
