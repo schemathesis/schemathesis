@@ -2944,6 +2944,39 @@ def test_optional_form_data(ctx):
         case.call()
 
 
+@pytest.mark.parametrize("media_type", ["application/x-www-form-urlencoded", "multipart/form-data"])
+@pytest.mark.parametrize(
+    ("version", "body"),
+    [
+        ("3.1.0", {"type": "object", "properties": {"a": {"anyOf": [{"type": "string"}, {"type": "null"}]}}}),
+        ("3.1.0", {"type": "object", "properties": {"a": {"type": ["integer", "null"]}}}),
+        ("3.0.2", {"type": "object", "properties": {"a": {"type": "boolean", "nullable": True}}}),
+        ("3.1.0", {"type": "object", "properties": {"a": {"enum": ["x", None]}}}),
+        ("3.1.0", {"$ref": "#/components/schemas/Form"}),
+        ("3.1.0", {"type": "object", "properties": {"a": {"type": ["string", "null"]}, "b": True}}),
+    ],
+    ids=["any-of", "type-list", "nullable", "enum", "ref", "boolean-sibling"],
+)
+def test_positive_form_fields_are_never_null(ctx, media_type, version, body):
+    # A form field has no spelling for null: the text "null" is a string.
+    operation = ctx.openapi.load_operation(
+        "POST /form",
+        {
+            "requestBody": {"required": True, "content": {media_type: {"schema": body}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        version=version,
+        components={
+            "schemas": {
+                "Form": {"type": "object", "properties": {"a": {"anyOf": [{"type": "string"}, {"type": "null"}]}}}
+            }
+        },
+    )
+    bodies = [case.body for case in generate_many(operation.as_strategy(), 10)]
+    assert [body for body in bodies if "a" in body and body["a"] is None] == []
+    assert any("a" in body for body in bodies)
+
+
 def test_path_parameter_space_encoded_in_url(ctx):
     # GH-4252: a space in a path segment must reach the wire as "%20", never "+"
     schema = ctx.openapi.load_schema(

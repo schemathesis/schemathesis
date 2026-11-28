@@ -29,6 +29,11 @@ USER_JSONSCHEMA = make_user_schema(middle_name={"anyOf": [{"type": "string"}, {"
 USER_JSONSCHEMA_WITH_FILE = make_user_schema(
     middle_name={"anyOf": [{"type": "string"}, {"type": "null"}]}, scan={"type": "string", "format": "binary"}
 )
+# A form field cannot send `null`, so form bodies generate none.
+USER_FORM_JSONSCHEMA = make_user_schema(middle_name={"anyOf": [{"type": "string"}]})
+USER_FORM_JSONSCHEMA_WITH_FILE = make_user_schema(
+    middle_name={"anyOf": [{"type": "string"}]}, scan={"type": "string", "format": "binary"}
+)
 OPEN_API_2_USER_FORM_PARAMETERS = [
     {"in": "formData", "name": "first_name", "required": True, "type": "string"},
     {"in": "formData", "name": "last_name", "required": True, "type": "string"},
@@ -137,7 +142,7 @@ def test_forms_open_api_2(consumes, make_openapi_2_schema):
                 for value in consumes
             ]
         ),
-        [USER_JSONSCHEMA] * len(consumes),
+        [USER_FORM_JSONSCHEMA] * len(consumes),
     )
 
 
@@ -166,7 +171,7 @@ def test_multipart_form_open_api_2(
                 )
             ]
         ),
-        [USER_JSONSCHEMA_WITH_FILE],
+        [USER_FORM_JSONSCHEMA_WITH_FILE],
     )
 
 
@@ -191,7 +196,7 @@ def test_urlencoded_form_open_api_3(make_openapi_3_schema):
                 )
             ]
         ),
-        [USER_JSONSCHEMA],
+        [USER_FORM_JSONSCHEMA],
     )
 
 
@@ -219,7 +224,7 @@ def test_loose_urlencoded_form_open_api_3(make_openapi_3_schema):
             ]
         ),
         # Conversion sets `type: object`, so it matches the default User schema
-        [USER_JSONSCHEMA],
+        [USER_FORM_JSONSCHEMA],
     )
 
 
@@ -244,7 +249,7 @@ def test_multipart_form_open_api_3(make_openapi_3_schema):
                 )
             ]
         ),
-        [USER_JSONSCHEMA_WITH_FILE],
+        [USER_FORM_JSONSCHEMA_WITH_FILE],
     )
 
 
@@ -308,15 +313,15 @@ def test_payload_open_api_2(
 
 
 @pytest.mark.parametrize(
-    "media_types",
+    ("media_types", "expected"),
     [
-        ["application/json"],
-        ["application/json", "application/xml"],
+        (["application/json"], [USER_JSONSCHEMA]),
+        (["application/json", "application/xml"], [USER_JSONSCHEMA] * 2),
         # Forms can be also combined
-        ["application/x-www-form-urlencoded", "multipart/form-data"],
+        (["application/x-www-form-urlencoded", "multipart/form-data"], [USER_FORM_JSONSCHEMA] * 2),
     ],
 )
-def test_payload_open_api_3(media_types, make_openapi_3_schema):
+def test_payload_open_api_3(media_types, expected, make_openapi_3_schema):
     schema = make_openapi_3_schema(
         {
             "required": True,
@@ -338,7 +343,7 @@ def test_payload_open_api_3(media_types, make_openapi_3_schema):
                 for media_type in media_types
             ]
         ),
-        [USER_JSONSCHEMA] * len(media_types),
+        expected,
     )
 
 

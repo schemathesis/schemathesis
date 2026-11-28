@@ -22,6 +22,7 @@ from schemathesis.core.jsonschema import (
     VALIDATED_FORMATS_BY_DRAFT,
     BundleError,
     Bundler,
+    bundled_name,
     example_is_valid,
     make_validator,
     maybe_resolve_bundled,
@@ -1560,6 +1561,37 @@ def _resolve_form_part(schema: dict[str, Any], root_schema: dict[str, Any]) -> d
     return schema
 
 
+def _without_null_fields(schema: JsonSchema) -> JsonSchema:
+    """Form body schema whose fields admit no `null`: a form field sends text, and the text "null" is a string."""
+    if not isinstance(schema, dict):
+        return schema
+    bundled = schema.get(BUNDLE_STORAGE_KEY)
+    name = bundled_name(schema.get("$ref"))
+    if name is not None and isinstance(bundled, dict) and isinstance(bundled.get(name), dict):
+        return {**schema, BUNDLE_STORAGE_KEY: {**bundled, name: _without_null_fields(bundled[name])}}
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return schema
+    return {**schema, "properties": {field: _without_null(subschema) for field, subschema in properties.items()}}
+
+
+def _without_null(schema: JsonSchema) -> JsonSchema:
+    """`schema` without its `null` alternative; as is when `null` is all it admits."""
+    if not isinstance(schema, dict):
+        return schema
+    types = schema.get("type")
+    if isinstance(types, list) and "null" in types and len(types) > 1:
+        schema = {**schema, "type": [ty for ty in types if ty != "null"]}
+    enum = schema.get("enum")
+    if isinstance(enum, list) and None in enum and len(enum) > 1:
+        schema = {**schema, "enum": [value for value in enum if value is not None]}
+    for keyword in ("anyOf", "oneOf"):
+        branches = schema.get(keyword)
+        if isinstance(branches, list) and {"type": "null"} in branches and len(branches) > 1:
+            schema = {**schema, keyword: [branch for branch in branches if branch != {"type": "null"}]}
+    return schema
+
+
 @dataclass
 class OpenApiBody(OpenApiComponent):
     media_type: str
@@ -1663,7 +1695,11 @@ class OpenApiBody(OpenApiComponent):
         return self.definition.get("schema", {})
 
     def _build_schema(self, *, optimize: bool) -> JsonSchema:
-        return self._shared(("generation", optimize), lambda: super(OpenApiBody, self)._build_schema(optimize=optimize))
+        def build() -> JsonSchema:
+            schema = super(OpenApiBody, self)._build_schema(optimize=optimize)
+            return _without_null_fields(schema) if self.media_type in FORM_MEDIA_TYPES else schema
+
+        return self._shared(("generation", optimize), build)
 
     def _build_validation_schema(self) -> JsonSchema:
         return self._shared(("validation",), super()._build_validation_schema)

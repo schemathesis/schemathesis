@@ -645,6 +645,24 @@ def test_required_form_body_positive_cases_are_never_empty(ctx, media_type):
     assert [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)] == [{"a": 1}]
 
 
+@pytest.mark.parametrize("media_type", ["application/x-www-form-urlencoded", "multipart/form-data"])
+@pytest.mark.parametrize(
+    ("version", "field"),
+    [
+        ("3.1.0", {"anyOf": [{"type": "integer", "enum": [1]}, {"type": "null"}]}),
+        ("3.1.0", {"type": ["integer", "null"], "enum": [1, None]}),
+        ("3.0.2", {"type": "integer", "minimum": 1, "maximum": 1, "nullable": True}),
+    ],
+    ids=["any-of", "type-list", "nullable"],
+)
+def test_positive_form_fields_are_never_null(ctx, media_type, version, field):
+    # A form field has no spelling for null: the text "null" is a string.
+    operation = body_operation(
+        ctx, {"type": "object", "properties": {"a": field}}, media_type=media_type, version=version
+    )
+    assert [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)] == [{"a": 1}]
+
+
 def test_with_example_openapi_3(ctx):
     schema = build_schema(
         ctx,
