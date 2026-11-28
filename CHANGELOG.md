@@ -16,6 +16,10 @@
 
 ## [4.34.3](https://github.com/schemathesis/schemathesis/compare/v4.34.2...v4.34.3) - 2026-11-27
 
+### :rocket: Added
+
+- `invalid_location` check for `Location` headers of created resources that answer `404`.
+
 ### :racing_car: Performance
 
 - Up to 1.9x more requests per second in the fuzzing phase.

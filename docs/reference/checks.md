@@ -48,6 +48,9 @@ See [CLI reference](../reference/cli.md#-c-checks-checks) and [configuration ref
 !!! note "Exception: max_response_time"
     The `max_response_time` check is **disabled by default**. Enable it with `--max-response-time <seconds>` or `max_response_time = <seconds>` under `[checks]` in configuration. It is independent from `--checks`/`--exclude-checks`.
 
+!!! note "Exception: invalid_location"
+    The [`invalid_location`](#invalid_location) check is **disabled by default**, because it sends extra requests. Enable it with `--checks` or `invalid_location.enabled = true` under `[checks]` in configuration.
+
 ## Response timing
 
 ### `max_response_time`
@@ -200,6 +203,37 @@ For schema examples, polymorphic events, and current limitations, see [Testing S
 #### GraphQL
 
 For GraphQL APIs, this check fails on a body that is not JSON, a JSON value that is not an object, a `null` returned for a non-nullable field, and `data` that is missing or does not match the query: a missing or unrequested field, or a value of the wrong type.
+
+---
+
+### `invalid_location`
+
+Failure codes: [ST120](failures.md#st120).
+
+Follows the `Location` header of `201` and `202` responses with one `GET` and fails when the API answers `404 Not Found`. Clients that follow such a link do not find the resource they just created.
+
+```text
+- ST120 Invalid Location
+
+`Location: /items/42` leads to `GET /items/42`, which answered `404 Not Found`
+
+Return a `Location` that points to the created resource
+```
+
+This check is **disabled by default**. Run it alone:
+
+```bash
+uvx schemathesis run https://api.example.com/openapi.json --checks invalid_location
+```
+
+Or add it to the default checks:
+
+```toml
+[checks]
+invalid_location.enabled = true
+```
+
+Each target path is followed once per run, with the credentials of the request that created the resource.
 
 ---
 

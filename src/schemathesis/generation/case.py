@@ -583,6 +583,7 @@ class Case(Generic[OperationT]):
             response_checks=run_checks.for_responses(),
             phase=phase,
             auth_enforced_operations=run_checks.auth_enforced_operations,
+            followed_location_paths=run_checks.followed_location_paths,
         )
         if not checks:
             # Default set: built-ins enabled in config + max_response_time + response checks.

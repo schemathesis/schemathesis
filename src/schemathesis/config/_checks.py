@@ -84,6 +84,18 @@ class SimpleCheckConfig(DiffBase):
 
 
 @dataclass(repr=False, slots=True)
+class OptInCheckConfig(DiffBase):
+    enabled: bool
+
+    def __init__(self, *, enabled: bool = False) -> None:
+        self.enabled = enabled
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> OptInCheckConfig:
+        return cls(enabled=data.get("enabled", False))._mark_source_keys(data)
+
+
+@dataclass(repr=False, slots=True)
 class ResponseSchemaConformanceConfig(DiffBase):
     enabled: bool
     validate_formats: bool
@@ -152,7 +164,7 @@ class MissingRequiredHeaderConfig(CheckConfig):
 # Built-in checks with a section of their own; `max_response_time` takes a bare number instead.
 _BUILTIN_CHECK_CONFIGS: dict[
     str,
-    type[SimpleCheckConfig] | type[ResponseSchemaConformanceConfig] | type[CheckConfig],
+    type[SimpleCheckConfig] | type[OptInCheckConfig] | type[ResponseSchemaConformanceConfig] | type[CheckConfig],
 ] = {
     "not_a_server_error": NotAServerErrorConfig,
     "status_code_conformance": SimpleCheckConfig,
@@ -168,6 +180,7 @@ _BUILTIN_CHECK_CONFIGS: dict[
     "object_level_authorization": SimpleCheckConfig,
     "unsupported_method": SimpleCheckConfig,
     "allow_header_conformance": SimpleCheckConfig,
+    "invalid_location": OptInCheckConfig,
 }
 _BUILTIN_CHECK_NAMES = frozenset({*_BUILTIN_CHECK_CONFIGS, "max_response_time"})
 
@@ -188,6 +201,7 @@ class ChecksConfig(DiffBase):
     object_level_authorization: SimpleCheckConfig
     unsupported_method: SimpleCheckConfig
     allow_header_conformance: SimpleCheckConfig
+    invalid_location: OptInCheckConfig
     max_response_time: MaxResponseTimeConfig
     _unknown: dict[str, SimpleCheckConfig]
     # Kwargs forwarded to __init__ of class-based checks, keyed by check class name.
@@ -214,6 +228,7 @@ class ChecksConfig(DiffBase):
         object_level_authorization: SimpleCheckConfig | None = None,
         unsupported_method: SimpleCheckConfig | None = None,
         allow_header_conformance: SimpleCheckConfig | None = None,
+        invalid_location: OptInCheckConfig | None = None,
         max_response_time: MaxResponseTimeConfig | None = None,
     ) -> None:
         self.not_a_server_error = not_a_server_error or NotAServerErrorConfig()
@@ -230,6 +245,7 @@ class ChecksConfig(DiffBase):
         self.object_level_authorization = object_level_authorization or SimpleCheckConfig()
         self.unsupported_method = unsupported_method or SimpleCheckConfig()
         self.allow_header_conformance = allow_header_conformance or SimpleCheckConfig()
+        self.invalid_location = invalid_location or OptInCheckConfig()
         self.max_response_time = max_response_time or MaxResponseTimeConfig()
         self._unknown = {}
         self._custom_kwargs = {}
@@ -295,7 +311,7 @@ class ChecksConfig(DiffBase):
                     merged._set_enabled(name, enabled=enabled)
         return merged
 
-    def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig | MaxResponseTimeConfig:
+    def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig | OptInCheckConfig | MaxResponseTimeConfig:
         try:
             return getattr(self, name)
         except AttributeError:

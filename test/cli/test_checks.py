@@ -7,7 +7,11 @@ import pytest
 from _pytest.main import ExitCode
 from flask import Response, jsonify, redirect, request
 
+import schemathesis
+from schemathesis.errors import FailureGroup
+from schemathesis.specs.openapi.checks import invalid_location
 from test.apps.catalog.openapi import basic
+from test.apps.runtime import OpenAPIApp
 from test.utils import to_float32
 
 
@@ -2379,3 +2383,404 @@ def test_phase_without_checks_keeps_running_until_max_time(ctx, cli):
         config={"checks": {"enabled": False}},
     )
     assert time.monotonic() - started >= 1
+
+
+def _location_paths(target_methods=("get",)):
+    target = {
+        method: {
+            "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        }
+        for method in target_methods
+    }
+    return {
+        "/items": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"name": {"type": "string"}},
+                                "required": ["name"],
+                            }
+                        }
+                    },
+                },
+                "responses": {"201": {"description": "Created"}},
+            }
+        },
+        "/items/{item_id}": target,
+    }
+
+
+def _followed(api):
+    # Generated requests carry no query string in positive mode, so `followed` marks the ones built from `Location`.
+    return [(request.path, request.raw_query) for request in api.requests if "followed" in request.raw_query]
+
+
+INVALID_LOCATION_ARGS = ("--checks=invalid_location", "--phases=fuzzing", "--mode=positive", "--max-examples=3")
+
+
+def test_invalid_location_working_link(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(_location_paths())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    assert cli.run_openapi_app(app, "--checks=invalid_location", "--max-examples=1") == snapshot_cli
+
+
+def test_invalid_location_broken_link(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(_location_paths())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), 404
+
+    assert cli.run_openapi_app(app, "--checks=invalid_location", "--max-examples=1") == snapshot_cli
+
+
+def test_invalid_location_is_off_by_default(ctx, cli, snapshot_cli):
+    app, spec = ctx.openapi.make_flask_app(_location_paths())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42?followed=1"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert cli.run(api.schema_url, "--phases=fuzzing", "--mode=positive", "--max-examples=3") == snapshot_cli
+    assert _followed(api) == []
+
+
+def test_invalid_location_skips_stateful_phase(ctx, cli, snapshot_cli):
+    # The link to the created resource sends the same `GET` there.
+    paths = _location_paths()
+    paths["/items/{item_id}"]["get"]["operationId"] = "getItem"
+    paths["/items"]["post"]["responses"]["201"]["links"] = {
+        "GetItem": {"operationId": "getItem", "parameters": {"item_id": "$response.body#/id"}}
+    }
+    app, spec = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({"id": "42"}), 201, {"Location": "/items/42?followed=1"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), 404
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert cli.run(api.schema_url, "--checks=invalid_location", "--phases=stateful", "--max-examples=3") == snapshot_cli
+    assert _followed(api) == []
+
+
+def test_invalid_location_relative_reference(ctx, cli, snapshot_cli):
+    paths = _location_paths()
+    paths["/items/"] = paths.pop("/items")
+    app, spec = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/items/", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "42?followed=1"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert cli.run(api.schema_url, *INVALID_LOCATION_ARGS) == snapshot_cli
+    assert _followed(api) == [("/items/42", "followed=1")]
+
+
+def test_invalid_location_keeps_query_string(ctx, cli, snapshot_cli):
+    app, spec = ctx.openapi.make_flask_app(_location_paths())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42?followed=1&tag=a&tag=b"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        if item_id == "42" and "followed" not in request.args:
+            return jsonify({}), 404
+        return jsonify({})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert cli.run(api.schema_url, *INVALID_LOCATION_ARGS) == snapshot_cli
+    assert _followed(api) == [("/items/42", "followed=1&tag=a&tag=b")]
+
+
+@pytest.mark.parametrize(
+    ("status_code", "headers"),
+    [(200, {"Location": "/items/42?followed=1"}), (300, {"Location": "/items/42?followed=1"}), (201, {})],
+    ids=["ok", "multiple-choices", "no-location"],
+)
+def test_invalid_location_ignores_responses_that_create_nothing(ctx, cli, snapshot_cli, status_code, headers):
+    app, spec = ctx.openapi.make_flask_app(_location_paths())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), status_code, headers
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), 404
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert cli.run(api.schema_url, *INVALID_LOCATION_ARGS) == snapshot_cli
+    assert _followed(api) == []
+
+
+def test_invalid_location_accepted_response(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(_location_paths())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 202, {"Location": "/items/42"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), 404
+
+    assert cli.run_openapi_app(app, *INVALID_LOCATION_ARGS) == snapshot_cli
+
+
+@pytest.mark.parametrize("status_code", [403, 405, 500], ids=["forbidden", "method-not-allowed", "server-error"])
+def test_invalid_location_fails_only_on_not_found(ctx, cli, snapshot_cli, status_code):
+    app, spec = ctx.openapi.make_flask_app(_location_paths())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42?followed=1"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), status_code
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert cli.run(api.schema_url, *INVALID_LOCATION_ARGS) == snapshot_cli
+    assert _followed(api) == [("/items/42", "followed=1")]
+
+
+def test_invalid_location_external_link_is_not_followed(ctx, cli, snapshot_cli):
+    app, spec = ctx.openapi.make_flask_app(_location_paths())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "https://example.test/items/42?followed=1"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), 404
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert cli.run(api.schema_url, *INVALID_LOCATION_ARGS) == snapshot_cli
+    assert _followed(api) == []
+
+
+def test_invalid_location_documented_path_without_get(ctx, cli, snapshot_cli):
+    # A `GET` to a path that documents only `DELETE` says nothing about the resource.
+    app, spec = ctx.openapi.make_flask_app(_location_paths(target_methods=("delete",)))
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42?followed=1"}
+
+    @app.route("/items/<item_id>", methods=["DELETE"])
+    def delete_item(item_id):
+        return jsonify({})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert cli.run(api.schema_url, *INVALID_LOCATION_ARGS) == snapshot_cli
+    assert _followed(api) == []
+
+
+def test_invalid_location_undocumented_path(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(_location_paths())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/exports/42"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            *INVALID_LOCATION_ARGS[1:],
+            config={"checks": {"enabled": False, "invalid_location": {"enabled": True}}},
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.parametrize(
+    ("location", "expected"),
+    [("/api/items/42?followed=1", [("/api/items/42", "followed=1")]), ("/items/42?followed=1", [])],
+    ids=["inside", "outside"],
+)
+def test_invalid_location_base_path(ctx, cli, snapshot_cli, location, expected):
+    app, spec = ctx.openapi.make_flask_app(_location_paths(), servers=[{"url": "/api"}])
+
+    @app.route("/api/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": location}
+
+    @app.route("/api/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def unrelated(item_id):
+        return jsonify({}), 404
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert cli.run(api.schema_url, *INVALID_LOCATION_ARGS) == snapshot_cli
+    assert _followed(api) == expected
+
+
+def test_invalid_location_follow_up_reuses_credentials(ctx, cli, snapshot_cli):
+    paths = _location_paths()
+    paths["/items"]["post"]["security"] = [{"token": [], "key": [], "session": []}]
+    app, spec = ctx.openapi.make_flask_app(
+        paths,
+        components={
+            "securitySchemes": {
+                "token": {"type": "http", "scheme": "bearer"},
+                "key": {"type": "apiKey", "in": "query", "name": "api_key"},
+                "session": {"type": "apiKey", "in": "cookie", "name": "session"},
+            }
+        },
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42?followed=1"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        # Resources are hidden from callers that do not own them.
+        if (
+            request.headers.get("Authorization") != "Bearer secret"
+            or request.args.get("api_key") != "key-1"
+            or request.cookies.get("session") != "session-1"
+        ):
+            return jsonify({}), 404
+        return jsonify({})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert (
+        cli.run(
+            api.schema_url,
+            *INVALID_LOCATION_ARGS,
+            config={
+                "auth": {
+                    "openapi": {
+                        "token": {"bearer": "secret"},
+                        "key": {"api_key": "key-1"},
+                        "session": {"api_key": "session-1"},
+                    }
+                }
+            },
+        )
+        == snapshot_cli
+    )
+    assert _followed(api) == [("/items/42", "followed=1&api_key=key-1")]
+
+
+def test_invalid_location_follow_up_reuses_requests_auth(ctx, cli, snapshot_cli):
+    app, spec = ctx.openapi.make_flask_app(_location_paths())
+    module = ctx.write_pymodule(
+        """
+from requests.auth import HTTPBasicAuth
+
+schemathesis.auth.set_from_requests(HTTPBasicAuth("user", "pass"))
+"""
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42?followed=1"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        if request.headers.get("Authorization") != "Basic dXNlcjpwYXNz":
+            return jsonify({}), 404
+        return jsonify({})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert cli.run(api.schema_url, *INVALID_LOCATION_ARGS, hooks=module) == snapshot_cli
+    assert _followed(api) == [("/items/42", "followed=1")]
+
+
+def test_invalid_location_one_follow_up_per_target_path(ctx, cli, snapshot_cli):
+    paths = _location_paths()
+    paths["/imports"] = paths["/items"]
+    app, spec = ctx.openapi.make_flask_app(paths)
+    created = []
+
+    @app.route("/items", methods=["POST"])
+    @app.route("/imports", methods=["POST"])
+    def create():
+        created.append(request.path)
+        return jsonify({}), 201, {"Location": f"/items/{len(created)}?followed=1"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+
+    assert cli.run(api.schema_url, *INVALID_LOCATION_ARGS) == snapshot_cli
+    assert set(created) == {"/imports", "/items"}
+    assert len(created) > 2
+    assert _followed(api) == [("/items/1", "followed=1")]
+
+
+def test_invalid_location_in_call_and_validate(ctx):
+    app, spec = ctx.openapi.make_flask_app(_location_paths())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42?followed=1"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), 404
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    case = schema["/items"]["POST"].Case()
+
+    with pytest.raises(FailureGroup, match="leads to `GET /items/42`, which answered `404 Not Found`"):
+        case.call_and_validate(checks=[invalid_location])
+    case.call_and_validate(checks=[invalid_location])
+    assert _followed(api) == [("/items/42", "followed=1")]

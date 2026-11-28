@@ -137,12 +137,15 @@ class CheckContext:
     """The testing phase this context belongs to, or `None` for standalone validation."""
     auth_enforced_operations: set[str] | None
     """Operations already shown to reject missing and invalid credentials, shared across a run."""
+    followed_location_paths: set[str]
+    """Path templates already requested after a `Location` header pointed to them, shared across a run."""
 
     __slots__ = (
         "config",
         "internals",
         "phase",
         "auth_enforced_operations",
+        "followed_location_paths",
     )
 
     def __init__(
@@ -157,6 +160,7 @@ class CheckContext:
         response_checks: ResponseChecks | None = None,
         phase: PhaseName | None = None,
         auth_enforced_operations: set[str] | None = None,
+        followed_location_paths: set[str] | None = None,
     ) -> None:
         self.config = config
         checks: list[CheckFunction] = []
@@ -180,6 +184,7 @@ class CheckContext:
         )
         self.phase = phase
         self.auth_enforced_operations = auth_enforced_operations
+        self.followed_location_paths = set() if followed_location_paths is None else followed_location_paths
 
     def send(
         self,
@@ -347,6 +352,8 @@ class RunChecks:
     locks: dict[str, threading.Lock]
     # Operations whose missing and invalid credentials were already rejected in this run.
     auth_enforced_operations: set[str] = field(default_factory=set)
+    # Path templates already requested in this run after a `Location` header pointed to them.
+    followed_location_paths: set[str] = field(default_factory=set)
 
     @classmethod
     def from_registry(cls, config: ChecksConfig) -> RunChecks:

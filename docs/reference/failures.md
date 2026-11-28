@@ -231,6 +231,16 @@ Schemathesis sends requests that match the schema, so the server's message type 
 
 `--exclude-checks not_a_server_error` turns it off, along with ST101, ST102, ST113.
 
+### ST120 Invalid Location {#st120}
+
+Reported by [`invalid_location`](checks.md#invalid_location).
+
+`Location` header of a `201` or `202` response that leads to `404 Not Found`.
+
+Schemathesis sends one `GET` to the URL in `Location`, resolved against the request URL: `42` returned by `POST /items` leads to `/42`, and to `/items/42` only after `POST /items/`.
+
+`--exclude-checks invalid_location` turns it off.
+
 ## Input handling (ST2xx)
 
 ### ST201 Schema-violating request accepted {#st201}

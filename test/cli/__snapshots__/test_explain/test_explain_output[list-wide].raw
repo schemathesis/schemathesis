@@ -37,6 +37,8 @@ Response validation (ST1xx)
                                                               reflects it, does not declare.
   ST119  Server could not decode the request                  gRPC request the server's gRPC library failed to decode
                                                               before any handler ran.
+  ST120  Invalid Location                                     `Location` header of a `201` or `202` response that leads
+                                                              to `404 Not Found`.
 
 Input handling (ST2xx)
   ST201  Schema-violating request accepted                    Schema-violating request accepted.
