@@ -1155,6 +1155,13 @@ def test_binary_array_near_max_items_does_not_break_coverage(ctx, app_runner, bo
             "minContains": 0,
             "maxContains": 0,
         },
+        {"type": "array", "contains": {"type": "integer"}, "allOf": [{"minContains": 0}]},
+        {"type": "array", "minContains": 0, "allOf": [{"contains": {"type": "integer"}}]},
+        {
+            "type": "array",
+            "contains": {"type": "integer"},
+            "allOf": [{"contains": {"type": "integer"}, "minContains": 0}],
+        },
     ],
     ids=[
         "no-min-items",
@@ -1167,6 +1174,9 @@ def test_binary_array_near_max_items_does_not_break_coverage(ctx, app_runner, bo
         "enum-items",
         "single-item-branch",
         "zero-max-contains",
+        "all-of-min-contains-without-contains",
+        "all-of-contains-without-min-contains",
+        "all-of-contains-with-other-bounds",
     ],
 )
 def test_positive_arrays_honor_contains(ctx, body):
