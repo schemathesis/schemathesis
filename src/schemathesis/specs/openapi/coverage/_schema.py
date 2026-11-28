@@ -1596,7 +1596,7 @@ def _merge_all_of(schema: JsonSchemaObject, *, judge_inherited_names: bool = Fal
     branches = schema.get("allOf")
     if not isinstance(branches, list):
         return None
-    outer = {key: value for key, value in schema.items() if key != "allOf"}
+    outer = _without_unused_contains_bounds({key: value for key, value in schema.items() if key != "allOf"})
     merged = dict(outer)
     folded_branches = [outer]
     for branch in branches:
@@ -1607,6 +1607,7 @@ def _merge_all_of(schema: JsonSchemaObject, *, judge_inherited_names: bool = Fal
             branch = folded
         if not isinstance(branch, dict):
             return None
+        branch = _without_unused_contains_bounds(branch)
         folded_branches.append(branch)
         for key, value in branch.items():
             if not _merge_keyword(merged, key, value):
@@ -1616,6 +1617,12 @@ def _merge_all_of(schema: JsonSchemaObject, *, judge_inherited_names: bool = Fal
         "items" in branch and branch.get("prefixItems") != prefix_items for branch in folded_branches
     ):
         # Beside `prefixItems`, `items` skips the prefix positions, which a branch with another prefix still judges.
+        return None
+    contains_bounds = {
+        (branch.get("minContains", 1), branch.get("maxContains")) for branch in folded_branches if "contains" in branch
+    }
+    if len(contains_bounds) > 1:
+        # Each `contains` counts its matches against the bounds beside it; one merged pair cannot hold both counts.
         return None
     if merged.get("type") == [] or merged.get("enum") == []:
         # The branches leave no type or no value in common, so nothing satisfies all of them.
@@ -1658,6 +1665,13 @@ def _merge_all_of(schema: JsonSchemaObject, *, judge_inherited_names: bool = Fal
         return {"not": {}}
     # Keyword order sets the coverage walk order; sort so it ignores which branch each keyword came from.
     return dict(sorted(merged.items()))
+
+
+def _without_unused_contains_bounds(schema: JsonSchemaObject) -> JsonSchemaObject:
+    """`minContains` and `maxContains` constrain only a `contains` in the same schema object; drop them otherwise."""
+    if "contains" in schema or ("minContains" not in schema and "maxContains" not in schema):
+        return schema
+    return {key: value for key, value in schema.items() if key not in ("minContains", "maxContains")}
 
 
 def _requires_an_impossible_name(merged: dict[str, Any]) -> bool:
