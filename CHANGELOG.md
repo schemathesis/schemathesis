@@ -10,6 +10,7 @@
 ### :bug: Fixed
 
 - Invalid positive arrays in the coverage phase for `allOf` splitting `contains` from `minContains` or `maxContains`.
+- False positive `positive_data_acceptance` for nullable fields in form bodies, sent as the text `null`.
 
 ## [4.34.4](https://github.com/schemathesis/schemathesis/compare/v4.34.3...v4.34.4) - 2026-11-27
 
